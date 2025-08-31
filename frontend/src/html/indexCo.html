@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Copropietario - Asambleas Digital</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Menú lateral */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(135deg, #2c5aa0 0%, #1e3c72 100%);
+            color: white;
+            padding: 0;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.2);
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.3rem;
+            margin-bottom: 8px;
+        }
+
+        .user-info {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .user-details {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px;
+        }
+
+        .user-details div {
+            margin-bottom: 8px;
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            margin-bottom: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 18px 20px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            font-size: 1.1rem;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: rgba(255,255,255,0.15);
+            border-left-color: #ffd700;
+            padding-left: 25px;
+        }
+
+        .nav-icon {
+            margin-right: 12px;
+            font-size: 1.3rem;
+        }
+
+        /* Contenido principal */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 20px;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: none;
+            min-height: calc(100vh - 60px);
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            margin-bottom: 25px;
+            color: #2c5aa0;
+            border-bottom: 3px solid #2c5aa0;
+            padding-bottom: 12px;
+        }
+
+        /* Sección de Asamblea */
+        .assembly-header {
+            background: linear-gradient(135deg, #2c5aa0 0%, #1e3c72 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .assembly-title {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .assembly-date {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .assembly-status {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: #ffd700;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        /* Zoom embebido */
+        .zoom-container {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .zoom-embed {
+            width: 100%;
+            height: 400px;
+            background: #000;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .zoom-placeholder {
+            text-align: center;
+        }
+
+        .zoom-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        /* Información de quórum */
+        .quorum-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .quorum-card {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .quorum-number {
+            font-size: 2.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .quorum-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .quorum-bar {
+            background: rgba(255,255,255,0.2);
+            height: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .quorum-progress {
+            background: #ffd700;
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        /* Sección de Votaciones */
+        .voting-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .voting-item {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .voting-item.active {
+            border-color: #2c5aa0;
+            background: #f8f9fa;
+        }
+
+        .voting-item.completed {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .voting-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .voting-question {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .voting-meta {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .voting-timer {
+            background: #fff3cd;
+            color: #856404;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .voting-timer.expired {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .voting-timer.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .voting-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .vote-btn {
+            padding: 12px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .vote-btn:hover {
+            border-color: #2c5aa0;
+            background: #f8f9fa;
+        }
+
+        .vote-btn.selected {
+            border-color: #2c5aa0;
+            background: #2c5aa0;
+            color: white;
+        }
+
+        .vote-btn:disabled {
+            background: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2c5aa0 0%, #1e3c72 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        /* Perfil */
+        .profile-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .profile-card {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #2c5aa0;
+        }
+
+        .profile-card h4 {
+            color: #2c5aa0;
+            margin-bottom: 20px;
+        }
+
+        .profile-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .profile-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .history-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .history-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-participated {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-absent {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-partial {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .quorum-info, .profile-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .voting-options {
+                flex-direction: column;
+            }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Poder recibido indicator */
+        .power-indicator {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .power-indicator h4 {
+            color: #1976d2;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Menú lateral -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">🏢</div>
+                <h2>Torre Azul</h2>
+                <div class="user-info">Copropietario</div>
+            </div>
+            
+            <div class="user-details">
+                <div><strong>María González</strong></div>
+                <div>Apartamento: 101</div>
+                <div>Coeficiente: 2.5%</div>
+                <div>maria.gonzalez@email.com</div>
+            </div>
+
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active" onclick="showSection('assembly')">
+                        <span class="nav-icon">🏛️</span>
+                        Asamblea Actual
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" onclick="showSection('voting')">
+                        <span class="nav-icon">🗳️</span>
+                        Votaciones
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" onclick="showSection('profile')">
+                        <span class="nav-icon">👤</span>
+                        Mi Perfil
+                    </a>
+                </li>
+                <li class="nav-item" style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                    <a href="#" class="nav-link" onclick="leaveAssembly()">
+                        <span class="nav-icon">🚪</span>
+                        Salir de Reunión
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Contenido principal -->
+        <main class="main-content">
+            <!-- Información de la Asamblea y Zoom Embebido -->
+            <section id="assembly" class="content-section active">
+                <div class="assembly-header">
+                    <h1 class="assembly-title">Asamblea Ordinaria - Septiembre 2025</h1>
+                    <div class="assembly-date">📅 15 de Septiembre, 2025 • ⏰ 19:00 hrs</div>
+                    <div class="assembly-status">
+                        <div class="status-dot"></div>
+                        EN VIVO
+                    </div>
+                </div>
+
+                <!-- Indicador de poder recibido -->
+                <div class="power-indicator">
+                    <h4>⚖️ Poder de Representación Activo</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div><strong>Representando a:</strong> Carlos Rodríguez (Apt. 202)</div>
+                            <div style="color: #666; font-size: 0.9rem;">Coeficiente adicional: 3.1%</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.2rem; font-weight: 600; color: #1976d2;">
+                                Total: 5.6%
+                            </div>
+                            <div style="font-size: 0.8rem; color: #666;">Mi voto + Poder</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Zoom embebido -->
+                <div class="zoom-container">
+                    <h3 style="margin-bottom: 20px; color: #333;">📹 Reunión Virtual</h3>
+                    <div class="zoom-embed" id="zoomEmbed">
+                        <div class="zoom-placeholder">
+                            <div style="font-size: 3rem; margin-bottom: 15px;">📹</div>
+                            <div>Haz clic en "Conectar" para unirte a la reunión</div>
+                            <div style="font-size: 0.9rem; opacity: 0.7; margin-top: 10px;">
+                                ID de reunión: 123-456-7890
+                            </div>
+                        </div>
+                    </div>
+                    <div class="zoom-controls">
+                        <button class="btn btn-success" id="connectBtn" onclick="connectToZoom()">
+                            <span>📹</span> Conectar a Zoom
+                        </button>
+                        <button class="btn btn-secondary" onclick="openZoomApp()">
+                            <span>📱</span> Abrir en App
+                        </button>
+                        <button class="btn btn-danger" id="disconnectBtn" onclick="disconnectZoom()" style="display: none;">
+                            <span>📴</span> Desconectar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Estado del Quórum -->
+                <div class="quorum-info">
+                    <div class="quorum-card">
+                        <div class="quorum-number" id="attendeesCount">38/45</div>
+                        <div class="quorum-label">Asistentes Conectados</div>
+                        <div class="quorum-bar">
+                            <div class="quorum-progress" style="width: 84%"></div>
+                        </div>
+                        <div>84% de Participación</div>
+                    </div>
+                    <div class="quorum-card">
+                        <div class="quorum-number" id="quorumPercentage">87.5%</div>
+                        <div class="quorum-label">Quórum Alcanzado</div>
+                        <div class="quorum-bar">
+                            <div class="quorum-progress" style="width: 87.5%"></div>
+                        </div>
+                        <div>✅ Válido para Votar</div>
+                    </div>
+                </div>
+
+                <div style="background: #e8f5e8; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745;">
+                    <h4 style="color: #155724; margin-bottom: 10px;">📋 Agenda de la Asamblea</h4>
+                    <ol style="color: #155724; line-height: 1.6;">
+                        <li>Verificación de quórum y apertura</li>
+                        <li>Lectura y aprobación del acta anterior</li>
+                        <li>Informe de administración</li>
+                        <li>Aprobación presupuesto obras 2026</li>
+                        <li>Elección comité de convivencia</li>
+                        <li>Proposiciones y varios</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- Sección de Votaciones -->
+            <section id="voting" class="content-section">
+                <h2 class="section-title">🗳️ Votaciones de la Asamblea</h2>
+
+                <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 25px; border-left: 4px solid #2196f3;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="color: #1976d2; margin-bottom: 5px;">Mi Poder de Voto</h4>
+                            <div>Coeficiente personal: <strong>2.5%</strong></div>
+                            <div>Poder de Carlos Rodríguez: <strong>3.1%</strong></div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #1976d2;">5.6%</div>
+                            <div style="font-size: 0.9rem; color: #666;">Peso Total</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="voting-list">
+                    <!-- Votación activa -->
+                    <div class="voting-item active">
+                        <div class="voting-header">
+                            <div>
+                                <div class="voting-question">¿Aprueba el presupuesto para obras de mantenimiento 2026 por $45.000.000?</div>
+                                <div class="voting-meta">Tema 4 de la agenda • Iniciada hace 2 minutos</div>
+                            </div>
+                            <div class="voting-timer" id="timer1">⏱️ 2:45</div>
+                        </div>
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <strong>Detalles:</strong> Incluye reparación de fachada, impermeabilización terraza y pintura áreas comunes
+                        </div>
+                        <div class="voting-options">
+                            <button class="vote-btn" onclick="selectVote(1, 'favor')">✅ A FAVOR</button>
+                            <button class="vote-btn" onclick="selectVote(1, 'contra')">❌ EN CONTRA</button>
+                            <button class="vote-btn" onclick="selectVote(1, 'abstencion')">⚪ ABSTENCIÓN</button>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <button class="btn btn-primary" id="confirmBtn1" onclick="confirmVote(1)" disabled>
+                                <span>✅</span> Confirmar mi Voto
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Votación pendiente -->
+                    <div class="voting-item">
+                        <div class="voting-header">
+                            <div>
+                                <div class="voting-question">Elección del nuevo comité de convivencia</div>
+                                <div class="voting-meta">Tema 5 de la agenda • Pendiente</div>
+                            </div>
+                            <div class="voting-timer">⏳ Pendiente</div>
+                        </div>
+                        <div style="color: #666; font-style: italic; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            Esta votación se habilitará cuando termine la votación anterior
+                        </div>
+                    </div>
+
+                    <!-- Votación completada -->
+                    <div class="voting-item completed">
+                        <div class="voting-header">
+                            <div>
+                                <div class="voting-question">Aprobación del acta de la asamblea anterior</div>
+                                <div class="voting-meta">Tema 2 de la agenda • Completada</div>
+                            </div>
+                            <div class="voting-timer completed">✅ Finalizada</div>
+                        </div>
+                        <div style="background: #f8fff9; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                            <div style="margin-bottom: 10px;"><strong>Resultado:</strong> Aprobada</div>
+                            <div style="display: flex; gap: 20px; font-size: 0.9rem;">
+                                <span>A favor: 82%</span>
+                                <span>En contra: 8%</span>
+                                <span>Abstenciones: 10%</span>
+                            </div>
+                            <div style="margin-top: 10px; color: #155724;">
+                                <strong>Mi voto:</strong> ✅ A FAVOR (5.6%)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Mi Perfil -->
+            <section id="profile" class="content-section">
+                <h2 class="section-title">👤 Mi Perfil</h2>
+                
+                <div class="profile-cards">
+                    <div class="profile-card">
+                        <h4>📋 Información Personal</h4>
+                        <div class="profile-item">
+                            <span>Nombre Completo:</span>
+                            <strong>María González</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Correo Electrónico:</span>
+                            <strong>maria.gonzalez@email.com</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Apartamento:</span>
+                            <strong>101</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Coeficiente:</span>
+                            <strong>2.5%</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Estado:</span>
+                            <span class="status-badge status-participated">Activo</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-card">
+                        <h4>📊 Estadísticas de Participación</h4>
+                        <div class="profile-item">
+                            <span>Asambleas Asistidas:</span>
+                            <strong>8/10 (80%)</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Votaciones Participadas:</span>
+                            <strong>42/45 (93%)</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Poderes Recibidos:</span>
+                            <strong>3 ocasiones</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Última Participación:</span>
+                            <strong>Hoy, 19:05</strong>
+                        </div>
+                        <div class="profile-item">
+                            <span>Promedio de Asistencia:</span>
+                            <strong>Excelente</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="margin-bottom: 20px; color: #2c5aa0;">📅 Historial de Asambleas</h3>
+                <div style="overflow-x: auto;">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Asamblea</th>
+                                <th>Participación</th>
+                                <th>Votaciones</th>
+                                <th>Poderes</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>15 Sep 2025</td>
+                                <td>Asamblea Ordinaria Septiembre</td>
+                                <td><span class="status-badge status-participated">En curso</span></td>
+                                <td>1/5 emitidas</td>
+                                <td>1 poder activo</td>
+                                <td>
+                                    <button class="btn btn-secondary">Ver Acta</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>28 May 2025</td>
+                                <td>Asamblea Ordinaria Mayo</td>
+                                <td><span class="status-badge status-partial">Participación parcial</span></td>
+                                <td>2/4 emitidas</td>
+                                <td>Sin poderes</td>
+                                <td>
+                                    <button class="btn btn-secondary">Ver Acta</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-top: 25px;">
+                    <h4 style="color: #2c5aa0; margin-bottom: 15px;">📧 Configuración de Notificaciones</h4>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                        <input type="checkbox" id="emailNotif" checked>
+                        <label for="emailNotif">Recibir invitaciones por correo electrónico</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                        <input type="checkbox" id="reminderNotif" checked>
+                        <label for="reminderNotif">Recordatorios 24 horas antes de la asamblea</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                        <input type="checkbox" id="votingNotif" checked>
+                        <label for="votingNotif">Notificaciones de nuevas votaciones</label>
+                    </div>
+                    <button class="btn btn-primary">Guardar Preferencias</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal de confirmación de salida -->
+    <div id="exitModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1500; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 15px; max-width: 450px; width: 90%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
+            <h3 style="color: #dc3545; margin-bottom: 15px;">Confirmar Salida de la Asamblea</h3>
+            <p style="margin-bottom: 25px; line-height: 1.5;">
+                ¿Está seguro de que desea abandonar la asamblea?<br>
+                <strong>Esto cerrará su conexión a Zoom y actualizará su estado a "Salió".</strong>
+            </p>
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                <strong>Nota:</strong> Si tiene problemas técnicos, podrá reingresar usando el mismo enlace de invitación.
+            </div>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="btn btn-danger" onclick="confirmExit()">
+                    <span>🚪</span> Sí, Salir
+                </button>
+                <button class="btn btn-secondary" onclick="closeExitModal()">
+                    <span>❌</span> Permanecer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedVotes = {};
+        let isConnectedToZoom = false;
+        let votingTimers = {1: 165}; // Timer para votación 1: 2:45 minutos
+
+        // Navegación entre secciones
+        function showSection(sectionId) {
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            document.getElementById(sectionId).classList.add('active');
+            event.target.closest('.nav-link').classList.add('active');
+        }
+
+        // Conexión a Zoom
+        function connectToZoom() {
+            // Simular validación de duplicidad
+            if (Math.random() > 0.9) { // 10% chance de conflicto
+                alert('⚠️ Error de Duplicidad\n\nYa existe una sesión activa con sus credenciales.\n\nSi experimentó una caída de conexión, espere 30 segundos e intente nuevamente.');
+                return;
+            }
+
+            document.getElementById('connectBtn').innerHTML = '<span>⏳</span> Conectando...';
+            document.getElementById('connectBtn').disabled = true;
+            
+            setTimeout(() => {
+                isConnectedToZoom = true;
+                
+                // Actualizar interfaz de Zoom
+                document.getElementById('zoomEmbed').innerHTML = `
+                    <div style="width: 100%; height: 100%; background: linear-gradient(45deg, #1e3c72, #2c5aa0); display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">📹</div>
+                        <div style="font-size: 1.1rem; margin-bottom: 10px;">Conectado a la Reunión</div>
+                        <div style="font-size: 0.9rem; opacity: 0.8;">Asamblea Ordinaria - Septiembre 2025</div>
+                        <div style="margin-top: 15px; padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 20px; font-size: 0.8rem;">
+                            <div style="width: 8px; height: 8px; background: #ffd700; border-radius: 50%; display: inline-block; margin-right: 8px; animation: pulse 2s infinite;"></div>
+                            EN VIVO
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('connectBtn').style.display = 'none';
+                document.getElementById('disconnectBtn').style.display = 'inline-flex';
+                
+                alert('✅ Conectado exitosamente\n\nYa está participando en la asamblea.\nLas votaciones aparecerán automáticamente en la sección correspondiente.');
+                
+            }, 2500);
+        }
+
+        function disconnectZoom() {
+            if (confirm('¿Está seguro de que desea desconectarse de Zoom?\n\nPodrá reconectarse en cualquier momento.')) {
+                isConnectedToZoom = false;
+                
+                document.getElementById('zoomEmbed').innerHTML = `
+                    <div class="zoom-placeholder">
+                        <div style="font-size: 3rem; margin-bottom: 15px;">📴</div>
+                        <div>Desconectado de la reunión</div>
+                        <div style="font-size: 0.9rem; opacity: 0.7; margin-top: 10px;">
+                            Haz clic en "Reconectar" para volver a unirte
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('connectBtn').style.display = 'inline-flex';
+                document.getElementById('connectBtn').innerHTML = '<span>🔄</span> Reconectar a Zoom';
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').style.display = 'none';
+            }
+        }
+
+        function openZoomApp() {
+            alert('🔗 Abriendo Zoom\n\nSe abrirá la aplicación de Zoom con los datos de la reunión:\n\nID: 123-456-7890\nCódigo: 987654');
+            // Simular apertura de app externa
+            window.open('zoommtg://zoom.us/join?confno=1234567890&pwd=987654', '_blank');
+        }
+
+        // Votaciones
+        function selectVote(votingId, option) {
+            selectedVotes[votingId] = option;
+            
+            // Actualizar interfaz visual
+            const votingItem = event.target.closest('.voting-item');
+            votingItem.querySelectorAll('.vote-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            event.target.classList.add('selected');
+            document.getElementById(`confirmBtn${votingId}`).disabled = false;
+        }
+
+        function confirmVote(votingId) {
+            const vote = selectedVotes[votingId];
+            if (!vote) {
+                alert('Por favor seleccione una opción');
+                return;
+            }
+
+            const voteLabels = {
+                'favor': 'A FAVOR',
+                'contra': 'EN CONTRA',
+                'abstencion': 'ABSTENCIÓN'
+            };
+
+            if (confirm(`Confirmar voto:\n\n"${voteLabels[vote]}"\n\nPeso del voto: 5.6%\n(Incluye su coeficiente + poder de Carlos Rodríguez)\n\n¿Confirmar?`)) {
+                alert(`✅ Voto registrado exitosamente\n\nSu voto: ${voteLabels[vote]}\nPeso: 5.6%\n\nGracias por su participación.`);
+                
+                // Deshabilitar votación
+                const confirmBtn = document.getElementById(`confirmBtn${votingId}`);
+                confirmBtn.innerHTML = '<span>✅</span> Voto Emitido';
+                confirmBtn.disabled = true;
+                confirmBtn.style.background = '#28a745';
+                
+                // Deshabilitar opciones
+                const votingItem = confirmBtn.closest('.voting-item');
+                votingItem.querySelectorAll('.vote-btn').forEach(btn => {
+                    btn.disabled = true;
+                });
+                
+                // Cambiar estado visual
+                votingItem.classList.remove('active');
+                votingItem.classList.add('completed');
+                
+                // Simular habilitación de siguiente votación
+                setTimeout(() => {
+                    simulateNewVoting();
+                }, 3000);
+            }
+        }
+
+        // Simular nueva votación
+        function simulateNewVoting() {
+            const pendingVoting = document.querySelector('.voting-item:not(.completed):not(.active)');
+            if (pendingVoting) {
+                pendingVoting.classList.add('active');
+                pendingVoting.querySelector('.voting-timer').innerHTML = '⏱️ 3:00';
+                pendingVoting.querySelector('.voting-timer').classList.remove('completed');
+                
+                // Agregar opciones de votación
+                const metaDiv = pendingVoting.querySelector('.voting-meta').parentElement;
+                metaDiv.insertAdjacentHTML('afterend', `
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <strong>Candidatos:</strong> Ana Martínez, Luis García, Pedro Sánchez
+                    </div>
+                    <div class="voting-options">
+                        <button class="vote-btn" onclick="selectVote(2, 'ana')">Ana Martínez</button>
+                        <button class="vote-btn" onclick="selectVote(2, 'luis')">Luis García</button>
+                        <button class="vote-btn" onclick="selectVote(2, 'pedro')">Pedro Sánchez</button>
+                        <button class="vote-btn" onclick="selectVote(2, 'blanco')">Voto en Blanco</button>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" id="confirmBtn2" onclick="confirmVote(2)" disabled>
+                            <span>✅</span> Confirmar mi Voto
+                        </button>
+                    </div>
+                `);
+                
+                alert('🗳️ Nueva votación habilitada\n\n"Elección del nuevo comité de convivencia"\n\nDiríjase a la sección de Votaciones para participar.');
+            }
+        }
+
+        // Timer de votaciones
+        function updateVotingTimers() {
+            Object.keys(votingTimers).forEach(votingId => {
+                if (votingTimers[votingId] > 0) {
+                    const minutes = Math.floor(votingTimers[votingId] / 60);
+                    const seconds = votingTimers[votingId] % 60;
+                    const timerElement = document.getElementById(`timer${votingId}`);
+                    
+                    if (timerElement) {
+                        timerElement.innerHTML = `⏱️ ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                    
+                    votingTimers[votingId]--;
+                    
+                    if (votingTimers[votingId] <= 0) {
+                        // Tiempo agotado
+                        if (timerElement) {
+                            timerElement.innerHTML = '⏰ Tiempo agotado';
+                            timerElement.classList.add('expired');
+                        }
+                        
+                        const confirmBtn = document.getElementById(`confirmBtn${votingId}`);
+                        if (confirmBtn && !confirmBtn.innerHTML.includes('Emitido')) {
+                            confirmBtn.innerHTML = '<span>⏰</span> Tiempo Agotado';
+                            confirmBtn.disabled = true;
+                            confirmBtn.style.background = '#dc3545';
+                        }
+                    }
+                }
+            });
+        }
+
+        // Actualización en tiempo real del quórum
+        function updateQuorumInfo() {
+            if (isConnectedToZoom) {
+                const currentAttendees = Math.floor(Math.random() * 5) + 36; // Entre 36-40
+                const percentage = Math.round((currentAttendees / 45) * 100);
+                const quorumPercentage = (currentAttendees * 2.3).toFixed(1); // Promedio de coeficientes
+                
+                document.getElementById('attendeesCount').textContent = `${currentAttendees}/45`;
+                document.getElementById('quorumPercentage').textContent = `${quorumPercentage}%`;
+                
+                // Actualizar barras de progreso
+                document.querySelectorAll('.quorum-progress')[0].style.width = `${percentage}%`;
+                document.querySelectorAll('.quorum-progress')[1].style.width = `${quorumPercentage}%`;
+            }
+        }
+
+        // Salir de la asamblea
+        function leaveAssembly() {
+            document.getElementById('exitModal').style.display = 'flex';
+        }
+
+        function closeExitModal() {
+            document.getElementById('exitModal').style.display = 'none';
+        }
+
+        function confirmExit() {
+            alert('🚪 Saliendo de la asamblea...\n\nSu estado se ha actualizado a "Salió".\nSu participación ha sido registrada.\n\nPodrá reingresar usando el mismo enlace si es necesario.');
+            
+            // Simular desconexión completa
+            isConnectedToZoom = false;
+            document.getElementById('zoomEmbed').innerHTML = `
+                <div class="zoom-placeholder">
+                    <div style="font-size: 3rem; margin-bottom: 15px; opacity: 0.5;">📴</div>
+                    <div style="opacity: 0.7;">Desconectado de la asamblea</div>
+                    <div style="font-size: 0.9rem; opacity: 0.5; margin-top: 10px;">
+                        Sesión finalizada
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('connectBtn').innerHTML = '<span>🔄</span> Reingresar a Asamblea';
+            document.getElementById('connectBtn').style.display = 'inline-flex';
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').style.display = 'none';
+            
+            closeExitModal();
+        }
+
+        // Validación de reconexión después de caída
+        function handleReconnection() {
+            if (!isConnectedToZoom && Math.random() > 0.85) {
+                setTimeout(() => {
+                    if (confirm('🔄 Reconexión Disponible\n\nSe detectó que salió de la reunión.\n¿Experimentó problemas técnicos?\n\n¿Desea reconectarse automáticamente?')) {
+                        connectToZoom();
+                    }
+                }, 2000);
+            }
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Panel de Copropietario cargado exitosamente');
+            
+            // Simular recepción de invitación por correo
+            setTimeout(() => {
+                alert('📧 Acceso Validado\n\nHa ingresado exitosamente usando el enlace de invitación recibido por correo electrónico.\n\nBienvenido a la Asamblea Ordinaria de Septiembre 2025.');
+            }, 1000);
+            
+            // Simular notificación de poder recibido
+            setTimeout(() => {
+                alert('⚖️ Poder de Representación\n\nCarlos Rodríguez (Apt. 202) le ha cedido su poder de votación para esta asamblea.\n\nSu peso de voto ahora es: 5.6%\n(Su 2.5% + 3.1% de Carlos)');
+            }, 4000);
+            
+            // Actualizar información cada 30 segundos
+            setInterval(updateQuorumInfo, 30000);
+            
+            // Actualizar timers cada segundo
+            setInterval(updateVotingTimers, 1000);
+            
+            // Validar reconexión cada 2 minutos
+            setInterval(handleReconnection, 120000);
+        });
+
+        // Prevenir cierre accidental de la página
+        window.addEventListener('beforeunload', function(e) {
+            if (isConnectedToZoom) {
+                e.preventDefault();
+                e.returnValue = '¿Está seguro de que desea salir? Esto lo desconectará de la asamblea en curso.';
+            }
+        });
+
+        // Simulación de notificaciones de nuevas votaciones
+        function checkForNewVotings() {
+            if (isConnectedToZoom && Math.random() > 0.8) {
+                setTimeout(() => {
+                    alert('🔔 Nueva Votación\n\nEl administrador ha iniciado una nueva votación.\n\nDiríjase a la sección "Votaciones" para participar.');
+                }, 1000);
+            }
+        }
+
+        // Verificar nuevas votaciones cada 45 segundos
+        setInterval(checkForNewVotings, 45000);
+    </script>
+</body>
+</html>
