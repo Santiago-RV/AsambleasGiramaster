@@ -1,0 +1,25 @@
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Decimal
+from sqlalchemy.orm import relationship
+from app.core.database import Base
+from datetime import datetime
+
+class PollResponseModel(Base):
+    __tablename__ = "tbl_poll_responses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    int_poll_id = Column(Integer, ForeignKey("tbl_polls.id"), nullable=False)
+    int_user_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
+    int_option_id = Column(Integer, ForeignKey("tbl_poll_options.id"), nullable=False)
+    str_response_text = Column(String, nullable=True)
+    dec_response_number = Column(Decimal, nullable=True)
+    dec_voting_weight = Column(Decimal, nullable=False)
+    bln_is_abstention = Column(Boolean, default=False)
+    dat_response_at = Column(DateTime, nullable=False)
+    str_ip_address = Column(String, nullable=False)
+    str_user_agent = Column(String, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.now)
+
+    poll = relationship("PollModel", back_populates="responses")
+    user = relationship("UserModel", back_populates="responses")
+    option = relationship("PollOptionModel", back_populates="responses")
