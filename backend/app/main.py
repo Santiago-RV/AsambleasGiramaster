@@ -1,1 +1,147 @@
-## Base de la aplicacion
+from sys import prefix
+from fastapi import FastAPI, Request
+from fastapi import HTTPException as HTTPError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from contextlib import asynccontextmanager
+import uvicorn
+import time
+
+from app.core.config import settings
+from app.core.database import init_db, close_db, check_db_connection
+from app.core.logging_config import get_logger
+
+tags_metadata = [
+  {
+    "name": "users",
+    "description": "Operaciones relacionadas con los usuarios",
+  },
+  {
+    "name": "residential_units",
+    "description": "Operaciones relacionadas con las unidades residenciales",
+  },
+  {
+    "name": "meetings",
+    "description": "Operaciones relacionadas con las reuniones",
+  },
+  {
+    "name": "zoom_sessions",
+    "description": "Operaciones relacionadas con las sesiones de Zoom",
+  },
+  {
+    "name": "role_permissions",
+    "description": "Operaciones relacionadas con los roles y permisos",
+  },
+  {
+    "name": "data_users",
+    "description": "Operaciones relacionadas con los datos de los usuarios",
+  },
+  {
+    "name": "rols",
+    "description": "Operaciones relacionadas con los roles",
+  },
+  {
+    "name": "permissions",
+    "description": "Operaciones relacionadas con los permisos",
+  },
+  {
+    "name": "role_permissions",
+    "description": "Operaciones relacionadas con los roles y permisos",
+  },
+  {
+    "name": "user_residential_units",
+    "description": "Operaciones relacionadas con las unidades residenciales de los usuarios",
+  },
+]
+
+logger = get_logger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+  """Vida útil de la aplicación"""
+  try:
+    logger.info("Inicializando la aplicación")
+    logger.info("Verificando la conexión a la base de datos")
+    await check_db_connection()
+    logger.info("Base de datos conectada")
+
+    logger.info("Inicializando la base de datos")
+    await init_db()
+    logger.info("Base de datos inicializada")
+
+    yield
+    logger.info("Cerrando la base de datos")
+    await close_db()
+    logger.info("Base de datos cerrada")
+  except Exception as e:
+    logger.error(f"Error al inicializar la aplicación: {e}")
+    raise HTTPError(status_code=500, detail=f"Error al verificar la conexión a la base de datos: {e}")
+  finally:
+    logger.info("Finalizando la aplicación")
+    try:
+      await close_db()
+      logger.info("Base de datos cerrada")
+    except Exception as e:
+      logger.error(f"Error al finalizar la aplicación: {e}")
+      raise HTTPError(status_code=500, detail=f"Error al cerrar la base de datos: {e}")
+
+app = FastAPI(
+  title=settings.PROJECT_NAME,
+  version=settings.VERSION,
+  description="""
+  ## Api para la aplicación de Giramaster
+  """,
+  lifespan=lifespan,
+  openapi_tags=tags_metadata,
+  docs_url="/docs",
+  redoc_url="/redoc",
+  swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+  redoc_url_options={"defaultModelsExpandDepth": -1},
+)
+
+app.add_middleware(
+  CORSMiddleware,
+  allow_origins=settings.ALLOWED_HOSTS,
+  allow_credentials=True,
+  allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allow_headers=[
+    "Autorization",
+    "X-Requested-With",
+    "Content-Type",
+    "DNT",
+    "Accept",
+    "X-CSRFToken",
+    "keep-alive",
+    "User-Agent",
+    "Origin",
+    "If-Modified-Since"
+    ],
+    expose_headers=["Content-Type", "X-Total-Count"],
+    max_age=600,
+)
+
+@app.get("/")
+async def root():
+  """Raiz de la API"""
+  logger.info("Acceso a la raiz de la API")
+  return {
+    "name": settings.PROJECT_NAME,
+    "version": settings.VERSION,
+    "status": "ok",
+    "documentation": {
+      "swagger": f"{settings.API_URL}/docs",
+      "redoc": f"{settings.API_URL}/redoc",
+    },
+  }
+
+if __name__ == "__main__":
+  uvicorn.run(
+    "app.main:app",
+    host=settings.HOST,
+    port=settings.PORT,
+    reload=settings.ENVIRONMENT == "development",
+    reload_dirs=["app"] if settings.ENVIRONMENT == "development" else None,
+    log_level=settings.LOG_LEVEL.lower(),
+    access_log=settings.ENVIRONMENT == "development"
+  )
