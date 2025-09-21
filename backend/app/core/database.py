@@ -44,9 +44,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db():
   """Inicializa la base de datos"""
-  async with engine.begin() as conn:
-    await conn.run_sync(Base.metadata.create_all)
-    logger.info("Base de datos inicializada")
+  try:
+    async with engine.begin() as conn:
+      await conn.run_sync(Base.metadata.create_all)
+      logger.info("Base de datos inicializada")
+  except Exception as e:
+    logger.error(f"Error al inicializar la base de datos: {e}")
+    raise
 
 async def close_db():
   """Cierra la base de datos"""
