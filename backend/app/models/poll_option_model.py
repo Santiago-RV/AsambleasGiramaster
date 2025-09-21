@@ -1,0 +1,22 @@
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Decimal
+from sqlalchemy.orm import relationship
+from app.core.database import Base
+from datetime import datetime
+
+class PollOptionModel(Base):
+    __tablename__ = "tbl_poll_options"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    int_poll_id = Column(Integer, ForeignKey("tbl_polls.id"), nullable=False)
+    str_option_text = Column(String, index=True, nullable=False)
+    int_option_order = Column(Integer, nullable=False)
+    bln_is_active = Column(Boolean, default=True)
+    int_votes_count = Column(Integer, nullable=False)
+    dec_weight_total = Column(Decimal, nullable=False)
+    dec_percentage = Column(Decimal, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now)
+
+    poll = relationship("PollModel", back_populates="options")
+    responses = relationship("PollResponseModel", back_populates="option")
