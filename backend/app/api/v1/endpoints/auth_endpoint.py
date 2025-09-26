@@ -105,7 +105,13 @@ async def register_user(request: Request, user_data: dict, db: AsyncSession = De
 
 
 # Endpoint de login
-@router.post("/login", response_model=Token)
+@router.post(
+    "/login", 
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Login de usuarios",
+    description="Login de usuarios"
+)
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     """
         Endpoint para login y obtención de token
@@ -154,7 +160,12 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         expires_delta=access_token_expires,
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Login exitoso",
+        data={"access_token": access_token, "token_type": "bearer"}
+    )
 
 
 # Simulación usando el get_current_user dependencia para un endpoint protegido
