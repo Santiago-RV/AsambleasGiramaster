@@ -15,7 +15,10 @@ from app.core.exceptions import (
     UserAlreadyExistsException,
     UserValidationException,
     ServiceException,
-    RateLimitException
+    RateLimitException,
+    InvalidCredentialsException,
+    UserNotFoundException,
+    UserNotActiveException
 )
 
 router = APIRouter()
@@ -103,27 +106,51 @@ async def register_user(request: Request, user_data: dict, db: AsyncSession = De
 
 # Endpoint de login
 @router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     """
         Endpoint para login y obtención de token
         Args:
+        request (Request): La solicitud HTTP
         form_data (OAuth2PasswordRequestForm, optional): _description_. Defaults to Depends().
+        db (AsyncSession, optional): La sesión de la base de datos. Defaults to Depends(get_db).
         Returns:
-            _type_: _description_
-            
+            Token: El token de acceso
     """
-    user_dict = fake_users_db.get(form_data.username)
+    user_service = UserService(db)
 
-    if not user_dict or user_dict["password"] != form_data.password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas",
-            headers={"WWW-Authenticate": "Bearer"},
+    # user_dict = fake_users_db.get(form_data.username)
+
+    # Rate limit
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
+    if not rate_limiter.is_allowed(f"login:{client_ip}", max_requests=10, window_minutes=60):
+        raise RateLimitException()
+
+    # Verificar si el usuario existe
+    exists_user = await user_service.get_user_by_username(form_data.username)
+    print(exists_user)
+    if not exists_user or not security_manager.verify_password(form_data.password, exists_user.str_password_hash):
+        raise UserNotFoundException(
+            message="El usuario no existe",
+            error_code="USER_NOT_FOUND"
         )
+
+    # Verificar si el usuario esta activo
+    if not exists_user.bln_is_active:
+        raise UserNotActiveException(
+            message="El usuario no esta activo",
+            error_code="USER_NOT_ACTIVE"
+        )
+
+    # if not user_dict or user_dict["password"] != form_data.password:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_401_UNAUTHORIZED,
+    #         detail="Credenciales incorrectas",
+    #         headers={"WWW-Authenticate": "Bearer"},
+    #     )
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user_dict["username"]},
+        data={"sub": exists_user.str_username},
         expires_delta=access_token_expires,
     )
 

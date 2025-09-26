@@ -66,11 +66,8 @@ class UserService:
         # Mapear los datos del usuario
         payload = user_data.model_dump()
 
-        # Mapear el hash de contraseña al campo del modelo
-        # payload['str_password_hash'] = payload.pop('password')
-
         # Normalizar campos
-        payload['str_username'] = payload['str_username'].lower()
+        payload['str_username'] = payload['str_username'].lower().strip()
 
         new_user = UserModel(**payload)
 
@@ -144,27 +141,75 @@ class UserService:
           error_code="CREATE_USER_ERROR"
         )
 
-    async def get_user_by_username(self, username: str) -> bool:
+    async def get_user_by_username(self, username: str) -> Optional[UserModel]:
       """ Obtiene un usuario por su nombre de usuario
       
       Args:
         username (str): El nombre de usuario a buscar
 
       Returns:
-        bool: True si el usuario existe, False si no existe
+        Optional[UserResponse]: El usuario encontrado
       """
       try:
         # Normalizar el nombre de usuario
-        username = username.lower().strip()
+        user_name = username.lower().strip()
 
         # Obtener el usuario por su nombre de usuario
-        user = await self.db.execute(select(UserModel.str_username).where(UserModel.str_username == username))
+        user = await self.db.execute(select(UserModel).where(UserModel.str_username == user_name))
         result = user.scalar_one_or_none()
         
         if not result:
-          return False
+            return None
+
+        return result
+
+        # Obtener los datos del usuario asociado
+        # data_user_query = select(DataUserModel).where(DataUserModel.id == result.int_data_user_id)
+        # data_user_result = await self.db.execute(data_user_query)
+        # data_user = data_user_result.scalar_one_or_none()
         
-        return True
+        # # Crear DataUserResponse si existe
+        # data_user_response = None
+        # if data_user:
+        #     data_user_response = DataUserResponse(
+        #         id=data_user.id,
+        #         str_firstname=data_user.str_firstname,
+        #         str_lastname=data_user.str_lastname,
+        #         str_email=data_user.str_email,
+        #         str_phone=data_user.str_phone,
+        #         created_at=data_user.created_at,
+        #         updated_at=data_user.updated_at
+        #     )
+
+        # # Obtener el rol asociado
+        # rol_query = select(RolModel).where(RolModel.id == result.int_id_rol)
+        # rol_result = await self.db.execute(rol_query)
+        # rol = rol_result.scalar_one_or_none()
+        
+        # # Crear RolResponse si existe
+        # rol_response = None
+        # if rol:
+        #     rol_response = RolResponse(
+        #         id=rol.id,
+        #         str_name=rol.str_name,
+        #         str_description=rol.str_description,
+        #         bln_is_active=rol.bln_is_active,
+        #         created_at=rol.created_at,
+        #         updated_at=rol.updated_at
+        #     )
+
+        # return UserResponse(
+        #   id=result.id,
+        #   str_username=result.str_username,
+        #   bln_is_external_delegate=result.bln_is_external_delegate,
+        #   bln_user_temporary=result.bln_user_temporary,
+        #   dat_temporary_expiration_date=result.dat_temporary_expiration_date,
+        #   bln_is_active=result.bln_is_active,
+        #   data_user=data_user_response,
+        #   rol=rol_response,
+        #   created_at=result.created_at,
+        #   updated_at=result.updated_at
+        # )
       except Exception as e:
         raise ServiceException(
           message="Error al obtener el usuario",

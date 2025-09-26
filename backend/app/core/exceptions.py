@@ -99,6 +99,18 @@ class UserValidationException(BaseAPIException):
     ):
         super().__init__(400, message, error_code, details)
 
+class UserNotActiveException(BaseAPIException):
+    """Excepción para usuario no activo"""
+    
+    def __init__(
+        self, 
+        message: str = "El usuario no esta activo",
+        error_code: str = "USER_NOT_ACTIVE",
+        details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(400, message, error_code, details)
+
+
 # Excepciones específicas para servicios
 class ServiceException(BaseAPIException):
     """Excepción para errores del servicio"""
