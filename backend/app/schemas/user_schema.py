@@ -18,7 +18,7 @@ class UserBase(BaseModel):
   bln_is_active: bool = Field(True, description="Estado del usuario")
   bln_is_external_delegate: bool = Field(False, description="Usuario externo")
   bln_user_temporary: bool = Field(False, description="Usuario temporal")
-  dat_temporary_expiration_date: datetime = Field(None, description="Fecha de expiración del usuario temporal")
+  dat_temporary_expiration_date: Optional[datetime] = Field(None, description="Fecha de expiración del usuario temporal")
 
 
 class UserCreate(UserBase):
@@ -31,6 +31,8 @@ class UserCreate(UserBase):
       _type_: _description_
   """
   str_password_hash: str = Field(..., min_length=8, description="Contraseña hash del usuario")
+  int_data_user_id: int = Field(..., description="ID del usuario de datos")
+  int_id_rol: int = Field(..., description="ID del rol")
 
   @validator('str_password_hash')
   def validate_password_hash(cls, v):

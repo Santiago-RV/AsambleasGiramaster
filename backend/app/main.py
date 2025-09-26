@@ -1,5 +1,6 @@
 from sys import prefix
 from fastapi import FastAPI, Request
+from fastapi import HTTPException
 from fastapi import HTTPException as HTTPError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -9,10 +10,26 @@ import uvicorn
 import time
 
 from app.core.config import settings
+from app.api.v1.api import api_router
 from app.core.database import init_db, close_db, check_db_connection
 from app.core.logging_config import get_logger
 
+from app.core.exceptions_handlers import (
+    base_api_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+    integrity_error_handler,
+    general_exception_handler
+)
+from app.core.exceptions import BaseAPIException
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import IntegrityError
+
 tags_metadata = [
+  {
+    "name": "auth",
+    "description": "Operaciones relacionadas con la autenticación",
+  },
   {
     "name": "users",
     "description": "Operaciones relacionadas con los usuarios",
@@ -100,6 +117,13 @@ app = FastAPI(
   redoc_url_options={"defaultModelsExpandDepth": -1},
 )
 
+# Registrar los manejadores de excepciones
+app.add_exception_handler(BaseAPIException, base_api_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(IntegrityError, integrity_error_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
 app.add_middleware(
   CORSMiddleware,
   allow_origins=settings.ALLOWED_HOSTS,
@@ -120,6 +144,8 @@ app.add_middleware(
     expose_headers=["Content-Type", "X-Total-Count"],
     max_age=600,
 )
+
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

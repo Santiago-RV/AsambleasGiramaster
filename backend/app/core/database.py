@@ -1,4 +1,4 @@
-from sqlalchemy import text
+from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
@@ -6,6 +6,9 @@ from typing import AsyncGenerator
 
 from app.core.config import settings
 from app.core.logging_config import get_logger
+
+# Import all models to ensure they are registered with SQLAlchemy
+from app.models import *
 
 engine = create_async_engine(
     settings.DATABASE_URL,
@@ -48,6 +51,8 @@ async def init_db():
     async with engine.begin() as conn:
       await conn.run_sync(Base.metadata.create_all)
       logger.info("Base de datos inicializada")
+      await seed_db()
+      logger.info("Base de datos semillada")
   except Exception as e:
     logger.error(f"Error al inicializar la base de datos: {e}")
     raise
@@ -70,4 +75,56 @@ async def check_db_connection():
     return True
   except Exception as e:
     logger.error(f"Error al verificar la conexión a la base de datos: {e}")
+    raise
+
+async def seed_db():
+  """Semilla de la base de datos"""
+  try:
+    async with AsyncSessionLocal() as session:
+      from app.models.rol_model import RolModel
+
+      verify_rol = await session.execute(select(RolModel).where(RolModel.id.in_([1, 2, 3, 4])))
+      existing_roles = {rol.id for rol in verify_rol.scalars().all()}
+
+      roles_to_create = []
+
+      roles = {
+        "1": {
+            "nombre": "Super Administrador",
+            "descripcion": "Acceso completo al sistema",
+            "permisos": ["crear", "leer", "actualizar", "eliminar"],
+            "nivel": 5
+        },
+        "2": {
+            "nombre": "Administrador",
+            "descripcion": "Puede crear y modificar contenido",
+            "permisos": ["crear", "leer", "actualizar"],
+            "nivel": 3
+        },
+        "3": {
+            "nombre": "Usuario",
+            "descripcion": "Solo puede ver contenido",
+            "permisos": ["leer"],
+            "nivel": 1
+        },
+        "4": {
+            "nombre": "Invitado",
+            "descripcion": "Puede moderar contenido",
+            "permisos": ["leer"],
+            "nivel": 1
+        }
+      }
+
+      for i in range(1, len(roles.keys()) + 1):
+        if i not in existing_roles:
+          roles_to_create.append(RolModel(id=i, str_name=roles[i]["nombre"], str_description=roles[i]["descripcion"], bln_is_active=True))
+
+      if roles_to_create:
+        session.add_all(roles_to_create)
+        await session.commit()
+        logger.info("Roles semillados correctamente")
+      else:
+        logger.info("Roles ya existentes")
+  except Exception as e:
+    logger.error(f"Error al semillar la base de datos: {e}")
     raise

@@ -12,9 +12,9 @@ class Settings(BaseSettings):
   # Base de Datos
   HOST_DB: str = "localhost"
   PORT_DB: int = 3306
-  USER_DB: str = "postgres"
-  PASSWORD_DB: str = "postgres"
-  NAME_DB: str = "giramaster"
+  USER_DB: str = "root"
+  PASSWORD_DB: str = ""
+  NAME_DB: str = "db_giramaster"
 
   @property
   def DATABASE_URL(self) -> str:

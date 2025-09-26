@@ -1,11 +1,22 @@
-# routes/auth_routes.py
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import timedelta
-from pydantic import BaseModel
-from auth.auth import create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
-from schemas.auth_token_schema import Token
+from app.auth.auth import create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.schemas.auth_token_schema import Token
+
+from app.schemas.responses_schema import SuccessResponse, ErrorResponse
+from app.schemas.user_schema import UserCreate
+from app.schemas.data_user_schema import DataUserCreate, DataUserResponse
+from app.services.user_service import UserService
+from app.core.security import security_manager, rate_limiter
+from app.core.database import get_db
+from app.core.exceptions import (
+    UserAlreadyExistsException,
+    UserValidationException,
+    ServiceException,
+    RateLimitException
+)
 
 router = APIRouter()
 
@@ -14,6 +25,81 @@ fake_users_db = {
     "santiago": {"username": "santiago", "password": "1234"},
     "admin": {"username": "admin", "password": "adminpass"},
 }
+
+# Endpoint de registro de nuevos usuarios
+@router.post(
+    "/register", 
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registro de nuevos usuarios",
+    description="Registra un nuevo usuario en la base de datos"
+    )
+async def register_user(request: Request, user_data: dict, db: AsyncSession = Depends(get_db)):
+    """
+        Endpoint para registro de nuevos usuarios
+        Args:
+        request (Request): La solicitud HTTP
+        user_data (dict): Los datos del usuario a registrar en formato raw
+    """
+    try: 
+        # Crear instancia del servicio de usuarios
+        user_service = UserService(db)
+
+        # Rate limit
+        client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
+        if not rate_limiter.is_allowed(f"register:{client_ip}", max_requests=10, window_minutes=60):
+            raise RateLimitException()
+
+        # Verificar si el usuario ya existe
+        exists_user = await user_service.get_user_by_username(user_data.get('str_email'))
+        if exists_user:
+            raise UserAlreadyExistsException(
+                message="El usuario ya existe",
+                error_code="USER_ALREADY_EXISTS"
+            )
+
+        # Crear objeto DataUserCreate con los datos restantes
+        data_user_data = DataUserCreate(
+            str_firstname=user_data.get('str_firstname'),
+            str_lastname=user_data.get('str_lastname'),
+            str_email=user_data.get('str_email'),
+            str_phone=user_data.get('str_phone')
+        )
+
+        # Registrar datos del usuario
+        data_user = await user_service.create_data_user(data_user_data)
+
+        # Hashear la contraseña
+        hashed_password = security_manager.create_password_hash(user_data.get('password'))
+
+        user = UserCreate(
+            str_username=data_user.str_email.lower().strip(),
+            str_password_hash=hashed_password,
+            int_data_user_id=data_user.id,
+            int_id_rol=1
+        )
+
+        # Crear el usuario
+        user_created = await user_service.create_user(user)
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_201_CREATED,
+            message="Usuario creado correctamente",
+            data=user_created
+        )
+    except UserAlreadyExistsException as e:
+        raise e
+    except UserValidationException as e:
+        raise e
+    except ServiceException as e:
+        raise e
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error inesperado al registrar el usuario: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
 
 # Endpoint de login
 @router.post("/login", response_model=Token)

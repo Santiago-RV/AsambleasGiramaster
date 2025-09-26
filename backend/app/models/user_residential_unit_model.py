@@ -9,7 +9,7 @@ class UserResidentialUnitModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     int_user_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
     int_residential_unit_id = Column(Integer, ForeignKey("tbl_residential_units.id"), nullable=False)
-    str_apartment_number = Column(String, nullable=False)
+    str_apartment_number = Column(String(50), nullable=False)
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now)

@@ -1,0 +1,36 @@
+# Import all models to ensure they are registered with SQLAlchemy
+from .data_user_model import DataUserModel
+from .user_model import UserModel
+from .rol_model import RolModel
+from .permission_model import PermissionModel
+from .role_permission_model import RolePermissionModel
+from .residential_unit_model import ResidentialUnitModel
+from .user_residential_unit_model import UserResidentialUnitModel
+from .meeting_model import MeetingModel
+from .meeting_invitation_model import MeetingInvitationModel
+from .meeting_attendance_model import MeetingAttendanceModel
+from .zoom_session_model import ZoomSessionModel
+from .poll_model import PollModel
+from .poll_option_model import PollOptionModel
+from .poll_response_model import PollResponseModel
+from .email_notification_model import EmailNotificationModel
+from .audit_log_model import AuditLogModel
+
+__all__ = [
+    "DataUserModel",
+    "UserModel", 
+    "RolModel",
+    "PermissionModel",
+    "RolePermissionModel",
+    "ResidentialUnitModel",
+    "UserResidentialUnitModel",
+    "MeetingModel",
+    "MeetingInvitationModel",
+    "MeetingAttendanceModel",
+    "ZoomSessionModel",
+    "PollModel",
+    "PollOptionModel",
+    "PollResponseModel",
+    "EmailNotificationModel",
+    "AuditLogModel"
+]
