@@ -11,14 +11,15 @@ class Settings(BaseSettings):
 
   # Base de Datos
   HOST_DB: str = "localhost"
-  PORT_DB: int = 5432
+  PORT_DB: int = 3306
   USER_DB: str = "postgres"
   PASSWORD_DB: str = "postgres"
   NAME_DB: str = "giramaster"
 
   @property
   def DATABASE_URL(self) -> str:
-    return f"postgresql://{self.USER_DB}:{self.PASSWORD_DB}@{self.HOST_DB}:{self.PORT_DB}/{self.NAME_DB}"
+    # Driver asíncrono requerido por SQLAlchemy AsyncEngine
+    return f"mysql+asyncmy://{self.USER_DB}:{self.PASSWORD_DB}@{self.HOST_DB}:{self.PORT_DB}/{self.NAME_DB}"
 
   # Seguridad
   SECRET_KEY: str = "SECRET-KEY-GIRAMASTER"
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
   REFRESH_TOKEN_EXPIRE_MINUTES: int = 60
   
   # CORS
-  ALLOWED_HOSTS: List[str] = ["*"]
+  ALLOWED_HOSTS: List[str] = ["localhost"]
 
   # Redis (para caché y sesiones)
   REDIS_HOST: str = "localhost"
@@ -42,7 +43,6 @@ class Settings(BaseSettings):
 
   class Config:
     env_file = ".env"
-    env_file_encoding = "utf-8"
     case_sensitive = True
 
 settings = Settings()

@@ -12,7 +12,7 @@ engine = create_async_engine(
     echo=settings.ENVIRONMENT == "development",
     future=True,
     pool_pre_ping=True,
-    pool_class=NullPool if settings.ENVIRONMENT == "development" else None,
+    poolclass=NullPool if settings.ENVIRONMENT == "development" else None,
     pool_recycle=300,
     hide_parameters=True if settings.ENVIRONMENT != "development" else False,
 )

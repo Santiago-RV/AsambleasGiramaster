@@ -11,6 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+__pycache__/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+.coverage.*.*
+.coverage.*.*.*
 
 # Editor directories and files
 .vscode/*
