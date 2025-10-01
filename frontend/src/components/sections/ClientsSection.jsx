@@ -139,10 +139,13 @@ const ClientsSection  = () => {
                                 <td>Juan Pérez</td>
                                 <td><span className="status-badge status-active">Activo</span></td>
                                 <td>
+                                <div className="flex flex-col gap-2">
                                     <button className="btn btn-warning">Editar</button>
                                     <button className="btn btn-danger">Borrar</button>
                                     <button className="btn btn-success">Informe</button>
+                                </div>
                                 </td>
+
                             </tr>
                         </tbody>
                     </table>

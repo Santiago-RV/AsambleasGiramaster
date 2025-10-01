@@ -78,13 +78,8 @@ const MonitoringSection = () => {
                 <small>65% completado</small>
               </td>
               <td>
-                <button
-                  className="btn btn-success"
-                  onClick={() => monitorAssembly("torres-parque")}
-                >
-                  INGRESAR
-                </button>
-                <button className="btn btn-warning">Configurar</button>
+                <button className="btn btn-success w-4/5">Ingresar</button>
+                <button className="btn btn-warning w-4/5">Configurar</button>
               </td>
             </tr>
 

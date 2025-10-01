@@ -44,6 +44,11 @@ const AssembliesSection = () => {
             </div>
 
             <div className="form-group">
+              <label>Nombre de la asamblea</label>
+              <input type="text" placeholder="Ej: Asamblea mensual" />
+            </div>
+
+            <div className="form-group">
               <label>Cantidad de Copropietarios</label>
               <input type="number" placeholder="Ej: 120" id="copropietarios-count" />
             </div>
