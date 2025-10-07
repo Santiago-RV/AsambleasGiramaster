@@ -38,6 +38,18 @@ class DataUserCreate(DataUserBase):
     pass
 
 
+class DataUserRegister(DataUserBase):
+    """Esquema para registro de usuario con contraseña
+
+    Args:
+        DataUserBase (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    password: str = Field(..., min_length=8, description="Contraseña del usuario")
+
+
 class DataUserUpdate(DataUserBase):
     """Esquema para actualizar un usuario
 

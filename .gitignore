@@ -35,3 +35,4 @@ htmlcov/
 .venv/
 venv/
 
+back_laravel/
