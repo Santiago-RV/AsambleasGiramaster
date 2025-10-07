@@ -2,10 +2,12 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
-import SuperAdminDashboard from "./SuperAdminDashboard";
+import React from "react";
+import Login from "./components/Login";
+import "./super_admin_dashboard.css"; 
 
 function App() {
-  return <SuperAdminDashboard />;
+  return <Login />;
 }
 
-export default App
+export default App;
