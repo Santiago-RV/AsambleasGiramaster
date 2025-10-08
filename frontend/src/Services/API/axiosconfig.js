@@ -1,10 +1,9 @@
-
 //Solicitudes
 import axios from "axios"
 import Swal from "sweetalert2"
-const API_BASE_URL = import.meta.env.API_BASE_URL || "http://localhost:8000/api/v1"
+//const API_BASE_URL = import.meta.env.API_BASE_URL || "http://localhost:8000/api/v1"
 const axiosInstance = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: import.meta.env.API_BASE_URL || "http://cloud.startcode.com.co:8000/api/v1",
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json'

@@ -1,20 +1,28 @@
 import React, { useState } from "react";
+import { AuthService } from "../Services/API/AuthService";
 
 const Login = () => {
   const [usuario, setUsuario] = useState("");
-  const [clave, setClave] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (usuario === "" || clave === "") {
-      alert("Por favor ingresa usuario y contraseña");
-      return;
-    }
 
-    if (usuario === "admin" && clave === "12345") {
-      alert("Bienvenido " + usuario);
-    } else {
-      alert("Usuario o contraseña incorrectos");
+    try {
+      const formData = new URLSearchParams();
+      formData.append("username", usuario); 
+      formData.append("password", password);
+
+      AuthService.Login(formData)
+
+      console.log(res.data);
+      alert("✅ Login exitoso");
+
+
+      localStorage.setItem("token", res.data.access_token);
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data?.detail || "Error en el login");
     }
   };
 
@@ -23,18 +31,24 @@ const Login = () => {
       <div className="form-container"></div>
       <h2 className="form-title">Iniciar Sesión</h2>
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-group" style={{ width: "200px",margin: "0 auto"}}>
+      <form onSubmit={Login}>
+        <div className="form-group" style={{ width: "200px", margin: "0 auto" }}>
           <label>Usuario</label>
-          <input type="text" placeholder="Usuario" />
+          <input type="text" value={usuario} onChange={(e) => setUsuario(e.target.value)} placeholder="Usuario" />
         </div>
 
-        <div className="form-group" style={{ width: "200px", margin: "0 auto"}}>
+        <div className="form-group" style={{ width: "200px", margin: "0 auto" }}>
           <label>Contraseña</label>
-          <input type="text" placeholder="Contraseña" />
+          <input
+            type="password"
+            className="w-full border border-gray-300 rounded-lg p-2"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Escribe tu contraseña"
+          />
         </div>
         <br></br>
-        <button type="submit" className="btn btn-success" style={{ width: "200px",margin: "0 auto"}}>
+        <button type="submit" className="btn btn-success" style={{ width: "200px", margin: "0 auto" }}>
           Ingresar
         </button>
 
