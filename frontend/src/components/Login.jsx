@@ -1,37 +1,35 @@
 import React, { useState } from "react";
-import { AuthService } from "../Services/API/AuthService";
+import useAxios from "../Hooks/UseAxios";
 
 const Login = () => {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
+  const { post, loading, error } = useAxios();
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
+    const formData = new URLSearchParams();
+    formData.append("username", usuario);
+    formData.append("password", password);
+
     try {
-      const formData = new URLSearchParams();
-      formData.append("username", usuario); 
-      formData.append("password", password);
-
-      AuthService.Login(formData)
-
-      console.log(res.data);
+      const data = await post("/auth/login", formData);
+      localStorage.setItem("token", data.access_token);
       alert("✅ Login exitoso");
-
-
-      localStorage.setItem("token", res.data.access_token);
-    } catch (error) {
-      console.error(error);
-      alert(error.response?.data?.detail || "Error en el login");
+      console.log(data);
+    } catch (err) {
+      console.error(err);
     }
   };
+
 
   return (
     <div className="content-section" id="Login">
       <div className="form-container"></div>
       <h2 className="form-title">Iniciar Sesión</h2>
 
-      <form onSubmit={Login}>
+      <form onSubmit={handleLogin}>
         <div className="form-group" style={{ width: "200px", margin: "0 auto" }}>
           <label>Usuario</label>
           <input type="text" value={usuario} onChange={(e) => setUsuario(e.target.value)} placeholder="Usuario" />
