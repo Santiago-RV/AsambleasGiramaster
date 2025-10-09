@@ -133,7 +133,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 
     # Verificar si el usuario existe
     exists_user = await user_service.get_user_by_username(form_data.username)
-    print(exists_user)
+    
     if not exists_user or not security_manager.verify_password(form_data.password, exists_user.str_password_hash):
         raise UserNotFoundException(
             message="El usuario no existe",
@@ -164,7 +164,14 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         success=True,
         status_code=status.HTTP_200_OK,
         message="Login exitoso",
-        data={"access_token": access_token, "token_type": "bearer"}
+        data={
+          "access_token": access_token, 
+          "token_type": "bearer", 
+          "user": {
+            "username": exists_user.str_username,
+            "role": exists_user.rol.str_name
+          }
+        }
     )
 
 

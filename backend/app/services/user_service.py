@@ -2,6 +2,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from app.models.user_model import UserModel
 from app.models.data_user_model import DataUserModel
@@ -154,8 +155,12 @@ class UserService:
         # Normalizar el nombre de usuario
         user_name = username.lower().strip()
 
-        # Obtener el usuario por su nombre de usuario
-        user = await self.db.execute(select(UserModel).where(UserModel.str_username == user_name))
+        # Obtener el usuario por su nombre de usuario con la relación del rol cargada
+        user = await self.db.execute(
+            select(UserModel)
+            .options(selectinload(UserModel.rol))
+            .where(UserModel.str_username == user_name)
+        )
         result = user.scalar_one_or_none()
         
         if not result:

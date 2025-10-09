@@ -2,6 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
 import { Home, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const Login = () => {
 	const {
@@ -28,6 +29,26 @@ const Login = () => {
 			await login(credentials);
 		} catch (error) {
 			console.error('Error al iniciar sesión:', error);
+
+			// Obtener mensaje de error de manera segura
+			let errorMessage = 'Error al iniciar sesión';
+
+			if (error.response?.data) {
+				errorMessage =
+					error.response.data.detail ||
+					error.response.data.message ||
+					errorMessage;
+			} else if (error.message) {
+				errorMessage = error.message;
+			}
+
+			Swal.fire({
+				icon: 'error',
+				title: 'Error de Autenticación',
+				text: errorMessage,
+        confirmButtonText: 'Cerrar',
+				confirmButtonColor: '#2563eb',
+			});
 		}
 	};
 
@@ -57,23 +78,6 @@ const Login = () => {
 						unidad residencial de forma digital, transparente y
 						eficiente
 					</p>
-
-					<div className="mt-12 grid grid-cols-3 gap-4 text-center">
-						<div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-							<div className="text-2xl font-bold">100%</div>
-							<div className="text-sm text-blue-100">Digital</div>
-						</div>
-						<div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-							<div className="text-2xl font-bold">24/7</div>
-							<div className="text-sm text-blue-100">Acceso</div>
-						</div>
-						<div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-							<div className="text-2xl font-bold">Seguro</div>
-							<div className="text-sm text-blue-100">
-								Confiable
-							</div>
-						</div>
-					</div>
 				</div>
 			</div>
 

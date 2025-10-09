@@ -3,6 +3,7 @@ import { AppProvider } from './providers/AppProvider';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import React from 'react';
 import Login from './pages/Login';
+import { SADashboard } from './pages/SADashboard';
 import './App.css';
 
 function App() {
@@ -10,7 +11,7 @@ function App() {
 		<AppProvider>
 			<Routes>
 				<Route path="/" element={<ProtectedRoute />}>
-					{/* <Route path="/" element={<Home />} /> */}
+					<Route path="/" element={<SADashboard />} />
 				</Route>
 				<Route path="/login" element={<Login />} />
 			</Routes>
