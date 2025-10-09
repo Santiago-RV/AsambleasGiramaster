@@ -1,13 +1,18 @@
 //Solicitudes
 import axios from "axios"
 import Swal from "sweetalert2"
+
+const API_BASE_URL = import.meta.env.API_URL || "http://localhost:8000/api/v1"
+
 const axiosInstance = axios.create({
-    baseURL: import.meta.env.API_BASE_URL || "http://cloud.startcode.com.co:8000/api/v1",
+    baseURL: API_BASE_URL,
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json'
     }
 })
+
+
 axiosInstance.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem("accessToken")
