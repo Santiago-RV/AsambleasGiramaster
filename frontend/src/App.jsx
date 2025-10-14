@@ -1,11 +1,22 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import SuperAdminDashboard from "./SuperAdminDashboard";
+import { Routes, Route } from 'react-router-dom';
+import { AppProvider } from './providers/AppProvider';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import React from 'react';
+import Login from './pages/Login';
+import { SADashboard } from './pages/SADashboard';
+import './App.css';
 
 function App() {
-  return <SuperAdminDashboard />;
+	return (
+		<AppProvider>
+			<Routes>
+				<Route path="/" element={<ProtectedRoute />}>
+					<Route path="/" element={<SADashboard />} />
+				</Route>
+				<Route path="/login" element={<Login />} />
+			</Routes>
+		</AppProvider>
+	);
 }
 
-export default App
+export default App;

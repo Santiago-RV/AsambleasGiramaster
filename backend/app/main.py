@@ -126,11 +126,11 @@ app.add_exception_handler(Exception, general_exception_handler)
 
 app.add_middleware(
   CORSMiddleware,
-  allow_origins=settings.ALLOWED_HOSTS,
+  allow_origins=list(settings.ALLOWED_HOSTS),
   allow_credentials=True,
   allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allow_headers=[
-    "Autorization",
+    "Authorization",
     "X-Requested-With",
     "Content-Type",
     "DNT",

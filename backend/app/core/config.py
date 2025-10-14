@@ -33,9 +33,16 @@ class Settings(BaseSettings):
   # Redis (para caché y sesiones)
   REDIS_HOST: str = "localhost"
   REDIS_PORT: int = 6379
-  REDIS_URL: str = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+  @property
+  def REDIS_URL(self) -> str:
+    return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}"
   REDIS_CACHE_TTL: int = 60 * 60 * 1
   REDIS_SESSION_TTL: int = 60 * 60 * 24 * 7
+
+  # API
+  @property
+  def API_URL(self) -> str:
+    return f"http://{self.HOST}:{self.PORT}"
 
   # Logging
   LOG_LEVEL: str = "INFO"

@@ -1,18 +1,17 @@
 import React, { useState } from "react";
-import "./super_admin_dashboard.css";
 
-import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
+import Sidebar from "../../../frontend/src/components/Sidebar";
+import Header from "../../../frontend/src/components/Header";
 
-import DashboardSection from "./components/sections/DashboardSection";
-import ClientsSection from "./components/sections/ClientsSection";
-import AssembliesSection from "./components/sections/AssembliesSection";
-import CalendarSection from "./components/sections/CalendarSection";
-import MonitoringSection from "./components/sections/MonitoringSection";
-import ReportsSection from "./components/sections/ReportsSection";
-import UsersSection from "./components/sections/UsersSection";
+import DashboardSection from "../../../frontend/src/components/sections/DashboardSection";
+import ClientsSection from "../../../frontend/src/components/sections/ClientsSection";
+import AssembliesSection from "../../../frontend/src/components/sections/AssembliesSection";
+import CalendarSection from "../../../frontend/src/components/sections/CalendarSection";
+import MonitoringSection from "../../../frontend/src/components/sections/MonitoringSection";
+import ReportsSection from "../../../frontend/src/components/sections/ReportsSection";
+import UsersSection from "../../../frontend/src/components/sections/UsersSection";
 
-const SuperAdminDashboard = () => {
+export const SADashboard = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
 
   const titles = {
@@ -44,5 +43,3 @@ const SuperAdminDashboard = () => {
     </div>
   );
 };
-
-export default SuperAdminDashboard;

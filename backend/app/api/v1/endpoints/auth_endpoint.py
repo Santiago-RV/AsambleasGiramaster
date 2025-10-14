@@ -7,7 +7,7 @@ from app.schemas.auth_token_schema import Token
 
 from app.schemas.responses_schema import SuccessResponse, ErrorResponse
 from app.schemas.user_schema import UserCreate
-from app.schemas.data_user_schema import DataUserCreate, DataUserResponse
+from app.schemas.data_user_schema import DataUserCreate, DataUserResponse, DataUserRegister
 from app.services.user_service import UserService
 from app.core.security import security_manager, rate_limiter
 from app.core.database import get_db
@@ -37,12 +37,12 @@ fake_users_db = {
     summary="Registro de nuevos usuarios",
     description="Registra un nuevo usuario en la base de datos"
     )
-async def register_user(request: Request, user_data: dict, db: AsyncSession = Depends(get_db)):
+async def register_user(request: Request, user_data: DataUserRegister, db: AsyncSession = Depends(get_db)):
     """
         Endpoint para registro de nuevos usuarios
         Args:
         request (Request): La solicitud HTTP
-        user_data (dict): Los datos del usuario a registrar en formato raw
+        user_data (DataUserRegister): Los datos del usuario a registrar
     """
     try: 
         # Crear instancia del servicio de usuarios
@@ -54,26 +54,26 @@ async def register_user(request: Request, user_data: dict, db: AsyncSession = De
             raise RateLimitException()
 
         # Verificar si el usuario ya existe
-        exists_user = await user_service.get_user_by_username(user_data.get('str_email'))
+        exists_user = await user_service.get_user_by_username(user_data.str_email)
         if exists_user:
             raise UserAlreadyExistsException(
                 message="El usuario ya existe",
                 error_code="USER_ALREADY_EXISTS"
             )
 
-        # Crear objeto DataUserCreate con los datos restantes
+        # Crear objeto DataUserCreate sin la contraseña
         data_user_data = DataUserCreate(
-            str_firstname=user_data.get('str_firstname'),
-            str_lastname=user_data.get('str_lastname'),
-            str_email=user_data.get('str_email'),
-            str_phone=user_data.get('str_phone')
+            str_firstname=user_data.str_firstname,
+            str_lastname=user_data.str_lastname,
+            str_email=user_data.str_email,
+            str_phone=user_data.str_phone
         )
 
         # Registrar datos del usuario
         data_user = await user_service.create_data_user(data_user_data)
 
         # Hashear la contraseña
-        hashed_password = security_manager.create_password_hash(user_data.get('password'))
+        hashed_password = security_manager.create_password_hash(user_data.password)
 
         user = UserCreate(
             str_username=data_user.str_email.lower().strip(),
@@ -133,7 +133,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 
     # Verificar si el usuario existe
     exists_user = await user_service.get_user_by_username(form_data.username)
-    print(exists_user)
+    
     if not exists_user or not security_manager.verify_password(form_data.password, exists_user.str_password_hash):
         raise UserNotFoundException(
             message="El usuario no existe",
@@ -164,7 +164,14 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         success=True,
         status_code=status.HTTP_200_OK,
         message="Login exitoso",
-        data={"access_token": access_token, "token_type": "bearer"}
+        data={
+          "access_token": access_token, 
+          "token_type": "bearer", 
+          "user": {
+            "username": exists_user.str_username,
+            "role": exists_user.rol.str_name
+          }
+        }
     )
 
 
