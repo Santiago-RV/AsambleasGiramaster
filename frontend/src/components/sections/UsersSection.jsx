@@ -2,70 +2,75 @@ import React from "react";
 
 const UsersSection = () => {
   return (
-    <div className="content-section" id="users">
-      <div className="form-container">
-        <h2 className="form-title">Gestión de Usuarios y Roles</h2>
+    <section id="users" className="p-8 ml-[280px] min-h-screen bg-[#f5f7fa] animate-fadeIn">
+      {/* 🧩 Gestión de Usuarios */}
+      <div className="bg-white p-8 rounded-xl shadow-lg mb-8">
+        <h2 className="text-xl font-semibold text-[#2c3e50] mb-6 border-b-2 border-gray-200 pb-2">
+          Gestión de Usuarios y Roles
+        </h2>
 
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-info">
-              <h3>156</h3>
-              <p>Super Administradores</p>
+        {/* Estadísticas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[
+            { title: "Super Administradores", value: "156" },
+            { title: "Administradores", value: "1,247" },
+            { title: "Invitados Activos", value: "8,932" },
+            { title: "Total Copropietarios", value: "23,456" },
+          ].map((stat, i) => (
+            <div key={i} className="bg-gradient-to-br from-[#3498db] to-[#2980b9] text-white rounded-xl p-6 shadow-md">
+              <h3 className="text-3xl font-bold">{stat.value}</h3>
+              <p className="text-sm mt-1">{stat.title}</p>
             </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-info">
-              <h3>1,247</h3>
-              <p>Administradores</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-info">
-              <h3>8,932</h3>
-              <p>Invitados Activos</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-info">
-              <h3>23,456</h3>
-              <p>Total Copropietarios</p>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <div className="form-grid">
-          <div className="form-group">
-            <label>Nombre Completo</label>
-            <input type="text" placeholder="Ej: Carlos Administrador" />
-          </div>
-          <div className="form-group">
-            <label>Correo Electrónico</label>
-            <input type="email" placeholder="carlos@email.com" />
-          </div>
-          <div className="form-group">
-            <label>Rol del Usuario</label>
-            <select>
+        {/* Formulario */}
+        <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(250px,1fr))]">
+          {[
+            { label: "Nombre Completo", type: "text", placeholder: "Ej: Carlos Administrador" },
+            { label: "Correo Electrónico", type: "email", placeholder: "carlos@email.com" },
+          ].map((field, i) => (
+            <div key={i}>
+              <label className="block mb-2 font-semibold text-gray-600">{field.label}</label>
+              <input
+                type={field.type}
+                placeholder={field.placeholder}
+                className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+              />
+            </div>
+          ))}
+
+          <div>
+            <label className="block mb-2 font-semibold text-gray-600">Rol del Usuario</label>
+            <select className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#3498db]">
               <option>Super Administrador</option>
               <option>Administrador</option>
               <option>Invitado</option>
             </select>
           </div>
-          <div className="form-group">
-            <label>Unidad Residencial (si aplica)</label>
-            <select>
+
+          <div>
+            <label className="block mb-2 font-semibold text-gray-600">Unidad Residencial (si aplica)</label>
+            <select className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#3498db]">
               <option>Todas las unidades</option>
               <option>Torres del Parque</option>
               <option>Conjunto Palmeras</option>
               <option>Edificio Central</option>
             </select>
           </div>
-          <div className="form-group">
-            <label>Contraseña</label>
-            <input type="password" placeholder="Contraseña" />
+
+          <div>
+            <label className="block mb-2 font-semibold text-gray-600">Contraseña</label>
+            <input
+              type="password"
+              placeholder="Contraseña"
+              className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+            />
           </div>
-          <div className="form-group">
-            <label>Estado</label>
-            <select>
+
+          <div>
+            <label className="block mb-2 font-semibold text-gray-600">Estado</label>
+            <select className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#3498db]">
               <option>Activo</option>
               <option>Inactivo</option>
               <option>Pendiente</option>
@@ -73,132 +78,105 @@ const UsersSection = () => {
           </div>
         </div>
 
-        <div style={{ marginTop: "1.5rem" }}>
-          <button className="btn btn-success">Crear Usuario</button>
-          <button className="btn btn-warning">Enviar Credenciales</button>
+        {/* Botones */}
+        <div className="flex flex-wrap gap-4 mt-8">
+          <button className="bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all">
+            Crear Usuario
+          </button>
+          <button className="bg-gradient-to-br from-[#f39c12] to-[#e67e22] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all">
+            Enviar Credenciales
+          </button>
         </div>
       </div>
 
-      <div className="table-container">
-        <div className="table-header">
-          <h3>Lista de Usuarios del Sistema</h3>
-          <div className="search-box">
-            <select
-              style={{
-                padding: "0.5rem",
-                border: "2px solid #ecf0f1",
-                borderRadius: "6px",
-                marginRight: "1rem",
-              }}
-            >
+      {/* 📋 Tabla de usuarios */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="flex justify-between items-center p-6 bg-gray-50 border-b border-gray-200 flex-wrap gap-4">
+          <h3 className="text-lg font-semibold text-[#2c3e50]">Lista de Usuarios del Sistema</h3>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <select className="p-2 border-2 border-gray-200 rounded-md focus:outline-none focus:border-[#3498db]">
               <option>Todos los roles</option>
               <option>Super Administradores</option>
               <option>Administradores</option>
               <option>Invitados</option>
             </select>
-            <input type="text" placeholder="Buscar usuario..." />
-            <button className="btn">Buscar</button>
+            <input
+              type="text"
+              placeholder="Buscar usuario..."
+              className="p-2 border-2 border-gray-200 rounded-md focus:outline-none focus:border-[#3498db]"
+            />
+            <button className="bg-gradient-to-br from-[#3498db] to-[#2980b9] text-white font-semibold px-4 py-2 rounded-md hover:-translate-y-0.5 hover:shadow-md transition-all">
+              Buscar
+            </button>
           </div>
         </div>
-        <table>
-          <thead>
+
+        <table className="w-full border-collapse">
+          <thead className="bg-gray-50">
             <tr>
-              <th>Usuario</th>
-              <th>Correo</th>
-              <th>Rol</th>
-              <th>Unidad Asignada</th>
-              <th>Último Acceso</th>
-              <th>Estado</th>
-              <th>Acciones</th>
+              {["Usuario", "Correo", "Rol", "Unidad Asignada", "Último Acceso", "Estado", "Acciones"].map((h) => (
+                <th key={h} className="p-4 text-left font-semibold text-[#2c3e50] border-b border-gray-200">
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <div
-                    className="user-avatar"
-                    style={{
-                      width: "32px",
-                      height: "32px",
-                      fontSize: "0.8rem",
-                    }}
-                  >
-                    JA
+            {[
+              {
+                nombre: "Juan Administrador",
+                correo: "juan.admin@adminpro.com",
+                rol: "Super Admin",
+                colorRol: "bg-green-100 text-green-600",
+                unidad: "Torres del Parque",
+                acceso: "2025-01-15 14:30",
+                estado: "Activo",
+              },
+              {
+                nombre: "María González",
+                correo: "maria.gonzalez@conjuntopalmeras.com",
+                rol: "Administrador",
+                colorRol: "bg-yellow-100 text-yellow-600",
+                unidad: "Conjunto Palmeras",
+                acceso: "2025-01-14 09:15",
+                estado: "Activo",
+              },
+            ].map((user, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="p-4 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] text-white flex items-center justify-center text-sm font-semibold">
+                    {user.nombre.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                   </div>
-                  <strong>Juan Administrador</strong>
-                </div>
-              </td>
-              <td>juan.admin@adminpro.com</td>
-              <td>
-                <span
-                  className="status-badge"
-                  style={{ background: "#d5f4e6", color: "#27ae60" }}
-                >
-                  Super Admin
-                </span>
-              </td>
-              <td>Torres del Parque</td>
-              <td>2025-01-15 14:30</td>
-              <td>
-                <span className="status-badge status-active">Activo</span>
-              </td>
-              <td>
-                <button className="btn btn-warning">Editar</button>
-                <button className="btn btn-danger">Eliminar</button>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <div
-                    className="user-avatar"
-                    style={{
-                      width: "32px",
-                      height: "32px",
-                      fontSize: "0.8rem",
-                    }}
-                  >
-                    MG
-                  </div>
-                  <strong>María González</strong>
-                </div>
-              </td>
-              <td>maria.gonzalez@conjuntopalmeras.com</td>
-              <td>
-                <span
-                  className="status-badge"
-                  style={{ background: "#fef5e7", color: "#f39c12" }}
-                >
-                  Administrador
-                </span>
-              </td>
-              <td>Conjunto Palmeras</td>
-              <td>2025-01-14 09:15</td>
-              <td>
-                <span className="status-badge status-active">Activo</span>
-              </td>
-              <td>
-                <button className="btn btn-warning">Editar</button>
-                <button className="btn btn-danger">Eliminar</button>
-              </td>
-            </tr>
+                  <strong>{user.nombre}</strong>
+                </td>
+                <td className="p-4">{user.correo}</td>
+                <td className="p-4">
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${user.colorRol}`}>
+                    {user.rol}
+                  </span>
+                </td>
+                <td className="p-4">{user.unidad}</td>
+                <td className="p-4">{user.acceso}</td>
+                <td className="p-4">
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-600">
+                    {user.estado}
+                  </span>
+                </td>
+                <td className="p-4 flex flex-wrap gap-2">
+                  <button className="bg-gradient-to-br from-[#f39c12] to-[#e67e22] text-white font-semibold px-4 py-2 rounded-md hover:-translate-y-0.5 hover:shadow-md transition-all">
+                    Editar
+                  </button>
+                  <button className="bg-gradient-to-br from-[#e74c3c] to-[#c0392b] text-white font-semibold px-4 py-2 rounded-md hover:-translate-y-0.5 hover:shadow-md transition-all">
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 };
 
