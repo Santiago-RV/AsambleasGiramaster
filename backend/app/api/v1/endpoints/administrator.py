@@ -5,7 +5,9 @@ from typing import List
 from app.auth.auth import get_current_user
 from app.schemas.responses_schema import SuccessResponse, ErrorResponse
 from app.schemas.meeting_invitation_schema import (
-    MeetingInvitationCreate
+    BulkUploadResponse,
+    MeetingInvitationCreate,
+    MeetingInvitationResponse
 )
 from app.services.meeting_invitation_service import MeetingInvitationService
 from app.services.user_service import UserService
