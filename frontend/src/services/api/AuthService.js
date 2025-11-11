@@ -33,16 +33,15 @@ export class AuthService {
       localStorage.setItem('access_token', access_token);
 
       // Validar que el objeto user tenga los campos necesarios
-      if (!user || !user.username || !user.role) {
+      if (!user || !user.username || !user.role || !user.id) {
         throw new Error('El servidor no retornó los datos de usuario correctamente');
       }
 
       const userData = {
+        id: user.id,
         username: user.username,
         role: user.role,
       };
-
-      localStorage.setItem('user', JSON.stringify(userData));
 
       return {
         success: true,

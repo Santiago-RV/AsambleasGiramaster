@@ -11,8 +11,11 @@ from app.schemas.meeting_invitation_schema import (
 )
 from app.services.meeting_invitation_service import MeetingInvitationService
 from app.services.user_service import UserService
+from app.services.residential_unit_service import ResidentialUnitService
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
+
+from app.schemas.residential_unit_schema import ResidentialUnitResponse
 
 router = APIRouter()
 
@@ -168,3 +171,4 @@ async def get_meeting_invitations(
             message=f"Error al obtener las invitaciones: {str(e)}",
             details={"original_error": str(e)}
         )
+

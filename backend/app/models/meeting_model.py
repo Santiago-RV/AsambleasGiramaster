@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -16,9 +16,10 @@ class MeetingModel(Base):
     int_estimated_duration = Column(Integer, nullable=False)
     int_organizer_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
     int_meeting_leader_id = Column(Integer, nullable=False)
-    int_zoom_meeting_id = Column(Integer, nullable=False)
+    int_zoom_meeting_id = Column(BigInteger, nullable=False)
     str_zoom_join_url = Column(String(500), nullable=False)
     str_zoom_start_url = Column(String(500), nullable=False)
+    str_zoom_password = Column(String(50), nullable=True)
     bln_allow_delegates = Column(Boolean, default=False)
     str_status = Column(String(50), index=True, nullable=False)
     bln_quorum_reached = Column(Boolean, default=False)

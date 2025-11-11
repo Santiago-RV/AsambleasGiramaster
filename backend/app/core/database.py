@@ -7,7 +7,11 @@ from typing import AsyncGenerator
 from app.core.config import settings
 from app.core.logging_config import get_logger
 
+# Define Base first to avoid circular imports
+Base = declarative_base()
+
 # Import all models to ensure they are registered with SQLAlchemy
+# This must be after Base is defined
 from app.models import *
 
 engine = create_async_engine(
@@ -28,7 +32,8 @@ AsyncSessionLocal = async_sessionmaker(
   autoflush=False,
 )
 
-Base = declarative_base()
+# Alias for compatibility
+async_session_maker = AsyncSessionLocal
 
 # Logger
 logger = get_logger(__name__)

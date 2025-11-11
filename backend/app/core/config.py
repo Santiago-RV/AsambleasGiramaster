@@ -48,6 +48,24 @@ class Settings(BaseSettings):
   LOG_LEVEL: str = "INFO"
   LOG_FILE: str = "app.log"
 
+  # Zoom SDK Configuration (para Meeting SDK - frontend)
+  ZOOM_SDK_KEY: str = ""
+  ZOOM_SDK_SECRET: str = ""
+  
+  # Zoom OAuth Server-to-Server (para API REST - crear reuniones)
+  ZOOM_ACCOUNT_ID: str = ""
+  ZOOM_CLIENT_ID: str = ""
+  ZOOM_CLIENT_SECRET: str = ""
+
+  # Configuración de Email (Gmail)
+  SMTP_HOST: str = "smtp.gmail.com"
+  SMTP_PORT: int = 587
+  SMTP_USER: str = ""  # Email de Gmail
+  SMTP_PASSWORD: str = ""  # Contraseña de aplicación de Gmail
+  SMTP_FROM_EMAIL: str = ""  # Email del remitente
+  SMTP_FROM_NAME: str = "GIRAMASTER - Sistema de Asambleas"
+  EMAIL_ENABLED: bool = True  # Activar/desactivar envío de emails
+
   class Config:
     env_file = ".env"
     case_sensitive = True

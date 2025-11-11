@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invitación a Reunión</title>
+</head>
+
+<body
+  style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0"
+          style="background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td
+              style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">
+                📅 Invitación a Reunión
+              </h1>
+              <p style="color: #e0e7ff; margin: 10px 0 0 0; font-size: 16px;">
+                GIRAMASTER - Sistema de Asambleas
+              </p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                Estimado(a) <strong>{{user_name}}</strong>,
+              </p>
+
+              <p style="color: #555555; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+                Ha sido invitado(a) a participar en la siguiente reunión de su unidad residencial:
+              </p>
+
+              <!-- Meeting Details Card -->
+              <table width="100%" cellpadding="0" cellspacing="0"
+                style="background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; margin-bottom: 30px;">
+                <tr>
+                  <td style="padding: 25px;">
+                    <h2 style="color: #667eea; margin: 0 0 20px 0; font-size: 22px;">
+                      {{meeting_title}}
+                    </h2>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <strong style="color: #333333; font-size: 14px;">📍 Unidad Residencial:</strong>
+                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{residential_unit}}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <strong style="color: #333333; font-size: 14px;">📅 Fecha:</strong>
+                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{meeting_date}}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <strong style="color: #333333; font-size: 14px;">⏰ Hora:</strong>
+                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{meeting_time}}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <strong style="color: #333333; font-size: 14px;">⏱️ Duración estimada:</strong>
+                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{duration}} minutos</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <strong style="color: #333333; font-size: 14px;">📋 Tipo:</strong>
+                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{meeting_type}}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <strong style="color: #333333; font-size: 14px;">👤 Organizador:</strong>
+                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{organizer_name}}</span>
+                        </td>
+                      </tr>
+                    </table>
+
+                    {{#if meeting_description}}
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+                      <strong style="color: #333333; font-size: 14px; display: block; margin-bottom: 10px;">📝
+                        Descripción:</strong>
+                      <p style="color: #555555; font-size: 14px; line-height: 1.6; margin: 0;">
+                        {{meeting_description}}
+                      </p>
+                    </div>
+                    {{/if}}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Zoom Access Info -->
+              <div
+                style="background-color: #e8f4fd; border-radius: 8px; padding: 20px; margin-bottom: 30px; border-left: 4px solid #2196F3;">
+                <h3 style="color: #2196F3; margin: 0 0 15px 0; font-size: 18px;">
+                  🎥 Acceso a la Reunión Virtual
+                </h3>
+
+                <p style="color: #555555; font-size: 14px; margin: 0 0 15px 0;">
+                  <strong>ID de la reunión:</strong> {{zoom_meeting_id}}
+                </p>
+
+                {{#if zoom_password}}
+                <p style="color: #555555; font-size: 14px; margin: 0 0 15px 0;">
+                  <strong>Contraseña:</strong> <code
+                    style="background-color: #ffffff; padding: 3px 8px; border-radius: 4px; font-family: monospace;">{{zoom_password}}</code>
+                </p>
+                {{/if}}
+
+                <p style="color: #555555; font-size: 14px; margin: 0 0 15px 0;">
+                  <strong>Enlace de acceso:</strong>
+                </p>
+
+                <a href="{{zoom_join_url}}"
+                  style="display: inline-block; background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: #ffffff; padding: 14px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; margin-top: 10px; box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);">
+                  🚀 Unirse a la Reunión
+                </a>
+              </div>
+
+              <!-- Important Notes -->
+              <div
+                style="background-color: #fff3cd; border-radius: 8px; padding: 20px; margin-bottom: 30px; border-left: 4px solid #ffc107;">
+                <h3 style="color: #856404; margin: 0 0 15px 0; font-size: 16px;">
+                  ⚠️ Notas Importantes
+                </h3>
+                <ul style="color: #856404; font-size: 14px; line-height: 1.6; margin: 0; padding-left: 20px;">
+                  <li>Le recomendamos unirse a la reunión 5 minutos antes del inicio.</li>
+                  <li>Asegúrese de tener una conexión estable a internet.</li>
+                  <li>Tenga lista su cámara y micrófono para participar activamente.</li>
+                  <li>Su asistencia es importante para alcanzar el quórum requerido.</li>
+                </ul>
+              </div>
+
+              <p style="color: #555555; font-size: 14px; line-height: 1.6; margin: 0;">
+                Si tiene alguna pregunta o problema para acceder a la reunión, por favor contacte al organizador.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #dee2e6;">
+              <p style="color: #666666; font-size: 12px; margin: 0 0 10px 0;">
+                Este es un correo automático generado por el Sistema GIRAMASTER
+              </p>
+              <p style="color: #999999; font-size: 11px; margin: 0;">
+                © {{current_year}} GIRAMASTER - Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+
+</html>

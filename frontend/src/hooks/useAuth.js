@@ -16,11 +16,12 @@ export const useAuth = () => {
         throw new Error(data.message || 'Error en la respuesta del servidor');
       }
 
-      if (!data.data.user || !data.data.user.username || !data.data.user.role) {
+      if (!data.data.user || !data.data.user.username || !data.data.user.role || !data.data.user.id) {
         throw new Error('Datos de usuario incompletos');
       }
 
       const userData = {
+        id: data.data.user.id,
         username: data.data.user.username,
         role: data.data.user.role,
       }
