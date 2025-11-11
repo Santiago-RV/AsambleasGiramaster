@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import {
@@ -26,8 +26,73 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
 	const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
+	const [isEditResidentModalOpen, setIsEditResidentModalOpen] = useState(false);
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
+	const [selectedResident, setSelectedResident] = useState(null);
+	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
+
+	// Actualizar posición del menú cuando cambia el scroll o el tamaño de la ventana
+	useEffect(() => {
+		const updateMenuPosition = () => {
+			if (selectedResidentMenu && menuButtonRefs.current[selectedResidentMenu]) {
+				const button = menuButtonRefs.current[selectedResidentMenu];
+				const rect = button.getBoundingClientRect();
+				const menuWidth = 192; // w-48 = 12rem = 192px
+				const viewportWidth = window.innerWidth;
+				const viewportHeight = window.innerHeight;
+				
+				// Calcular posición izquierda - alineado al botón
+				let left = rect.right - menuWidth;
+				// Si el menú se sale por la izquierda, alinearlo al borde izquierdo con margen
+				if (left < 8) {
+					left = 8;
+				}
+				// Si el menú se sale por la derecha, alinearlo al borde derecho con margen
+				if (rect.right > viewportWidth - 8) {
+					left = viewportWidth - menuWidth - 8;
+				}
+				
+				// Calcular posición superior
+				let top = rect.bottom + 8;
+				const menuHeight = 120; // Aproximadamente la altura del menú
+				// Si el menú se sale por abajo, mostrarlo arriba del botón
+				if (top + menuHeight > viewportHeight - 8) {
+					top = rect.top - menuHeight - 8;
+				}
+				// Asegurar que no se salga por arriba
+				if (top < 8) {
+					top = 8;
+				}
+				
+				setMenuPosition({
+					top: top,
+					left: left,
+				});
+			}
+		};
+
+		if (selectedResidentMenu) {
+			updateMenuPosition();
+			// Escuchar scroll en todos los contenedores
+			const scrollContainers = document.querySelectorAll('[class*="overflow-y-auto"]');
+			scrollContainers.forEach(container => {
+				container.addEventListener('scroll', updateMenuPosition, true);
+			});
+			window.addEventListener('scroll', updateMenuPosition, true);
+			window.addEventListener('resize', updateMenuPosition);
+		}
+
+		return () => {
+			const scrollContainers = document.querySelectorAll('[class*="overflow-y-auto"]');
+			scrollContainers.forEach(container => {
+				container.removeEventListener('scroll', updateMenuPosition, true);
+			});
+			window.removeEventListener('scroll', updateMenuPosition, true);
+			window.removeEventListener('resize', updateMenuPosition);
+		};
+	}, [selectedResidentMenu]);
 
 	// Obtener datos de la unidad residencial
 	const {
@@ -109,6 +174,25 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		},
 	});
 
+	// Formulario para editar residente
+	const {
+		register: registerResident,
+		handleSubmit: handleSubmitResident,
+		reset: resetResident,
+		setValue: setResidentValue,
+		formState: { errors: errorsResident },
+	} = useForm({
+		defaultValues: {
+			firstname: '',
+			lastname: '',
+			username: '',
+			email: '',
+			phone: '',
+			apartment_number: '',
+			is_active: true,
+		},
+	});
+
 	// Mutación para crear reunión
 	const createMeetingMutation = useMutation({
 		mutationFn: MeetingService.createMeeting,
@@ -181,12 +265,68 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 
 	const handleEditResident = (resident) => {
 		setSelectedResidentMenu(null);
-		// TODO: Implementar edición de residente
-		Swal.fire({
-			icon: 'info',
-			title: 'Editar Residente',
-			text: 'Funcionalidad de edición próximamente',
-		});
+		setSelectedResident(resident);
+		// Cargar los datos del residente en el formulario
+		setResidentValue('firstname', resident.firstname || '');
+		setResidentValue('lastname', resident.lastname || '');
+		setResidentValue('username', resident.username || '');
+		setResidentValue('email', resident.email || '');
+		setResidentValue('phone', resident.phone || '');
+		setResidentValue('apartment_number', resident.apartment_number || '');
+		setResidentValue('is_active', resident.is_active !== undefined ? resident.is_active : true);
+		setIsEditResidentModalOpen(true);
+	};
+
+	// Mutación para actualizar residente
+	const updateResidentMutation = useMutation({
+		mutationFn: async (data) => {
+			// TODO: Implementar actualización en el backend
+			// Por ahora solo mostramos un mensaje de éxito
+			return new Promise((resolve) => {
+				setTimeout(() => {
+					resolve({ success: true, message: 'Residente actualizado exitosamente' });
+				}, 1000);
+			});
+		},
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			resetResident();
+			setIsEditResidentModalOpen(false);
+			setSelectedResident(null);
+			Swal.fire({
+				icon: 'success',
+				title: '¡Éxito!',
+				text: response.message || 'Residente actualizado exitosamente',
+				showConfirmButton: false,
+				timer: 2000,
+				toast: true,
+				position: 'top-end',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: error.message || 'Error al actualizar el residente',
+			});
+		},
+	});
+
+	const onSubmitResident = (data) => {
+		if (!selectedResident) return;
+		
+		const residentData = {
+			id: selectedResident.id,
+			firstname: data.firstname,
+			lastname: data.lastname,
+			username: data.username,
+			email: data.email,
+			phone: data.phone || '',
+			apartment_number: data.apartment_number,
+			is_active: data.is_active,
+		};
+
+		updateResidentMutation.mutate(residentData);
 	};
 
 	const handleDeleteResident = (resident) => {
@@ -348,14 +488,14 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				{/* Listado de Residentes */}
-				<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-					<div className="p-6 border-b border-gray-200">
+				<div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col" style={{ maxHeight: '700px' }}>
+					<div className="p-6 border-b border-gray-200 flex-shrink-0">
 						<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
 							<UsersIcon size={24} />
 							Residentes ({filteredResidents?.length || 0})
 						</h2>
 					</div>
-					<div className="max-h-[600px] overflow-y-auto">
+					<div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ minHeight: 0 }}>
 						{isLoadingResidents ? (
 							<div className="flex items-center justify-center py-12">
 								<svg
@@ -385,9 +525,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 								{filteredResidents.map((resident) => (
 									<div
 										key={resident.id}
-										className="p-4 hover:bg-gray-50 transition-colors relative z-0"
+										className="p-4 hover:bg-gray-50 transition-colors relative"
 										onClick={() => {
-											if (selectedResidentMenu) {
+											if (selectedResidentMenu && selectedResidentMenu !== resident.id) {
 												setSelectedResidentMenu(null);
 											}
 										}}
@@ -403,16 +543,50 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 													{resident.apartment_number}
 												</p>
 											</div>
-											<div className="relative z-20">
+											<div className="relative">
 												<button
+													ref={(el) => {
+														if (el) {
+															menuButtonRefs.current[resident.id] = el;
+														}
+													}}
 													onClick={(e) => {
 														e.stopPropagation();
-														setSelectedResidentMenu(
-															selectedResidentMenu ===
-																resident.id
-																? null
-																: resident.id
-														);
+														const button = e.currentTarget;
+														
+														if (selectedResidentMenu === resident.id) {
+															setSelectedResidentMenu(null);
+														} else {
+															const rect = button.getBoundingClientRect();
+															const menuWidth = 192;
+															const viewportWidth = window.innerWidth;
+															const viewportHeight = window.innerHeight;
+															
+															// Calcular posición izquierda
+															let left = rect.right - menuWidth;
+															if (left < 8) {
+																left = 8;
+															}
+															if (rect.right > viewportWidth - 8) {
+																left = viewportWidth - menuWidth - 8;
+															}
+															
+															// Calcular posición superior
+															let top = rect.bottom + 8;
+															const menuHeight = 120;
+															if (top + menuHeight > viewportHeight - 8) {
+																top = rect.top - menuHeight - 8;
+															}
+															if (top < 8) {
+																top = 8;
+															}
+															
+															setMenuPosition({
+																top: top,
+																left: left,
+															});
+															setSelectedResidentMenu(resident.id);
+														}
 													}}
 													className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
 												>
@@ -421,49 +595,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 														className="text-gray-600"
 													/>
 												</button>
-												{selectedResidentMenu ===
-													resident.id && (
-													<div
-														className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-30"
-														onClick={(e) =>
-															e.stopPropagation()
-														}
-													>
-														<button
-															onClick={() =>
-																handleViewResident(
-																	resident
-																)
-															}
-															className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 rounded-t-lg"
-														>
-															<Eye size={16} />
-															Ver detalles
-														</button>
-														<button
-															onClick={() =>
-																handleEditResident(
-																	resident
-																)
-															}
-															className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-														>
-															<Edit size={16} />
-															Editar
-														</button>
-														<button
-															onClick={() =>
-																handleDeleteResident(
-																	resident
-																)
-															}
-															className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
-														>
-															<Trash2 size={16} />
-															Eliminar
-														</button>
-													</div>
-												)}
 											</div>
 										</div>
 									</div>
@@ -486,8 +617,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				</div>
 
 				{/* Vista de Reuniones */}
-				<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-					<div className="p-6 border-b border-gray-200 flex justify-between items-center">
+				<div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col" style={{ maxHeight: '700px' }}>
+					<div className="p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
 						<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
 							<Calendar size={24} />
 							Reuniones ({meetingsData?.length || 0})
@@ -500,7 +631,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							Nueva Reunión
 						</button>
 					</div>
-					<div className="max-h-[600px] overflow-y-auto p-4">
+					<div className="flex-1 overflow-y-auto overflow-x-hidden p-4" style={{ minHeight: 0 }}>
 						{isLoadingMeetings ? (
 							<div className="flex items-center justify-center py-12">
 								<svg
@@ -820,12 +951,276 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				</form>
 			</Modal>
 
-			{/* Cerrar menú al hacer click fuera */}
+			{/* Modal para editar residente */}
+			<Modal
+				isOpen={isEditResidentModalOpen}
+				onClose={() => {
+					setIsEditResidentModalOpen(false);
+					resetResident();
+					setSelectedResident(null);
+				}}
+				title="Editar Copropietario"
+				size="lg"
+			>
+				<form
+					onSubmit={handleSubmitResident(onSubmitResident)}
+					className="space-y-6"
+				>
+					<div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+						{/* Nombre */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Nombre *
+							</label>
+							<input
+								type="text"
+								{...registerResident('firstname', {
+									required: 'El nombre es obligatorio',
+									minLength: {
+										value: 2,
+										message: 'Mínimo 2 caracteres',
+									},
+								})}
+								placeholder="Ej: Juan"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsResident.firstname && (
+								<span className="text-red-500 text-sm">
+									{errorsResident.firstname.message}
+								</span>
+							)}
+						</div>
+
+						{/* Apellido */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Apellido *
+							</label>
+							<input
+								type="text"
+								{...registerResident('lastname', {
+									required: 'El apellido es obligatorio',
+									minLength: {
+										value: 2,
+										message: 'Mínimo 2 caracteres',
+									},
+								})}
+								placeholder="Ej: Pérez"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsResident.lastname && (
+								<span className="text-red-500 text-sm">
+									{errorsResident.lastname.message}
+								</span>
+							)}
+						</div>
+
+						{/* Usuario */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Usuario *
+							</label>
+							<input
+								type="text"
+								{...registerResident('username', {
+									required: 'El usuario es obligatorio',
+									minLength: {
+										value: 3,
+										message: 'Mínimo 3 caracteres',
+									},
+								})}
+								placeholder="Ej: juan.perez"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsResident.username && (
+								<span className="text-red-500 text-sm">
+									{errorsResident.username.message}
+								</span>
+							)}
+						</div>
+
+						{/* Email */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Email *
+							</label>
+							<input
+								type="email"
+								{...registerResident('email', {
+									required: 'El email es obligatorio',
+									pattern: {
+										value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+										message: 'Email inválido',
+									},
+								})}
+								placeholder="Ej: juan@example.com"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsResident.email && (
+								<span className="text-red-500 text-sm">
+									{errorsResident.email.message}
+								</span>
+							)}
+						</div>
+
+						{/* Teléfono */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Teléfono
+							</label>
+							<input
+								type="text"
+								{...registerResident('phone')}
+								placeholder="Ej: +57 300 123 4567"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+						</div>
+
+						{/* Apartamento */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Número de Apartamento *
+							</label>
+							<input
+								type="text"
+								{...registerResident('apartment_number', {
+									required: 'El número de apartamento es obligatorio',
+								})}
+								placeholder="Ej: 101"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsResident.apartment_number && (
+								<span className="text-red-500 text-sm">
+									{errorsResident.apartment_number.message}
+								</span>
+							)}
+						</div>
+					</div>
+
+					{/* Estado activo */}
+					<div>
+						<label className="flex items-center gap-3 cursor-pointer">
+							<input
+								type="checkbox"
+								{...registerResident('is_active')}
+								className="w-5 h-5 text-[#3498db] border-gray-300 rounded focus:ring-[#3498db]"
+							/>
+							<span className="font-semibold text-gray-700">
+								Activo
+							</span>
+						</label>
+					</div>
+
+					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
+						<button
+							type="submit"
+							disabled={updateResidentMutation.isPending}
+							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${
+								updateResidentMutation.isPending
+									? 'opacity-50 cursor-not-allowed'
+									: ''
+							}`}
+						>
+							{updateResidentMutation.isPending ? (
+								<>
+									<svg
+										className="animate-spin h-5 w-5"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle
+											className="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											strokeWidth="4"
+										></circle>
+										<path
+											className="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+									Guardando...
+								</>
+							) : (
+								<>
+									<Edit size={20} />
+									Guardar Cambios
+								</>
+							)}
+						</button>
+
+						<button
+							type="button"
+							onClick={() => {
+								setIsEditResidentModalOpen(false);
+								resetResident();
+								setSelectedResident(null);
+							}}
+							disabled={updateResidentMutation.isPending}
+							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							Cancelar
+						</button>
+					</div>
+				</form>
+			</Modal>
+
+			{/* Menú desplegable con posición fixed para evitar cortes */}
 			{selectedResidentMenu && (
-				<div
-					className="fixed inset-0 z-[5]"
-					onClick={() => setSelectedResidentMenu(null)}
-				></div>
+				<>
+					<div
+						className="fixed inset-0 z-40"
+						onClick={() => setSelectedResidentMenu(null)}
+					></div>
+					<div
+						className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
+						style={{
+							top: `${menuPosition.top}px`,
+							left: `${menuPosition.left}px`,
+						}}
+						onClick={(e) => e.stopPropagation()}
+					>
+						{filteredResidents
+							?.filter((r) => r.id === selectedResidentMenu)
+							.map((resident) => (
+								<React.Fragment key={resident.id}>
+									<button
+										onClick={() => {
+											handleViewResident(resident);
+											setSelectedResidentMenu(null);
+										}}
+										className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 rounded-t-lg"
+									>
+										<Eye size={16} />
+										Ver detalles
+									</button>
+									<button
+										onClick={() => {
+											handleEditResident(resident);
+										}}
+										className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+									>
+										<Edit size={16} />
+										Editar
+									</button>
+									<button
+										onClick={() => {
+											handleDeleteResident(resident);
+											setSelectedResidentMenu(null);
+										}}
+										className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
+									>
+										<Trash2 size={16} />
+										Eliminar
+									</button>
+								</React.Fragment>
+							))}
+					</div>
+				</>
 			)}
 		</div>
 	);

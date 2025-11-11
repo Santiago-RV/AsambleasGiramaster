@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import {
 	LayoutDashboard,
 	Building2,
-	Users,
 	Calendar,
-	PlayCircle,
+	FileText,
 	ChevronDown,
 	ChevronRight,
 } from 'lucide-react';
@@ -24,22 +23,14 @@ const SidebarSA = ({ activeTab, onTabChange }) => {
 			icon: Building2,
 		},
 		{
-			id: 'residentes',
-			label: 'Residentes',
-			icon: Users,
+			id: 'reuniones',
+			label: 'Reuniones Activas',
+			icon: Calendar,
 		},
 		{
-			id: 'reuniones',
-			label: 'Reuniones',
-			icon: Calendar,
-			hasSubmenu: true,
-			submenu: [
-				{
-					id: 'reunion-activa',
-					label: 'Reunión Activa',
-					icon: PlayCircle,
-				},
-			],
+			id: 'informes',
+			label: 'Informes',
+			icon: FileText,
 		},
 	];
 
@@ -85,8 +76,9 @@ const SidebarSA = ({ activeTab, onTabChange }) => {
 										setReunionesExpanded(
 											!reunionesExpanded
 										);
-										if (!reunionesExpanded) {
-											handleClick(item.id);
+										// Si es el primer click, ir directamente a la reunión activa
+										if (!reunionesExpanded && item.submenu && item.submenu.length > 0) {
+											handleClick(item.submenu[0].id);
 										}
 									} else {
 										handleClick(item.id);
@@ -117,7 +109,7 @@ const SidebarSA = ({ activeTab, onTabChange }) => {
 
 							{/* Submenú */}
 							{item.hasSubmenu && reunionesExpanded && (
-								<div className="bg-black/20">
+								<div className="bg-black/20 z-50 relative">
 									{item.submenu.map((subItem) => {
 										const SubIcon = subItem.icon;
 										const subActive =

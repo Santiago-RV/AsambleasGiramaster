@@ -3,9 +3,9 @@ import { Bell, Settings, LogOut } from 'lucide-react';
 import SidebarSA from '../components/layout/SidebarSA';
 import DashboardTab from '../components/saDashboard/DashboardTab';
 import UnidadesResidencialesTab from '../components/saDashboard/UnidadesResidencialesTab';
-import ResidentesTab from '../components/saDashboard/ResidentesTab';
-import ReunionesTab from '../components/saDashboard/ReunionesTab';
 import ReunionActivaTab from '../components/saDashboard/ReunionActivaTab';
+import InformesTab from '../components/saDashboard/InformesTab';
+import ConfiguracionTab from '../components/saDashboard/ConfiguracionTab';
 import ZoomMeetingView from '../components/saDashboard/ZoomMeetingView';
 import UnidadResidencialDetalles from '../components/saDashboard/UnidadResidencialDetalles';
 
@@ -13,6 +13,7 @@ const HomeSA = () => {
 	const [activeTab, setActiveTab] = useState('dashboard');
 	const [meetingData, setMeetingData] = useState(null);
 	const [selectedUnitId, setSelectedUnitId] = useState(null);
+	const [previousTab, setPreviousTab] = useState('dashboard');
 
 	// Función para iniciar una reunión
 	const handleStartMeeting = (meeting) => {
@@ -38,6 +39,17 @@ const HomeSA = () => {
 		setActiveTab('unidades');
 	};
 
+	// Función para navegar a configuración
+	const handleOpenSettings = () => {
+		setPreviousTab(activeTab);
+		setActiveTab('configuracion');
+	};
+
+	// Función para volver desde configuración
+	const handleBackFromSettings = () => {
+		setActiveTab(previousTab);
+	};
+
 	// Renderizar el componente según el tab activo
 	const renderContent = () => {
 		switch (activeTab) {
@@ -57,12 +69,12 @@ const HomeSA = () => {
 						onStartMeeting={handleStartMeeting}
 					/>
 				);
-			case 'residentes':
-				return <ResidentesTab />;
 			case 'reuniones':
-				return <ReunionesTab onStartMeeting={handleStartMeeting} />;
-			case 'reunion-activa':
 				return <ReunionActivaTab />;
+			case 'informes':
+				return <InformesTab />;
+			case 'configuracion':
+				return <ConfiguracionTab onBack={handleBackFromSettings} />;
 			case 'zoom-meeting':
 				return (
 					<ZoomMeetingView
@@ -77,19 +89,21 @@ const HomeSA = () => {
 
 	return (
 		<div className="min-h-screen bg-gray-50">
-			{/* Sidebar - Ocultar cuando estamos en la reunión de Zoom */}
-			{activeTab !== 'zoom-meeting' && (
+			{/* Sidebar - Ocultar cuando estamos en la reunión de Zoom o en configuración */}
+			{activeTab !== 'zoom-meeting' && activeTab !== 'configuracion' && (
 				<SidebarSA activeTab={activeTab} onTabChange={setActiveTab} />
 			)}
 
 			{/* Contenido principal */}
 			<div
 				className={`${
-					activeTab !== 'zoom-meeting' ? 'ml-[280px]' : ''
+					activeTab !== 'zoom-meeting' && activeTab !== 'configuracion'
+						? 'ml-[280px]'
+						: ''
 				} min-h-screen flex flex-col`}
 			>
-				{/* Header - Ocultar cuando estamos en la reunión de Zoom */}
-				{activeTab !== 'zoom-meeting' && (
+			{/* Header - Ocultar cuando estamos en la reunión de Zoom o en configuración */}
+			{activeTab !== 'zoom-meeting' && activeTab !== 'configuracion' && (
 					<header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
 						<div className="px-8 py-4 flex justify-between items-center">
 							<div className="flex items-center gap-4">
@@ -99,14 +113,12 @@ const HomeSA = () => {
 							</div>
 
 							<div className="flex items-center gap-4">
-								{/* Notificaciones */}
-								<button className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
-									<Bell size={20} />
-									<span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-								</button>
-
 								{/* Configuración */}
-								<button className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+								<button
+									onClick={handleOpenSettings}
+									className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+									title="Configuración"
+								>
 									<Settings size={20} />
 								</button>
 
@@ -140,7 +152,7 @@ const HomeSA = () => {
 				{/* Contenido */}
 				<main
 					className={`flex-1 ${
-						activeTab !== 'zoom-meeting' ? 'p-8' : 'p-0'
+						activeTab === 'zoom-meeting' ? 'p-0' : 'p-8'
 					}`}
 				>
 					{renderContent()}
