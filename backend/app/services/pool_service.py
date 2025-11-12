@@ -12,7 +12,7 @@ from app.models.poll_option_model import PollOptionModel
 from app.schemas.poll_schema import PollCreate, PollUpdate
 from app.schemas.pool_response_schema import PollResponseCreate
 from app.core.exceptions import (
-    UserNotFoundException, 
+    UserNotFoundException,
     ValidationException,
     BusinessLogicException
 )
@@ -28,10 +28,10 @@ class PollService:
     async def create_poll(self, poll_data: PollCreate, user_id: int) -> PollModel:
         """Crea una nueva encuesta con sus opciones"""
         # Verificar que la reunión existe
-        from app.models.meeting_models import MeetingModel
+        from app.models.meeting_model import MeetingModel
         meeting = await self.db.get(MeetingModel, poll_data.int_meeting_id)
         if not meeting:
-            raise NotFoundException(
+            raise UserNotFoundException(
                 message="La reunión no existe",
                 error_code="MEETING_NOT_FOUND"
             )
@@ -127,7 +127,7 @@ class PollService:
         """Inicia una encuesta"""
         poll = await self.get_poll_by_id(poll_id)
         if not poll:
-            raise NotFoundException(
+            raise UserNotFoundException(
                 message="La encuesta no existe",
                 error_code="POLL_NOT_FOUND"
             )
@@ -188,7 +188,7 @@ class PollService:
         """Registra una respuesta a la encuesta"""
         poll = await self.get_poll_by_id(poll_id)
         if not poll:
-            raise NotFoundException(
+            raise UserNotFoundException(
                 message="La encuesta no existe",
                 error_code="POLL_NOT_FOUND"
             )
@@ -322,7 +322,7 @@ class PollService:
         """Obtiene estadísticas detalladas de una encuesta"""
         poll = await self.get_poll_by_id(poll_id)
         if not poll:
-            raise NotFoundException(
+            raise UserNotFoundException(
                 message="La encuesta no existe",
                 error_code="POLL_NOT_FOUND"
             )
