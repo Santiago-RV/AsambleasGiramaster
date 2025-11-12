@@ -6,7 +6,6 @@ from app.api.v1.endpoints import residential_enpoint
 from app.api.v1.endpoints import meeting_endpoint
 from app.api.v1.endpoints import zoom_endpoint
 from app.api.v1.endpoints import poll_endpoint 
-from app.api.v1.endpoints import poll_endpoint 
 
 api_router = APIRouter()
 
