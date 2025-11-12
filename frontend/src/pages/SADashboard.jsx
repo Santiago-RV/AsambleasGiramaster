@@ -16,9 +16,9 @@ export const SADashboard = () => {
 
   const titles = {
     dashboard: "Dashboard",
-    clients: "Gestión de Clientes",
-    assemblies: "Configurar Asambleas",
-    calendar: "Calendario de Eventos",
+    clients: "Unidades Residenciales",
+    assemblies: "Residentes",
+    calendar: "Asambleas",
     monitoring: "Monitoreo de Asambleas",
     reports: "Informes y Reportes",
     users: "Gestión de Usuarios",

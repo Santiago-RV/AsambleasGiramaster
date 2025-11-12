@@ -9,7 +9,7 @@ from .config import settings
 from .database import get_db
 
 pwd_context = CryptContext(
-    schemes=["bcrypt_sha256"],
+    schemes=["bcrypt"],
     deprecated="auto"
 )
 
@@ -68,6 +68,3 @@ class RateLimiter:
     return True
 
 rate_limiter = RateLimiter()
-
-# class AuthMiddleware:
-#   """ Middleware de autenticación """

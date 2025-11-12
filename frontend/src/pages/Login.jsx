@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
 import { Home, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import Swal from 'sweetalert2';
+import logo from '../assets/logo_giramaster.jpeg';
+import background from '../assets/background_giramaster.jpeg';
 
 const Login = () => {
 	const {
@@ -46,7 +48,7 @@ const Login = () => {
 				icon: 'error',
 				title: 'Error de Autenticación',
 				text: errorMessage,
-        confirmButtonText: 'Cerrar',
+				confirmButtonText: 'Cerrar',
 				confirmButtonColor: '#2563eb',
 			});
 		}
@@ -55,46 +57,25 @@ const Login = () => {
 	return (
 		<div className="min-h-screen flex">
 			{/* Sección izquierda - Branding */}
-			<div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 p-12 flex-col justify-center items-center text-white relative overflow-hidden">
-				<div className="absolute inset-0 bg-blue-800 opacity-20">
-					<div className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
-					<div
-						className="absolute bottom-0 right-0 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"
-						style={{ animationDelay: '1s' }}
-					></div>
-				</div>
-
-				<div className="relative z-10 text-center max-w-md">
-					<div className="mb-8 inline-flex items-center justify-center w-24 h-24 bg-white/10 backdrop-blur-lg rounded-3xl border border-white/20 shadow-2xl">
-						<Home className="w-12 h-12 text-white" />
-					</div>
-
-					<h1 className="text-4xl font-bold mb-4 leading-tight">
-						Sistema de Gestión de Asambleas
-					</h1>
-
-					<p className="text-blue-100 text-lg leading-relaxed">
-						Administra reuniones, votaciones y decisiones de tu
-						unidad residencial de forma digital, transparente y
-						eficiente
-					</p>
-				</div>
+			<div className="hidden lg:flex lg:w-1/2 p-12 flex-col justify-center items-center text-white relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url(${background})` }}>
+				
 			</div>
 
 			{/* Sección derecha - Login */}
 			<div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
 				<div className="w-full max-w-md">
-					<div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-						{/* Header mobile */}
-						<div className="lg:hidden mb-8 text-center">
-							<div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl mb-4">
-								<Home className="w-8 h-8 text-white" />
-							</div>
-							<h2 className="text-xl font-bold text-gray-800">
-								Sistema de Asambleas
-							</h2>
+					{/* Logo sobre el formulario */}
+					<div className="mb-8 flex justify-center">
+						<div className="inline-flex items-center justify-center w-full h-40">
+							<img
+								src={logo}
+								alt="Logo GIRAMASTER"
+								className="w-full h-full object-contain"
+							/>
 						</div>
+					</div>
 
+					<div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
 						<div className="mb-8">
 							<h2 className="text-3xl font-bold text-gray-800 mb-2">
 								Bienvenido
