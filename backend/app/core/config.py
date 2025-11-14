@@ -19,7 +19,7 @@ class Settings(BaseSettings):
   @property
   def DATABASE_URL(self) -> str:
     # Driver asíncrono requerido por SQLAlchemy AsyncEngine
-    return f"mysql+asyncmy://{self.USER_DB}:{self.PASSWORD_DB}@{self.HOST_DB}:{self.PORT_DB}/{self.NAME_DB}"
+    return f"mysql+aiomysql://{self.USER_DB}:{self.PASSWORD_DB}@{self.HOST_DB}:{self.PORT_DB}/{self.NAME_DB}"
 
   # Seguridad
   SECRET_KEY: str = "SECRET-KEY-GIRAMASTER"
