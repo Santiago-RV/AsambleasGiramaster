@@ -16,6 +16,9 @@ import {
 	Users as UsersIcon,
 	PlayCircle,
 	FileSpreadsheet,
+	UserCog,
+	Mail,
+	Phone,
 } from 'lucide-react';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import { MeetingService } from '../../services/api/MeetingService';
@@ -27,11 +30,23 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
 	const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
 	const [isEditResidentModalOpen, setIsEditResidentModalOpen] = useState(false);
+	const [isChangeAdminModalOpen, setIsChangeAdminModalOpen] = useState(false);
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
 	const [selectedResident, setSelectedResident] = useState(null);
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
+
+	// Datos ficticios del administrador
+	const [currentAdmin, setCurrentAdmin] = useState({
+		id: 1,
+		firstname: 'Carlos',
+		lastname: 'Rodríguez',
+		email: 'carlos.rodriguez@unidad.com',
+		phone: '+57 300 123 4567',
+		apartment_number: '101',
+		role: 'Administrador',
+	});
 
 	// Actualizar posición del menú cuando cambia el scroll o el tamaño de la ventana
 	useEffect(() => {
@@ -423,24 +438,65 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		<div className="space-y-6">
 			{/* Encabezado */}
 			<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-				<div className="flex items-center gap-4 mb-4">
-					<button
-						onClick={onBack}
-						className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-					>
-						<ArrowLeft size={24} className="text-gray-600" />
-					</button>
-					<div>
-						<h1 className="text-3xl font-bold text-gray-800">
-							{unitData.str_name}
-						</h1>
-						<div className="flex items-center gap-2 text-gray-600 mt-1">
-							<MapPin size={18} />
-							<p>
-								{unitData.str_address}, {unitData.str_city},{' '}
-								{unitData.str_state}
-							</p>
+				<div className="flex items-start justify-between gap-4 mb-4">
+					<div className="flex items-center gap-4 flex-1">
+						<button
+							onClick={onBack}
+							className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+						>
+							<ArrowLeft size={24} className="text-gray-600" />
+						</button>
+						<div className="flex-1">
+							<h1 className="text-3xl font-bold text-gray-800">
+								{unitData.str_name}
+							</h1>
+							<div className="flex items-center gap-2 text-gray-600 mt-1">
+								<MapPin size={18} />
+								<p>
+									{unitData.str_address}, {unitData.str_city},{' '}
+									{unitData.str_state}
+								</p>
+							</div>
 						</div>
+					</div>
+					
+					{/* Información del Administrador */}
+					<div className="flex items-center gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+						<div className="flex items-center gap-3">
+							<div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md">
+								{currentAdmin.firstname.charAt(0)}
+								{currentAdmin.lastname.charAt(0)}
+							</div>
+							<div>
+								<div className="flex items-center gap-2">
+									<p className="font-semibold text-gray-800">
+										{currentAdmin.firstname} {currentAdmin.lastname}
+									</p>
+									<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+										{currentAdmin.role}
+									</span>
+								</div>
+								<div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+									<div className="flex items-center gap-1">
+										<Mail size={14} />
+										<span>{currentAdmin.email}</span>
+									</div>
+									{currentAdmin.phone && (
+										<div className="flex items-center gap-1">
+											<Phone size={14} />
+											<span>{currentAdmin.phone}</span>
+										</div>
+									)}
+								</div>
+							</div>
+						</div>
+						<button
+							onClick={() => setIsChangeAdminModalOpen(true)}
+							className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm whitespace-nowrap"
+						>
+							<UserCog size={18} />
+							Cambiar Administrador
+						</button>
 					</div>
 				</div>
 
@@ -1167,6 +1223,166 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</button>
 					</div>
 				</form>
+			</Modal>
+
+			{/* Modal para cambiar administrador */}
+			<Modal
+				isOpen={isChangeAdminModalOpen}
+				onClose={() => setIsChangeAdminModalOpen(false)}
+				title="Cambiar Administrador de la Unidad"
+				size="lg"
+			>
+				<div className="space-y-6">
+					<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+						<h3 className="font-semibold text-blue-800 mb-2">
+							👤 Seleccionar Nuevo Administrador
+						</h3>
+						<p className="text-sm text-blue-700">
+							Selecciona un residente de la lista para asignarlo como
+							administrador de esta unidad residencial.
+						</p>
+					</div>
+
+					{/* Administrador actual */}
+					<div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+						<p className="text-sm font-semibold text-gray-700 mb-2">
+							Administrador Actual:
+						</p>
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold">
+								{currentAdmin.firstname.charAt(0)}
+								{currentAdmin.lastname.charAt(0)}
+							</div>
+							<div>
+								<p className="font-semibold text-gray-800">
+									{currentAdmin.firstname} {currentAdmin.lastname}
+								</p>
+								<p className="text-sm text-gray-600">
+									{currentAdmin.email} • Apt. {currentAdmin.apartment_number}
+								</p>
+							</div>
+						</div>
+					</div>
+
+					{/* Lista de residentes disponibles */}
+					<div>
+						<label className="block mb-3 font-semibold text-gray-700">
+							Seleccionar Nuevo Administrador:
+						</label>
+						<div className="max-h-[400px] overflow-y-auto border border-gray-200 rounded-lg">
+							{isLoadingResidents ? (
+								<div className="flex items-center justify-center py-12">
+									<svg
+										className="animate-spin h-8 w-8 text-[#3498db]"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle
+											className="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											strokeWidth="4"
+										></circle>
+										<path
+											className="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+								</div>
+							) : filteredResidents && filteredResidents.length > 0 ? (
+								<div className="divide-y divide-gray-200">
+									{filteredResidents.map((resident) => (
+										<button
+											key={resident.id}
+											onClick={() => {
+												setCurrentAdmin({
+													id: resident.id,
+													firstname: resident.firstname,
+													lastname: resident.lastname,
+													email: resident.email || '',
+													phone: resident.phone || '',
+													apartment_number:
+														resident.apartment_number || '',
+													role: 'Administrador',
+												});
+												setIsChangeAdminModalOpen(false);
+												Swal.fire({
+													icon: 'success',
+													title: '¡Administrador Cambiado!',
+													text: `${resident.firstname} ${resident.lastname} ha sido asignado como nuevo administrador`,
+													showConfirmButton: false,
+													timer: 2000,
+													toast: true,
+													position: 'top-end',
+												});
+											}}
+											className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
+												currentAdmin.id === resident.id
+													? 'bg-blue-50 border-l-4 border-blue-500'
+													: ''
+											}`}
+										>
+											<div className="flex items-center gap-3">
+												<div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold">
+													{resident.firstname?.charAt(0) || ''}
+													{resident.lastname?.charAt(0) || ''}
+												</div>
+												<div className="flex-1">
+													<div className="flex items-center gap-2">
+														<p className="font-semibold text-gray-800">
+															{resident.firstname} {resident.lastname}
+														</p>
+														{currentAdmin.id === resident.id && (
+															<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+																Actual
+															</span>
+														)}
+													</div>
+													<div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+														{resident.email && (
+															<div className="flex items-center gap-1">
+																<Mail size={12} />
+																<span>{resident.email}</span>
+															</div>
+														)}
+														{resident.apartment_number && (
+															<span>Apt. {resident.apartment_number}</span>
+														)}
+													</div>
+												</div>
+											</div>
+										</button>
+									))}
+								</div>
+							) : (
+								<div className="text-center py-12">
+									<UsersIcon
+										className="mx-auto text-gray-400 mb-4"
+										size={48}
+									/>
+									<p className="text-gray-600">
+										No hay residentes disponibles para asignar como
+										administrador
+									</p>
+								</div>
+							)}
+						</div>
+					</div>
+
+					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
+						<button
+							type="button"
+							onClick={() => setIsChangeAdminModalOpen(false)}
+							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all"
+						>
+							Cancelar
+						</button>
+					</div>
+				</div>
 			</Modal>
 
 			{/* Menú desplegable con posición fixed para evitar cortes */}

@@ -9,7 +9,7 @@ from .config import settings
 from .database import get_db
 
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["bcrypt_sha256"],
     deprecated="auto"
 )
 
