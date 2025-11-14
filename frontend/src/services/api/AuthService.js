@@ -41,7 +41,12 @@ export class AuthService {
         id: user.id,
         username: user.username,
         role: user.role,
+        name: user.name || null,
+        email: user.email || null,
       };
+
+      // Guardar los datos del usuario en localStorage
+      localStorage.setItem('user', JSON.stringify(userData));
 
       return {
         success: true,

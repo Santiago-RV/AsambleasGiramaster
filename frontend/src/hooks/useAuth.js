@@ -24,6 +24,8 @@ export const useAuth = () => {
         id: data.data.user.id,
         username: data.data.user.username,
         role: data.data.user.role,
+        name: data.data.user.name || null,
+        email: data.data.user.email || null,
       }
       updateUser(userData);
 
