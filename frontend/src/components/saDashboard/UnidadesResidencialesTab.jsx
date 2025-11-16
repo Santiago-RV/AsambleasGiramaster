@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResidentialCode } from '../../hooks/useResidentialCode';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
-import { Building2, Users, MapPin, Plus } from 'lucide-react';
+import { Building2, FileText, MapPin, Hash, Home, Users, Calendar, Map, Plus, UserCog, Mail, Phone, User } from 'lucide-react';
 import Modal from '../common/Modal';
 
 const UnidadesResidencialesTab = ({ onViewDetails }) => {
@@ -16,6 +16,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 		handleSubmit,
 		watch,
 		reset,
+		setValue,
 		formState: { errors },
 	} = useForm({
 		defaultValues: {
@@ -55,6 +56,38 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 		select: (response) => response.data || [],
 	});
 
+	// Datos temporales del personal administrativo (hasta conectar con la DB)
+	const administrativeStaff = [
+		{
+			id: "1",
+			str_firstname: "Juan Carlos",
+			str_lastname: "Pérez González",
+			str_email: "juan.perez@ejemplo.com",
+			str_phone: "3102456987"
+		},
+		{
+			id: "2",
+			str_firstname: "María",
+			str_lastname: "Rodríguez",
+			str_email: "maria.rodriguez@ejemplo.com",
+			str_phone: "3151234567"
+		},
+		{
+			id: "3",
+			str_firstname: "Carlos",
+			str_lastname: "Martínez",
+			str_email: "carlos.martinez@ejemplo.com",
+			str_phone: "3209876543"
+		},
+		{
+			id: "4",
+			str_firstname: "Ana",
+			str_lastname: "García",
+			str_email: "ana.garcia@ejemplo.com",
+			str_phone: "3187654321"
+		}
+	];
+
 	// Mutación para crear unidad residencial
 	const createResidentialUnitMutation = useMutation({
 		mutationFn: ResidentialUnitService.createResidentialUnit,
@@ -85,6 +118,32 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 		},
 	});
 
+	const handleAdminSelect = (e) => {
+    const selectedId = e.target.value;
+    
+    if (!selectedId) {
+      // Limpiar campos si no hay selección
+      setValue('admin_str_firstname', '');
+      setValue('admin_str_lastname', '');
+      setValue('admin_str_email', '');
+      setValue('admin_str_phone', '');
+      return;
+    }
+
+    // Buscar el administrador seleccionado
+    const selectedAdmin = administrativeStaff.find(admin => admin.id === selectedId);
+    
+    if (selectedAdmin) {
+      setValue('admin_str_firstname', selectedAdmin.str_firstname);
+      setValue('admin_str_lastname', selectedAdmin.str_lastname);
+      setValue('admin_str_email', selectedAdmin.str_email);
+      setValue('admin_str_phone', selectedAdmin.str_phone);
+    }
+  };
+
+	// Estado de envío del formulario
+	const isSubmitting = createResidentialUnitMutation.isPending;
+
 	const onSubmit = (data) => {
 		const unitData = {
 			str_residential_code: residentialCode,
@@ -99,7 +158,20 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			int_max_concurrent_meetings: parseInt(
 				data.int_max_concurrent_meetings
 			),
+
+			administrator: {
+        str_firstname: data.admin_str_firstname,
+        str_lastname: data.admin_str_lastname,
+        str_email: data.admin_str_email,
+        str_phone: data.admin_str_phone
+      }
 		};
+
+		// Remover los campos temporales del admin
+    delete dataWithCode.admin_str_firstname;
+    delete dataWithCode.admin_str_lastname;
+    delete dataWithCode.admin_str_email;
+    delete dataWithCode.admin_str_phone;
 
 		createResidentialUnitMutation.mutate(unitData);
 	};
@@ -275,265 +347,437 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 				title="Crear Nueva Unidad Residencial"
 				size="xl"
 			>
-				<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-					{/* Código generado automáticamente */}
-					<div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
-						<label className="block mb-2 font-semibold text-gray-700">
-							Código de Unidad Residencial (Generado
-							Automáticamente)
-						</label>
-						<input
-							type="text"
-							value={residentialCode}
-							readOnly
-							className="w-full p-3 border-2 border-blue-300 rounded-lg text-lg font-mono bg-blue-100 text-blue-800 cursor-not-allowed"
-							placeholder="Se genera automáticamente al llenar el formulario"
-						/>
-						<p className="text-sm text-gray-600 mt-2">
-							Este código se genera automáticamente basado en el
-							nombre, NIT y número de apartamentos
-						</p>
-					</div>
+				<form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        
+        {/* SECCIÓN: Código Automático */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200 shadow-sm">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full -mr-16 -mt-16 opacity-50"></div>
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <Hash className="w-5 h-5 text-white" />
+              </div>
+              <label className="text-sm font-semibold text-gray-700">
+                Código de Unidad Residencial
+              </label>
+              <span className="ml-auto px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
+                Auto-generado
+              </span>
+            </div>
+            <input
+              type="text"
+              value={residentialCode}
+              readOnly
+              className="w-full p-4 bg-white border-2 border-blue-200 rounded-xl text-lg font-mono text-blue-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
+              placeholder="Se genera automáticamente"
+            />
+            <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
+              <span className="w-1 h-1 bg-blue-500 rounded-full"></span>
+              Generado automáticamente desde nombre, NIT y apartamentos
+            </p>
+          </div>
+        </div>
 
-					<div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-						{/* Nombre de la Unidad */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								Nombre de la Unidad Residencial *
-							</label>
-							<input
-								type="text"
-								{...register('str_name', {
-									required: 'El nombre es obligatorio',
-									minLength: {
-										value: 3,
-										message: 'Mínimo 3 caracteres',
-									},
-								})}
-								placeholder="Ej: Torres del Parque"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errors.str_name && (
-								<span className="text-red-500 text-sm">
-									{errors.str_name.message}
-								</span>
-							)}
-						</div>
+        {/* SECCIÓN: Información Básica */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+            <Building2 className="w-5 h-5 text-indigo-600" />
+            <h3 className="text-lg font-bold text-gray-800">Información Básica</h3>
+          </div>
 
-						{/* NIT */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								NIT *
-							</label>
-							<input
-								type="text"
-								{...register('str_nit', {
-									required: 'El NIT es obligatorio',
-									pattern: {
-										value: /^[0-9-]+$/,
-										message:
-											'NIT inválido (solo números y guiones)',
-									},
-								})}
-								placeholder="Ej: 900123456-7"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errors.str_nit && (
-								<span className="text-red-500 text-sm">
-									{errors.str_nit.message}
-								</span>
-							)}
-						</div>
+          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+            
+            {/* Nombre */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Building2 className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                Nombre de la Unidad Residencial
+              </label>
+              <input
+                type="text"
+                {...register('str_name', {
+                  minLength: {
+                    value: 3,
+                    message: 'El nombre debe tener al menos 3 caracteres'
+                  }
+                })}
+                placeholder="Ej: Torres del Parque"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.str_name 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                }`}
+              />
+              {errors.str_name && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.str_name.message}
+                </p>
+              )}
+            </div>
 
-						{/* Tipo de Unidad */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								Tipo de Unidad *
-							</label>
-							<select
-								{...register('str_unit_type', {
-									required: 'El tipo es obligatorio',
-								})}
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							>
-								<option value="Conjunto Residencial">
-									Conjunto Residencial
-								</option>
-								<option value="Edificio">Edificio</option>
-								<option value="Condominio">Condominio</option>
-								<option value="Urbanización">
-									Urbanización
-								</option>
-							</select>
-							{errors.str_unit_type && (
-								<span className="text-red-500 text-sm">
-									{errors.str_unit_type.message}
-								</span>
-							)}
-						</div>
+            {/* NIT */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <FileText className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                NIT
+              </label>
+              <input
+                type="text"
+                {...register('str_nit', {
+                  pattern: {
+                    value: /^[0-9-]+$/,
+                    message: 'NIT inválido (solo números y guiones)'
+                  }
+                })}
+                placeholder="Ej: 900123456-7"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.str_nit 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                }`}
+              />
+              {errors.str_nit && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.str_nit.message}
+                </p>
+              )}
+            </div>
 
-						{/* Número de Apartamentos */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								Número de Apartamentos *
-							</label>
-							<input
-								type="number"
-								{...register('int_total_apartments', {
-									required:
-										'El número de apartamentos es obligatorio',
-									min: {
-										value: 1,
-										message: 'Mínimo 1 apartamento',
-									},
-								})}
-								placeholder="Ej: 120"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errors.int_total_apartments && (
-								<span className="text-red-500 text-sm">
-									{errors.int_total_apartments.message}
-								</span>
-							)}
-						</div>
+            {/* Tipo de Unidad */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Home className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                Tipo de Unidad
+              </label>
+              <select 
+                {...register('str_unit_type')}
+                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all hover:border-gray-300 cursor-pointer"
+              >
+                <option value="">Selecciona un tipo</option>
+                <option value="Conjunto Residencial">Conjunto Residencial</option>
+                <option value="Edificio">Edificio</option>
+                <option value="Condominio">Condominio</option>
+                <option value="Urbanización">Urbanización</option>
+              </select>
+            </div>
 
-						{/* Ciudad */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								Ciudad *
-							</label>
-							<input
-								type="text"
-								{...register('str_city', {
-									required: 'La ciudad es obligatoria',
-								})}
-								placeholder="Ej: Medellín"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errors.str_city && (
-								<span className="text-red-500 text-sm">
-									{errors.str_city.message}
-								</span>
-							)}
-						</div>
+            {/* Número de Apartamentos */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Users className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                Número de Apartamentos
+              </label>
+              <input
+                type="number"
+                {...register('int_total_apartments', {
+                  min: {
+                    value: 1,
+                    message: 'Debe haber al menos 1 apartamento'
+                  },
+                  valueAsNumber: true
+                })}
+                placeholder="Ej: 120"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.int_total_apartments 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                }`}
+              />
+              {errors.int_total_apartments && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.int_total_apartments.message}
+                </p>
+              )}
+            </div>
 
-						{/* Departamento/Estado */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								Departamento/Estado *
-							</label>
-							<input
-								type="text"
-								{...register('str_state', {
-									required: 'El departamento es obligatorio',
-								})}
-								placeholder="Ej: Antioquia"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errors.str_state && (
-								<span className="text-red-500 text-sm">
-									{errors.str_state.message}
-								</span>
-							)}
-						</div>
+          </div>
+        </div>
 
-						{/* Dirección */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								Dirección *
-							</label>
-							<input
-								type="text"
-								{...register('str_address', {
-									required: 'La dirección es obligatoria',
-								})}
-								placeholder="Ej: Carrera 15 # 25-30"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errors.str_address && (
-								<span className="text-red-500 text-sm">
-									{errors.str_address.message}
-								</span>
-							)}
-						</div>
+        {/* SECCIÓN: Ubicación */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-bold text-gray-800">Ubicación</h3>
+          </div>
 
-						{/* Máximo de Reuniones Concurrentes */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-600">
-								Máximo de Reuniones Concurrentes *
-							</label>
-							<input
-								type="number"
-								{...register('int_max_concurrent_meetings', {
-									required: 'Este campo es obligatorio',
-									min: {
-										value: 1,
-										message: 'Mínimo 1 reunión',
-									},
-								})}
-								placeholder="Ej: 5"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errors.int_max_concurrent_meetings && (
-								<span className="text-red-500 text-sm">
-									{errors.int_max_concurrent_meetings.message}
-								</span>
-							)}
-						</div>
-					</div>
+          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+            
+            {/* Ciudad */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <MapPin className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                Ciudad
+              </label>
+              <input
+                type="text"
+                {...register('str_city')}
+                placeholder="Ej: Medellín"
+                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
+              />
+            </div>
 
-					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
-						<button
-							type="submit"
-							disabled={createResidentialUnitMutation.isPending}
-							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${
-								createResidentialUnitMutation.isPending
-									? 'opacity-50 cursor-not-allowed'
-									: ''
-							}`}
-						>
-							{createResidentialUnitMutation.isPending ? (
-								<>
-									<svg
-										className="animate-spin h-5 w-5"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											className="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											strokeWidth="4"
-										></circle>
-										<path
-											className="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									Guardando...
-								</>
-							) : (
-								<>
-									<Plus size={20} />
-									Guardar Unidad Residencial
-								</>
-							)}
-						</button>
+            {/* Departamento */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Map className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                Departamento/Estado
+              </label>
+              <input
+                type="text"
+                {...register('str_state')}
+                placeholder="Ej: Antioquia"
+                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
+              />
+            </div>
 
-						<button
-							type="button"
-							onClick={handleCloseModal}
-							disabled={createResidentialUnitMutation.isPending}
-							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							Cancelar
-						</button>
-					</div>
-				</form>
+            {/* Dirección - Ocupa todo el ancho */}
+            <div className="group md:col-span-2">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Map className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                Dirección Completa
+              </label>
+              <input
+                type="text"
+                {...register('str_address')}
+                placeholder="Ej: Carrera 15 # 25-30"
+                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
+              />
+            </div>
+
+          </div>
+        </div>
+
+        {/* SECCIÓN: Configuración */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+            <Calendar className="w-5 h-5 text-purple-600" />
+            <h3 className="text-lg font-bold text-gray-800">Configuración</h3>
+          </div>
+
+          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+            
+            {/* Máximo de Reuniones */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Calendar className="w-4 h-4 text-gray-400 group-hover:text-purple-500 transition-colors" />
+                Máximo de Reuniones Concurrentes
+              </label>
+              <input
+                type="number"
+                {...register('int_max_concurrent_meetings', {
+                  min: {
+                    value: 1,
+                    message: 'Debe permitir al menos 1 reunión'
+                  },
+                  valueAsNumber: true
+                })}
+                placeholder="Ej: 5"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.int_max_concurrent_meetings 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100'
+                }`}
+              />
+              <p className="text-xs text-gray-500 mt-1.5">
+                Número de reuniones que pueden ocurrir al mismo tiempo
+              </p>
+              {errors.int_max_concurrent_meetings && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.int_max_concurrent_meetings.message}
+                </p>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+				{/* SECCIÓN: Administrador de la Unidad */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+            <UserCog className="w-5 h-5 text-amber-600" />
+            <h3 className="text-lg font-bold text-gray-800">Administrador de la Unidad</h3>
+          </div>
+
+          {/* Select de Personal Administrativo */}
+          {administrativeStaff.length > 0 && (
+            <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <UserCog className="w-4 h-4 text-amber-600" />
+                Seleccionar Personal Administrativo Existente
+              </label>
+              <select 
+                onChange={handleAdminSelect}
+                className="w-full p-3.5 bg-white border-2 border-amber-200 rounded-xl text-base focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition-all hover:border-amber-300 cursor-pointer"
+              >
+                <option value="">Selecciona un administrador o registra uno nuevo</option>
+                {administrativeStaff.map((admin) => (
+                  <option key={admin.id} value={admin.id}>
+                    {admin.str_firstname} {admin.str_lastname} - {admin.str_email}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                <span className="w-1 h-1 bg-amber-600 rounded-full"></span>
+                O puedes llenar manualmente los campos para registrar uno nuevo
+              </p>
+            </div>
+          )}
+
+          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+            
+            {/* Nombres */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <User className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
+                Nombres
+              </label>
+              <input
+                type="text"
+                {...register('admin_str_firstname', {
+                  minLength: {
+                    value: 2,
+                    message: 'Los nombres deben tener al menos 2 caracteres'
+                  }
+                })}
+                placeholder="Ej: Juan Carlos"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.admin_str_firstname 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
+                }`}
+              />
+              {errors.admin_str_firstname && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.admin_str_firstname.message}
+                </p>
+              )}
+            </div>
+
+            {/* Apellidos */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <User className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
+                Apellidos
+              </label>
+              <input
+                type="text"
+                {...register('admin_str_lastname', {
+                  minLength: {
+                    value: 2,
+                    message: 'Los apellidos deben tener al menos 2 caracteres'
+                  }
+                })}
+                placeholder="Ej: Pérez González"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.admin_str_lastname 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
+                }`}
+              />
+              {errors.admin_str_lastname && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.admin_str_lastname.message}
+                </p>
+              )}
+            </div>
+
+            {/* Correo Electrónico */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Mail className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                {...register('admin_str_email', {
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Correo electrónico inválido'
+                  }
+                })}
+                placeholder="Ej: admin@ejemplo.com"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.admin_str_email 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
+                }`}
+              />
+              {errors.admin_str_email && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.admin_str_email.message}
+                </p>
+              )}
+            </div>
+
+            {/* Teléfono */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Phone className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
+                Teléfono
+              </label>
+              <input
+                type="tel"
+                {...register('admin_str_phone', {
+                  pattern: {
+                    value: /^[0-9]{10}$/,
+                    message: 'Teléfono inválido (10 dígitos sin espacios)'
+                  }
+                })}
+                placeholder="Ej: 3102456987"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.admin_str_phone 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                    : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
+                }`}
+              />
+              {errors.admin_str_phone && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.admin_str_phone.message}
+                </p>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        {/* BOTONES */}
+        <div className="flex flex-wrap gap-3 pt-6 border-t-2 border-gray-100">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={`flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all duration-200 ${
+              isSubmitting
+                ? 'opacity-50 cursor-not-allowed'
+                : 'hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+            }`}
+          >
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Plus className="w-5 h-5" />
+                Guardar Unidad Residencial
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCloseModal}
+            disabled={isSubmitting}
+            className="bg-gray-100 text-gray-700 font-semibold px-8 py-3.5 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancelar
+          </button>
+        </div>
+
+      </form>
 			</Modal>
 		</div>
 	);

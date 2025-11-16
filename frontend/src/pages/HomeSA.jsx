@@ -8,12 +8,16 @@ import InformesTab from '../components/saDashboard/InformesTab';
 import ConfiguracionTab from '../components/saDashboard/ConfiguracionTab';
 import ZoomMeetingView from '../components/saDashboard/ZoomMeetingView';
 import UnidadResidencialDetalles from '../components/saDashboard/UnidadResidencialDetalles';
+import { useAuth } from '../hooks/useAuth';
+import { useAuthContext } from '../providers/AuthProvider';
 
 const HomeSA = () => {
 	const [activeTab, setActiveTab] = useState('dashboard');
 	const [meetingData, setMeetingData] = useState(null);
 	const [selectedUnitId, setSelectedUnitId] = useState(null);
 	const [previousTab, setPreviousTab] = useState('dashboard');
+	const { logout } = useAuth();
+	const { user } = useAuthContext();
 
 	// Función para iniciar una reunión
 	const handleStartMeeting = (meeting) => {
@@ -128,20 +132,27 @@ const HomeSA = () => {
 								{/* Perfil de usuario */}
 								<div className="flex items-center gap-3">
 									<div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md">
-										SA
+										{user?.name 
+											? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+											: user?.role?.charAt(0).toUpperCase() || 'U'
+										}
 									</div>
 									<div className="flex flex-col">
 										<span className="text-sm font-semibold text-gray-800">
-											Super Administrador
+											{user?.name || user?.role || 'Usuario'}
 										</span>
 										<span className="text-xs text-gray-500">
-											admin@sistema.com
+											{user?.email || ''}
 										</span>
 									</div>
 								</div>
 
 								{/* Cerrar sesión */}
-								<button className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+								<button 
+									onClick={logout}
+									className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+									title="Cerrar sesión"
+								>
 									<LogOut size={20} />
 								</button>
 							</div>

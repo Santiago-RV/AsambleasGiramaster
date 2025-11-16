@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from datetime import timedelta
 from app.auth.auth import create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.schemas.auth_token_schema import Token
@@ -11,6 +12,7 @@ from app.schemas.data_user_schema import DataUserCreate, DataUserResponse, DataU
 from app.services.user_service import UserService
 from app.core.security import security_manager, rate_limiter
 from app.core.database import get_db
+from app.models.data_user_model import DataUserModel
 from app.core.exceptions import (
     UserAlreadyExistsException,
     UserValidationException,
@@ -134,7 +136,18 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     # Verificar si el usuario existe
     exists_user = await user_service.get_user_by_username(form_data.username)
     
-    if not exists_user or not security_manager.verify_password(form_data.password, exists_user.str_password_hash):
+    # if not exists_user or not security_manager.verify_password(form_data.password, exists_user.str_password_hash):
+    #     raise UserNotFoundException(
+    #         message="El usuario no existe",
+    #         error_code="USER_NOT_FOUND"
+    #     )
+
+    is_valid, new_hash = security_manager.verify_and_update(
+        form_data.password,
+        exists_user.str_password_hash
+    )
+
+    if not is_valid:
         raise UserNotFoundException(
             message="El usuario no existe",
             error_code="USER_NOT_FOUND"
@@ -147,12 +160,27 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
             error_code="USER_NOT_ACTIVE"
         )
 
-    # if not user_dict or user_dict["password"] != form_data.password:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Credenciales incorrectas",
-    #         headers={"WWW-Authenticate": "Bearer"},
-    #     )
+    # Obtener los datos del usuario (DataUser) asociados
+    data_user_query = select(DataUserModel).where(DataUserModel.id == exists_user.int_data_user_id)
+    data_user_result = await db.execute(data_user_query)
+    data_user = data_user_result.scalar_one_or_none()
+
+    # Construir el nombre completo
+    full_name = None
+    email = None
+    if data_user:
+        full_name = f"{data_user.str_firstname} {data_user.str_lastname}".strip()
+        email = data_user.str_email
+    
+    if not data_user:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    
+    # 3. Si hay nuevo hash, actualizar en la base de datos
+    if new_hash:
+        exists_user.str_password_hash = new_hash
+        await db.commit()
+        await db.refresh(exists_user)
+        print(f"✅ Hash de usuario {exists_user.str_username} migrado a Argon2")
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -170,7 +198,9 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
           "user": {
             "id": exists_user.id,
             "username": exists_user.str_username,
-            "role": exists_user.rol.str_name
+            "role": exists_user.rol.str_name,
+            "name": full_name,
+            "email": email
           }
         }
     )
