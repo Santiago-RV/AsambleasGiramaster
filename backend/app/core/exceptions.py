@@ -183,11 +183,22 @@ class ResourceAlreadyExistsException(BaseAPIException):
 # Excepciones específicas para permisos
 class PermissionDeniedException(BaseAPIException):
     """Excepción para permisos denegados"""
-    
+
     def __init__(
-        self, 
+        self,
         message: str = "No tienes permisos para realizar esta acción",
         error_code: str = "PERMISSION_DENIED",
+        details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(403, message, error_code, details)
+
+class UnauthorizedException(BaseAPIException):
+    """Excepción para acceso no autorizado"""
+
+    def __init__(
+        self,
+        message: str = "No tienes autorización para realizar esta acción",
+        error_code: str = "UNAUTHORIZED",
         details: Optional[Dict[str, Any]] = None
     ):
         super().__init__(403, message, error_code, details)

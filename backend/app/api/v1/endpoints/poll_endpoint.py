@@ -329,11 +329,65 @@ async def end_poll(
 # ==================== Votación ====================
 
 @router.post(
+    "/code/{poll_code}/vote",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Votar en encuesta (público)",
+    description="Registra un voto en la encuesta usando el código (no requiere autenticación)"
+)
+async def vote_poll_by_code(
+    poll_code: str,
+    request: Request,
+    response_data: PollResponseCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Registra un voto en la encuesta usando el código (acceso público)"""
+    try:
+        poll_service = PollService(db)
+
+        # Obtener la encuesta por código
+        poll = await poll_service.get_poll_by_code(poll_code)
+        if not poll:
+            raise NotFoundException(
+                message="La encuesta no existe",
+                error_code="POLL_NOT_FOUND"
+            )
+
+        # Obtener IP y User-Agent
+        client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
+        user_agent = request.headers.get("User-Agent", "")
+
+        # Registrar voto sin user_id (anónimo)
+        response = await poll_service.submit_response(
+            poll.id, None, response_data, client_ip, user_agent
+        )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_201_CREATED,
+            message="Voto registrado exitosamente",
+            data={
+                "id": response.id,
+                "poll_id": response.int_poll_id,
+                "voted_at": response.dat_response_at,
+                "is_abstention": response.bln_is_abstention
+            }
+        )
+    except (NotFoundException, ValidationException, BusinessLogicException) as e:
+        raise e
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al registrar el voto: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.post(
     "/{poll_id}/vote",
     response_model=SuccessResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Votar en encuesta",
-    description="Registra un voto en la encuesta"
+    summary="Votar en encuesta (autenticado)",
+    description="Registra un voto en la encuesta (requiere autenticación)"
 )
 async def vote_poll(
     poll_id: int,
@@ -342,26 +396,26 @@ async def vote_poll(
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Registra un voto en la encuesta"""
+    """Registra un voto en la encuesta (usuario autenticado)"""
     try:
         poll_service = PollService(db)
         user_service = UserService(db)
-        
+
         user = await user_service.get_user_by_username(current_user)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Usuario no autenticado"
             )
-        
+
         # Obtener IP y User-Agent
         client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
         user_agent = request.headers.get("User-Agent", "")
-        
+
         response = await poll_service.submit_response(
             poll_id, user.id, response_data, client_ip, user_agent
         )
-        
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_201_CREATED,

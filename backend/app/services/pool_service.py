@@ -14,7 +14,8 @@ from app.schemas.pool_response_schema import PollResponseCreate
 from app.core.exceptions import (
     UserNotFoundException,
     ValidationException,
-    BusinessLogicException
+    BusinessLogicException,
+    UnauthorizedException
 )
 
 class PollService:
@@ -25,16 +26,33 @@ class PollService:
         """Genera un código único para la encuesta"""
         return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 
-    async def create_poll(self, poll_data: PollCreate, user_id: int) -> PollModel:
-        """Crea una nueva encuesta con sus opciones"""
-        # Verificar que la reunión existe
+    async def _verify_admin_permissions(self, meeting_id: int, user_id: int):
+        """Verifica que el usuario sea administrador de la reunión"""
         from app.models.meeting_model import MeetingModel
-        meeting = await self.db.get(MeetingModel, poll_data.int_meeting_id)
+
+        result = await self.db.execute(
+            select(MeetingModel)
+            .where(MeetingModel.id == meeting_id)
+        )
+        meeting = result.scalar_one_or_none()
+
         if not meeting:
             raise UserNotFoundException(
                 message="La reunión no existe",
                 error_code="MEETING_NOT_FOUND"
             )
+
+        # Verificar que el usuario sea el organizador o el líder de la reunión
+        if meeting.int_organizer_id != user_id and meeting.int_meeting_leader_id != user_id:
+            raise UnauthorizedException(
+                message="No tienes permisos para administrar encuestas de esta reunión",
+                error_code="INSUFFICIENT_PERMISSIONS"
+            )
+
+    async def create_poll(self, poll_data: PollCreate, user_id: int) -> PollModel:
+        """Crea una nueva encuesta con sus opciones"""
+        # Verificar permisos de administrador
+        await self._verify_admin_permissions(poll_data.int_meeting_id, user_id)
 
         # Generar código único
         poll_code = self._generate_poll_code()
@@ -132,6 +150,9 @@ class PollService:
                 error_code="POLL_NOT_FOUND"
             )
 
+        # Verificar permisos de administrador
+        await self._verify_admin_permissions(poll.int_meeting_id, user_id)
+
         if poll.str_status != 'draft':
             raise BusinessLogicException(
                 message=f"No se puede iniciar una encuesta en estado {poll.str_status}",
@@ -164,6 +185,9 @@ class PollService:
                 error_code="POLL_NOT_FOUND"
             )
 
+        # Verificar permisos de administrador
+        await self._verify_admin_permissions(poll.int_meeting_id, user_id)
+
         if poll.str_status != 'active':
             raise BusinessLogicException(
                 message=f"No se puede finalizar una encuesta en estado {poll.str_status}",
@@ -183,7 +207,7 @@ class PollService:
         
         return poll
 
-    async def submit_response(self, poll_id: int, user_id: int, response_data: PollResponseCreate, 
+    async def submit_response(self, poll_id: int, user_id: Optional[int], response_data: PollResponseCreate,
                              ip_address: str, user_agent: str) -> PollResponseModel:
         """Registra una respuesta a la encuesta"""
         poll = await self.get_poll_by_id(poll_id)
@@ -199,8 +223,8 @@ class PollService:
                 error_code="POLL_NOT_ACTIVE"
             )
 
-        # Verificar si ya votó
-        if not poll.bln_is_anonymous:
+        # Verificar si ya votó (solo si no es anónima y tenemos user_id)
+        if not poll.bln_is_anonymous and user_id:
             existing = await self._user_has_voted(poll_id, user_id)
             if existing:
                 raise BusinessLogicException(
@@ -211,8 +235,12 @@ class PollService:
         # Validar respuesta según tipo de encuesta
         await self._validate_response(poll, response_data)
 
-        # Obtener peso de votación del usuario
-        voting_weight = await self._get_user_voting_weight(user_id, poll.int_meeting_id)
+        # Obtener peso de votación del usuario (si está autenticado, sino 1.0)
+        if user_id:
+            voting_weight = await self._get_user_voting_weight(user_id, poll.int_meeting_id)
+        else:
+            # Para votos anónimos sin autenticación, peso por defecto
+            voting_weight = 1.0
 
         # Crear respuesta
         db_response = PollResponseModel(
@@ -289,8 +317,24 @@ class PollService:
 
     async def _get_user_voting_weight(self, user_id: int, meeting_id: int) -> float:
         """Obtiene el peso de votación del usuario en la reunión"""
-        # TODO: Implementar obtención del coeficiente desde meeting_invitations
-        return 1.0
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+
+        result = await self.db.execute(
+            select(MeetingInvitationModel.dec_voting_weight)
+            .where(and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_user_id == user_id
+            ))
+        )
+        voting_weight = result.scalar_one_or_none()
+
+        if voting_weight is None:
+            raise ValidationException(
+                message="El usuario no está invitado a esta reunión",
+                error_code="USER_NOT_INVITED"
+            )
+
+        return float(voting_weight)
 
     async def _update_option_stats(self, option_id: int, voting_weight: float):
         """Actualiza las estadísticas de una opción"""
@@ -347,8 +391,16 @@ class PollService:
         # Contar abstenciones
         total_abstentions = total_responses - total_votes
 
-        # Calcular participación (TODO: obtener total de participantes reales)
-        total_participants = 100  # Placeholder
+        # Calcular participación real (total de invitados a la reunión)
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+
+        total_participants_result = await self.db.execute(
+            select(func.count(MeetingInvitationModel.id))
+            .where(MeetingInvitationModel.int_meeting_id == poll.int_meeting_id)
+        )
+        total_participants = total_participants_result.scalar()
+
+        # Calcular porcentaje de participación
         participation_percentage = (total_responses / total_participants * 100) if total_participants > 0 else 0
 
         # Verificar quorum
