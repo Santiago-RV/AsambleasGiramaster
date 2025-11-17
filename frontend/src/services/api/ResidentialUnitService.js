@@ -174,5 +174,67 @@ export class ResidentialUnitService {
       throw new Error(errorMessage);
     }
   }
+
+  /**
+   * Carga masiva de copropietarios desde un archivo Excel
+   * @param {number} unitId - ID de la unidad residencial
+   * @param {File} file - Archivo Excel
+   * @returns {Promise} Resultado de la carga
+   */
+  static async uploadResidentsExcel(unitId, file) {
+    try {
+      // Verificar que hay un token
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+
+      if (!token) {
+        throw new Error('No hay sesión activa. Por favor inicia sesión nuevamente.');
+      }
+
+      // Crear FormData para enviar el archivo
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Realizar la petición con el token explícito
+      const response = await axiosInstance.post(
+        `/super-admin/residential-units/${unitId}/upload-residents-excel`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}` // Token explícito
+          }
+        }
+      );
+
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Error al cargar el archivo');
+      }
+
+      return {
+        success: true,
+        message: response.data.message,
+        data: response.data.data,
+      };
+    } catch (error) {
+      console.error('Error uploading residents Excel:', error);
+
+      // Manejo específico de errores
+      if (error.response?.status === 401) {
+        throw new Error('Token inválido o expirado');
+      }
+
+      if (error.response?.status === 403) {
+        throw new Error('No tienes permisos para realizar esta acción');
+      }
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al cargar el archivo Excel';
+
+      throw new Error(errorMessage);
+    }
+  }
 }
 

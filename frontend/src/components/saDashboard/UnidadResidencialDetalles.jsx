@@ -23,12 +23,15 @@ import {
 	Video,
 	FileText,
 	UserCheck,
-	AlertCircle
+	AlertCircle,
+	Download
 } from 'lucide-react';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import { MeetingService } from '../../services/api/MeetingService';
 import Modal from '../common/Modal';
 import Swal from 'sweetalert2';
+import { uploadResidentsExcel, downloadResidentsExcelTemplate } from '../../services/residentialUnitService';
+
 
 const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [searchTerm, setSearchTerm] = useState('');
@@ -193,34 +196,34 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			str_description: '',
 			str_meeting_type: 'Ordinaria',
 			dat_schedule_start: '',
-      dat_schedule_end: '',
+			dat_schedule_end: '',
 			bln_allow_delegates: false,
 		},
 	});
 
 	const watchStart = watch('dat_schedule_start');
-  const watchEnd = watch('dat_schedule_end');
+	const watchEnd = watch('dat_schedule_end');
 
-  const calculateDuration = () => {
-    if (!watchStart || !watchEnd) return 'No calculado';
-    
-    const start = new Date(watchStart);
-    const end = new Date(watchEnd);
-    const diffMs = end - start;
-    
-    if (diffMs <= 0) return 'Fecha final debe ser posterior';
-    
-    const diffMinutes = Math.floor(diffMs / 60000);
-    const hours = Math.floor(diffMinutes / 60);
-    const minutes = diffMinutes % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}min`;
-    }
-    return `${minutes} minutos`;
-  };
+	const calculateDuration = () => {
+		if (!watchStart || !watchEnd) return 'No calculado';
 
-  const estimatedDuration = calculateDuration();
+		const start = new Date(watchStart);
+		const end = new Date(watchEnd);
+		const diffMs = end - start;
+
+		if (diffMs <= 0) return 'Fecha final debe ser posterior';
+
+		const diffMinutes = Math.floor(diffMs / 60000);
+		const hours = Math.floor(diffMinutes / 60);
+		const minutes = diffMinutes % 60;
+
+		if (hours > 0) {
+			return `${hours}h ${minutes}min`;
+		}
+		return `${minutes} minutos`;
+	};
+
+	const estimatedDuration = calculateDuration();
 
 	// Formulario para editar residente
 	const {
@@ -462,14 +465,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		setIsUploading(true);
 
 		try {
-			// TODO: Implementar la llamada al servicio para cargar el archivo
-			// Por ahora simulamos una carga
-			const formData = new FormData();
-			formData.append('file', selectedFile);
-			formData.append('unit_id', unitId);
+			// Llamar al servicio para subir el Excel
+			const response = await uploadResidentsExcel(unitId, selectedFile);
 
-			// Simulación de carga (reemplazar con llamada real al servicio)
-			await new Promise((resolve) => setTimeout(resolve, 2000));
+			// Mostrar resultados
+			const { total_rows, successful, failed, users_created, errors } = response.data;
 
 			// Invalidar queries para refrescar los datos
 			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
@@ -479,20 +479,98 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			setIsExcelModalOpen(false);
 			setIsUploading(false);
 
+			// Mostrar resumen detallado
+			let htmlContent = `
+			<div class="text-left space-y-3">
+				<div class="bg-blue-50 p-3 rounded-lg">
+					<p class="font-semibold text-blue-800">📊 Resumen del Proceso</p>
+					<p class="text-sm text-blue-700">Total de filas procesadas: <strong>${total_rows}</strong></p>
+					<p class="text-sm text-green-700">Copropietarios creados exitosamente: <strong>${successful}</strong></p>
+					<p class="text-sm text-green-700">Nuevos usuarios creados: <strong>${users_created}</strong></p>
+					${failed > 0 ? `<p class="text-sm text-red-700">Filas con errores: <strong>${failed}</strong></p>` : ''}
+				</div>
+		`;
+
+			// Agregar errores si existen
+			if (errors && errors.length > 0) {
+				htmlContent += `
+				<div class="bg-red-50 p-3 rounded-lg max-h-48 overflow-y-auto">
+					<p class="font-semibold text-red-800 mb-2">❌ Errores Encontrados:</p>
+					<ul class="text-sm text-red-700 space-y-1">
+			`;
+
+				errors.forEach(error => {
+					htmlContent += `<li>Fila ${error.row} (${error.email}): ${error.error}</li>`;
+				});
+
+				htmlContent += `
+					</ul>
+				</div>
+			`;
+			}
+
+			htmlContent += `
+				<div class="text-xs text-gray-600 mt-2">
+					<p>💡 Los copropietarios creados ya pueden iniciar sesión con su email y la contraseña configurada.</p>
+				</div>
+			</div>
+		`;
+
 			Swal.fire({
-				icon: 'success',
-				title: '¡Archivo cargado exitosamente!',
-				text: 'Los residentes han sido importados correctamente',
-				showConfirmButton: true,
+				icon: successful > 0 ? 'success' : 'error',
+				title: successful > 0 ? '¡Carga completada!' : 'Error en la carga',
+				html: htmlContent,
 				confirmButtonColor: '#3498db',
+				width: '600px'
 			});
+
 		} catch (error) {
+			console.error('Error uploading Excel:', error);
+
 			setIsUploading(false);
+
 			Swal.fire({
 				icon: 'error',
-				title: 'Error al cargar el archivo',
-				text: error.message || 'Ocurrió un error al procesar el archivo',
+				title: 'Error al cargar archivo',
+				html: `
+				<div class="text-left">
+					<p class="mb-2">${error.message}</p>
+					<div class="bg-gray-50 p-3 rounded text-sm">
+						<p class="font-semibold mb-1">Verifica que:</p>
+						<ul class="list-disc list-inside space-y-1">
+							<li>El archivo sea formato Excel (.xlsx o .xls)</li>
+							<li>Contenga las columnas requeridas: firstname, lastname, email, apartment_number</li>
+							<li>Los emails sean válidos y únicos</li>
+							<li>Tengas permisos de Super Admin</li>
+						</ul>
+					</div>
+				</div>
+			`,
 				confirmButtonColor: '#3498db',
+				width: '600px'
+			});
+		}
+	};
+
+	const handleDownloadTemplate = () => {
+		try {
+			downloadResidentsExcelTemplate();
+
+			Swal.fire({
+				icon: 'success',
+				title: 'Plantilla descargada',
+				text: 'La plantilla de Excel ha sido descargada. Complétala con los datos de los copropietarios.',
+				timer: 3000,
+				showConfirmButton: false
+			});
+		} catch (error) {
+			console.error('Error downloading template:', error);
+
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: 'No se pudo descargar la plantilla',
+				confirmButtonColor: '#3498db'
 			});
 		}
 	};
@@ -990,8 +1068,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 									})}
 									placeholder="Ej: Asamblea Ordinaria Anual 2025"
 									className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errorsMeeting.str_title
-											? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-											: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+										? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+										: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
 										}`}
 								/>
 								{errorsMeeting.str_title && (
@@ -1018,8 +1096,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 									placeholder="Descripción de la reunión, agenda, temas a tratar..."
 									rows={4}
 									className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 resize-none ${errorsMeeting.str_description
-											? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-											: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+										? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+										: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
 										}`}
 								/>
 								{errorsMeeting.str_description && (
@@ -1046,8 +1124,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 											required: 'El tipo de reunión es obligatorio'
 										})}
 										className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 cursor-pointer ${errorsMeeting.str_meeting_type
-												? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-												: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+											? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+											: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
 											}`}
 									>
 										<option value="Ordinaria">Asamblea Ordinaria</option>
@@ -1081,8 +1159,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 										})}
 										placeholder="Ej: 123"
 										className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errorsMeeting.int_meeting_leader_id
-												? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-												: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+											? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+											: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
 											}`}
 									/>
 									{errorsMeeting.int_meeting_leader_id && (
@@ -1129,8 +1207,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 										}
 									})}
 									className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errorsMeeting.dat_schedule_start
-											? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-											: 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
+										? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+										: 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
 										}`}
 								/>
 								{errorsMeeting.dat_schedule_start && (
@@ -1169,8 +1247,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 										}
 									})}
 									className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errorsMeeting.dat_schedule_end
-											? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-											: 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
+										? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+										: 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
 										}`}
 								/>
 								{errorsMeeting.dat_schedule_end && (
@@ -1234,8 +1312,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							type="submit"
 							disabled={isSubmitting}
 							className={`flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all duration-200 ${isSubmitting
-									? 'opacity-50 cursor-not-allowed'
-									: 'hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+								? 'opacity-50 cursor-not-allowed'
+								: 'hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
 								}`}
 						>
 							{isSubmitting ? (
@@ -1432,8 +1510,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							type="submit"
 							disabled={updateResidentMutation.isPending}
 							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${updateResidentMutation.isPending
-									? 'opacity-50 cursor-not-allowed'
-									: ''
+								? 'opacity-50 cursor-not-allowed'
+								: ''
 								}`}
 						>
 							{updateResidentMutation.isPending ? (
@@ -1580,8 +1658,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 												});
 											}}
 											className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${currentAdmin.id === resident.id
-													? 'bg-blue-50 border-l-4 border-blue-500'
-													: ''
+												? 'bg-blue-50 border-l-4 border-blue-500'
+												: ''
 												}`}
 										>
 											<div className="flex items-center gap-3">
@@ -1647,11 +1725,54 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			<Modal
 				isOpen={isExcelModalOpen}
 				onClose={handleCloseExcelModal}
-				title="Cargar Residentes desde Excel"
+				title="Cargar Copropietarios desde Excel"
 				size="lg"
 			>
 				<div className="space-y-6">
-					{/* Información */}
+					{/* Botón para descargar plantilla */}
+					<div className="bg-green-50 p-4 rounded-lg border border-green-200">
+						<h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+							<FileSpreadsheet size={20} />
+							Descargar Plantilla
+						</h3>
+						<p className="text-sm text-green-700 mb-3">
+							Descarga la plantilla de Excel para facilitar la carga de copropietarios con sus pesos de votación.
+						</p>
+						<button
+							type="button"
+							onClick={handleDownloadTemplate}
+							className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
+						>
+							<Download size={18} />
+							Descargar Plantilla Excel
+						</button>
+					</div>
+
+					{/* Información sobre voting_weight */}
+					<div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+						<h3 className="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+							⚖️ Sobre el Peso de Votación
+						</h3>
+						<div className="text-sm text-purple-700 space-y-2">
+							<p>
+								El <strong>voting_weight</strong> (peso de votación) representa el coeficiente de copropiedad de cada propietario.
+							</p>
+							<div className="bg-purple-100 p-3 rounded">
+								<p className="font-semibold mb-1">Ejemplos:</p>
+								<ul className="list-disc list-inside space-y-1 ml-2">
+									<li><code className="bg-white px-2 py-0.5 rounded">0.25</code> = 25% (apartamento grande)</li>
+									<li><code className="bg-white px-2 py-0.5 rounded">0.15</code> = 15% (apartamento mediano)</li>
+									<li><code className="bg-white px-2 py-0.5 rounded">0.10</code> = 10% (apartamento pequeño)</li>
+								</ul>
+							</div>
+							<p className="text-xs text-purple-600 mt-2">
+								💡 <strong>Importante:</strong> Este peso se usa para ponderar los votos en las encuestas.
+								La suma de todos los pesos debería ser 1.0 (100%).
+							</p>
+						</div>
+					</div>
+
+					{/* Información sobre formato */}
 					<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
 						<h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
 							<FileSpreadsheet size={20} />
@@ -1660,13 +1781,59 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						<p className="text-sm text-blue-700 mb-2">
 							El archivo Excel debe contener las siguientes columnas:
 						</p>
-						<ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-							<li>Nombres (firstname)</li>
-							<li>Apellidos (lastname)</li>
-							<li>Email</li>
-							<li>Teléfono (opcional)</li>
-							<li>Número de Apartamento (apartment_number)</li>
-						</ul>
+						<div className="space-y-3">
+							<div>
+								<p className="text-sm font-semibold text-blue-800 mb-1">📋 Columnas REQUERIDAS:</p>
+								<ul className="text-sm text-blue-700 list-disc list-inside space-y-1 ml-2">
+									<li><strong>email</strong> - Email del copropietario (único, será su usuario de login)</li>
+									<li><strong>firstname</strong> - Nombre del copropietario</li>
+									<li><strong>lastname</strong> - Apellido del copropietario</li>
+									<li><strong>apartment_number</strong> - Número de apartamento</li>
+									<li><strong>voting_weight</strong> - Peso de votación (ej: 0.25, 0.30, 0.15)</li>
+								</ul>
+							</div>
+							<div>
+								<p className="text-sm font-semibold text-blue-800 mb-1">📝 Columnas OPCIONALES:</p>
+								<ul className="text-sm text-blue-700 list-disc list-inside space-y-1 ml-2">
+									<li><strong>phone</strong> - Teléfono del copropietario (puede estar vacío)</li>
+									<li><strong>password</strong> - Contraseña inicial (default: Temporal123!)</li>
+								</ul>
+							</div>
+						</div>
+						<div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+							<p className="text-xs text-yellow-800">
+								⚠️ <strong>Formato de ejemplo:</strong>
+							</p>
+							<div className="mt-2 bg-white p-2 rounded text-xs font-mono overflow-x-auto">
+								<table className="min-w-full">
+									<thead>
+										<tr className="text-left">
+											<th className="px-2">email</th>
+											<th className="px-2">firstname</th>
+											<th className="px-2">lastname</th>
+											<th className="px-2">apartment_number</th>
+											<th className="px-2">voting_weight</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td className="px-2">juan@email.com</td>
+											<td className="px-2">Juan</td>
+											<td className="px-2">Pérez</td>
+											<td className="px-2">101</td>
+											<td className="px-2 font-bold text-purple-600">0.25</td>
+										</tr>
+										<tr>
+											<td className="px-2">maria@email.com</td>
+											<td className="px-2">María</td>
+											<td className="px-2">González</td>
+											<td className="px-2">102</td>
+											<td className="px-2 font-bold text-purple-600">0.30</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
 					</div>
 
 					{/* Selector de archivo */}
@@ -1693,79 +1860,60 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 									}`}
 							>
 								{selectedFile ? (
-									<div className="flex flex-col items-center gap-2">
-										<FileSpreadsheet
-											size={32}
-											className="text-green-600"
-										/>
-										<span className="text-sm font-medium text-green-700">
+									<>
+										<FileSpreadsheet className="text-green-500 mb-2" size={40} />
+										<p className="text-sm font-semibold text-green-700">
 											{selectedFile.name}
-										</span>
-										<span className="text-xs text-gray-500">
-											{(
-												selectedFile.size /
-												1024
-											).toFixed(2)}{' '}
-											KB
-										</span>
-									</div>
+										</p>
+										<p className="text-xs text-green-600 mt-1">
+											{(selectedFile.size / 1024).toFixed(2)} KB
+										</p>
+									</>
 								) : (
-									<div className="flex flex-col items-center gap-2">
-										<Upload
-											size={32}
-											className="text-gray-400"
-										/>
-										<span className="text-sm font-medium text-gray-700">
-											Haz clic para seleccionar un archivo
-										</span>
-										<span className="text-xs text-gray-500">
-											Excel (.xlsx, .xls)
-										</span>
-									</div>
+									<>
+										<Upload className="text-gray-400 mb-2" size={40} />
+										<p className="text-sm text-gray-600">
+											<span className="font-semibold text-[#3498db]">
+												Haz clic para seleccionar
+											</span>{' '}
+											o arrastra el archivo aquí
+										</p>
+										<p className="text-xs text-gray-500 mt-1">
+											Formatos aceptados: .xlsx, .xls
+										</p>
+									</>
 								)}
 							</label>
 						</div>
 
-						{/* Archivo seleccionado con botón para eliminar */}
 						{selectedFile && (
-							<div className="mt-3 flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
-								<div className="flex items-center gap-3 flex-1">
-									<FileSpreadsheet
-										size={20}
-										className="text-green-600"
-									/>
-									<div className="flex-1 min-w-0">
-										<p className="text-sm font-medium text-gray-800 truncate">
-											{selectedFile.name}
-										</p>
-										<p className="text-xs text-gray-500">
-											{(selectedFile.size / 1024).toFixed(2)} KB
-										</p>
-									</div>
-								</div>
-								<button
-									type="button"
-									onClick={handleRemoveFile}
-									disabled={isUploading}
-									className="p-2 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-									title="Eliminar archivo"
-								>
-									<X size={18} className="text-red-600" />
-								</button>
-							</div>
+							<button
+								type="button"
+								onClick={handleRemoveFile}
+								disabled={isUploading}
+								className="mt-2 text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+							>
+								<X size={16} />
+								Remover archivo
+							</button>
 						)}
 					</div>
 
-					{/* Botones */}
+					{/* Botones de acción */}
 					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
+						<button
+							type="button"
+							onClick={handleCloseExcelModal}
+							disabled={isUploading}
+							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							Cancelar
+						</button>
 						<button
 							type="button"
 							onClick={handleUploadExcel}
 							disabled={!selectedFile || isUploading}
-							className={`flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:shadow-lg transition-all ${!selectedFile || isUploading
-									? 'opacity-50 cursor-not-allowed'
-									: 'hover:-translate-y-0.5'
-								}`}
+							className="bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white font-semibold px-6 py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
 						>
 							{isUploading ? (
 								<>
@@ -1789,23 +1937,14 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 										></path>
 									</svg>
-									Subiendo...
+									<span>Procesando...</span>
 								</>
 							) : (
 								<>
-									<Upload size={20} />
-									Confirmar Carga
+									<Upload size={18} />
+									<span>Cargar Copropietarios</span>
 								</>
 							)}
-						</button>
-
-						<button
-							type="button"
-							onClick={handleCloseExcelModal}
-							disabled={isUploading}
-							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							Cancelar
 						</button>
 					</div>
 				</div>
