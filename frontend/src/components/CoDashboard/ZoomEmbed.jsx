@@ -18,7 +18,7 @@ export default function ZoomEmbed() {
 
   return (
     <div className="bg-gray-100 border-2 border-gray-300 p-6 rounded-xl mb-6">
-      <h3 className="text-xl font-semibold mb-4">📹 Reunión Virtual</h3>
+      <h3 className="text-xl font-semibold mb-4"> Reunión Virtual</h3>
 
       <div className="w-full h-72 bg-black text-white rounded-lg flex items-center justify-center mb-4">
         {!connected ? (
@@ -47,7 +47,7 @@ export default function ZoomEmbed() {
             disabled={loading}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
           >
-            {loading ? "⏳ Conectando..." : "📹 Conectar"}
+            {loading ? " Conectando..." : " Conectar"}
           </button>
         ) : (
           <>
@@ -55,13 +55,13 @@ export default function ZoomEmbed() {
               onClick={handleDisconnect}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
-              📴 Desconectar
+               Desconectar
             </button>
           </>
         )}
 
         <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
-          📱 Abrir en App
+           Abrir en App
         </button>
       </div>
     </div>

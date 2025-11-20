@@ -39,7 +39,7 @@ export default function ProfilePage() {
   return (
     <section className="bg-white rounded-xl p-6 shadow-md">
       <h1 className="text-2xl font-semibold text-[#2c5aa0] border-b-2 pb-2 mb-6">
-        👤 Mi Perfil
+        Mi Perfil
       </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -48,7 +48,7 @@ export default function ProfilePage() {
       </div>
 
       <h3 className="mt-8 mb-3 text-[#2c5aa0] text-lg font-semibold">
-        📅 Historial de Asambleas
+         Historial de Asambleas
       </h3>
 
       <HistoryTable data={history} />

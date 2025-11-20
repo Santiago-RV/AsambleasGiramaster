@@ -27,7 +27,7 @@ export default function VotingPage() {
   return (
     <section className="bg-white rounded-xl p-6 shadow-md">
       <h1 className="text-2xl font-semibold text-[#2c5aa0] border-b-2 pb-2 mb-4">
-        🗳️ Votaciones
+         Votaciones
       </h1>
 
       <VotingItem
@@ -39,9 +39,9 @@ export default function VotingPage() {
         completed={votes[1].completed}
         duration={180}
         options={[
-          { value: "favor", label: "✅ A FAVOR" },
-          { value: "contra", label: "❌ EN CONTRA" },
-          { value: "abstencion", label: "⚪ ABSTENCIÓN" },
+          { value: "favor", label: " A FAVOR" },
+          { value: "contra", label: " EN CONTRA" },
+          { value: "abstencion", label: " ABSTENCIÓN" },
         ]}
         onVoteConfirmed={handleVoteConfirmed}
       />

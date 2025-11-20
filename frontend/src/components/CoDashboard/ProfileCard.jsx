@@ -2,7 +2,7 @@ export default function ProfileCard({ user }) {
   return (
     <div className="bg-gray-50 p-6 rounded-xl border-l-4 border-[#2c5aa0] shadow-sm">
       <h4 className="text-[#2c5aa0] font-semibold text-lg mb-4">
-        📋 Información Personal
+         Información Personal
       </h4>
 
       <div className="space-y-3 text-sm">

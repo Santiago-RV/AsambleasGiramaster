@@ -2,7 +2,7 @@ export default function PowerIndicator() {
   return (
     <div className="bg-blue-50 border-2 border-blue-400 p-5 rounded-xl mb-6">
       <h4 className="text-blue-700 font-semibold mb-3 flex items-center text-lg">
-        ⚖️ Poder de Representación Activo
+         Poder de Representación Activo
       </h4>
 
       <div className="flex justify-between items-center text-sm">

@@ -14,7 +14,7 @@ export default function NotificationSettings() {
   return (
     <div className="bg-gray-50 p-6 rounded-xl shadow mt-6">
       <h4 className="text-[#2c5aa0] font-semibold text-lg mb-4">
-        📧 Configuración de Notificaciones
+        Configuración de Notificaciones
       </h4>
 
       <div className="space-y-3 text-sm">
