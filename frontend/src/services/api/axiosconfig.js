@@ -15,7 +15,8 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken")
+    // Buscar token en ambos nombres (por compatibilidad)
+    const token = localStorage.getItem("access_token") || localStorage.getItem("accessToken")
     if (token && !config.headers["Skip-Auth"]) {
       config.headers.set("Authorization", `Bearer ${token}`)
     }
