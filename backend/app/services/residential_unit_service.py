@@ -77,7 +77,6 @@ class ResidentialUnitService:
                 .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
                 .where(UserResidentialUnitModel.int_residential_unit_id == residential_unit_id)
-                .where(UserModel.bln_is_active == True)
             )
             
             result = await self.db.execute(query)

@@ -167,12 +167,6 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
       }
 		};
 
-		// Remover los campos temporales del admin
-    delete dataWithCode.admin_str_firstname;
-    delete dataWithCode.admin_str_lastname;
-    delete dataWithCode.admin_str_email;
-    delete dataWithCode.admin_str_phone;
-
 		createResidentialUnitMutation.mutate(unitData);
 	};
 
