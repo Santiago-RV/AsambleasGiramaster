@@ -110,7 +110,6 @@ class UserNotActiveException(BaseAPIException):
     ):
         super().__init__(400, message, error_code, details)
 
-
 # Excepciones específicas para servicios
 class ServiceException(BaseAPIException):
     """Excepción para errores del servicio"""
@@ -184,11 +183,22 @@ class ResourceAlreadyExistsException(BaseAPIException):
 # Excepciones específicas para permisos
 class PermissionDeniedException(BaseAPIException):
     """Excepción para permisos denegados"""
-    
+
     def __init__(
-        self, 
+        self,
         message: str = "No tienes permisos para realizar esta acción",
         error_code: str = "PERMISSION_DENIED",
+        details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(403, message, error_code, details)
+
+class UnauthorizedException(BaseAPIException):
+    """Excepción para acceso no autorizado"""
+
+    def __init__(
+        self,
+        message: str = "No tienes autorización para realizar esta acción",
+        error_code: str = "UNAUTHORIZED",
         details: Optional[Dict[str, Any]] = None
     ):
         super().__init__(403, message, error_code, details)
@@ -204,3 +214,41 @@ class ConfigurationException(BaseAPIException):
         details: Optional[Dict[str, Any]] = None
     ):
         super().__init__(500, message, error_code, details)
+
+# ==================== NUEVAS EXCEPCIONES ====================
+
+# Excepciones específicas para recursos no encontrados (genérica)
+class NotFoundException(BaseAPIException):
+    """Excepción para recurso no encontrado"""
+    
+    def __init__(
+        self, 
+        message: str = "El recurso solicitado no fue encontrado",
+        error_code: str = "NOT_FOUND",
+        details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(404, message, error_code, details)
+
+# Excepciones específicas para lógica de negocio
+class BusinessLogicException(BaseAPIException):
+    """Excepción para errores de lógica de negocio"""
+    
+    def __init__(
+        self, 
+        message: str = "Error en la lógica de negocio",
+        error_code: str = "BUSINESS_LOGIC_ERROR",
+        details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(400, message, error_code, details)
+
+# Excepciones específicas para conflictos
+class ConflictException(BaseAPIException):
+    """Excepción para conflictos (recursos duplicados, estado inválido, etc)"""
+    
+    def __init__(
+        self, 
+        message: str = "Existe un conflicto con el estado actual del recurso",
+        error_code: str = "CONFLICT",
+        details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(409, message, error_code, details)

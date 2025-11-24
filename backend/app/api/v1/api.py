@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from app.api.v1.endpoints import auth_endpoint
 from app.api.v1.endpoints import administrator
 from app.api.v1.endpoints import residential_enpoint
 from app.api.v1.endpoints import meeting_endpoint
 from app.api.v1.endpoints import zoom_endpoint
+from app.api.v1.endpoints import poll_endpoint 
 
 api_router = APIRouter()
 
 api_router.include_router(
-  auth_endpoint.router, 
-  prefix="/auth", 
-  tags=["auth"])
+    auth_endpoint.router, 
+    prefix="/auth", 
+    tags=["auth"]
+)
 
 api_router.include_router(
     administrator.router,
@@ -38,4 +40,18 @@ api_router.include_router(
     zoom_endpoint.router,
     prefix="/zoom",
     tags=["Zoom SDK"]
+)
+
+# ← AGREGAR ESTO
+api_router.include_router(
+    poll_endpoint.router,
+    prefix="/polls",
+    tags=["Polls"]
+)
+
+# ← AGREGAR ESTO
+api_router.include_router(
+    poll_endpoint.router,
+    prefix="/polls",
+    tags=["Polls"]
 )

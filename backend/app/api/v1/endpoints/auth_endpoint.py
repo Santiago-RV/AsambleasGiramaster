@@ -136,11 +136,11 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     # Verificar si el usuario existe
     exists_user = await user_service.get_user_by_username(form_data.username)
     
-    # if not exists_user or not security_manager.verify_password(form_data.password, exists_user.str_password_hash):
-    #     raise UserNotFoundException(
-    #         message="El usuario no existe",
-    #         error_code="USER_NOT_FOUND"
-    #     )
+    if not exists_user or not security_manager.verify_password(form_data.password, exists_user.str_password_hash):
+        raise UserNotFoundException(
+            message="El usuario no existe",
+            error_code="USER_NOT_FOUND"
+        )
 
     is_valid, new_hash = security_manager.verify_and_update(
         form_data.password,

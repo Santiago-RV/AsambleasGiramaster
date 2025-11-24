@@ -28,98 +28,33 @@ axiosInstance.interceptors.request.use(
     return Promise.reject(error)
   }
 )
-let isRefresing = false
-let refreshAttempts = 0
+
 axiosInstance.interceptors.response.use(
   (response) => {
     return response;
   },
   async (error) => {
-    const originalRequest = error.config & {
-      _retry
-    };
+    const originalRequest = error.config;
 
     // Manejo de errores 401 (no autorizado)
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      // Verificar si hemos excedido el número máximo de intentos de refresh
-      if (refreshAttempts >= MAX_REFRESH_ATTEMPTS) {
-        // Limpiar tokens y redirigir a login
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
-
-        return Promise.reject(
-          new Error('Máximo número de intentos de refresh excedido')
-        );
-      }
-
-      // Si ya estamos refrescando, agregar a la cola
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            if (originalRequest.headers) {
-              originalRequest.headers['Authorization'] = `Bearer ${token}`;
-            }
-            return axiosInstance(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
-      }
-
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
-      isRefreshing = true;
-      refreshAttempts++;
 
-      try {
-        // Usar el nuevo método de AuthService para refresh token
-        const response = await AuthService.refreshToken();
+      // Limpiar tokens y redirigir a login
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
 
-        if (response.success && response.data) {
-          const { access_token } = response.data;
-
-          // Resetear contador de intentos de refresh
-          refreshAttempts = 0;
-
-          // Procesar cola de peticiones fallidas
-          processQueue(null, access_token);
-
-          // Reintentar petición original con el nuevo token
-          if (originalRequest.headers) {
-            originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-          }
-
-          return axiosInstance(originalRequest);
-        } else {
-          throw new Error('Invalid refresh token response');
-        }
-      } catch (refreshError) {
-        // Si falla el refresh, limpiar tokens y procesar cola
-        processQueue(refreshError, null);
-
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-
-        // Evitar redirección si ya estamos en login
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
-
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+      // Evitar redirección si ya estamos en login
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
       }
+
+      return Promise.reject(new Error('Sesión expirada. Por favor, inicia sesión nuevamente.'));
     }
 
     // Manejo de otros errores - solo mostrar toast si no es una petición de login
-    const isLoginRequest = originalRequest.url?.includes('/auth/login');
+    const isLoginRequest = originalRequest?.url?.includes('/auth/login');
 
     if (!isLoginRequest) {
       if (error.response?.data) {
