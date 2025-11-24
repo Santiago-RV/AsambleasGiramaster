@@ -153,11 +153,11 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
             error_code="USER_NOT_FOUND"
         )
 
-    # Verificar si el usuario esta activo
-    if not exists_user.bln_is_active:
+    # Verificar si el usuario tiene permitido el acceso
+    if not exists_user.bln_allow_entry:
         raise UserNotActiveException(
-            message="El usuario no esta activo",
-            error_code="USER_NOT_ACTIVE"
+            message="El usuario no tiene permiso para acceder",
+            error_code="USER_NOT_ALLOW_ENTRY"
         )
 
     # Obtener los datos del usuario (DataUser) asociados

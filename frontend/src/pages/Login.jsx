@@ -1,7 +1,7 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
-import { Home, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
+import { Home, User, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import Swal from 'sweetalert2';
 import logo from '../assets/logo_giramaster.jpeg';
 import background from '../assets/background_giramaster.jpeg';
@@ -13,7 +13,7 @@ const Login = () => {
 		formState: { errors, isSubmitting },
 	} = useForm({
 		defaultValues: {
-			email: '',
+			username: '',
 			password: '',
 			rememberMe: false,
 		},
@@ -24,7 +24,7 @@ const Login = () => {
 		try {
 			// Mapear 'usuario' a 'username' que es lo que espera el backend
 			const credentials = {
-				username: data.email,
+				username: data.username,
 				password: data.password,
 			};
 
@@ -86,42 +86,37 @@ const Login = () => {
 						</div>
 
 						<div className="space-y-6">
-							{/* Campo Email */}
+							{/* Campo username */}
 							<div>
 								<label
-									htmlFor="email"
+									htmlFor="username"
 									className="block text-sm font-medium text-gray-700 mb-2"
 								>
-									Correo electrónico
+									Usuario
 								</label>
 								<div className="relative">
 									<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-										<Mail className="h-5 w-5 text-gray-400" />
+										<User className="h-5 w-5 text-gray-400" />
 									</div>
 									<input
-										id="email"
-										type="email"
-										{...register('email', {
+										id="unsername"
+										type="text"
+										{...register('username', {
 											required:
-												'El correo electrónico es obligatorio',
-											pattern: {
-												value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-												message:
-													'Correo electrónico inválido',
-											},
+												'El usuario es obligatorio',
 										})}
 										className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 bg-gray-50 focus:bg-white ${
-											errors.email
+											errors.username
 												? 'border-red-500'
 												: 'border-gray-300'
 										}`}
-										placeholder="tu@email.com"
+										placeholder="usuario.ingreso"
 									/>
 								</div>
-								{errors.email && (
+								{errors.username && (
 									<div className="mt-1 flex items-center gap-1 text-red-600 text-sm">
 										<AlertCircle className="h-4 w-4" />
-										<span>{errors.email.message}</span>
+										<span>{errors.username.message}</span>
 									</div>
 								)}
 							</div>

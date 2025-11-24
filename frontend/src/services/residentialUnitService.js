@@ -3,9 +3,7 @@
  * Reemplazar el archivo: frontend/src/services/residentialUnitService.js
  */
 
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+import axiosInstance from "./api/axiosconfig"
 
 /**
  * Sube un archivo Excel con copropietarios para una unidad residencial
@@ -17,18 +15,9 @@ export const uploadResidentsExcel = async (unitId, file) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
-
-    const token = localStorage.getItem('token');
     
-    const response = await axios.post(
-      `${API_BASE_URL}/super-admin/residential-units/${unitId}/upload-residents-excel`,
+    const response = await axiosInstance.post(`/super-admin/residential-units/${unitId}/upload-residents-excel`,
       formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
-        }
-      }
     );
 
     return response.data;
@@ -51,16 +40,8 @@ export const uploadResidentsExcel = async (unitId, file) => {
  */
 export const getResidentsByUnit = async (unitId) => {
   try {
-    const token = localStorage.getItem('token');
     
-    const response = await axios.get(
-      `${API_BASE_URL}/residential-units/${unitId}/residents`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      }
-    );
+    const response = await axiosInstance.get(`/residential-units/${unitId}/residents`);
 
     return response.data.data;
   } catch (error) {

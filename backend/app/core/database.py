@@ -87,32 +87,36 @@ async def seed_db():
   try:
     async with AsyncSessionLocal() as session:
       from app.models.rol_model import RolModel
+      from app.models.data_user_model import DataUserModel
+      from app.models.user_model import UserModel
+      from app.core.security import security_manager
 
+      # Semilla de roles
       verify_rol = await session.execute(select(RolModel).where(RolModel.id.in_([1, 2, 3, 4])))
       existing_roles = {rol.id for rol in verify_rol.scalars().all()}
 
       roles_to_create = []
 
       roles = {
-        "1": {
+        1: {
             "nombre": "Super Administrador",
             "descripcion": "Acceso completo al sistema",
             "permisos": ["crear", "leer", "actualizar", "eliminar"],
             "nivel": 5
         },
-        "2": {
+        2: {
             "nombre": "Administrador",
             "descripcion": "Puede crear y modificar contenido",
             "permisos": ["crear", "leer", "actualizar"],
             "nivel": 3
         },
-        "3": {
+        3: {
             "nombre": "Usuario",
             "descripcion": "Solo puede ver contenido",
             "permisos": ["leer"],
             "nivel": 1
         },
-        "4": {
+        4: {
             "nombre": "Invitado",
             "descripcion": "Puede moderar contenido",
             "permisos": ["leer"],
@@ -130,6 +134,39 @@ async def seed_db():
         logger.info("Roles semillados correctamente")
       else:
         logger.info("Roles ya existentes")
+
+      # Semilla de usuario administrador por defecto
+      verify_user = await session.execute(select(UserModel).where(UserModel.str_username == "admin"))
+      existing_user = verify_user.scalar_one_or_none()
+
+      if not existing_user:
+        # Crear datos del usuario
+        data_user = DataUserModel(
+          str_firstname="Administrador",
+          str_lastname="Sistema",
+          str_email="admin@sistema.com",
+          str_phone=None
+        )
+        session.add(data_user)
+        await session.flush()  # Para obtener el ID generado
+
+        # Crear usuario con contraseña hasheada
+        password_hash = security_manager.create_password_hash("Super@dmin.12345")
+        user = UserModel(
+          int_data_user_id=data_user.id,
+          str_username="admin",
+          str_password_hash=password_hash,
+          int_id_rol=1,  # Super Administrador
+          bln_is_external_delegate=False,
+          bln_user_temporary=False,
+          bln_allow_entry=True
+        )
+        session.add(user)
+        await session.commit()
+        logger.info("Usuario administrador creado correctamente")
+      else:
+        logger.info("Usuario administrador ya existe")
+
   except Exception as e:
     logger.error(f"Error al semillar la base de datos: {e}")
     raise

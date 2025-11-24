@@ -14,7 +14,7 @@ class UserModel(Base):
     bln_is_external_delegate = Column(Boolean, default=False)
     bln_user_temporary = Column(Boolean, default=False)
     dat_temporary_expiration_date = Column(DateTime, nullable=True)
-    bln_is_active = Column(Boolean, default=True)           
+    bln_allow_entry = Column(Boolean, default=False)              
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now)
