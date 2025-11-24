@@ -111,9 +111,12 @@ class ResidentialUnitService:
         file_content: bytes, 
         unit_id: int, 
         created_by: int
-    ) -> Dict:
+    ) -> dict:  # Cambiado de Dict a dict para compatibilidad
         """
-        Procesa el archivo Excel y crea copropietarios masivamente con peso de votación
+        Procesa el archivo Excel y crea copropietarios masivamente insertando en 3 tablas:
+        - tbl_data_users: Información personal
+        - tbl_users: Credenciales y permisos
+        - tbl_user_residential_units: Relación con unidad residencial
         
         Args:
             file_content: Contenido del archivo Excel en bytes
@@ -141,7 +144,7 @@ class ResidentialUnitService:
             # Leer el archivo Excel
             df = pd.read_excel(file_content)
             
-            # Validar columnas requeridas (ahora incluye voting_weight)
+            # Validar columnas requeridas
             required_columns = ['email', 'firstname', 'lastname', 'apartment_number', 'voting_weight']
             missing_columns = [col for col in required_columns if col not in df.columns]
             
@@ -195,43 +198,62 @@ class ResidentialUnitService:
                     user_was_created = False
                     
                     if not existing_user:
-                        # Crear DataUser
+                        # ============================================
+                        # PASO 1: Crear registro en tbl_data_users
+                        # ============================================
                         data_user = DataUserModel(
                             str_firstname=firstname,
                             str_lastname=lastname,
                             str_email=email,
-                            str_phone=phone
+                            str_phone=phone,
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
                         )
                         
                         self.db.add(data_user)
                         await self.db.flush()  # Para obtener el ID sin hacer commit
+                        
+                        logger.info(f"DataUser creado: {email} (ID: {data_user.id})")
 
+                        # ============================================
+                        # PASO 2: Crear registro en tbl_users
+                        # ============================================
+                        # CAMBIO IMPORTANTE: Generar username como nombre.apellido.nroapartamento
+                        username = f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", "")
+                        
                         # Hashear contraseña
                         hashed_password = security_manager.create_password_hash(password)
 
-                        # Crear User con rol de copropietario (rol 3)
+                        # Crear User con rol 3 (copropietario) y acceso DESHABILITADO
                         user = UserModel(
-                            str_username=email,
-                            str_password_hash=hashed_password,
                             int_data_user_id=data_user.id,
-                            int_id_rol=3,  # 3: Copropietario
-                            bln_is_active=True,
+                            str_username=username,  # ← CAMBIO: Ya no usa email
+                            str_password_hash=hashed_password,
+                            int_id_rol=3,  # 3: Copropietario (FIJO)
+                            bln_allow_entry=False,  # ← NUEVO: Acceso deshabilitado (0)
                             bln_is_external_delegate=False,
                             bln_user_temporary=False,
-                            created_by=created_by,
-                            updated_by=created_by
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                            # Nota: created_by y updated_by se omiten si no existen en el modelo
                         )
 
                         self.db.add(user)
-                        await self.db.flush()
+                        await self.db.flush()  # Para obtener el ID sin hacer commit
                         
                         user_was_created = True
                         results['users_created'] += 1
-                        logger.info(f"Usuario creado: {email}")
+                        logger.info(
+                            f"Usuario creado: {username} - Email: {email} - "
+                            f"Rol: 3 (Copropietario) - Acceso: Deshabilitado"
+                        )
                     else:
                         user = existing_user
-                        logger.info(f"Usuario ya existe: {email}")
+                        logger.info(f"Usuario ya existe: {email} (ID: {user.id})")
 
+                    # ============================================
+                    # PASO 3: Crear/actualizar registro en tbl_user_residential_units
+                    # ============================================
                     # Verificar si ya está asignado a esta unidad residencial
                     existing_assignment = await self._check_user_unit_assignment(
                         user.id, 
@@ -261,12 +283,12 @@ class ResidentialUnitService:
                         if needs_update:
                             existing_assignment.updated_at = datetime.now()
                     else:
-                        # Crear relación usuario-unidad residencial con voting_weight
+                        # Crear relación usuario-unidad residencial
                         user_unit = UserResidentialUnitModel(
                             int_user_id=user.id,
                             int_residential_unit_id=unit_id,
                             str_apartment_number=apartment_number,
-                            dec_default_voting_weight=voting_weight,  # NUEVO: guardar peso de votación
+                            dec_default_voting_weight=voting_weight,
                             created_at=datetime.now(),
                             updated_at=datetime.now()
                         )
@@ -292,7 +314,10 @@ class ResidentialUnitService:
             # Commit de todas las operaciones exitosas
             if results['successful'] > 0:
                 await self.db.commit()
-                logger.info(f"Proceso completado exitosamente: {results['successful']} copropietarios procesados")
+                logger.info(
+                    f"Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
+                    f"{results['users_created']} usuarios nuevos creados"
+                )
             else:
                 await self.db.rollback()
                 logger.warning("No se procesó ningún copropietario exitosamente")
@@ -302,7 +327,31 @@ class ResidentialUnitService:
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Error procesando archivo Excel: {e}")
-            raise
+            raise ServiceException(
+                message=f"Error al procesar el archivo Excel: {str(e)}",
+                details={"original_error": str(e)}
+            )
+            
+    async def get_residential_unit_by_id(self, unit_id: int) -> Optional[ResidentialUnitModel]:
+        """
+        Obtiene una unidad residencial por su ID
+        
+        Args:
+            unit_id: ID de la unidad residencial
+        
+        Returns:
+            ResidentialUnitModel o None si no existe
+        """
+        try:
+            query = select(ResidentialUnitModel).where(ResidentialUnitModel.id == unit_id)
+            result = await self.db.execute(query)
+            residential_unit = result.scalar_one_or_none()
+            return residential_unit
+        except Exception as e:
+            raise ServiceException(
+                message=f"Error al obtener la unidad residencial por ID: {str(e)}",
+                details={"original_error": str(e)}
+            )
 
 
     async def _get_user_by_email(self, email: str):
