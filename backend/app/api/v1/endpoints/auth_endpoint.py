@@ -168,6 +168,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     # Construir el nombre completo
     full_name = None
     email = None
+    
     if data_user:
         full_name = f"{data_user.str_firstname} {data_user.str_lastname}".strip()
         email = data_user.str_email
