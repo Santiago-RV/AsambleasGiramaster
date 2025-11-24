@@ -121,3 +121,34 @@ async def get_residents_by_residential_unit(
             message=f"Error al obtener los residentes de la unidad residencial: {str(e)}",
             details={"original_error": str(e)}
         )
+
+@router.get(
+    "/available-users",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener usuarios disponibles para asignar",
+    description="Obtiene todos los usuarios que NO tienen una unidad residencial asociada. Útil para seleccionar personal administrativo."
+)
+async def get_available_users(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene usuarios sin unidad residencial asociada.
+    Estos usuarios están disponibles para ser asignados como personal administrativo
+    de una nueva unidad residencial.
+    """
+    try:
+        residential_unit_service = ResidentialUnitService(db)
+        users = await residential_unit_service.get_users_without_residential_unit()
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Se encontraron {len(users)} usuarios disponibles",
+            data=users
+        )
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al obtener usuarios disponibles: {str(e)}",
+            details={"original_error": str(e)}
+        )

@@ -236,5 +236,33 @@ export class ResidentialUnitService {
       throw new Error(errorMessage);
     }
   }
+
+  /**
+   * Obtiene los usuarios disponibles (sin unidad residencial asociada)
+   * Útil para seleccionar personal administrativo al crear una unidad
+   * @returns {Promise} Lista de usuarios disponibles
+   */
+  static async getAvailableUsers() {
+    try {
+      const response = await axiosInstance.get('/residential/available-users');
+
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Error al obtener usuarios disponibles');
+      }
+
+      return {
+        success: true,
+        message: response.data.message,
+        data: response.data.data,
+      };
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al obtener usuarios disponibles';
+      throw new Error(errorMessage);
+    }
+  }
 }
 

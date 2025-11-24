@@ -56,37 +56,19 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 		select: (response) => response.data || [],
 	});
 
-	// Datos temporales del personal administrativo (hasta conectar con la DB)
-	const administrativeStaff = [
-		{
-			id: "1",
-			str_firstname: "Juan Carlos",
-			str_lastname: "Pérez González",
-			str_email: "juan.perez@ejemplo.com",
-			str_phone: "3102456987"
-		},
-		{
-			id: "2",
-			str_firstname: "María",
-			str_lastname: "Rodríguez",
-			str_email: "maria.rodriguez@ejemplo.com",
-			str_phone: "3151234567"
-		},
-		{
-			id: "3",
-			str_firstname: "Carlos",
-			str_lastname: "Martínez",
-			str_email: "carlos.martinez@ejemplo.com",
-			str_phone: "3209876543"
-		},
-		{
-			id: "4",
-			str_firstname: "Ana",
-			str_lastname: "García",
-			str_email: "ana.garcia@ejemplo.com",
-			str_phone: "3187654321"
-		}
-	];
+	// Query para obtener usuarios disponibles (sin unidad residencial)
+	const {
+		data: availableUsersData,
+		isLoading: isLoadingUsers,
+		isError: isErrorUsers,
+	} = useQuery({
+		queryKey: ['availableUsers'],
+		queryFn: ResidentialUnitService.getAvailableUsers,
+		select: (response) => response.data || [],
+	});
+
+	// Usar los datos del backend o un array vacío si está cargando
+	const administrativeStaff = availableUsersData || [];
 
 	// Mutación para crear unidad residencial
 	const createResidentialUnitMutation = useMutation({
@@ -120,7 +102,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 
 	const handleAdminSelect = (e) => {
     const selectedId = e.target.value;
-    
+
     if (!selectedId) {
       // Limpiar campos si no hay selección
       setValue('admin_str_firstname', '');
@@ -130,14 +112,15 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
       return;
     }
 
-    // Buscar el administrador seleccionado
-    const selectedAdmin = administrativeStaff.find(admin => admin.id === selectedId);
-    
+    // Buscar el administrador seleccionado (convertir id a número para comparar)
+    const selectedAdmin = administrativeStaff.find(admin => admin.id === parseInt(selectedId));
+
     if (selectedAdmin) {
-      setValue('admin_str_firstname', selectedAdmin.str_firstname);
-      setValue('admin_str_lastname', selectedAdmin.str_lastname);
-      setValue('admin_str_email', selectedAdmin.str_email);
-      setValue('admin_str_phone', selectedAdmin.str_phone);
+      // Los campos del backend son: firstname, lastname, email, phone
+      setValue('admin_str_firstname', selectedAdmin.firstname || '');
+      setValue('admin_str_lastname', selectedAdmin.lastname || '');
+      setValue('admin_str_email', selectedAdmin.email || '');
+      setValue('admin_str_phone', selectedAdmin.phone || '');
     }
   };
 
@@ -593,29 +576,53 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
           </div>
 
           {/* Select de Personal Administrativo */}
-          {administrativeStaff.length > 0 && (
-            <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <UserCog className="w-4 h-4 text-amber-600" />
-                Seleccionar Personal Administrativo Existente
-              </label>
-              <select 
-                onChange={handleAdminSelect}
-                className="w-full p-3.5 bg-white border-2 border-amber-200 rounded-xl text-base focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition-all hover:border-amber-300 cursor-pointer"
-              >
-                <option value="">Selecciona un administrador o registra uno nuevo</option>
-                {administrativeStaff.map((admin) => (
-                  <option key={admin.id} value={admin.id}>
-                    {admin.str_firstname} {admin.str_lastname} - {admin.str_email}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
-                <span className="w-1 h-1 bg-amber-600 rounded-full"></span>
-                O puedes llenar manualmente los campos para registrar uno nuevo
-              </p>
-            </div>
-          )}
+          <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+            <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+              <UserCog className="w-4 h-4 text-amber-600" />
+              Seleccionar Personal Administrativo Existente
+            </label>
+
+            {isLoadingUsers ? (
+              <div className="flex items-center justify-center p-4 bg-white rounded-xl border-2 border-amber-200">
+                <svg className="animate-spin h-5 w-5 text-amber-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-sm text-gray-600">Cargando usuarios disponibles...</span>
+              </div>
+            ) : isErrorUsers ? (
+              <div className="p-4 bg-red-50 rounded-xl border-2 border-red-200">
+                <p className="text-sm text-red-700">Error al cargar usuarios disponibles</p>
+              </div>
+            ) : administrativeStaff.length > 0 ? (
+              <>
+                <select
+                  onChange={handleAdminSelect}
+                  className="w-full p-3.5 bg-white border-2 border-amber-200 rounded-xl text-base focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition-all hover:border-amber-300 cursor-pointer"
+                >
+                  <option value="">Selecciona un administrador o registra uno nuevo</option>
+                  {administrativeStaff.map((admin) => (
+                    <option key={admin.id} value={admin.id}>
+                      {admin.full_name} - {admin.email}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-amber-600 rounded-full"></span>
+                  {administrativeStaff.length} usuario{administrativeStaff.length !== 1 ? 's' : ''} disponible{administrativeStaff.length !== 1 ? 's' : ''} sin unidad residencial
+                </p>
+              </>
+            ) : (
+              <div className="p-4 bg-blue-50 rounded-xl border-2 border-blue-200">
+                <p className="text-sm text-blue-700">No hay usuarios disponibles. Todos los usuarios ya tienen una unidad residencial asignada.</p>
+              </div>
+            )}
+
+            <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+              <span className="w-1 h-1 bg-amber-600 rounded-full"></span>
+              O puedes llenar manualmente los campos para registrar uno nuevo
+            </p>
+          </div>
 
           <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
             

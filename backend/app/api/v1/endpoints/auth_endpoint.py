@@ -25,12 +25,6 @@ from app.core.exceptions import (
 
 router = APIRouter()
 
-# Simulación de usuarios
-fake_users_db = {
-    "santiago": {"username": "santiago", "password": "1234"},
-    "admin": {"username": "admin", "password": "adminpass"},
-}
-
 # Endpoint de registro de nuevos usuarios
 @router.post(
     "/register", 
@@ -126,8 +120,6 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     """
     user_service = UserService(db)
 
-    # user_dict = fake_users_db.get(form_data.username)
-
     # Rate limit
     client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
     if not rate_limiter.is_allowed(f"login:{client_ip}", max_requests=10, window_minutes=60):
@@ -181,7 +173,9 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         exists_user.str_password_hash = new_hash
         await db.commit()
         await db.refresh(exists_user)
-        print(f"✅ Hash de usuario {exists_user.str_username} migrado a Argon2")
+        from app.core.logging_config import get_logger
+        logger = get_logger(__name__)
+        logger.info(f"Hash de usuario migrado a Argon2", extra={"username": exists_user.str_username})
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(

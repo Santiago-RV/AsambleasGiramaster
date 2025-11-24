@@ -95,7 +95,6 @@ class ResidentialUnitService:
                     "apartment_number": apartment_number,
                     "is_external_delegate": user.bln_is_external_delegate,
                     "user_temporary": user.bln_user_temporary,
-                    "is_active": user.bln_is_active,
                     "created_at": user.created_at,
                 })
             
@@ -320,7 +319,7 @@ class ResidentialUnitService:
     async def _check_user_unit_assignment(self, user_id: int, unit_id: int):
         """Helper para verificar si un usuario ya está asignado a una unidad"""
         from sqlalchemy import select
-        
+
         result = await self.db.execute(
             select(UserResidentialUnitModel)
             .where(
@@ -330,4 +329,51 @@ class ResidentialUnitService:
         )
         return result.scalar_one_or_none()
 
+    async def get_users_without_residential_unit(self) -> List[dict]:
+        """
+        Obtiene todos los usuarios que NO tienen una unidad residencial asociada.
+        Útil para seleccionar personal administrativo al crear una unidad residencial.
+
+        Returns:
+            Lista de usuarios con sus datos personales que no tienen unidad residencial
+        """
+        try:
+            # Subconsulta para obtener IDs de usuarios que SÍ tienen unidad residencial
+            subquery = select(UserResidentialUnitModel.int_user_id).distinct()
+
+            # Consulta principal: usuarios que NO están en la subconsulta
+            query = (
+                select(UserModel, DataUserModel)
+                .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .where(
+                    UserModel.id.notin_(subquery)
+                )
+                .order_by(DataUserModel.str_firstname, DataUserModel.str_lastname)
+            )
+
+            result = await self.db.execute(query)
+            users_data = result.all()
+
+            # Formatear la respuesta
+            users = []
+            for user, data_user in users_data:
+                users.append({
+                    "id": user.id,
+                    "username": user.str_username,
+                    "firstname": data_user.str_firstname,
+                    "lastname": data_user.str_lastname,
+                    "email": data_user.str_email,
+                    "phone": data_user.str_phone,
+                    "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
+                    "role_id": user.int_id_rol,
+                    "is_external_delegate": user.bln_is_external_delegate
+                })
+
+            return users
+
+        except Exception as e:
+            raise ServiceException(
+                message=f"Error al obtener usuarios sin unidad residencial: {str(e)}",
+                details={"original_error": str(e)}
+            )
 
