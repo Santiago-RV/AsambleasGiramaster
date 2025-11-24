@@ -7,11 +7,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  // SOLUCIÓN: Quitar Content-Type por defecto
+  // Axios lo establecerá automáticamente según el tipo de datos:
+  // - application/json para objetos JS
+  // - multipart/form-data para FormData
 })
-
 
 axiosInstance.interceptors.request.use(
   (config) => {
@@ -23,6 +23,13 @@ axiosInstance.interceptors.request.use(
     if (config.headers["Skip-Auth"]) {
       delete config.headers["Skip-Auth"]
     }
+    
+    // NUEVO: Establecer Content-Type solo si NO es FormData
+    if (!(config.data instanceof FormData)) {
+      config.headers.set('Content-Type', 'application/json')
+    }
+    // Si es FormData, Axios automáticamente establece multipart/form-data
+    
     return config
   },
   (error) => {
@@ -73,27 +80,39 @@ axiosInstance.interceptors.response.use(
           title: "ERROR",
           text: 'Error de conexión. Por favor, verifica tu conexión a internet.',
           icon: "error"
-        }
-        );
+        });
       } else {
         Swal.fire({
           title: "ERROR",
           text: 'Ha ocurrido un error inesperado',
           icon: "error"
-        })
+        });
       }
     }
     return Promise.reject(error);
   }
 );
+
 // Crear una instancia para peticiones públicas (sin autenticación)
 export const publicAxios = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // SOLUCIÓN: Quitar Content-Type por defecto también aquí
 });
+
+// Agregar interceptor a publicAxios
+publicAxios.interceptors.request.use(
+  (config) => {
+    // NUEVO: Establecer Content-Type solo si NO es FormData
+    if (!(config.data instanceof FormData)) {
+      config.headers.set('Content-Type', 'application/json')
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+);
 
 // Agregar interceptor a publicAxios para manejo de errores (sin autenticación)
 publicAxios.interceptors.response.use(

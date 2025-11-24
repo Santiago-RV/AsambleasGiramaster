@@ -1,8 +1,3 @@
-"""
-Nuevo endpoint para cargar copropietarios desde Excel en una unidad residencial
-Agregar este código al archivo: backend/app/api/v1/endpoints/super_admin.py
-"""
-
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
