@@ -45,7 +45,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [isUploading, setIsUploading] = useState(false);
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
 	const [selectedResident, setSelectedResident] = useState(null);
-	const [residentModalMode, setResidentModalMode] = useState('create'); 
+	const [residentModalMode, setResidentModalMode] = useState('create');
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
@@ -429,7 +429,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			if (!selectedResident) return;
 
 			const residentData = {};
-			
+
 			if (data.firstname !== selectedResident.firstname) {
 				residentData.firstname = data.firstname;
 			}
@@ -448,7 +448,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			if (data.is_active !== selectedResident.is_active) {
 				residentData.is_active = data.is_active;
 			}
-			
+
 			if (data.password && data.password.trim() !== '') {
 				residentData.password = data.password;
 			}
@@ -515,10 +515,10 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			if (result.isConfirmed) {
 				try {
 					await ResidentService.deleteResident(unitId, resident.id);
-					
+
 					// Actualizar la lista de residentes
 					queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
-					
+
 					Swal.fire({
 						icon: 'success',
 						title: 'Eliminado',
@@ -535,6 +535,75 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						text: error.response?.data?.message || error.message || 'Error al eliminar el copropietario',
 					});
 				}
+			}
+		});
+	};
+
+	const handleResendCredentials = async (resident) => {
+		setSelectedResidentMenu(null);
+
+		Swal.fire({
+			title: '¿Enviar credenciales?',
+			html: `
+				<div class="text-left">
+					<p class="mb-3">Se generará una nueva contraseña temporal y se enviará por correo a:</p>
+					<div class="bg-blue-50 p-3 rounded-lg">
+						<p class="font-semibold text-blue-800">${resident.firstname} ${resident.lastname}</p>
+						<p class="text-sm text-blue-700 mt-1">
+							<strong>Email:</strong> ${resident.email}
+						</p>
+						<p class="text-sm text-blue-700">
+							<strong>Usuario:</strong> ${resident.username}
+						</p>
+					</div>
+					<p class="text-xs text-gray-600 mt-3">
+						💡 La contraseña actual será reemplazada por una nueva contraseña temporal.
+					</p>
+				</div>
+			`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonColor: '#3498db',
+			cancelButtonColor: '#95a5a6',
+			confirmButtonText: 'Sí, enviar',
+			cancelButtonText: 'Cancelar',
+			width: '500px',
+			showLoaderOnConfirm: true,
+			preConfirm: async () => {
+				try {
+					const response = await ResidentService.resendCredentials(unitId, resident.id);
+					return response;
+				} catch (error) {
+					Swal.showValidationMessage(
+						error.response?.data?.message || error.message || 'Error al enviar credenciales'
+					);
+				}
+			},
+			allowOutsideClick: () => !Swal.isLoading()
+		}).then((result) => {
+			if (result.isConfirmed && result.value?.success) {
+				Swal.fire({
+					icon: 'success',
+					title: '¡Credenciales Enviadas!',
+					html: `
+						<div class="text-left">
+							<p class="mb-2">Las credenciales han sido enviadas exitosamente a:</p>
+							<div class="bg-green-50 p-3 rounded-lg">
+								<p class="text-sm text-green-700">
+									<strong>Email:</strong> ${resident.email}
+								</p>
+								<p class="text-sm text-green-700 mt-1">
+									<strong>Usuario:</strong> ${resident.username}
+								</p>
+							</div>
+							<p class="text-xs text-gray-600 mt-3">
+								📧 El copropietario recibirá un correo con su nueva contraseña temporal.
+							</p>
+						</div>
+					`,
+					confirmButtonColor: '#27ae60',
+					width: '500px'
+				});
 			}
 		});
 	};
@@ -944,57 +1013,73 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 												</p>
 											</div>
 											<div className="relative">
-												<button
-													ref={(el) => {
-														if (el) {
-															menuButtonRefs.current[resident.id] = el;
-														}
-													}}
-													onClick={(e) => {
-														e.stopPropagation();
-														const button = e.currentTarget;
+												<div className="flex items-center gap-2">
+													{/* Botón para enviar credenciales */}
+													<button
+														onClick={(e) => {
+															e.stopPropagation();
+															handleResendCredentials(resident);
+														}}
+														className="p-2 hover:bg-blue-100 rounded-lg transition-colors group"
+														title="Enviar credenciales por correo"
+													>
+														<Mail
+															size={20}
+															className="text-blue-600 group-hover:text-blue-700"
+														/>
+													</button>
 
-														if (selectedResidentMenu === resident.id) {
-															setSelectedResidentMenu(null);
-														} else {
-															const rect = button.getBoundingClientRect();
-															const menuWidth = 192;
-															const viewportWidth = window.innerWidth;
-															const viewportHeight = window.innerHeight;
+													{/* Botón del menú de 3 puntos (mantener el código existente) */}
+													<button
+														ref={(el) => {
+															if (el) {
+																menuButtonRefs.current[resident.id] = el;
+															}
+														}}
+														onClick={(e) => {
+															e.stopPropagation();
+															const button = e.currentTarget;
 
-															// Calcular posición izquierda
-															let left = rect.right - menuWidth;
-															if (left < 8) {
-																left = 8;
-															}
-															if (rect.right > viewportWidth - 8) {
-																left = viewportWidth - menuWidth - 8;
-															}
+															if (selectedResidentMenu === resident.id) {
+																setSelectedResidentMenu(null);
+															} else {
+																const rect = button.getBoundingClientRect();
+																const menuWidth = 192;
+																const viewportWidth = window.innerWidth;
+																const viewportHeight = window.innerHeight;
 
-															// Calcular posición superior
-															let top = rect.bottom + 8;
-															const menuHeight = 120;
-															if (top + menuHeight > viewportHeight - 8) {
-																top = rect.top - menuHeight - 8;
-															}
-															if (top < 8) {
-																top = 8;
-															}
+																let left = rect.right - menuWidth;
+																if (left < 8) {
+																	left = 8;
+																}
+																if (rect.right > viewportWidth - 8) {
+																	left = viewportWidth - menuWidth - 8;
+																}
 
-															setMenuPosition({
-																top: top,
-																left: left,
-															});
-															setSelectedResidentMenu(resident.id);
-														}
-													}}
-													className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-												>
-													<MoreVertical
-														size={20}
-														className="text-gray-600"
-													/>
-												</button>
+																let top = rect.bottom + 8;
+																const menuHeight = 120;
+																if (top + menuHeight > viewportHeight - 8) {
+																	top = rect.top - menuHeight - 8;
+																}
+																if (top < 8) {
+																	top = 8;
+																}
+
+																setMenuPosition({
+																	top: top,
+																	left: left,
+																});
+																setSelectedResidentMenu(resident.id);
+															}
+														}}
+														className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+													>
+														<MoreVertical
+															size={20}
+															className="text-gray-600"
+														/>
+													</button>
+												</div>
 											</div>
 										</div>
 									</div>
@@ -1653,8 +1738,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</label>
 						<input
 							type="password"
-							{...registerResident('password', 
-								residentModalMode === 'create' 
+							{...registerResident('password',
+								residentModalMode === 'create'
 									? {
 										required: 'La contraseña es obligatoria',
 										minLength: {
@@ -1670,8 +1755,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 									}
 							)}
 							placeholder={
-								residentModalMode === 'create' 
-									? 'Contraseña inicial del copropietario' 
+								residentModalMode === 'create'
+									? 'Contraseña inicial del copropietario'
 									: 'Dejar en blanco para mantener la actual'
 							}
 							className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
@@ -1682,8 +1767,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							</span>
 						)}
 						<p className="text-sm text-gray-500 mt-1">
-							💡 {residentModalMode === 'create' 
-								? 'Si no especificas una contraseña, se usará: Temporal123!' 
+							💡 {residentModalMode === 'create'
+								? 'Si no especificas una contraseña, se usará: Temporal123!'
 								: 'Solo se actualizará si proporcionas una nueva contraseña'}
 						</p>
 					</div>
@@ -1709,15 +1794,14 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						<button
 							type="submit"
 							disabled={
-								residentModalMode === 'create' 
-									? createResidentMutation.isPending 
+								residentModalMode === 'create'
+									? createResidentMutation.isPending
 									: updateResidentMutation.isPending
 							}
-							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${
-								(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending)
+							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending)
 									? 'opacity-50 cursor-not-allowed'
 									: ''
-							}`}
+								}`}
 						>
 							{(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending) ? (
 								<>
@@ -1759,8 +1843,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 								setSelectedResident(null);
 							}}
 							disabled={
-								residentModalMode === 'create' 
-									? createResidentMutation.isPending 
+								residentModalMode === 'create'
+									? createResidentMutation.isPending
 									: updateResidentMutation.isPending
 							}
 							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2062,10 +2146,10 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							<label
 								htmlFor="excel-file-input"
 								className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-all ${isUploading
-										? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-										: selectedFile
-											? 'border-green-300 bg-green-50'
-											: 'border-gray-300 bg-gray-50 hover:border-[#3498db] hover:bg-blue-50'
+									? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+									: selectedFile
+										? 'border-green-300 bg-green-50'
+										: 'border-gray-300 bg-gray-50 hover:border-[#3498db] hover:bg-blue-50'
 									}`}
 							>
 								{selectedFile ? (

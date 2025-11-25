@@ -929,3 +929,95 @@ Sistema GIRAMASTER
                 message=f"Error al eliminar copropietario: {str(e)}",
                 details={"original_error": str(e)}
             )
+            
+    async def resend_resident_credentials(self, user_id: int, unit_id: int):
+        """
+        Reenvía las credenciales de acceso por correo electrónico a un copropietario
+        NOTA: La contraseña ya está hasheada, por lo que se enviará una contraseña temporal nueva
+        """
+        try:
+            # Verificar que el usuario existe y pertenece a la unidad
+            query = (
+                select(UserModel, DataUserModel, UserResidentialUnitModel)
+                .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                .where(
+                    and_(
+                        UserModel.id == user_id,
+                        UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                        UserModel.int_id_rol == 3  # Solo copropietarios
+                    )
+                )
+            )
+            
+            result = await self.db.execute(query)
+            user_data = result.first()
+            
+            if not user_data:
+                raise ResourceNotFoundException(
+                    message=f"Copropietario no encontrado",
+                    error_code="RESIDENT_NOT_FOUND"
+                )
+            
+            user, data_user, user_unit = user_data
+            
+            # Obtener información de la unidad residencial
+            residential_unit = await self.get_residential_unit_by_id(unit_id)
+            if not residential_unit:
+                raise ResourceNotFoundException(
+                    message=f"Unidad residencial no encontrada",
+                    error_code="RESIDENTIAL_UNIT_NOT_FOUND"
+                )
+            
+            # Generar nueva contraseña temporal
+            import secrets
+            import string
+            
+            # Generar contraseña aleatoria de 12 caracteres
+            alphabet = string.ascii_letters + string.digits + "!@#$%"
+            temporary_password = ''.join(secrets.choice(alphabet) for i in range(12))
+            
+            # Actualizar contraseña en la base de datos
+            hashed_password = security_manager.create_password_hash(temporary_password)
+            user.str_password_hash = hashed_password
+            user.updated_at = datetime.now()
+            
+            await self.db.commit()
+            
+            # Enviar correo con las nuevas credenciales
+            email_sent = self._send_welcome_email(
+                user_email=data_user.str_email,
+                user_name=f"{data_user.str_firstname} {data_user.str_lastname}",
+                username=user.str_username,
+                password=temporary_password,  # Contraseña sin hashear
+                residential_unit_name=residential_unit.str_name,
+                apartment_number=user_unit.str_apartment_number,
+                voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
+                phone=data_user.str_phone
+            )
+            
+            if email_sent:
+                logger.info(f"✅ Credenciales reenviadas a {data_user.str_email}")
+                return {
+                    "email": data_user.str_email,
+                    "username": user.str_username,
+                    "email_sent": True,
+                    "message": f"Credenciales enviadas a {data_user.str_email}"
+                }
+            else:
+                logger.warning(f"⚠️ No se pudo enviar correo a {data_user.str_email}")
+                raise ServiceException(
+                    message=f"No se pudo enviar el correo a {data_user.str_email}",
+                    details={"email": data_user.str_email}
+                )
+                
+        except (ResourceNotFoundException, ServiceException):
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al reenviar credenciales: {str(e)}")
+            raise ServiceException(
+                message=f"Error al reenviar credenciales: {str(e)}",
+                details={"original_error": str(e)}
+            )

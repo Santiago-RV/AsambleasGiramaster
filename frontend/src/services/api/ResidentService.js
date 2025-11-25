@@ -33,4 +33,16 @@ export class ResidentService {
             throw error;
         }
     }
+
+    static async resendCredentials(unitId, userId) {
+        try {
+            const response = await axiosInstance.post(
+                `/residential/units/${unitId}/residents/${userId}/resend-credentials`
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error resending credentials:', error);
+            throw error;
+        }
+    }
 }

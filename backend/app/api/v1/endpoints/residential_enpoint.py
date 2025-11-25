@@ -315,3 +315,51 @@ async def create_resident(
             message=f"Error al crear copropietario: {str(e)}",
             details={"original_error": str(e)}
         )
+
+@router.post(
+    "/units/{unit_id}/residents/{user_id}/resend-credentials",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Reenviar credenciales por correo",
+    description="Envía las credenciales de acceso al copropietario por correo electrónico"
+)
+async def resend_credentials(
+    unit_id: int,
+    user_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Reenvía las credenciales de acceso por correo"""
+    try:
+        # Verificar permisos
+        user_service = UserService(db)
+        current_user_data = await user_service.get_user_by_username(current_user)
+        
+        if current_user_data.int_id_rol not in [1, 2]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para enviar credenciales"
+            )
+        
+        residential_unit_service = ResidentialUnitService(db)
+        
+        # Enviar credenciales
+        result = await residential_unit_service.resend_resident_credentials(
+            user_id=user_id,
+            unit_id=unit_id
+        )
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Credenciales enviadas exitosamente",
+            data=result
+        )
+        
+    except (ResourceNotFoundException, HTTPException, ServiceException):
+        raise
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al enviar credenciales: {str(e)}",
+            details={"original_error": str(e)}
+        )
