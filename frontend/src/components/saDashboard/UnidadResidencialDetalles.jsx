@@ -45,6 +45,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [isUploading, setIsUploading] = useState(false);
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
 	const [selectedResident, setSelectedResident] = useState(null);
+	const [residentModalMode, setResidentModalMode] = useState('create'); 
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
@@ -322,9 +323,20 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		});
 	};
 
+	const handleCreateResident = () => {
+		setResidentModalMode('create');
+		resetResident();
+		// Establecer valores por defecto para crear
+		setResidentValue('is_active', true);
+		setResidentValue('password', '');
+		setIsResidentModalOpen(true);
+	};
+
+	// Para editar (modificar la función existente)
 	const handleEditResident = (resident) => {
 		setSelectedResidentMenu(null);
 		setSelectedResident(resident);
+		setResidentModalMode('edit');
 		// Cargar los datos del residente en el formulario
 		setResidentValue('firstname', resident.firstname || '');
 		setResidentValue('lastname', resident.lastname || '');
@@ -333,7 +345,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		setResidentValue('phone', resident.phone || '');
 		setResidentValue('apartment_number', resident.apartment_number || '');
 		setResidentValue('is_active', resident.is_active !== undefined ? resident.is_active : true);
-		setIsEditResidentModalOpen(true);
+		setResidentValue('password', ''); // Vacío para edición
+		setIsResidentModalOpen(true);
 	};
 
 	// Mutación para actualizar residente
@@ -369,51 +382,108 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		},
 	});
 
-	const onSubmitResident = (data) => {
-		if (!selectedResident) return;
-
-		// Construir objeto solo con los campos que cambiaron
-		const residentData = {};
-		
-		if (data.firstname !== selectedResident.firstname) {
-			residentData.firstname = data.firstname;
-		}
-		if (data.lastname !== selectedResident.lastname) {
-			residentData.lastname = data.lastname;
-		}
-		if (data.email !== selectedResident.email) {
-			residentData.email = data.email;
-		}
-		if (data.phone !== selectedResident.phone) {
-			residentData.phone = data.phone || null;
-		}
-		if (data.apartment_number !== selectedResident.apartment_number) {
-			residentData.apartment_number = data.apartment_number;
-		}
-		if (data.is_active !== selectedResident.is_active) {
-			residentData.is_active = data.is_active;
-		}
-		
-		// Si se proporcionó una contraseña, incluirla
-		if (data.password && data.password.trim() !== '') {
-			residentData.password = data.password;
-		}
-
-		// Si no hay cambios, no hacer nada
-		if (Object.keys(residentData).length === 0) {
+	// Mutación para crear residente
+	const createResidentMutation = useMutation({
+		mutationFn: async (data) => {
+			return await ResidentService.createResident(unitId, data);
+		},
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			resetResident();
+			setIsResidentModalOpen(false);
 			Swal.fire({
-				icon: 'info',
-				title: 'Sin cambios',
-				text: 'No se detectaron cambios para guardar',
+				icon: 'success',
+				title: '¡Éxito!',
+				text: response.message || 'Copropietario creado exitosamente',
+				showConfirmButton: false,
+				timer: 2000,
 				toast: true,
 				position: 'top-end',
-				timer: 2000,
-				showConfirmButton: false,
 			});
-			return;
-		}
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: error.response?.data?.message || error.message || 'Error al crear el copropietario',
+			});
+		},
+	});
 
-		updateResidentMutation.mutate(residentData);
+	const onSubmitResident = (data) => {
+		if (residentModalMode === 'create') {
+			// Modo crear
+			const residentData = {
+				firstname: data.firstname,
+				lastname: data.lastname,
+				username: data.username,
+				email: data.email,
+				phone: data.phone || null,
+				apartment_number: data.apartment_number,
+				is_active: data.is_active,
+				password: data.password || 'Temporal123!',
+			};
+			createResidentMutation.mutate(residentData);
+		} else {
+			// Modo editar
+			if (!selectedResident) return;
+
+			const residentData = {};
+			
+			if (data.firstname !== selectedResident.firstname) {
+				residentData.firstname = data.firstname;
+			}
+			if (data.lastname !== selectedResident.lastname) {
+				residentData.lastname = data.lastname;
+			}
+			if (data.email !== selectedResident.email) {
+				residentData.email = data.email;
+			}
+			if (data.phone !== selectedResident.phone) {
+				residentData.phone = data.phone || null;
+			}
+			if (data.apartment_number !== selectedResident.apartment_number) {
+				residentData.apartment_number = data.apartment_number;
+			}
+			if (data.is_active !== selectedResident.is_active) {
+				residentData.is_active = data.is_active;
+			}
+			
+			if (data.password && data.password.trim() !== '') {
+				residentData.password = data.password;
+			}
+
+			if (Object.keys(residentData).length === 0) {
+				Swal.fire({
+					icon: 'info',
+					title: 'Sin cambios',
+					text: 'No se detectaron cambios para guardar',
+					toast: true,
+					position: 'top-end',
+					timer: 2000,
+					showConfirmButton: false,
+				});
+				return;
+			}
+
+			updateResidentMutation.mutate(residentData);
+		}
+	};
+
+	const onSubmitCreateResident = (data) => {
+		const residentData = {
+			firstname: data.firstname,
+			lastname: data.lastname,
+			username: data.username || undefined, // Opcional, se generará automáticamente
+			email: data.email,
+			phone: data.phone || null,
+			apartment_number: data.apartment_number,
+			is_active: data.is_active,
+			password: data.password || 'Temporal123!',
+			voting_weight: data.voting_weight || 0.0,  // Agregar este campo
+		};
+
+		createResidentMutation.mutate(residentData);
 	};
 
 	const handleDeleteResident = (resident) => {
@@ -783,7 +853,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				{/* Botones de acción para residentes */}
 				<div className="flex gap-3 pt-4 border-t border-gray-200">
 					<button
-						onClick={() => setIsResidentModalOpen(true)}
+						onClick={handleCreateResident}
 						className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 					>
 						<Plus size={18} />
@@ -1405,15 +1475,15 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				</form>
 			</Modal>
 
-			{/* Modal para editar residente */}
+			{/* Modal unificado para crear/editar residente */}
 			<Modal
-				isOpen={isEditResidentModalOpen}
+				isOpen={isResidentModalOpen}
 				onClose={() => {
-					setIsEditResidentModalOpen(false);
+					setIsResidentModalOpen(false);
 					resetResident();
 					setSelectedResident(null);
 				}}
-				title="Editar Copropietario"
+				title={residentModalMode === 'create' ? 'Agregar Nuevo Copropietario' : 'Editar Copropietario'}
 				size="lg"
 			>
 				<form
@@ -1485,11 +1555,17 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 								})}
 								placeholder="Ej: juan.perez"
 								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+								disabled={residentModalMode === 'edit'}
 							/>
 							{errorsResident.username && (
 								<span className="text-red-500 text-sm">
 									{errorsResident.username.message}
 								</span>
+							)}
+							{residentModalMode === 'edit' && (
+								<p className="text-xs text-gray-500 mt-1">
+									El usuario no se puede modificar
+								</p>
 							)}
 						</div>
 
@@ -1551,20 +1627,53 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</div>
 					</div>
 
-					{/* Nueva Contraseña (opcional) */}
-					<div className="md:col-span-2">
+					{/* Peso de Votación */}
+					<div>
 						<label className="block mb-2 font-semibold text-gray-700">
-							Nueva Contraseña (opcional)
+							Peso de Votación (Coeficiente)
+						</label>
+						<input
+							type="number"
+							step="0.01"
+							min="0"
+							max="1"
+							{...registerResident('voting_weight')}
+							placeholder="Ej: 0.25 (25%)"
+							className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+						/>
+						<p className="text-sm text-gray-500 mt-1">
+							💡 Coeficiente de copropiedad (ej: 0.25 = 25%). Dejar vacío para 0.0
+						</p>
+					</div>
+
+					{/* Contraseña */}
+					<div>
+						<label className="block mb-2 font-semibold text-gray-700">
+							{residentModalMode === 'create' ? 'Contraseña *' : 'Nueva Contraseña (opcional)'}
 						</label>
 						<input
 							type="password"
-							{...registerResident('password', {
-								minLength: {
-									value: 8,
-									message: 'La contraseña debe tener mínimo 8 caracteres',
-								},
-							})}
-							placeholder="Dejar en blanco para mantener la actual"
+							{...registerResident('password', 
+								residentModalMode === 'create' 
+									? {
+										required: 'La contraseña es obligatoria',
+										minLength: {
+											value: 8,
+											message: 'La contraseña debe tener mínimo 8 caracteres',
+										},
+									}
+									: {
+										minLength: {
+											value: 8,
+											message: 'La contraseña debe tener mínimo 8 caracteres',
+										},
+									}
+							)}
+							placeholder={
+								residentModalMode === 'create' 
+									? 'Contraseña inicial del copropietario' 
+									: 'Dejar en blanco para mantener la actual'
+							}
 							className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
 						/>
 						{errorsResident.password && (
@@ -1573,7 +1682,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							</span>
 						)}
 						<p className="text-sm text-gray-500 mt-1">
-							💡 Solo se actualizará si proporcionas una nueva contraseña
+							💡 {residentModalMode === 'create' 
+								? 'Si no especificas una contraseña, se usará: Temporal123!' 
+								: 'Solo se actualizará si proporcionas una nueva contraseña'}
 						</p>
 					</div>
 
@@ -1589,20 +1700,26 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 								Activo
 							</span>
 						</label>
+						<p className="text-sm text-gray-500 mt-1 ml-8">
+							Los copropietarios activos pueden iniciar sesión en el sistema
+						</p>
 					</div>
-
-
 
 					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
 						<button
 							type="submit"
-							disabled={updateResidentMutation.isPending}
-							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${updateResidentMutation.isPending
-								? 'opacity-50 cursor-not-allowed'
-								: ''
-								}`}
+							disabled={
+								residentModalMode === 'create' 
+									? createResidentMutation.isPending 
+									: updateResidentMutation.isPending
+							}
+							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${
+								(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending)
+									? 'opacity-50 cursor-not-allowed'
+									: ''
+							}`}
 						>
-							{updateResidentMutation.isPending ? (
+							{(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending) ? (
 								<>
 									<svg
 										className="animate-spin h-5 w-5"
@@ -1624,12 +1741,12 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 										></path>
 									</svg>
-									Guardando...
+									{residentModalMode === 'create' ? 'Creando...' : 'Guardando...'}
 								</>
 							) : (
 								<>
-									<Edit size={20} />
-									Guardar Cambios
+									{residentModalMode === 'create' ? <Plus size={20} /> : <Edit size={20} />}
+									{residentModalMode === 'create' ? 'Crear Copropietario' : 'Guardar Cambios'}
 								</>
 							)}
 						</button>
@@ -1637,11 +1754,15 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						<button
 							type="button"
 							onClick={() => {
-								setIsEditResidentModalOpen(false);
+								setIsResidentModalOpen(false);
 								resetResident();
 								setSelectedResident(null);
 							}}
-							disabled={updateResidentMutation.isPending}
+							disabled={
+								residentModalMode === 'create' 
+									? createResidentMutation.isPending 
+									: updateResidentMutation.isPending
+							}
 							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							Cancelar

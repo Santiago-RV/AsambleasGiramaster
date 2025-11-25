@@ -260,3 +260,58 @@ async def delete_resident(
             message=f"Error: {str(e)}",
             details={"original_error": str(e)}
         )
+        
+@router.post(
+    "/units/{unit_id}/residents",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear copropietario",
+    description="Crea un nuevo copropietario para una unidad residencial"
+)
+async def create_resident(
+    unit_id: int,
+    resident_data: ResidentUpdate,  # Puedes crear un schema específico ResidentCreate si lo prefieres
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Crea un nuevo copropietario para una unidad residencial"""
+    try:
+        # Verificar permisos (Super Admin o Admin)
+        user_service = UserService(db)
+        current_user_data = await user_service.get_user_by_username(current_user)
+        
+        if current_user_data.int_id_rol not in [1, 2]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para crear copropietarios"
+            )
+        
+        residential_unit_service = ResidentialUnitService(db)
+        
+        # Validar que vengan los datos obligatorios
+        if not resident_data.firstname or not resident_data.lastname or not resident_data.email or not resident_data.apartment_number:
+            raise ServiceException(
+                message="Datos incompletos: firstname, lastname, email y apartment_number son obligatorios",
+                details={}
+            )
+        
+        # Crear el copropietario
+        new_resident = await residential_unit_service.create_resident(
+            unit_id=unit_id,
+            resident_data=resident_data.model_dump(exclude_unset=True, exclude_none=False)
+        )
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_201_CREATED,
+            message="Copropietario creado exitosamente",
+            data=new_resident
+        )
+        
+    except (ResourceNotFoundException, HTTPException, ServiceException):
+        raise
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al crear copropietario: {str(e)}",
+            details={"original_error": str(e)}
+        )

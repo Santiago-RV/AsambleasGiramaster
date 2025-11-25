@@ -196,7 +196,190 @@ class ResidentialUnitService:
                 message=f"Error al obtener usuarios sin unidad residencial: {str(e)}",
                 details={"original_error": str(e)}
             )
-        
+    async def create_resident(self, unit_id: int, resident_data: dict):
+        """
+        Crea un nuevo copropietario para una unidad residencial
+        Inserta en 3 tablas: tbl_data_users, tbl_users, tbl_user_residential_units
+        """
+        try:
+            # 1. Verificar que la unidad residencial existe
+            residential_unit = await self.get_residential_unit_by_id(unit_id)
+            if not residential_unit:
+                raise ResourceNotFoundException(
+                    message=f"Unidad residencial con ID {unit_id} no encontrada",
+                    error_code="RESIDENTIAL_UNIT_NOT_FOUND"
+                )
+            
+            # 2. Extraer y validar datos
+            firstname = resident_data.get('firstname', '').strip()
+            lastname = resident_data.get('lastname', '').strip()
+            email = resident_data.get('email', '').strip().lower()
+            phone = resident_data.get('phone', '').strip() if resident_data.get('phone') else None
+            apartment_number = resident_data.get('apartment_number', '').strip()
+            password = resident_data.get('password', 'Temporal123!')
+            is_active = resident_data.get('is_active', False)  # Por defecto deshabilitado
+            voting_weight = resident_data.get('voting_weight', Decimal('0.0'))
+            
+            # Validaciones básicas
+            if not firstname or len(firstname) < 2:
+                raise ServiceException(
+                    message="El nombre debe tener al menos 2 caracteres",
+                    details={"field": "firstname"}
+                )
+            
+            if not lastname or len(lastname) < 2:
+                raise ServiceException(
+                    message="El apellido debe tener al menos 2 caracteres",
+                    details={"field": "lastname"}
+                )
+            
+            if not email or '@' not in email:
+                raise ServiceException(
+                    message="Email inválido",
+                    details={"field": "email"}
+                )
+            
+            if not apartment_number:
+                raise ServiceException(
+                    message="El número de apartamento es obligatorio",
+                    details={"field": "apartment_number"}
+                )
+            
+            # 3. Generar username si no viene (formato: nombre.apellido.apartamento)
+            username = resident_data.get('username')
+            if not username:
+                username = f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", "")
+            
+            # 4. Verificar que el email no exista
+            existing_email = await self.db.execute(
+                select(DataUserModel).where(DataUserModel.str_email == email)
+            )
+            if existing_email.scalar_one_or_none():
+                raise ServiceException(
+                    message=f"El email {email} ya está registrado",
+                    details={"field": "email"}
+                )
+            
+            # 5. Verificar que el username no exista
+            existing_username = await self.db.execute(
+                select(UserModel).where(UserModel.str_username == username)
+            )
+            if existing_username.scalar_one_or_none():
+                raise ServiceException(
+                    message=f"El usuario {username} ya existe",
+                    details={"field": "username"}
+                )
+            
+            # 6. Crear registro en tbl_data_users
+            data_user = DataUserModel(
+                str_firstname=firstname,
+                str_lastname=lastname,
+                str_email=email,
+                str_phone=phone,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            
+            self.db.add(data_user)
+            await self.db.flush()  # Para obtener el ID
+            
+            logger.info(f"📝 DataUser creado: {email} (ID: {data_user.id})")
+            
+            # 7. Crear registro en tbl_users
+            # Hashear contraseña
+            hashed_password = security_manager.create_password_hash(password)
+            
+            user = UserModel(
+                int_data_user_id=data_user.id,
+                str_username=username,
+                str_password_hash=hashed_password,
+                int_id_rol=3,  # 3: Copropietario (FIJO)
+                bln_allow_entry=is_active,  # Usar el valor proporcionado
+                bln_is_external_delegate=False,
+                bln_user_temporary=False,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            
+            self.db.add(user)
+            await self.db.flush()  # Para obtener el ID
+            
+            logger.info(
+                f"👤 Usuario creado: {username} - Email: {email} - "
+                f"Rol: 3 (Copropietario) - Acceso: {'Habilitado' if is_active else 'Deshabilitado'}"
+            )
+            
+            # 8. Crear registro en tbl_user_residential_units
+            user_unit = UserResidentialUnitModel(
+                int_user_id=user.id,
+                int_residential_unit_id=unit_id,
+                str_apartment_number=apartment_number,
+                dec_default_voting_weight=voting_weight,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            
+            self.db.add(user_unit)
+            
+            logger.info(
+                f"🔗 Usuario asignado a unidad: {email} - "
+                f"Apt: {apartment_number} - Peso: {voting_weight}"
+            )
+            
+            # 9. Commit de la transacción
+            await self.db.commit()
+            await self.db.refresh(user)
+            await self.db.refresh(data_user)
+            await self.db.refresh(user_unit)
+            
+            # 10. Enviar correo de bienvenida (opcional)
+            try:
+                email_sent = self._send_welcome_email(
+                    user_email=email,
+                    user_name=f"{firstname} {lastname}",
+                    username=username,
+                    password=password,  # Contraseña sin hashear
+                    residential_unit_name=residential_unit.str_name,
+                    apartment_number=apartment_number,
+                    voting_weight=voting_weight,
+                    phone=phone
+                )
+                
+                if email_sent:
+                    logger.info(f"✅ Correo de bienvenida enviado a {email}")
+                else:
+                    logger.warning(f"⚠️ No se pudo enviar correo de bienvenida a {email}")
+            except Exception as e:
+                # No fallar si el correo falla, solo registrar
+                logger.error(f"❌ Error al enviar correo de bienvenida: {str(e)}")
+            
+            # 11. Retornar los datos del residente creado
+            logger.info(f"✅ Copropietario creado exitosamente: {username}")
+            
+            return {
+                "id": user.id,
+                "username": username,
+                "firstname": firstname,
+                "lastname": lastname,
+                "email": email,
+                "phone": phone,
+                "apartment_number": apartment_number,
+                "voting_weight": float(voting_weight) if voting_weight else 0.0,
+                "is_active": is_active,
+                "created_at": user.created_at
+            }
+            
+        except (ResourceNotFoundException, ServiceException):
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"❌ Error al crear copropietario: {str(e)}")
+            raise ServiceException(
+                message=f"Error al crear copropietario: {str(e)}",
+                details={"original_error": str(e)}
+            )
+            
     def _send_welcome_email(
         self,
         user_email: str,
