@@ -31,6 +31,7 @@ import { MeetingService } from '../../services/api/MeetingService';
 import Modal from '../common/Modal';
 import Swal from 'sweetalert2';
 import { uploadResidentsExcel, downloadResidentsExcelTemplate } from '../../services/residentialUnitService';
+import { ResidentService } from '../../services/api/ResidentService';
 
 
 const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
@@ -241,6 +242,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			phone: '',
 			apartment_number: '',
 			is_active: true,
+			password: '',
 		},
 	});
 
@@ -337,13 +339,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	// Mutación para actualizar residente
 	const updateResidentMutation = useMutation({
 		mutationFn: async (data) => {
-			// TODO: Implementar actualización en el backend
-			// Por ahora solo mostramos un mensaje de éxito
-			return new Promise((resolve) => {
-				setTimeout(() => {
-					resolve({ success: true, message: 'Residente actualizado exitosamente' });
-				}, 1000);
-			});
+			return await ResidentService.updateResident(
+				unitId,
+				selectedResident.id,
+				data
+			);
 		},
 		onSuccess: (response) => {
 			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
@@ -353,7 +353,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			Swal.fire({
 				icon: 'success',
 				title: '¡Éxito!',
-				text: response.message || 'Residente actualizado exitosamente',
+				text: response.message || 'Copropietario actualizado exitosamente',
 				showConfirmButton: false,
 				timer: 2000,
 				toast: true,
@@ -364,7 +364,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			Swal.fire({
 				icon: 'error',
 				title: 'Error',
-				text: error.message || 'Error al actualizar el residente',
+				text: error.response?.data?.message || error.message || 'Error al actualizar el copropietario',
 			});
 		},
 	});
@@ -372,16 +372,46 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const onSubmitResident = (data) => {
 		if (!selectedResident) return;
 
-		const residentData = {
-			id: selectedResident.id,
-			firstname: data.firstname,
-			lastname: data.lastname,
-			username: data.username,
-			email: data.email,
-			phone: data.phone || '',
-			apartment_number: data.apartment_number,
-			is_active: data.is_active,
-		};
+		// Construir objeto solo con los campos que cambiaron
+		const residentData = {};
+		
+		if (data.firstname !== selectedResident.firstname) {
+			residentData.firstname = data.firstname;
+		}
+		if (data.lastname !== selectedResident.lastname) {
+			residentData.lastname = data.lastname;
+		}
+		if (data.email !== selectedResident.email) {
+			residentData.email = data.email;
+		}
+		if (data.phone !== selectedResident.phone) {
+			residentData.phone = data.phone || null;
+		}
+		if (data.apartment_number !== selectedResident.apartment_number) {
+			residentData.apartment_number = data.apartment_number;
+		}
+		if (data.is_active !== selectedResident.is_active) {
+			residentData.is_active = data.is_active;
+		}
+		
+		// Si se proporcionó una contraseña, incluirla
+		if (data.password && data.password.trim() !== '') {
+			residentData.password = data.password;
+		}
+
+		// Si no hay cambios, no hacer nada
+		if (Object.keys(residentData).length === 0) {
+			Swal.fire({
+				icon: 'info',
+				title: 'Sin cambios',
+				text: 'No se detectaron cambios para guardar',
+				toast: true,
+				position: 'top-end',
+				timer: 2000,
+				showConfirmButton: false,
+			});
+			return;
+		}
 
 		updateResidentMutation.mutate(residentData);
 	};
@@ -390,21 +420,51 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		setSelectedResidentMenu(null);
 		Swal.fire({
 			title: '¿Estás seguro?',
-			text: `¿Deseas eliminar a ${resident.firstname} ${resident.lastname}?`,
+			html: `
+				<p>¿Deseas eliminar a <strong>${resident.firstname} ${resident.lastname}</strong>?</p>
+				<br>
+				<div class="text-left bg-red-50 p-3 rounded">
+					<p class="text-sm text-red-700"><strong>⚠️ Advertencia:</strong></p>
+					<p class="text-sm text-red-600">Esta acción eliminará completamente:</p>
+					<ul class="text-sm text-red-600 list-disc list-inside mt-2">
+						<li>Su cuenta de usuario</li>
+						<li>Todos sus datos personales</li>
+						<li>Su relación con la unidad residencial</li>
+					</ul>
+					<p class="text-sm text-red-700 mt-2"><strong>Esta acción NO se puede deshacer.</strong></p>
+				</div>
+			`,
 			icon: 'warning',
 			showCancelButton: true,
 			confirmButtonColor: '#d33',
 			cancelButtonColor: '#3085d6',
 			confirmButtonText: 'Sí, eliminar',
 			cancelButtonText: 'Cancelar',
-		}).then((result) => {
+			width: '600px'
+		}).then(async (result) => {
 			if (result.isConfirmed) {
-				// TODO: Implementar eliminación de residente
-				Swal.fire(
-					'Eliminado',
-					'El residente ha sido eliminado',
-					'success'
-				);
+				try {
+					await ResidentService.deleteResident(unitId, resident.id);
+					
+					// Actualizar la lista de residentes
+					queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+					
+					Swal.fire({
+						icon: 'success',
+						title: 'Eliminado',
+						text: `${resident.firstname} ${resident.lastname} ha sido eliminado exitosamente`,
+						showConfirmButton: false,
+						timer: 2000,
+						toast: true,
+						position: 'top-end',
+					});
+				} catch (error) {
+					Swal.fire({
+						icon: 'error',
+						title: 'Error',
+						text: error.response?.data?.message || error.message || 'Error al eliminar el copropietario',
+					});
+				}
 			}
 		});
 	};
@@ -1491,6 +1551,32 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</div>
 					</div>
 
+					{/* Nueva Contraseña (opcional) */}
+					<div className="md:col-span-2">
+						<label className="block mb-2 font-semibold text-gray-700">
+							Nueva Contraseña (opcional)
+						</label>
+						<input
+							type="password"
+							{...registerResident('password', {
+								minLength: {
+									value: 8,
+									message: 'La contraseña debe tener mínimo 8 caracteres',
+								},
+							})}
+							placeholder="Dejar en blanco para mantener la actual"
+							className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+						/>
+						{errorsResident.password && (
+							<span className="text-red-500 text-sm">
+								{errorsResident.password.message}
+							</span>
+						)}
+						<p className="text-sm text-gray-500 mt-1">
+							💡 Solo se actualizará si proporcionas una nueva contraseña
+						</p>
+					</div>
+
 					{/* Estado activo */}
 					<div>
 						<label className="flex items-center gap-3 cursor-pointer">
@@ -1504,6 +1590,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							</span>
 						</label>
 					</div>
+
+
 
 					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
 						<button
