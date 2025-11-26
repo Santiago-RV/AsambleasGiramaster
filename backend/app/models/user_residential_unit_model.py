@@ -10,7 +10,7 @@ class UserResidentialUnitModel(Base):
     int_user_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
     int_residential_unit_id = Column(Integer, ForeignKey("tbl_residential_units.id"), nullable=False)
     str_apartment_number = Column(String(50), nullable=False)
-    bools_is_admin = Column(Boolean, default=False)
+    bool_is_admin = Column(Boolean, default=False)
     dec_default_voting_weight = Column(Numeric(10, 4), nullable=False, default=0)
 
     created_at = Column(DateTime, default=datetime.now)

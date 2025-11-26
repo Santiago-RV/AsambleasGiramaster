@@ -1,12 +1,12 @@
 import { useState } from "react";
-import SidebarAdmin from "./components/layout/SidebarAD";
-import DashboardPage from "./components/AdDashboard/DashboardPage";
-import UsersPage from "./components/AdDashboard/UsersPage";
-import AssembliesPage from "./components/AdDashboard/AssembliesPage";
-import LivePage from "./components/AdDashboard/LivePage";
-import ReportsPage from "./components/AdDashboard/ReportsPage";
-import SettingsPage from "./components/AdDashboard/SettingsPage";
-import PowerModal from "./components/AdDashboard/PowerModal";
+import SidebarAdmin from "../components/layout/SidebarAD";
+import DashboardPage from "../components/AdDashboard/DashboardPage";
+import UsersPage from "../components/AdDashboard/UsersPage";
+import AssembliesPage from "../components/AdDashboard/AssembliesPage";
+import LivePage from "../components/AdDashboard/LivePage";
+import ReportsPage from "../components/AdDashboard/ReportsPage";
+import SettingsPage from "../components/AdDashboard/SettingsPage";
+import PowerModal from "../components/AdDashboard/PowerModal";
 
 export default function AppAdmin() {
   const [section, setSection] = useState("dashboard");

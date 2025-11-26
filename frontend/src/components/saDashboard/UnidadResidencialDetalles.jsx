@@ -48,16 +48,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
 
-	// Datos ficticios del administrador
-	const [currentAdmin, setCurrentAdmin] = useState({
-		id: 1,
-		firstname: 'Carlos',
-		lastname: 'Rodríguez',
-		email: 'carlos.rodriguez@unidad.com',
-		phone: '+57 300 123 4567',
-		apartment_number: '101',
-		role: 'Administrador',
-	});
+	// Estado para el administrador actual
+	const [currentAdmin, setCurrentAdmin] = useState(null);
 
 	// Actualizar posición del menú cuando cambia el scroll o el tamaño de la ventana
 	useEffect(() => {
@@ -182,6 +174,24 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		},
 		enabled: !!unitId,
 	});
+
+	// Obtener el administrador actual de la unidad
+	const {
+		data: administratorData,
+		isLoading: isLoadingAdministrator,
+	} = useQuery({
+		queryKey: ['administrator', unitId],
+		queryFn: () => ResidentialUnitService.getUnitAdministrator(unitId),
+		select: (response) => response.data,
+		enabled: !!unitId,
+	});
+
+	// Sincronizar el estado local con los datos del administrador
+	useEffect(() => {
+		if (administratorData !== undefined) {
+			setCurrentAdmin(administratorData);
+		}
+	}, [administratorData]);
 
 	// Formulario para crear reunión
 	const {
@@ -365,6 +375,41 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				icon: 'error',
 				title: 'Error',
 				text: error.message || 'Error al actualizar el residente',
+			});
+		},
+	});
+
+	// Mutación para cambiar el administrador
+	const changeAdminMutation = useMutation({
+		mutationFn: (newAdminUserId) =>
+			ResidentialUnitService.changeUnitAdministrator(unitId, newAdminUserId),
+		onSuccess: (response) => {
+			// Invalidar las queries para refrescar los datos
+			queryClient.invalidateQueries({ queryKey: ['administrator', unitId] });
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+
+			// Actualizar el estado local
+			if (response.data && response.data.new_administrator) {
+				setCurrentAdmin(response.data.new_administrator);
+			}
+
+			setIsChangeAdminModalOpen(false);
+
+			Swal.fire({
+				icon: 'success',
+				title: '¡Administrador Cambiado!',
+				text: response.message || 'El administrador ha sido actualizado exitosamente',
+				showConfirmButton: false,
+				timer: 2000,
+				toast: true,
+				position: 'top-end',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: error.message || 'Error al cambiar el administrador',
 			});
 		},
 	});
@@ -682,41 +727,90 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 
 					{/* Información del Administrador */}
 					<div className="flex items-center gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
-						<div className="flex items-center gap-3">
-							<div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md">
-								{currentAdmin.firstname.charAt(0)}
-								{currentAdmin.lastname.charAt(0)}
+						{isLoadingAdministrator ? (
+							<div className="flex items-center gap-3">
+								<svg
+									className="animate-spin h-8 w-8 text-[#3498db]"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+								>
+									<circle
+										className="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										strokeWidth="4"
+									></circle>
+									<path
+										className="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+								<span className="text-gray-600">Cargando administrador...</span>
 							</div>
-							<div>
-								<div className="flex items-center gap-2">
-									<p className="font-semibold text-gray-800">
-										{currentAdmin.firstname} {currentAdmin.lastname}
-									</p>
-									<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-										{currentAdmin.role}
-									</span>
-								</div>
-								<div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
-									<div className="flex items-center gap-1">
-										<Mail size={14} />
-										<span>{currentAdmin.email}</span>
+						) : currentAdmin ? (
+							<>
+								<div className="flex items-center gap-3">
+									<div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md">
+										{currentAdmin.firstname?.charAt(0) || ''}
+										{currentAdmin.lastname?.charAt(0) || ''}
 									</div>
-									{currentAdmin.phone && (
-										<div className="flex items-center gap-1">
-											<Phone size={14} />
-											<span>{currentAdmin.phone}</span>
+									<div>
+										<div className="flex items-center gap-2">
+											<p className="font-semibold text-gray-800">
+												{currentAdmin.firstname} {currentAdmin.lastname}
+											</p>
+											<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+												{currentAdmin.role}
+											</span>
 										</div>
-									)}
+										<div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+											<div className="flex items-center gap-1">
+												<Mail size={14} />
+												<span>{currentAdmin.email}</span>
+											</div>
+											{currentAdmin.phone && (
+												<div className="flex items-center gap-1">
+													<Phone size={14} />
+													<span>{currentAdmin.phone}</span>
+												</div>
+											)}
+										</div>
+									</div>
 								</div>
-							</div>
-						</div>
-						<button
-							onClick={() => setIsChangeAdminModalOpen(true)}
-							className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm whitespace-nowrap"
-						>
-							<UserCog size={18} />
-							Cambiar Administrador
-						</button>
+								<button
+									onClick={() => setIsChangeAdminModalOpen(true)}
+									className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm whitespace-nowrap"
+								>
+									<UserCog size={18} />
+									Cambiar Administrador
+								</button>
+							</>
+						) : (
+							<>
+								<div className="flex items-center gap-3">
+									<AlertCircle className="text-orange-500" size={32} />
+									<div>
+										<p className="font-semibold text-gray-800">
+											No hay administrador asignado
+										</p>
+										<p className="text-sm text-gray-600">
+											Selecciona un residente como administrador
+										</p>
+									</div>
+								</div>
+								<button
+									onClick={() => setIsChangeAdminModalOpen(true)}
+									className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm whitespace-nowrap"
+								>
+									<UserCog size={18} />
+									Asignar Administrador
+								</button>
+							</>
+						)}
 					</div>
 				</div>
 
@@ -1581,25 +1675,27 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 					</div>
 
 					{/* Administrador actual */}
-					<div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-						<p className="text-sm font-semibold text-gray-700 mb-2">
-							Administrador Actual:
-						</p>
-						<div className="flex items-center gap-3">
-							<div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold">
-								{currentAdmin.firstname.charAt(0)}
-								{currentAdmin.lastname.charAt(0)}
-							</div>
-							<div>
-								<p className="font-semibold text-gray-800">
-									{currentAdmin.firstname} {currentAdmin.lastname}
-								</p>
-								<p className="text-sm text-gray-600">
-									{currentAdmin.email} • Apt. {currentAdmin.apartment_number}
-								</p>
+					{currentAdmin && (
+						<div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+							<p className="text-sm font-semibold text-gray-700 mb-2">
+								Administrador Actual:
+							</p>
+							<div className="flex items-center gap-3">
+								<div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold">
+									{currentAdmin.firstname?.charAt(0) || ''}
+									{currentAdmin.lastname?.charAt(0) || ''}
+								</div>
+								<div>
+									<p className="font-semibold text-gray-800">
+										{currentAdmin.firstname} {currentAdmin.lastname}
+									</p>
+									<p className="text-sm text-gray-600">
+										{currentAdmin.email} • Apt. {currentAdmin.apartment_number}
+									</p>
+								</div>
 							</div>
 						</div>
-					</div>
+					)}
 
 					{/* Lista de residentes disponibles */}
 					<div>
@@ -1635,29 +1731,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 									{filteredResidents.map((resident) => (
 										<button
 											key={resident.id}
-											onClick={() => {
-												setCurrentAdmin({
-													id: resident.id,
-													firstname: resident.firstname,
-													lastname: resident.lastname,
-													email: resident.email || '',
-													phone: resident.phone || '',
-													apartment_number:
-														resident.apartment_number || '',
-													role: 'Administrador',
-												});
-												setIsChangeAdminModalOpen(false);
-												Swal.fire({
-													icon: 'success',
-													title: '¡Administrador Cambiado!',
-													text: `${resident.firstname} ${resident.lastname} ha sido asignado como nuevo administrador`,
-													showConfirmButton: false,
-													timer: 2000,
-													toast: true,
-													position: 'top-end',
-												});
-											}}
-											className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${currentAdmin.id === resident.id
+											onClick={() => changeAdminMutation.mutate(resident.id)}
+											disabled={changeAdminMutation.isPending || (currentAdmin && currentAdmin.id === resident.id)}
+											className={`w-full p-4 text-left hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${currentAdmin && currentAdmin.id === resident.id
 												? 'bg-blue-50 border-l-4 border-blue-500'
 												: ''
 												}`}
@@ -1672,7 +1748,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 														<p className="font-semibold text-gray-800">
 															{resident.firstname} {resident.lastname}
 														</p>
-														{currentAdmin.id === resident.id && (
+														{currentAdmin && currentAdmin.id === resident.id && (
 															<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
 																Actual
 															</span>

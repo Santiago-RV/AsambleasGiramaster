@@ -264,5 +264,100 @@ export class ResidentialUnitService {
       throw new Error(errorMessage);
     }
   }
+
+  /**
+   * Obtiene el administrador actual de una unidad residencial
+   * @param {number} unitId - ID de la unidad residencial
+   * @returns {Promise} Datos del administrador o null si no hay
+   */
+  static async getUnitAdministrator(unitId) {
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+
+      if (!token) {
+        throw new Error('No hay sesión activa. Por favor inicia sesión nuevamente.');
+      }
+
+      const response = await axiosInstance.get(
+        `/super-admin/residential-units/${unitId}/administrator`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Error al obtener el administrador');
+      }
+
+      return {
+        success: true,
+        message: response.data.message,
+        data: response.data.data,
+      };
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al obtener el administrador';
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Cambia el administrador de una unidad residencial
+   * @param {number} unitId - ID de la unidad residencial
+   * @param {number} newAdminUserId - ID del usuario que será el nuevo administrador
+   * @returns {Promise} Resultado del cambio
+   */
+  static async changeUnitAdministrator(unitId, newAdminUserId) {
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+
+      if (!token) {
+        throw new Error('No hay sesión activa. Por favor inicia sesión nuevamente.');
+      }
+
+      const response = await axiosInstance.put(
+        `/super-admin/residential-units/${unitId}/administrator/${newAdminUserId}`,
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Error al cambiar el administrador');
+      }
+
+      return {
+        success: true,
+        message: response.data.message,
+        data: response.data.data,
+      };
+    } catch (error) {
+      console.error('Error changing administrator:', error);
+
+      if (error.response?.status === 401) {
+        throw new Error('Token inválido o expirado');
+      }
+
+      if (error.response?.status === 403) {
+        throw new Error('No tienes permisos para realizar esta acción');
+      }
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al cambiar el administrador';
+
+      throw new Error(errorMessage);
+    }
+  }
 }
 

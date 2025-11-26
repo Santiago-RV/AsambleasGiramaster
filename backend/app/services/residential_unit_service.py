@@ -51,14 +51,127 @@ class ResidentialUnitService:
             )
     
     async def create_residential_unit(self, residential_unit_data: ResidentialUnitCreate) -> ResidentialUnitResponse:
-        """Crea una unidad residencial"""
+        """
+        Crea una unidad residencial y opcionalmente asigna un administrador.
+
+        Si se proporciona información del administrador:
+        1. Busca si el usuario ya existe por email
+        2. Si existe: lo asigna como administrador de la unidad
+        3. Si no existe: crea un nuevo usuario con rol Administrador y lo asigna
+        """
         try:
-            residential_unit = ResidentialUnitModel(**residential_unit_data.model_dump())
+            # Extraer datos del administrador antes de crear la unidad
+            admin_data = residential_unit_data.administrator
+
+            # Crear la unidad residencial (sin el campo administrator)
+            unit_dict = residential_unit_data.model_dump(exclude={'administrator'})
+            residential_unit = ResidentialUnitModel(**unit_dict)
             self.db.add(residential_unit)
+            await self.db.flush()  # Obtener el ID de la unidad sin hacer commit final
+
+            logger.info(f"Unidad residencial creada: {residential_unit.str_name} (ID: {residential_unit.id})")
+
+            # Si se proporcionó información del administrador, procesarla
+            if admin_data and admin_data.str_email:
+                try:
+                    # Verificar si el usuario ya existe por email
+                    existing_user = await self._get_user_by_email(admin_data.str_email)
+
+                    if existing_user:
+                        # Usuario existente: asignarlo como administrador
+                        logger.info(f"Usuario existente encontrado: {admin_data.str_email} (ID: {existing_user.id})")
+
+                        # Crear relación en tbl_user_residential_units con bool_is_admin = True
+                        user_unit = UserResidentialUnitModel(
+                            int_user_id=existing_user.id,
+                            int_residential_unit_id=residential_unit.id,
+                            str_apartment_number="ADMIN",  # Identificador especial para administradores
+                            bool_is_admin=True,
+                            dec_default_voting_weight=0,  # Los admins no votan por defecto
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        self.db.add(user_unit)
+
+                        # Actualizar bln_allow_entry en tbl_users
+                        existing_user.bln_allow_entry = True
+                        existing_user.updated_at = datetime.now()
+
+                        logger.info(f"Usuario {existing_user.id} asignado como administrador de la unidad {residential_unit.id}")
+
+                    else:
+                        # Usuario nuevo: crear en las 3 tablas
+                        logger.info(f"Creando nuevo usuario administrador: {admin_data.str_email}")
+
+                        # 1. Crear en tbl_data_users
+                        data_user = DataUserModel(
+                            str_firstname=admin_data.str_firstname,
+                            str_lastname=admin_data.str_lastname,
+                            str_email=admin_data.str_email,
+                            str_phone=admin_data.str_phone,
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        self.db.add(data_user)
+                        await self.db.flush()
+
+                        logger.info(f"DataUser creado para administrador: {admin_data.str_email} (ID: {data_user.id})")
+
+                        # 2. Crear en tbl_users con rol 2 (Administrador)
+                        username = f"{admin_data.str_firstname.lower()}.{admin_data.str_lastname.lower()}".replace(" ", "")
+                        default_password = "Admin123!"  # Contraseña temporal para administradores
+                        hashed_password = security_manager.create_password_hash(default_password)
+
+                        user = UserModel(
+                            int_data_user_id=data_user.id,
+                            str_username=username,
+                            str_password_hash=hashed_password,
+                            int_id_rol=2,  # 2: Administrador
+                            bln_allow_entry=True,  # Administrador tiene acceso habilitado
+                            bln_is_external_delegate=False,
+                            bln_user_temporary=False,
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        self.db.add(user)
+                        await self.db.flush()
+
+                        logger.info(
+                            f"Usuario administrador creado: {username} - Email: {admin_data.str_email} - "
+                            f"Rol: 2 (Administrador) - Acceso: Habilitado"
+                        )
+
+                        # 3. Crear relación en tbl_user_residential_units con bool_is_admin = True
+                        user_unit = UserResidentialUnitModel(
+                            int_user_id=user.id,
+                            int_residential_unit_id=residential_unit.id,
+                            str_apartment_number="ADMIN",  # Identificador especial
+                            bool_is_admin=True,
+                            dec_default_voting_weight=0,
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        self.db.add(user_unit)
+
+                        logger.info(
+                            f"Usuario {user.id} asignado como administrador de la unidad {residential_unit.id} "
+                            f"con contraseña temporal: {default_password}"
+                        )
+
+                except Exception as admin_error:
+                    logger.error(f"Error al procesar administrador: {admin_error}")
+                    # Continuar sin fallar la creación de la unidad
+                    logger.warning("La unidad se creó pero hubo un problema asignando el administrador")
+
+            # Commit de todas las operaciones
             await self.db.commit()
             await self.db.refresh(residential_unit)
+
             return ResidentialUnitResponse.model_validate(residential_unit)
+
         except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al crear la unidad residencial: {e}")
             raise ServiceException(
                 message=f"Error al crear la unidad residencial: {str(e)}",
                 details={"original_error": str(e)}
@@ -423,6 +536,182 @@ class ResidentialUnitService:
         except Exception as e:
             raise ServiceException(
                 message=f"Error al obtener usuarios sin unidad residencial: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
+    async def get_unit_administrator(self, unit_id: int) -> Optional[dict]:
+        """
+        Obtiene el administrador actual de una unidad residencial.
+
+        Args:
+            unit_id: ID de la unidad residencial
+
+        Returns:
+            Diccionario con datos del administrador o None si no hay administrador
+        """
+        try:
+            query = (
+                select(UserModel, DataUserModel, UserResidentialUnitModel)
+                .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                .where(
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                    UserResidentialUnitModel.bool_is_admin == True
+                )
+            )
+
+            result = await self.db.execute(query)
+            admin_data = result.first()
+
+            if not admin_data:
+                return None
+
+            user, data_user, user_unit = admin_data
+
+            return {
+                "id": user.id,
+                "username": user.str_username,
+                "firstname": data_user.str_firstname,
+                "lastname": data_user.str_lastname,
+                "email": data_user.str_email,
+                "phone": data_user.str_phone,
+                "apartment_number": user_unit.str_apartment_number,
+                "role": "Administrador"
+            }
+
+        except Exception as e:
+            raise ServiceException(
+                message=f"Error al obtener el administrador de la unidad: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
+    async def change_unit_administrator(self, unit_id: int, new_admin_user_id: int) -> dict:
+        """
+        Cambia el administrador de una unidad residencial.
+
+        - Marca bool_is_admin = False para el administrador anterior
+        - Marca bool_is_admin = True para el nuevo administrador
+        - Actualiza bln_allow_entry = True para el nuevo administrador
+        - Actualiza bln_allow_entry = False para el anterior (solo si era admin)
+
+        Args:
+            unit_id: ID de la unidad residencial
+            new_admin_user_id: ID del usuario que será el nuevo administrador
+
+        Returns:
+            Diccionario con información del resultado
+        """
+        try:
+            # Verificar que la unidad residencial existe
+            unit = await self.get_residential_unit_by_id(unit_id)
+            if not unit:
+                raise ValueError(f"No existe la unidad residencial con ID {unit_id}")
+
+            # Verificar que el nuevo administrador existe y pertenece a esta unidad
+            query_new_admin = (
+                select(UserResidentialUnitModel, UserModel)
+                .join(UserModel, UserResidentialUnitModel.int_user_id == UserModel.id)
+                .where(
+                    UserResidentialUnitModel.int_user_id == new_admin_user_id,
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id
+                )
+            )
+            result_new = await self.db.execute(query_new_admin)
+            new_admin_data = result_new.first()
+
+            if not new_admin_data:
+                raise ValueError(
+                    f"El usuario {new_admin_user_id} no pertenece a la unidad residencial {unit_id}"
+                )
+
+            new_admin_unit, new_admin_user = new_admin_data
+
+            # Buscar al administrador anterior (si existe)
+            query_old_admin = (
+                select(UserResidentialUnitModel, UserModel)
+                .join(UserModel, UserResidentialUnitModel.int_user_id == UserModel.id)
+                .where(
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                    UserResidentialUnitModel.bool_is_admin == True
+                )
+            )
+            result_old = await self.db.execute(query_old_admin)
+            old_admin_data = result_old.first()
+
+            # Si existe un administrador anterior, quitarle privilegios
+            if old_admin_data:
+                old_admin_unit, old_admin_user = old_admin_data
+
+                # No hacer nada si es el mismo usuario
+                if old_admin_user.id == new_admin_user_id:
+                    return {
+                        "message": "El usuario ya es el administrador actual",
+                        "changed": False
+                    }
+
+                # Quitar privilegios al anterior
+                old_admin_unit.bool_is_admin = False
+                old_admin_unit.updated_at = datetime.now()
+
+                old_admin_user.bln_allow_entry = False
+                old_admin_user.updated_at = datetime.now()
+
+                logger.info(
+                    f"Privilegios de administrador removidos del usuario {old_admin_user.id} "
+                    f"en la unidad {unit_id}"
+                )
+
+            # Asignar privilegios al nuevo administrador
+            new_admin_unit.bool_is_admin = True
+            new_admin_unit.updated_at = datetime.now()
+
+            new_admin_user.bln_allow_entry = True
+            new_admin_user.updated_at = datetime.now()
+
+            logger.info(
+                f"Usuario {new_admin_user_id} asignado como administrador "
+                f"de la unidad {unit_id}"
+            )
+
+            # Confirmar cambios
+            await self.db.commit()
+
+            # Obtener datos del nuevo administrador para respuesta
+            await self.db.refresh(new_admin_user)
+            await self.db.refresh(new_admin_unit)
+
+            query_data = (
+                select(DataUserModel)
+                .where(DataUserModel.id == new_admin_user.int_data_user_id)
+            )
+            result_data = await self.db.execute(query_data)
+            data_user = result_data.scalar_one()
+
+            return {
+                "message": "Administrador cambiado exitosamente",
+                "changed": True,
+                "new_administrator": {
+                    "id": new_admin_user.id,
+                    "username": new_admin_user.str_username,
+                    "firstname": data_user.str_firstname,
+                    "lastname": data_user.str_lastname,
+                    "email": data_user.str_email,
+                    "phone": data_user.str_phone,
+                    "apartment_number": new_admin_unit.str_apartment_number,
+                    "role": "Administrador"
+                }
+            }
+
+        except ValueError as e:
+            await self.db.rollback()
+            raise ServiceException(
+                message=str(e),
+                details={"unit_id": unit_id, "new_admin_user_id": new_admin_user_id}
+            )
+        except Exception as e:
+            await self.db.rollback()
+            raise ServiceException(
+                message=f"Error al cambiar el administrador: {str(e)}",
                 details={"original_error": str(e)}
             )
 
