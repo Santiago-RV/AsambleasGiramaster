@@ -87,7 +87,8 @@ class ResidentialUnitService:
                 select(
                     UserModel,
                     DataUserModel,
-                    UserResidentialUnitModel.str_apartment_number
+                    UserResidentialUnitModel.str_apartment_number,
+                    UserResidentialUnitModel.dec_default_voting_weight
                 )
                 .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
@@ -99,7 +100,7 @@ class ResidentialUnitService:
             
             # Formatear la respuesta
             residents = []
-            for user, data_user, apartment_number in residents_data:
+            for user, data_user, apartment_number, voting_weight  in residents_data:
                 residents.append({
                     "id": user.id,
                     "username": user.str_username,
@@ -108,6 +109,7 @@ class ResidentialUnitService:
                     "email": data_user.str_email,
                     "phone": data_user.str_phone,
                     "apartment_number": apartment_number,
+                    "voting_weight": float(voting_weight) if voting_weight else 0.0,
                     "is_external_delegate": user.bln_is_external_delegate,
                     "user_temporary": user.bln_user_temporary,
                     "is_active": user.bln_allow_entry,  # ← CAMBIO: usar bln_allow_entry

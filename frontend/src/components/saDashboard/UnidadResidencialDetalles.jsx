@@ -344,6 +344,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		setResidentValue('email', resident.email || '');
 		setResidentValue('phone', resident.phone || '');
 		setResidentValue('apartment_number', resident.apartment_number || '');
+		setResidentValue('voting_weight', resident.voting_weight || '');
 		setResidentValue('is_active', resident.is_active !== undefined ? resident.is_active : true);
 		setResidentValue('password', ''); // Vacío para edición
 		setIsResidentModalOpen(true);
@@ -361,7 +362,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		onSuccess: (response) => {
 			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
 			resetResident();
-			setIsEditResidentModalOpen(false);
+			setIsResidentModalOpen(false);
 			setSelectedResident(null);
 			Swal.fire({
 				icon: 'success',
@@ -422,6 +423,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				apartment_number: data.apartment_number,
 				is_active: data.is_active,
 				password: data.password || 'Temporal123!',
+				voting_weight: data.voting_weight || 0.0,
 			};
 			createResidentMutation.mutate(residentData);
 		} else {
@@ -448,7 +450,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			if (data.is_active !== selectedResident.is_active) {
 				residentData.is_active = data.is_active;
 			}
-
+			if (data.voting_weight !== selectedResident.voting_weight) {
+				residentData.voting_weight = data.voting_weight || 0.0;
+			}
 			if (data.password && data.password.trim() !== '') {
 				residentData.password = data.password;
 			}
@@ -1741,6 +1745,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							{...registerResident('password',
 								residentModalMode === 'create'
 									? {
+										// Modo CREAR: contraseña obligatoria
 										required: 'La contraseña es obligatoria',
 										minLength: {
 											value: 8,
@@ -1748,10 +1753,18 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 										},
 									}
 									: {
-										minLength: {
-											value: 8,
-											message: 'La contraseña debe tener mínimo 8 caracteres',
-										},
+										// Modo EDITAR: contraseña opcional, pero si se proporciona debe ser válida
+										validate: (value) => {
+											// Si está vacío, es válido (opcional en edición)
+											if (!value || value.trim() === '') {
+												return true;
+											}
+											// Si tiene valor, validar que tenga al menos 8 caracteres
+											if (value.length < 8) {
+												return 'La contraseña debe tener mínimo 8 caracteres';
+											}
+											return true;
+										}
 									}
 							)}
 							placeholder={
@@ -1799,8 +1812,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 									: updateResidentMutation.isPending
 							}
 							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending)
-									? 'opacity-50 cursor-not-allowed'
-									: ''
+								? 'opacity-50 cursor-not-allowed'
+								: ''
 								}`}
 						>
 							{(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending) ? (
