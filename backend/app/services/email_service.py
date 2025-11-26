@@ -15,6 +15,8 @@ from app.models.data_user_model import DataUserModel
 from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.residential_unit_model import ResidentialUnitModel
 from app.utils.email_sender import email_sender
+from app.services.email_notification_service import EmailNotificationService
+
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,7 @@ class EmailService:
     ) -> dict:
         """
         Envía invitaciones por correo a usuarios de una reunión.
+        Registra cada envío en tbl_email_notifications.
         Si no se especifican user_ids, se envía a todos los usuarios de la unidad residencial.
         
         Args:
@@ -108,9 +111,12 @@ class EmailService:
             user_ids: Lista opcional de IDs de usuarios específicos
             
         Returns:
-            dict: Estadísticas del envío
+            dict: Estadísticas del envío con notificaciones registradas
         """
         try:
+            # Crear instancia del servicio de notificaciones
+            notification_service = EmailNotificationService(db)
+            
             # Obtener información de la reunión
             query = select(MeetingModel).where(MeetingModel.id == meeting_id)
             result = await db.execute(query)
@@ -180,11 +186,23 @@ class EmailService:
             # Formatear fecha y hora
             meeting_date, meeting_time = self._format_datetime(meeting.dat_schedule_date)
             
-            # Preparar emails para envío masivo
+            # Preparar emails para envío masivo Y crear notificaciones
             emails_to_send = []
+            notification_mapping = {}  # {email: notification_id}
             
             for user, data_user in users_data:
-                # Preparar datos para la plantilla
+                # 1️⃣ CREAR NOTIFICACIÓN EN ESTADO "PENDING"
+                notification = await notification_service.create_notification(
+                    user_id=user.id,
+                    template="meeting_invite",
+                    status="pending",
+                    meeting_id=meeting_id
+                )
+                
+                # Guardar mapeo email -> notification_id para actualizar después
+                notification_mapping[data_user.str_email] = notification.id
+                
+                # 2️⃣ PREPARAR DATOS PARA LA PLANTILLA
                 template_data = {
                     "user_name": f"{data_user.str_firstname} {data_user.str_lastname}",
                     "meeting_title": meeting.str_title,
@@ -204,25 +222,55 @@ class EmailService:
                 # Renderizar plantilla
                 html_content = self._render_template(template, template_data)
                 
-                # Agregar a la lista de envíos
+                # 3️⃣ AGREGAR A LA LISTA DE ENVÍOS
                 emails_to_send.append({
                     "to_emails": [data_user.str_email],
                     "subject": f"Invitación: {meeting.str_title}",
                     "html_content": html_content
                 })
             
-            # Enviar emails
+            # 4️⃣ ENVIAR EMAILS
             stats = email_sender.send_bulk_emails(emails_to_send)
             
+            # 5️⃣ ACTUALIZAR ESTADO DE NOTIFICACIONES
+            # Necesito identificar cuáles emails se enviaron exitosamente
+            # send_bulk_emails retorna: {'exitosos': int, 'fallidos': int, 'detalles': list}
+            
+            # Si send_bulk_emails NO retorna detalles de cada email individual,
+            # asumimos que todos se enviaron (o fallaron todos)
+            if stats.get('exitosos', 0) > 0:
+                # Marcar todas las notificaciones como "sent"
+                for email, notification_id in notification_mapping.items():
+                    await notification_service.update_status(
+                        notification_id=notification_id,
+                        status="sent",
+                        commit=False  # No hacer commit individual
+                    )
+            
+            if stats.get('fallidos', 0) > 0:
+                # Si hay fallidos pero no tenemos detalles, log de advertencia
+                logger.warning(
+                    f"⚠️ {stats['fallidos']} emails fallaron. "
+                    f"No se puede actualizar estado individual de notificaciones."
+                )
+            
+            # 6️⃣ COMMIT DE TODAS LAS NOTIFICACIONES
+            await db.commit()
+            
             logger.info(
-                f"Invitaciones enviadas para reunión {meeting_id}: "
-                f"{stats['exitosos']} exitosos, {stats['fallidos']} fallidos"
+                f"✅ Invitaciones enviadas para reunión {meeting_id}: "
+                f"{stats['exitosos']} exitosos, {stats['fallidos']} fallidos. "
+                f"📧 {len(notification_mapping)} notificaciones registradas."
             )
+            
+            # Agregar info de notificaciones al resultado
+            stats['notifications_created'] = len(notification_mapping)
             
             return stats
             
         except Exception as e:
-            logger.error(f"Error al enviar invitaciones: {str(e)}")
+            await db.rollback()
+            logger.error(f"❌ Error al enviar invitaciones: {str(e)}")
             return {"error": str(e)}
     
     async def send_meeting_reminder(

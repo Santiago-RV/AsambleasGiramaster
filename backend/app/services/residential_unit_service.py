@@ -18,6 +18,7 @@ from app.schemas.residential_unit_schema import ResidentialUnitCreate, Residenti
 from app.core.exceptions import ServiceException, ResourceNotFoundException
 from app.core.security import security_manager
 from app.utils.email_sender import email_sender
+from app.services.email_notification_service import EmailNotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -392,7 +393,10 @@ class ResidentialUnitService:
         phone: Optional[str] = None
     ) -> bool:
         """
-        Envía correo de bienvenida al copropietario con sus credenciales
+        Envía correo de bienvenida al copropietario con sus credenciales.
+        
+        ⚠️ NOTA: Este método NO registra notificaciones en la BD.
+        Las notificaciones deben ser manejadas por el método que llama a esta función.
         
         Args:
             user_email: Email del copropietario
@@ -430,7 +434,7 @@ class ResidentialUnitService:
             html_content = html_content.replace('{{password}}', password)
             html_content = html_content.replace('{{voting_weight}}', f"{voting_weight_percent:.2f}")
             html_content = html_content.replace('{{current_year}}', str(datetime.now().year))
-            html_content = html_content.replace('{{login_url}}', 'http://localhost:5173/login')  # Ajustar según tu URL
+            html_content = html_content.replace('{{login_url}}', 'http://localhost:5173/login')
             
             # Manejar teléfono opcional
             if phone:
@@ -448,26 +452,26 @@ class ResidentialUnitService:
                 subject=f"Bienvenido a GIRAMASTER - {residential_unit_name}",
                 html_content=html_content,
                 text_content=f"""
-Estimado(a) {user_name},
+    Estimado(a) {user_name},
 
-Se ha creado exitosamente su cuenta como copropietario de {residential_unit_name}.
+    Se ha creado exitosamente su cuenta como copropietario de {residential_unit_name}.
 
-CREDENCIALES DE ACCESO:
-- Usuario: {username}
-- Contraseña: {password}
+    CREDENCIALES DE ACCESO:
+    - Usuario: {username}
+    - Contraseña: {password}
 
-Información de su cuenta:
-- Apartamento: {apartment_number}
-- Email: {user_email}
-- Peso de votación: {voting_weight_percent:.2f}%
+    Información de su cuenta:
+    - Apartamento: {apartment_number}
+    - Email: {user_email}
+    - Peso de votación: {voting_weight_percent:.2f}%
 
-IMPORTANTE: Su cuenta ha sido creada con acceso DESHABILITADO por motivos de seguridad.
-El Super Administrador debe habilitar su acceso antes de que pueda iniciar sesión.
+    IMPORTANTE: Su cuenta ha sido creada con acceso DESHABILITADO por motivos de seguridad.
+    El Super Administrador debe habilitar su acceso antes de que pueda iniciar sesión.
 
-Por seguridad, le recomendamos cambiar su contraseña después del primer inicio de sesión.
+    Por seguridad, le recomendamos cambiar su contraseña después del primer inicio de sesión.
 
-Saludos,
-Sistema GIRAMASTER
+    Saludos,
+    Sistema GIRAMASTER
                 """
             )
             
@@ -481,259 +485,6 @@ Sistema GIRAMASTER
         except Exception as e:
             logger.error(f"❌ Error al enviar correo de bienvenida a {user_email}: {str(e)}")
             return False
-        
-    async def process_residents_excel_file(
-        self, 
-        file_content: bytes, 
-        unit_id: int, 
-        created_by: int
-    ) -> dict:
-        """
-        Procesa el archivo Excel y crea copropietarios masivamente insertando en 3 tablas:
-        - tbl_data_users: Información personal
-        - tbl_users: Credenciales y permisos
-        - tbl_user_residential_units: Relación con unidad residencial
-        
-        Después de crear cada usuario, envía un correo de bienvenida con sus credenciales.
-        
-        Args:
-            file_content: Contenido del archivo Excel en bytes
-            unit_id: ID de la unidad residencial
-            created_by: ID del usuario que está creando los registros
-        
-        Returns:
-            Dict con estadísticas del proceso:
-            - total_rows: Total de filas procesadas
-            - successful: Copropietarios creados exitosamente
-            - failed: Filas que fallaron
-            - users_created: Número de usuarios creados
-            - emails_sent: Número de correos enviados exitosamente
-            - emails_failed: Número de correos que fallaron
-            - errors: Lista de errores detallados
-        """
-        try:
-            # Obtener información de la unidad residencial para los correos
-            residential_unit = await self.get_residential_unit_by_id(unit_id)
-            if not residential_unit:
-                raise ValueError(f"Unidad residencial con ID {unit_id} no encontrada")
-            
-            residential_unit_name = residential_unit.str_name
-            
-            # Leer el archivo Excel
-            df = pd.read_excel(file_content)
-            
-            # Validar columnas requeridas
-            required_columns = ['email', 'firstname', 'lastname', 'apartment_number', 'voting_weight']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            
-            if missing_columns:
-                raise ValueError(
-                    f"Columnas faltantes en el Excel: {', '.join(missing_columns)}. "
-                    f"Columnas requeridas: email, firstname, lastname, apartment_number, voting_weight"
-                )
-
-            results = {
-                'total_rows': len(df),
-                'successful': 0,
-                'failed': 0,
-                'users_created': 0,
-                'emails_sent': 0,
-                'emails_failed': 0,
-                'errors': []
-            }
-
-            # Procesar cada fila
-            for index, row in df.iterrows():
-                try:
-                    row_dict = row.to_dict()
-                    
-                    # Validar y limpiar datos
-                    email = str(row_dict['email']).strip().lower()
-                    firstname = str(row_dict['firstname']).strip()
-                    lastname = str(row_dict['lastname']).strip()
-                    apartment_number = str(row_dict['apartment_number']).strip()
-                    phone = str(row_dict.get('phone', '')).strip() if pd.notna(row_dict.get('phone')) else None
-                    password = str(row_dict.get('password', 'Temporal123!')).strip()
-                    
-                    # Validar y convertir voting_weight
-                    try:
-                        voting_weight = Decimal(str(row_dict['voting_weight']))
-                        if voting_weight <= 0 or voting_weight > 100:
-                            raise ValueError("El peso de votación debe estar entre 0 y 100")
-                    except (ValueError, TypeError) as e:
-                        raise ValueError(f"Peso de votación inválido: {row_dict.get('voting_weight')}. Debe ser un número decimal (ej: 0.25)")
-
-                    # Validaciones básicas
-                    if len(firstname) < 2:
-                        raise ValueError("El nombre debe tener al menos 2 caracteres")
-                    if len(lastname) < 2:
-                        raise ValueError("El apellido debe tener al menos 2 caracteres")
-                    if '@' not in email:
-                        raise ValueError("Email inválido")
-                    if len(apartment_number) == 0:
-                        raise ValueError("Número de apartamento requerido")
-
-                    # Verificar si el usuario ya existe por email
-                    existing_user = await self._get_user_by_email(email)
-                    user_was_created = False
-                    password_to_send = password  # Guardar contraseña antes de hashear
-                    
-                    if not existing_user:
-                        # ============================================
-                        # PASO 1: Crear registro en tbl_data_users
-                        # ============================================
-                        data_user = DataUserModel(
-                            str_firstname=firstname,
-                            str_lastname=lastname,
-                            str_email=email,
-                            str_phone=phone,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
-                        )
-                        
-                        self.db.add(data_user)
-                        await self.db.flush()
-                        
-                        logger.info(f"📝 DataUser creado: {email} (ID: {data_user.id})")
-
-                        # ============================================
-                        # PASO 2: Crear registro en tbl_users
-                        # ============================================
-                        # Generar username como nombre.apellido.nroapartamento
-                        username = f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", "")
-                        
-                        # Hashear contraseña
-                        hashed_password = security_manager.create_password_hash(password)
-
-                        # Crear User con rol 3 (copropietario) y acceso DESHABILITADO
-                        user = UserModel(
-                            int_data_user_id=data_user.id,
-                            str_username=username,
-                            str_password_hash=hashed_password,
-                            int_id_rol=3,  # 3: Copropietario (FIJO)
-                            bln_allow_entry=False,  # Acceso deshabilitado (0)
-                            bln_is_external_delegate=False,
-                            bln_user_temporary=False,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
-                        )
-
-                        self.db.add(user)
-                        await self.db.flush()
-                        
-                        user_was_created = True
-                        results['users_created'] += 1
-                        logger.info(
-                            f"👤 Usuario creado: {username} - Email: {email} - "
-                            f"Rol: 3 (Copropietario) - Acceso: Deshabilitado"
-                        )
-                    else:
-                        user = existing_user
-                        username = user.str_username
-                        logger.info(f"ℹ️ Usuario ya existe: {email} (ID: {user.id})")
-
-                    # ============================================
-                    # PASO 3: Crear/actualizar registro en tbl_user_residential_units
-                    # ============================================
-                    existing_assignment = await self._check_user_unit_assignment(
-                        user.id, 
-                        unit_id
-                    )
-                    
-                    if existing_assignment:
-                        # Actualizar si hay cambios
-                        needs_update = False
-                        
-                        if existing_assignment.str_apartment_number != apartment_number:
-                            existing_assignment.str_apartment_number = apartment_number
-                            needs_update = True
-                            logger.info(
-                                f"🏠 Apartamento actualizado para {email}: "
-                                f"{existing_assignment.str_apartment_number} -> {apartment_number}"
-                            )
-                        
-                        if existing_assignment.dec_default_voting_weight != voting_weight:
-                            existing_assignment.dec_default_voting_weight = voting_weight
-                            needs_update = True
-                            logger.info(
-                                f"⚖️ Peso de votación actualizado para {email}: "
-                                f"{existing_assignment.dec_default_voting_weight} -> {voting_weight}"
-                            )
-                        
-                        if needs_update:
-                            existing_assignment.updated_at = datetime.now()
-                    else:
-                        # Crear relación usuario-unidad residencial
-                        user_unit = UserResidentialUnitModel(
-                            int_user_id=user.id,
-                            int_residential_unit_id=unit_id,
-                            str_apartment_number=apartment_number,
-                            dec_default_voting_weight=voting_weight,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
-                        )
-                        
-                        self.db.add(user_unit)
-                        logger.info(
-                            f"🔗 Usuario asignado a unidad: {email} - "
-                            f"Apt: {apartment_number} - Peso: {voting_weight}"
-                        )
-
-                    # ============================================
-                    # PASO 4: Enviar correo de bienvenida (solo si es usuario nuevo)
-                    # ============================================
-                    if user_was_created:
-                        email_sent = self._send_welcome_email(
-                            user_email=email,
-                            user_name=f"{firstname} {lastname}",
-                            username=username,
-                            password=password_to_send,  # Contraseña sin hashear
-                            residential_unit_name=residential_unit_name,
-                            apartment_number=apartment_number,
-                            voting_weight=voting_weight,
-                            phone=phone
-                        )
-                        
-                        if email_sent:
-                            results['emails_sent'] += 1
-                            logger.info(f"✅ Correo enviado a {email}")
-                        else:
-                            results['emails_failed'] += 1
-                            logger.warning(f"⚠️ No se pudo enviar correo a {email}")
-
-                    results['successful'] += 1
-
-                except Exception as e:
-                    results['errors'].append({
-                        'row': index + 2,  # +2 porque Excel empieza en 1 y tiene header
-                        'email': row_dict.get('email', 'N/A'),
-                        'apartment': row_dict.get('apartment_number', 'N/A'),
-                        'error': str(e)
-                    })
-                    results['failed'] += 1
-                    logger.error(f"❌ Error procesando fila {index + 2}: {e}")
-
-            # Commit de todas las operaciones exitosas
-            if results['successful'] > 0:
-                await self.db.commit()
-                logger.info(
-                    f"✅ Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
-                    f"{results['users_created']} usuarios nuevos creados, "
-                    f"{results['emails_sent']} correos enviados"
-                )
-            else:
-                await self.db.rollback()
-                logger.warning("⚠️ No se procesó ningún copropietario exitosamente")
-
-            return results
-
-        except Exception as e:
-            await self.db.rollback()
-            logger.error(f"❌ Error procesando archivo Excel: {e}")
-            raise ServiceException(
-                message=f"Error al procesar el archivo Excel: {str(e)}",
-                details={"original_error": str(e)}
-            )
 
 
     async def _get_user_by_email(self, email: str):
@@ -932,8 +683,8 @@ Sistema GIRAMASTER
             
     async def resend_resident_credentials(self, user_id: int, unit_id: int):
         """
-        Reenvía las credenciales de acceso por correo electrónico a un copropietario
-        NOTA: La contraseña ya está hasheada, por lo que se enviará una contraseña temporal nueva
+        Reenvía las credenciales de acceso por correo electrónico a un copropietario.
+        Genera una nueva contraseña temporal y registra la notificación en BD.
         """
         try:
             # Verificar que el usuario existe y pertenece a la unidad
@@ -984,31 +735,70 @@ Sistema GIRAMASTER
             
             await self.db.commit()
             
-            # Enviar correo con las nuevas credenciales
-            email_sent = self._send_welcome_email(
-                user_email=data_user.str_email,
-                user_name=f"{data_user.str_firstname} {data_user.str_lastname}",
-                username=user.str_username,
-                password=temporary_password,  # Contraseña sin hashear
-                residential_unit_name=residential_unit.str_name,
-                apartment_number=user_unit.str_apartment_number,
-                voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
-                phone=data_user.str_phone
-            )
+            # 🔥 REGISTRAR NOTIFICACIÓN Y ENVIAR CORREO
+            notification_service = EmailNotificationService(self.db)
             
-            if email_sent:
-                logger.info(f"✅ Credenciales reenviadas a {data_user.str_email}")
-                return {
-                    "email": data_user.str_email,
-                    "username": user.str_username,
-                    "email_sent": True,
-                    "message": f"Credenciales enviadas a {data_user.str_email}"
-                }
-            else:
-                logger.warning(f"⚠️ No se pudo enviar correo a {data_user.str_email}")
+            try:
+                # Crear notificación en estado "pending"
+                notification = await notification_service.create_notification(
+                    user_id=user.id,
+                    template="resend_credentials",
+                    status="pending",
+                    meeting_id=None
+                )
+                
+                # Enviar correo con las nuevas credenciales
+                email_sent = self._send_welcome_email(
+                    user_email=data_user.str_email,
+                    user_name=f"{data_user.str_firstname} {data_user.str_lastname}",
+                    username=user.str_username,
+                    password=temporary_password,  # Contraseña sin hashear
+                    residential_unit_name=residential_unit.str_name,
+                    apartment_number=user_unit.str_apartment_number,
+                    voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
+                    phone=data_user.str_phone
+                )
+                
+                # Actualizar estado de la notificación según resultado
+                status = "sent" if email_sent else "failed"
+                await notification_service.update_status(
+                    notification_id=notification.id,
+                    status=status,
+                    commit=True  # Commit de la notificación
+                )
+                
+                if email_sent:
+                    logger.info(
+                        f"✅ Credenciales reenviadas a {data_user.str_email} "
+                        f"- Notificación ID: {notification.id} registrada como '{status}'"
+                    )
+                    return {
+                        "email": data_user.str_email,
+                        "username": user.str_username,
+                        "email_sent": True,
+                        "notification_id": notification.id,
+                        "message": f"Credenciales enviadas a {data_user.str_email}"
+                    }
+                else:
+                    logger.warning(
+                        f"⚠️ No se pudo enviar correo a {data_user.str_email} "
+                        f"- Notificación ID: {notification.id} marcada como 'failed'"
+                    )
+                    raise ServiceException(
+                        message=f"No se pudo enviar el correo a {data_user.str_email}",
+                        details={
+                            "email": data_user.str_email,
+                            "notification_id": notification.id
+                        }
+                    )
+                    
+            except ServiceException:
+                raise
+            except Exception as e:
+                logger.error(f"❌ Error al enviar correo/notificación: {str(e)}")
                 raise ServiceException(
-                    message=f"No se pudo enviar el correo a {data_user.str_email}",
-                    details={"email": data_user.str_email}
+                    message=f"Error al procesar el envío de credenciales: {str(e)}",
+                    details={"original_error": str(e)}
                 )
                 
         except (ResourceNotFoundException, ServiceException):
@@ -1016,7 +806,7 @@ Sistema GIRAMASTER
             raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Error al reenviar credenciales: {str(e)}")
+            logger.error(f"❌ Error al reenviar credenciales: {str(e)}")
             raise ServiceException(
                 message=f"Error al reenviar credenciales: {str(e)}",
                 details={"original_error": str(e)}
