@@ -7,7 +7,17 @@ class UserSimplifiedSchema(BaseModel):
   """
   id: int = Field(..., description="ID del usuario")
   str_username: str = Field(..., description="Nombre de usuario")
-  
+
+  model_config = ConfigDict(from_attributes=True)
+
+class AdministratorData(BaseModel):
+  """Esquema para los datos del administrador de la unidad residencial
+  """
+  str_firstname: str = Field(..., description="Nombres del administrador")
+  str_lastname: str = Field(..., description="Apellidos del administrador")
+  str_email: str = Field(..., description="Email del administrador")
+  str_phone: Optional[str] = Field(None, description="Teléfono del administrador")
+
   model_config = ConfigDict(from_attributes=True)
 
 class ResidentialUnitBase(BaseModel):
@@ -31,6 +41,7 @@ class ResidentialUnitCreate(ResidentialUnitBase):
   """
   created_by: int = Field(..., description="ID del usuario que creó la unidad residencial")
   updated_by: int = Field(..., description="ID del usuario que actualizó la unidad residencial")
+  administrator: Optional[AdministratorData] = Field(None, description="Datos del administrador de la unidad")
 
 class ResidentialUnitUpdate(ResidentialUnitBase):
   """Esquema para actualizar una unidad residencial

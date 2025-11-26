@@ -5,6 +5,7 @@ import { RoleBasedRoute } from './components/Auth/RoleBasedRoute';
 import React from 'react';
 import Login from './pages/Login';
 import HomeSA from './pages/HomeSA';
+import AppAdmin from './pages/AdDashboard.jsx'
 import NotFound from './pages/NotFound';
 import './App.css';
 
@@ -17,17 +18,28 @@ function App() {
 
 				{/* Rutas protegidas por autenticación */}
 				<Route path="/" element={<ProtectedRoute />}>
-					{/* Ruta principal - Redirige según el rol */}
+					{/* Ruta para Super Administrador */}
 					<Route
-						index
+						path="super-admin"
 						element={
-							<RoleBasedRoute
-								allowedRoles={['Super Administrador']}
-							>
+							<RoleBasedRoute allowedRoles={['Super Administrador']}>
 								<HomeSA />
 							</RoleBasedRoute>
 						}
 					/>
+
+					{/* Ruta para Administrador */}
+					<Route
+						path="admin"
+						element={
+							<RoleBasedRoute allowedRoles={['Administrador']}>
+								<AppAdmin />
+							</RoleBasedRoute>
+						}
+					/>
+
+					{/* Ruta index - Redirige según el rol del usuario */}
+					<Route index element={<Navigate to="/login" replace />} />
 				</Route>
 
 				{/* Ruta 404 - Página no encontrada */}

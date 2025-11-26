@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
-import { Home, User, Lock, AlertCircle, ArrowRight } from 'lucide-react';
+import { User, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import Swal from 'sweetalert2';
 import logo from '../assets/logo_giramaster.jpeg';
 import background from '../assets/background_giramaster.jpeg';
 
 const Login = () => {
+	const [showPassword, setShowPassword] = useState(false);
+
 	const {
 		register,
 		handleSubmit,
@@ -85,7 +87,7 @@ const Login = () => {
 							</p>
 						</div>
 
-						<div className="space-y-6">
+						<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 							{/* Campo username */}
 							<div>
 								<label
@@ -99,7 +101,7 @@ const Login = () => {
 										<User className="h-5 w-5 text-gray-400" />
 									</div>
 									<input
-										id="unsername"
+										id="username"
 										type="text"
 										{...register('username', {
 											required:
@@ -135,7 +137,7 @@ const Login = () => {
 									</div>
 									<input
 										id="password"
-										type="password"
+										type={showPassword ? 'text' : 'password'}
 										{...register('password', {
 											required:
 												'La contraseña es obligatoria',
@@ -145,13 +147,25 @@ const Login = () => {
 													'La contraseña debe tener al menos 6 caracteres',
 											},
 										})}
-										className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 bg-gray-50 focus:bg-white ${
+										className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 bg-gray-50 focus:bg-white ${
 											errors.password
 												? 'border-red-500'
 												: 'border-gray-300'
 										}`}
 										placeholder="••••••••"
 									/>
+									<button
+										type="button"
+										onClick={() => setShowPassword(!showPassword)}
+										className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+										tabIndex={-1}
+									>
+										{showPassword ? (
+											<EyeOff className="h-5 w-5" />
+										) : (
+											<Eye className="h-5 w-5" />
+										)}
+									</button>
 								</div>
 								{errors.password && (
 									<div className="mt-1 flex items-center gap-1 text-red-600 text-sm">
@@ -188,7 +202,7 @@ const Login = () => {
 
 							{/* Botón Submit */}
 							<button
-								onClick={handleSubmit(onSubmit)}
+								type="submit"
 								disabled={isSubmitting}
 								className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
 							>
@@ -204,7 +218,7 @@ const Login = () => {
 									</>
 								)}
 							</button>
-						</div>
+						</form>
 
 						<div className="mt-6 text-center">
 							<p className="text-sm text-gray-600">

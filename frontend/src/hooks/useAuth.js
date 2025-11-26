@@ -41,7 +41,14 @@ export const useAuth = () => {
         showConfirmButton: false,
       });
 
-      navigate('/');
+      // Redirigir según el rol del usuario
+      if (userData.role === 'Super Administrador') {
+        navigate('/super-admin');
+      } else if (userData.role === 'Administrador') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     },
     onError: (error) => {
       console.error('Error al iniciar sesión:', error);
