@@ -504,6 +504,7 @@ class ResidentialUnitService:
                             int_residential_unit_id=unit_id,
                             str_apartment_number=apartment_number,
                             dec_default_voting_weight=voting_weight,
+                            bool_is_admin=False,
                             created_at=datetime.now(),
                             updated_at=datetime.now()
                         )
@@ -719,6 +720,7 @@ class ResidentialUnitService:
                 int_residential_unit_id=unit_id,
                 str_apartment_number=apartment_number,
                 dec_default_voting_weight=voting_weight,
+                bool_is_admin=False,
                 created_at=datetime.now(),
                 updated_at=datetime.now()
             )
@@ -1024,10 +1026,70 @@ class ResidentialUnitService:
                 details={"original_error": str(e)}
             )
             
+    # async def delete_resident(self, user_id: int, unit_id: int):
+    #     """Elimina un copropietario (eliminación en cascada)"""
+    #     try:
+    #         # Verificar que existe
+    #         query = (
+    #             select(UserModel, DataUserModel, UserResidentialUnitModel)
+    #             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+    #             .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+    #             .where(
+    #                 and_(
+    #                     UserModel.id == user_id,
+    #                     UserResidentialUnitModel.int_residential_unit_id == unit_id,
+    #                     UserModel.int_id_rol == 3  # Solo copropietarios
+    #                 )
+    #             )
+    #         )
+            
+    #         result = await self.db.execute(query)
+    #         user_data = result.first()
+            
+    #         if not user_data:
+    #             raise ResourceNotFoundException(
+    #                 message=f"Copropietario no encontrado",
+    #                 error_code="RESIDENT_NOT_FOUND"
+    #             )
+            
+    #         user, data_user, user_unit = user_data
+    #         username = user.str_username
+    #         email = data_user.str_email
+    #         data_user_id = user.int_data_user_id
+            
+    #         # Eliminar en orden: relación -> usuario -> datos
+    #         await self.db.execute(
+    #             delete(UserResidentialUnitModel).where(
+    #                 and_(
+    #                     UserResidentialUnitModel.int_user_id == user_id,
+    #                     UserResidentialUnitModel.int_residential_unit_id == unit_id
+    #                 )
+    #             )
+    #         )
+            
+    #         await self.db.execute(delete(UserModel).where(UserModel.id == user_id))
+    #         await self.db.execute(delete(DataUserModel).where(DataUserModel.id == data_user_id))
+            
+    #         await self.db.commit()
+            
+    #         logger.info(f"✅ Copropietario eliminado: {username} ({email})")
+            
+    #         return True
+            
+    #     except ResourceNotFoundException:
+    #         raise
+    #     except Exception as e:
+    #         await self.db.rollback()
+    #         logger.error(f"Error al eliminar: {str(e)}")
+    #         raise ServiceException(
+    #             message=f"Error al eliminar copropietario: {str(e)}",
+    #             details={"original_error": str(e)}
+    #         )
+    
     async def delete_resident(self, user_id: int, unit_id: int):
         """Elimina un copropietario (eliminación en cascada)"""
         try:
-            # Verificar que existe
+            # PASO 1: Verificar que existe la relación usuario-unidad
             query = (
                 select(UserModel, DataUserModel, UserResidentialUnitModel)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
@@ -1036,7 +1098,8 @@ class ResidentialUnitService:
                     and_(
                         UserModel.id == user_id,
                         UserResidentialUnitModel.int_residential_unit_id == unit_id,
-                        UserModel.int_id_rol == 3  # Solo copropietarios
+                        # 🔥 CAMBIO: Verificar que NO sea administrador en lugar de verificar rol
+                        UserResidentialUnitModel.bool_is_admin == False
                     )
                 )
             )
@@ -1045,15 +1108,57 @@ class ResidentialUnitService:
             user_data = result.first()
             
             if not user_data:
-                raise ResourceNotFoundException(
-                    message=f"Copropietario no encontrado",
-                    error_code="RESIDENT_NOT_FOUND"
+                # 🔥 NUEVO: Query de diagnóstico para dar mejor información del error
+                diagnostic_query = (
+                    select(UserModel, UserResidentialUnitModel)
+                    .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                    .where(
+                        and_(
+                            UserModel.id == user_id,
+                            UserResidentialUnitModel.int_residential_unit_id == unit_id
+                        )
+                    )
                 )
+                diagnostic_result = await self.db.execute(diagnostic_query)
+                diagnostic_data = diagnostic_result.first()
+                
+                if diagnostic_data:
+                    user, user_unit = diagnostic_data
+                    if user_unit.bool_is_admin:
+                        raise ServiceException(
+                            message="No se puede eliminar: el usuario es administrador de esta unidad",
+                            details={
+                                "user_id": user_id,
+                                "unit_id": unit_id,
+                                "is_admin": True
+                            }
+                        )
+                    else:
+                        raise ServiceException(
+                            message=f"Usuario encontrado pero no se puede eliminar (Rol: {user.int_id_rol})",
+                            details={
+                                "user_id": user_id,
+                                "unit_id": unit_id,
+                                "role": user.int_id_rol
+                            }
+                        )
+                else:
+                    raise ResourceNotFoundException(
+                        message=f"Copropietario no encontrado en esta unidad",
+                        error_code="RESIDENT_NOT_FOUND"
+                    )
             
             user, data_user, user_unit = user_data
             username = user.str_username
             email = data_user.str_email
             data_user_id = user.int_data_user_id
+            
+            # 🔥 VALIDACIÓN ADICIONAL: No permitir eliminar si es admin
+            if user_unit.bool_is_admin:
+                raise ServiceException(
+                    message="No se puede eliminar un administrador. Primero debe remover sus privilegios.",
+                    details={"user_id": user_id, "is_admin": True}
+                )
             
             # Eliminar en orden: relación -> usuario -> datos
             await self.db.execute(
@@ -1076,14 +1181,16 @@ class ResidentialUnitService:
             
         except ResourceNotFoundException:
             raise
+        except ServiceException:
+            raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Error al eliminar: {str(e)}")
+            logger.error(f"❌ Error al eliminar: {str(e)}")
             raise ServiceException(
                 message=f"Error al eliminar copropietario: {str(e)}",
                 details={"original_error": str(e)}
             )
-            
+                
     async def resend_resident_credentials(self, user_id: int, unit_id: int):
         """
         Reenvía las credenciales de acceso por correo electrónico a un copropietario.
@@ -1099,7 +1206,7 @@ class ResidentialUnitService:
                     and_(
                         UserModel.id == user_id,
                         UserResidentialUnitModel.int_residential_unit_id == unit_id,
-                        UserModel.int_id_rol == 3  # Solo copropietarios
+                        (UserModel.int_id_rol == 3) | (UserResidentialUnitModel.bool_is_admin == False)  # Solo copropietarios
                     )
                 )
             )
@@ -1213,7 +1320,9 @@ class ResidentialUnitService:
             raise ServiceException(
                 message=f"Error al reenviar credenciales: {str(e)}",
                 details={"original_error": str(e)}
-            )    async def get_unit_administrator(self, unit_id: int) -> Optional[dict]:
+            )    
+            
+    async def get_unit_administrator(self, unit_id: int) -> Optional[dict]:
         """
         Obtiene el administrador actual de una unidad residencial.
 
