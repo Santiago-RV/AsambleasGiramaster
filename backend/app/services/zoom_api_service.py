@@ -80,7 +80,7 @@ class ZoomAPIService:
                 expires_in = token_data.get("expires_in", 3600)
                 self._token_expiry = time.time() + expires_in - 300
                 
-                logger.info(f"✅ Access token de Zoom obtenido exitosamente (expira en {expires_in}s)")
+                logger.info(f"Access token de Zoom obtenido exitosamente (expira en {expires_in}s)")
                 return self._access_token
             else:
                 error_msg = f"Error al obtener token de Zoom: {response.status_code} - {response.text}"
@@ -180,7 +180,7 @@ class ZoomAPIService:
             if response.status_code == 201:
                 meeting_info = response.json()
                 logger.info(
-                    f"✅ Reunión de Zoom creada exitosamente:\n"
+                    f"Reunión de Zoom creada exitosamente:\n"
                     f"   ID: {meeting_info.get('id')}\n"
                     f"   URL: {meeting_info.get('join_url')}\n"
                     f"   Password: {meeting_info.get('password', 'Sin contraseña')}"

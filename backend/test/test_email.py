@@ -20,7 +20,7 @@ async def test_simple_email():
     print("=" * 60)
     
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print("❌ Error: Configuración de email no encontrada")
+        print("Error: Configuración de email no encontrada")
         print("Por favor configura SMTP_USER y SMTP_PASSWORD en el archivo .env")
         return False
     
@@ -35,7 +35,7 @@ async def test_simple_email():
     </head>
     <body style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
         <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
-            <h1 style="color: #667eea;">✅ Test Exitoso</h1>
+            <h1 style="color: #667eea;">Test Exitoso</h1>
             <p>Si estás leyendo este mensaje, significa que el sistema de correos está configurado correctamente.</p>
             <hr style="border: 1px solid #e0e0e0; margin: 20px 0;">
             <p style="color: #666; font-size: 12px;">
@@ -54,11 +54,11 @@ async def test_simple_email():
     )
     
     if success:
-        print("✅ Correo enviado exitosamente")
+        print("Correo enviado exitosamente")
         print(f"📬 Revisa tu bandeja de entrada: {settings.SMTP_USER}")
         return True
     else:
-        print("❌ Error al enviar el correo")
+        print("Error al enviar el correo")
         print("Revisa los logs para más detalles")
         return False
 
@@ -86,7 +86,7 @@ async def test_meeting_invitation():
             )
             
             if "error" in stats:
-                print(f"❌ Error: {stats['error']}")
+                print(f"Error: {stats['error']}")
                 return False
             
             print("\n📊 Estadísticas de envío:")
@@ -95,14 +95,14 @@ async def test_meeting_invitation():
             print(f"   Fallidos: {stats.get('fallidos', 0)}")
             
             if stats.get('exitosos', 0) > 0:
-                print("✅ Invitaciones enviadas correctamente")
+                print("Invitaciones enviadas correctamente")
                 return True
             else:
-                print("⚠️  No se enviaron correos")
+                print(" No se enviaron correos")
                 return False
                 
     except Exception as e:
-        print(f"❌ Error en test de invitación: {str(e)}")
+        print(f"Error en test de invitación: {str(e)}")
         import traceback
         traceback.print_exc()
         return False
@@ -117,14 +117,14 @@ async def test_configuration():
     print("\n📋 Configuración actual:")
     print(f"   SMTP Host: {settings.SMTP_HOST}")
     print(f"   SMTP Port: {settings.SMTP_PORT}")
-    print(f"   SMTP User: {settings.SMTP_USER or '❌ NO CONFIGURADO'}")
-    print(f"   SMTP Password: {'✅ Configurado' if settings.SMTP_PASSWORD else '❌ NO CONFIGURADO'}")
+    print(f"   SMTP User: {settings.SMTP_USER or 'NO CONFIGURADO'}")
+    print(f"   SMTP Password: {'Configurado' if settings.SMTP_PASSWORD else 'NO CONFIGURADO'}")
     print(f"   From Email: {settings.SMTP_FROM_EMAIL or settings.SMTP_USER}")
     print(f"   From Name: {settings.SMTP_FROM_NAME}")
     print(f"   Email Enabled: {settings.EMAIL_ENABLED}")
     
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print("\n⚠️  CONFIGURACIÓN INCOMPLETA")
+        print("\n CONFIGURACIÓN INCOMPLETA")
         print("\nPara configurar el sistema de correos:")
         print("1. Edita el archivo backend/.env")
         print("2. Configura las variables:")
@@ -133,7 +133,7 @@ async def test_configuration():
         print("3. Lee CONFIGURAR_EMAIL.md para más detalles")
         return False
     
-    print("\n✅ Configuración completa")
+    print("\nConfiguración completa")
     return True
 
 
@@ -172,15 +172,15 @@ async def main():
     print("\n" + "=" * 60)
     print("RESUMEN DE TESTS")
     print("=" * 60)
-    print(f"Test 1 (Correo Simple): {'✅ PASÓ' if test1_ok else '❌ FALLÓ'}")
+    print(f"Test 1 (Correo Simple): {'PASÓ' if test1_ok else 'FALLÓ'}")
     if test2_ok is not None:
-        print(f"Test 2 (Invitación): {'✅ PASÓ' if test2_ok else '❌ FALLÓ'}")
+        print(f"Test 2 (Invitación): {'PASÓ' if test2_ok else 'FALLÓ'}")
     print("=" * 60)
     
     if test1_ok:
         print("\n🎉 ¡Sistema de correos funcionando correctamente!")
     else:
-        print("\n⚠️  Revisa la configuración y los logs")
+        print("\n Revisa la configuración y los logs")
 
 
 if __name__ == "__main__":

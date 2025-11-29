@@ -62,7 +62,7 @@ const ReunionesTab = ({ onStartMeeting }) => {
 				title: '¡Reunión Creada Exitosamente!',
 				html: `
 					<div class="text-center">
-						<p class="mb-3 text-lg">✅ La reunión se creó correctamente</p>
+						<p class="mb-3 text-lg">La reunión se creó correctamente</p>
 						<p class="mb-3">📧 Las invitaciones han sido enviadas automáticamente a todos los usuarios de la unidad residencial</p>
 						<p class="text-sm text-gray-600 mt-3">Revisa los logs del servidor para ver las estadísticas de envío</p>
 					</div>

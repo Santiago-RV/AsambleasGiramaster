@@ -83,7 +83,7 @@ Content-Type: application/json
 }
 ```
 
-**⚠️ IMPORTANTE:** El administrador debe compartir el código `A7K9X2L1` con los copropietarios.
+**IMPORTANTE:** El administrador debe compartir el código `A7K9X2L1` con los copropietarios.
 
 ---
 
@@ -390,7 +390,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-## ⚠️ MANEJO DE ERRORES
+## MANEJO DE ERRORES
 
 ### Error: Encuesta no encontrada
 ```json
@@ -483,7 +483,7 @@ await fetch(`/api/v1/polls/code/${pollCode}/vote`, {
 
 ---
 
-## ✅ CHECKLIST DE IMPLEMENTACIÓN
+## CHECKLIST DE IMPLEMENTACIÓN
 
 - [ ] Ejecutar migración SQL (`MIGRATION_POLL_FIX.sql`)
 - [ ] Reiniciar servidor backend

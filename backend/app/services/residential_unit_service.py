@@ -14,11 +14,17 @@ from app.models.residential_unit_model import ResidentialUnitModel
 from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.user_model import UserModel
 from app.models.data_user_model import DataUserModel
-from app.schemas.residential_unit_schema import ResidentialUnitCreate, ResidentialUnitResponse
+from app.schemas.residential_unit_schema import AdministratorData, ResidentialUnitCreate, ResidentialUnitResponse
 from app.core.exceptions import ServiceException, ResourceNotFoundException
 from app.core.security import security_manager
 from app.utils.email_sender import email_sender
 from app.services.email_notification_service import EmailNotificationService
+
+from app.models.email_notification_model import EmailNotificationModel
+from app.services.email_service import EmailService
+from sqlalchemy import select
+from datetime import datetime
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -551,20 +557,20 @@ class ResidentialUnitService:
                             if email_sent:
                                 results['emails_sent'] += 1
                                 logger.info(
-                                    f"✅ Correo enviado a {email} - "
+                                    f"Correo enviado a {email} - "
                                     f"Notificación ID: {notification.id}"
                                 )
                             else:
                                 results['emails_failed'] += 1
                                 logger.warning(
-                                    f"⚠️ No se pudo enviar correo a {email} - "
+                                    f"No se pudo enviar correo a {email} - "
                                     f"Notificación ID: {notification.id} marcada como 'failed'"
                                 )
                                 
                         except Exception as email_error:
                             results['emails_failed'] += 1
                             logger.error(
-                                f"❌ Error al enviar correo/notificación a {email}: {str(email_error)}"
+                                f"Error al enviar correo/notificación a {email}: {str(email_error)}"
                             )
 
                     results['successful'] += 1
@@ -577,25 +583,25 @@ class ResidentialUnitService:
                         'error': str(e)
                     })
                     results['failed'] += 1
-                    logger.error(f"❌ Error procesando fila {index + 2}: {e}")
+                    logger.error(f"Error procesando fila {index + 2}: {e}")
 
             # Commit de todas las operaciones exitosas
             if results['successful'] > 0:
                 await self.db.commit()
                 logger.info(
-                    f"✅ Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
+                    f"Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
                     f"{results['users_created']} usuarios nuevos creados, "
                     f"{results['emails_sent']} correos enviados"
                 )
             else:
                 await self.db.rollback()
-                logger.warning("⚠️ No se procesó ningún copropietario exitosamente")
+                logger.warning("No se procesó ningún copropietario exitosamente")
 
             return results
 
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"❌ Error procesando archivo Excel: {e}")
+            logger.error(f"Error procesando archivo Excel: {e}")
             raise ServiceException(
                 message=f"Error al procesar el archivo Excel: {str(e)}",
                 details={"original_error": str(e)}
@@ -752,15 +758,15 @@ class ResidentialUnitService:
                 )
                 
                 if email_sent:
-                    logger.info(f"✅ Correo de bienvenida enviado a {email}")
+                    logger.info(f"Correo de bienvenida enviado a {email}")
                 else:
-                    logger.warning(f"⚠️ No se pudo enviar correo de bienvenida a {email}")
+                    logger.warning(f"No se pudo enviar correo de bienvenida a {email}")
             except Exception as e:
                 # No fallar si el correo falla, solo registrar
-                logger.error(f"❌ Error al enviar correo de bienvenida: {str(e)}")
+                logger.error(f"Error al enviar correo de bienvenida: {str(e)}")
             
             # 11. Retornar los datos del residente creado
-            logger.info(f"✅ Copropietario creado exitosamente: {username}")
+            logger.info(f"Copropietario creado exitosamente: {username}")
             
             return {
                 "id": user.id,
@@ -780,7 +786,7 @@ class ResidentialUnitService:
             raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"❌ Error al crear copropietario: {str(e)}")
+            logger.error(f"Error al crear copropietario: {str(e)}")
             raise ServiceException(
                 message=f"Error al crear copropietario: {str(e)}",
                 details={"original_error": str(e)}
@@ -800,7 +806,7 @@ class ResidentialUnitService:
         """
         Envía correo de bienvenida al copropietario con sus credenciales.
         
-        ⚠️ NOTA: Este método NO registra notificaciones en la BD.
+        NOTA: Este método NO registra notificaciones en la BD.
         Las notificaciones deben ser manejadas por el método que llama a esta función.
         
         Args:
@@ -883,12 +889,12 @@ class ResidentialUnitService:
             if success:
                 logger.info(f"✉️ Correo de bienvenida enviado exitosamente a {user_email}")
             else:
-                logger.warning(f"⚠️ No se pudo enviar correo de bienvenida a {user_email}")
+                logger.warning(f"No se pudo enviar correo de bienvenida a {user_email}")
             
             return success
             
         except Exception as e:
-            logger.error(f"❌ Error al enviar correo de bienvenida a {user_email}: {str(e)}")
+            logger.error(f"Error al enviar correo de bienvenida a {user_email}: {str(e)}")
             return False
 
 
@@ -999,7 +1005,7 @@ class ResidentialUnitService:
             await self.db.refresh(data_user)
             await self.db.refresh(user_unit)
             
-            logger.info(f"✅ Copropietario actualizado: {user.str_username}")
+            logger.info(f"Copropietario actualizado: {user.str_username}")
             
             return {
                 "id": user.id,
@@ -1072,7 +1078,7 @@ class ResidentialUnitService:
             
     #         await self.db.commit()
             
-    #         logger.info(f"✅ Copropietario eliminado: {username} ({email})")
+    #         logger.info(f"Copropietario eliminado: {username} ({email})")
             
     #         return True
             
@@ -1175,7 +1181,7 @@ class ResidentialUnitService:
             
             await self.db.commit()
             
-            logger.info(f"✅ Copropietario eliminado: {username} ({email})")
+            logger.info(f"Copropietario eliminado: {username} ({email})")
             
             return True
             
@@ -1185,7 +1191,7 @@ class ResidentialUnitService:
             raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"❌ Error al eliminar: {str(e)}")
+            logger.error(f"Error al eliminar: {str(e)}")
             raise ServiceException(
                 message=f"Error al eliminar copropietario: {str(e)}",
                 details={"original_error": str(e)}
@@ -1279,7 +1285,7 @@ class ResidentialUnitService:
                 
                 if email_sent:
                     logger.info(
-                        f"✅ Credenciales reenviadas a {data_user.str_email} "
+                        f"Credenciales reenviadas a {data_user.str_email} "
                         f"- Notificación ID: {notification.id} registrada como '{status}'"
                     )
                     return {
@@ -1291,7 +1297,7 @@ class ResidentialUnitService:
                     }
                 else:
                     logger.warning(
-                        f"⚠️ No se pudo enviar correo a {data_user.str_email} "
+                        f"No se pudo enviar correo a {data_user.str_email} "
                         f"- Notificación ID: {notification.id} marcada como 'failed'"
                     )
                     raise ServiceException(
@@ -1305,7 +1311,7 @@ class ResidentialUnitService:
             except ServiceException:
                 raise
             except Exception as e:
-                logger.error(f"❌ Error al enviar correo/notificación: {str(e)}")
+                logger.error(f"Error al enviar correo/notificación: {str(e)}")
                 raise ServiceException(
                     message=f"Error al procesar el envío de credenciales: {str(e)}",
                     details={"original_error": str(e)}
@@ -1316,7 +1322,7 @@ class ResidentialUnitService:
             raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"❌ Error al reenviar credenciales: {str(e)}")
+            logger.error(f"Error al reenviar credenciales: {str(e)}")
             raise ServiceException(
                 message=f"Error al reenviar credenciales: {str(e)}",
                 details={"original_error": str(e)}
@@ -1365,6 +1371,235 @@ class ResidentialUnitService:
         except Exception as e:
             raise ServiceException(
                 message=f"Error al obtener el administrador de la unidad: {str(e)}",
+                details={"original_error": str(e)}
+            )
+    
+    async def create_manual_administrator(
+        self,
+        unit_id: int,
+        admin_data: AdministratorData,
+        created_by_user_id: int
+    ) -> dict:
+        """
+        Crea un administrador manual (sin ser copropietario) y lo asigna a una unidad residencial.
+        """
+        
+        try:
+            # ============================================
+            # PASO 1: Validar que el email no exista
+            # ============================================
+            query_email_check = select(DataUserModel).where(
+                DataUserModel.str_email == admin_data.str_email
+            )
+            result_email = await self.db.execute(query_email_check)
+            existing_email = result_email.scalar_one_or_none()
+
+            if existing_email:
+                raise ValueError(
+                    f"Ya existe un usuario con el email {admin_data.str_email}. "
+                    "Por favor utiliza otro email o asigna ese usuario existente como administrador."
+                )
+
+            logger.info(f"Email {admin_data.str_email} disponible para nuevo administrador")
+
+            # ============================================
+            # PASO 2: Crear registro en tbl_data_users
+            # ============================================
+            data_user = DataUserModel(
+                str_firstname=admin_data.str_firstname,
+                str_lastname=admin_data.str_lastname,
+                str_email=admin_data.str_email,
+                str_phone=admin_data.str_phone,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(data_user)
+            await self.db.flush()
+
+            logger.info(f"DataUser creado: ID {data_user.id}")
+
+            # ============================================
+            # PASO 3: Generar username y contraseña
+            # ============================================
+            # Username: nombre.apellido (sin espacios, minúsculas)
+            username = f"{admin_data.str_firstname.lower()}.{admin_data.str_lastname.split()[0].lower()}".replace(" ", "")
+
+            # Verificar que el username no exista
+            counter = 1
+            original_username = username
+            while True:
+                query_username = select(UserModel).where(UserModel.str_username == username)
+                result_username = await self.db.execute(query_username)
+                existing_username = result_username.scalar_one_or_none()
+
+                if not existing_username:
+                    break
+
+                username = f"{original_username}{counter}"
+                counter += 1
+
+            # Contraseña temporal para administradores
+            default_password = "Admin123!"
+            hashed_password = security_manager.create_password_hash(default_password)
+
+            logger.info(f"Username generado: {username}")
+
+            # ============================================
+            # PASO 4: Crear registro en tbl_users
+            # ============================================
+            user = UserModel(
+                int_data_user_id=data_user.id,
+                str_username=username,
+                str_password_hash=hashed_password,
+                int_id_rol=2,  # 2: Administrador
+                bln_allow_entry=True,  # Acceso HABILITADO
+                bln_is_external_delegate=False,
+                bln_user_temporary=False,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(user)
+            await self.db.flush()
+
+            logger.info(
+                f"Usuario creado: {username} - Rol: 2 (Administrador) - "
+                f"Acceso: Habilitado - ID: {user.id}"
+            )
+
+            # ============================================
+            # PASO 5: Desactivar administrador anterior (si existe)
+            # ============================================
+            query_old_admin = (
+                select(UserResidentialUnitModel, UserModel)
+                .join(UserModel, UserResidentialUnitModel.int_user_id == UserModel.id)
+                .where(
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                    UserResidentialUnitModel.bool_is_admin == True
+                )
+            )
+            result_old = await self.db.execute(query_old_admin)
+            old_admin_data = result_old.first()
+
+            if old_admin_data:
+                old_admin_unit, old_admin_user = old_admin_data
+
+                # Marcar como NO administrador
+                old_admin_unit.bool_is_admin = False
+                old_admin_unit.updated_at = datetime.now()
+
+                # Deshabilitar acceso (solo si NO es copropietario de la unidad)
+                # Si str_apartment_number es "ADMIN", significa que es admin puro, no copropietario
+                if old_admin_unit.str_apartment_number == "ADMIN":
+                    old_admin_user.bln_allow_entry = False
+                    old_admin_user.updated_at = datetime.now()
+
+                logger.info(
+                    f"Administrador anterior removido: Usuario ID {old_admin_user.id}"
+                )
+
+            # ============================================
+            # PASO 6: Crear relación en tbl_user_residential_units
+            # ============================================
+            user_unit = UserResidentialUnitModel(
+                int_user_id=user.id,
+                int_residential_unit_id=unit_id,
+                str_apartment_number="ADMIN",  # Identificador especial para administradores
+                bool_is_admin=True,
+                dec_default_voting_weight=0,  # Administradores no votan
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(user_unit)
+
+            logger.info(
+                f"Administrador asignado a unidad {unit_id} con bool_is_admin=True"
+            )
+
+            # ============================================
+            # PASO 7: Enviar email con credenciales
+            # ============================================
+            email_service = EmailService()
+
+            # Obtener el nombre de la unidad residencial para el email
+            unit = await self.get_residential_unit_by_id(unit_id)
+            unit_name = unit.str_name if unit else "la unidad residencial"
+
+            try:
+                await email_service.send_administrator_credentials_email(
+                    to_email=admin_data.str_email,
+                    firstname=admin_data.str_firstname,
+                    lastname=admin_data.str_lastname,
+                    username=username,
+                    password=default_password,
+                    residential_unit_name=unit_name
+                )
+
+                logger.info(f"Email de credenciales enviado a {admin_data.str_email}")
+
+                # Registrar el envío del email
+                email_notification = EmailNotificationModel(
+                    int_meeting_id=None,  # No está asociado a una reunión
+                    int_user_id=user.id,
+                    str_status="sent",  
+                    str_template="admin_credentials",  
+                    dat_sent_at=datetime.now(),
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                self.db.add(email_notification)
+
+            except Exception as email_error:
+                logger.error(f"Error al enviar email: {email_error}")
+                # No fallar la creación si el email falla
+                # Registrar intento fallido
+                email_notification = EmailNotificationModel(
+                    int_meeting_id=None,
+                    int_user_id=user.id,
+                    str_status="failed",  
+                    str_template="admin_credentials",  
+                    dat_sent_at=None,  # No se envió
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                self.db.add(email_notification)
+
+            # ============================================
+            # PASO 8: Commit de todas las operaciones
+            # ============================================
+            await self.db.commit()
+            await self.db.refresh(user)
+            await self.db.refresh(data_user)
+
+            logger.info(
+                f"Administrador creado exitosamente: {username} para unidad {unit_id}"
+            )
+
+            # ============================================
+            # PASO 9: Retornar información del administrador
+            # ============================================
+            return {
+                "user_id": user.id,
+                "username": username,
+                "firstname": data_user.str_firstname,
+                "lastname": data_user.str_lastname,
+                "email": data_user.str_email,
+                "phone": data_user.str_phone,
+                "role": "Administrador",
+                "residential_unit_id": unit_id,
+                "is_admin": True,
+                "allow_entry": True,
+                "temporary_password": default_password,
+                "message": "Administrador creado exitosamente. Se envió un email con las credenciales de acceso."
+            }
+
+        except ValueError:
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al crear administrador manual: {e}")
+            raise ServiceException(
+                message=f"Error al crear el administrador: {str(e)}",
                 details={"original_error": str(e)}
             )
 

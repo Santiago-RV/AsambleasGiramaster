@@ -515,7 +515,7 @@ const handleVote = async (pollCode, voteData) => {
 
 ---
 
-## ✅ TIPS
+## TIPS
 
 1. **Usar códigos QR:** Genera un QR con el `poll_code` para que los usuarios escaneen y voten fácilmente
 2. **Actualización en tiempo real:** Usa `setInterval` para actualizar estadísticas cada 5-10 segundos

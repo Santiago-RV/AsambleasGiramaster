@@ -43,7 +43,7 @@ INSERT INTO tbl_user_residential_units (int_user_id, int_residential_unit_id, st
 VALUES (@user_id_3, 1, 'Apto 103', NOW(), NOW());
 
 -- Usuario 4: Ana Martínez (Tu email para testing)
--- ⚠️ IMPORTANTE: Reemplaza 'tu-email@gmail.com' con tu email real
+-- IMPORTANTE: Reemplaza 'tu-email@gmail.com' con tu email real
 INSERT INTO tbl_data_users (str_firstname, str_lastname, str_email, str_phone, created_at, updated_at)
 VALUES ('Ana', 'Martínez Silva', 'tu-email@gmail.com', '+57 300 444 5555', NOW(), NOW());
 SET @data_user_id_4 = LAST_INSERT_ID();

@@ -24,7 +24,8 @@ import {
 	FileText,
 	UserCheck,
 	AlertCircle,
-	Download
+	Download,
+	UserPlus
 } from 'lucide-react';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import { MeetingService } from '../../services/api/MeetingService';
@@ -49,6 +50,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
+	const [isCreateManualAdminModalOpen, setIsCreateManualAdminModalOpen] = useState(false);
+
 
 	// Estado para el administrador actual
 	const [currentAdmin, setCurrentAdmin] = useState(null);
@@ -188,6 +191,21 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		enabled: !!unitId,
 	});
 
+	// Crear administrador de manera manual, formulario
+	const {
+		register: registerManualAdmin,
+		handleSubmit: handleSubmitManualAdmin,
+		reset: resetManualAdmin,
+		formState: { errors: errorsManualAdmin },
+	} = useForm({
+		defaultValues: {
+			str_firstname: '',
+			str_lastname: '',
+			str_email: '',
+			str_phone: '',
+		},
+	});
+
 	// Sincronizar el estado local con los datos del administrador
 	useEffect(() => {
 		if (administratorData !== undefined) {
@@ -281,6 +299,42 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		},
 	});
 
+	// Crear la mutación para crear el administrador manual
+	const createManualAdminMutation = useMutation({
+		mutationFn: ({ unitId, adminData }) =>
+			ResidentialUnitService.createManualAdministrator(unitId, adminData),
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['administrator', unitId] });
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			resetManualAdmin();
+			setIsCreateManualAdminModalOpen(false);
+			setIsChangeAdminModalOpen(false);
+			Swal.fire({
+				icon: 'success',
+				title: '¡Administrador Creado!',
+				html: `
+				<p>${response.message}</p>
+				<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+					<p style="margin: 5px 0;"><strong>Usuario:</strong> ${response.data.username}</p>
+					<p style="margin: 5px 0;"><strong>Contraseña Temporal:</strong> ${response.data.temporary_password}</p>
+					<p style="margin: 5px 0; color: #6c757d; font-size: 14px;">Se envió un email con las credenciales</p>
+				</div>
+			`,
+				confirmButtonText: 'Entendido',
+				confirmButtonColor: '#3498db',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al Crear Administrador',
+				text: error.message || 'Hubo un problema al crear el administrador',
+				confirmButtonText: 'Entendido',
+				confirmButtonColor: '#e74c3c',
+			});
+		},
+	});
+
 	// Estado de envío del formulario de reunión
 	const isSubmitting = createMeetingMutation.isPending;
 
@@ -299,6 +353,35 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			dat_schedule_date: data.dat_schedule_start,
 		};
 		createMeetingMutation.mutate(meetingData);
+	};
+
+	// Handler para enviar el formulario del administrador local
+	const onSubmitManualAdmin = (data) => {
+		Swal.fire({
+			title: '¿Crear Nuevo Administrador?',
+			html: `
+			<p>Se creará un usuario administrador con los siguientes datos:</p>
+			<div style="text-align: left; margin: 20px 0;">
+				<p><strong>Nombre:</strong> ${data.str_firstname} ${data.str_lastname}</p>
+				<p><strong>Email:</strong> ${data.str_email}</p>
+				${data.str_phone ? `<p><strong>Teléfono:</strong> ${data.str_phone}</p>` : ''}
+			</div>
+			<p style="color: #6c757d; font-size: 14px;">Se enviará un email con las credenciales de acceso.</p>
+		`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonText: 'Sí, Crear',
+			cancelButtonText: 'Cancelar',
+			confirmButtonColor: '#3498db',
+			cancelButtonColor: '#6c757d',
+		}).then((result) => {
+			if (result.isConfirmed) {
+				createManualAdminMutation.mutate({
+					unitId: unitId,
+					adminData: data,
+				});
+			}
+		});
 	};
 
 	// Filtrar residentes por búsqueda
@@ -543,7 +626,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				<p>¿Deseas eliminar a <strong>${resident.firstname} ${resident.lastname}</strong>?</p>
 				<br>
 				<div class="text-left bg-red-50 p-3 rounded">
-					<p class="text-sm text-red-700"><strong>⚠️ Advertencia:</strong></p>
+					<p class="text-sm text-red-700"><strong>Advertencia:</strong></p>
 					<p class="text-sm text-red-600">Esta acción eliminará completamente:</p>
 					<ul class="text-sm text-red-600 list-disc list-inside mt-2">
 						<li>Su cuenta de usuario</li>
@@ -743,7 +826,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			if (errors && errors.length > 0) {
 				htmlContent += `
 				<div class="bg-red-50 p-3 rounded-lg max-h-48 overflow-y-auto">
-					<p class="font-semibold text-red-800 mb-2">❌ Errores Encontrados:</p>
+					<p class="font-semibold text-red-800 mb-2">Errores Encontrados:</p>
 					<ul class="text-sm text-red-700 space-y-1">
 			`;
 
@@ -1980,6 +2063,23 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</p>
 					</div>
 
+					<div className="mb-4">
+						<button
+							type="button"
+							onClick={() => {
+								setIsChangeAdminModalOpen(false);
+								setIsCreateManualAdminModalOpen(true);
+							}}
+							className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold px-4 py-3 rounded-lg hover:shadow-lg transition-all"
+						>
+							<UserPlus size={20} />
+							Crear Administrador Manual (No Copropietario)
+						</button>
+						<p className="text-sm text-gray-600 mt-2 text-center">
+							O selecciona un residente existente como administrador:
+						</p>
+					</div>
+
 					{/* Administrador actual */}
 					{currentAdmin && (
 						<div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -2103,6 +2203,177 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				</div>
 			</Modal>
 
+			{/* Modal para crear administrador manual */}
+			<Modal
+				isOpen={isCreateManualAdminModalOpen}
+				onClose={() => {
+					setIsCreateManualAdminModalOpen(false);
+					resetManualAdmin();
+				}}
+				title="Crear Administrador Manual"
+				size="lg"
+			>
+				<form onSubmit={handleSubmitManualAdmin(onSubmitManualAdmin)}>
+					<div className="space-y-6">
+						<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+							<h3 className="font-semibold text-blue-800 mb-2">
+								👤 Nuevo Administrador
+							</h3>
+							<p className="text-sm text-blue-700">
+								Crea un usuario con rol de administrador que NO está asociado a ningún apartamento.
+								Este usuario tendrá acceso completo para gestionar la unidad residencial.
+							</p>
+						</div>
+
+						{/* Nombres */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Nombres *
+							</label>
+							<input
+								type="text"
+								{...registerManualAdmin('str_firstname', {
+									required: 'Los nombres son obligatorios',
+									minLength: {
+										value: 2,
+										message: 'Mínimo 2 caracteres',
+									},
+								})}
+								placeholder="Ej: Juan Carlos"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsManualAdmin.str_firstname && (
+								<span className="text-red-500 text-sm">
+									{errorsManualAdmin.str_firstname.message}
+								</span>
+							)}
+						</div>
+
+						{/* Apellidos */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Apellidos *
+							</label>
+							<input
+								type="text"
+								{...registerManualAdmin('str_lastname', {
+									required: 'Los apellidos son obligatorios',
+									minLength: {
+										value: 2,
+										message: 'Mínimo 2 caracteres',
+									},
+								})}
+								placeholder="Ej: Pérez García"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsManualAdmin.str_lastname && (
+								<span className="text-red-500 text-sm">
+									{errorsManualAdmin.str_lastname.message}
+								</span>
+							)}
+						</div>
+
+						{/* Email */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Email *
+							</label>
+							<input
+								type="email"
+								{...registerManualAdmin('str_email', {
+									required: 'El email es obligatorio',
+									pattern: {
+										value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+										message: 'Email inválido',
+									},
+								})}
+								placeholder="Ej: admin@correo.com"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsManualAdmin.str_email && (
+								<span className="text-red-500 text-sm">
+									{errorsManualAdmin.str_email.message}
+								</span>
+							)}
+						</div>
+
+						{/* Teléfono (opcional) */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Teléfono (Opcional)
+							</label>
+							<input
+								type="tel"
+								{...registerManualAdmin('str_phone')}
+								placeholder="Ej: +57 300 123 4567"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+						</div>
+
+						<div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+							<p className="text-sm text-yellow-800">
+								<strong>📧 Nota:</strong> Se generará un usuario y contraseña temporal automáticamente.
+								El administrador recibirá un email con sus credenciales de acceso.
+							</p>
+						</div>
+
+						{/* Botones */}
+						<div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+							<button
+								type="button"
+								onClick={() => {
+									setIsCreateManualAdminModalOpen(false);
+									resetManualAdmin();
+								}}
+								disabled={createManualAdminMutation.isPending}
+								className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								Cancelar
+							</button>
+							<button
+								type="submit"
+								disabled={createManualAdminMutation.isPending}
+								className={`flex items-center gap-2 bg-gradient-to-br from-[#3498db] to-[#2980b9] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${createManualAdminMutation.isPending
+									? 'opacity-50 cursor-not-allowed'
+									: ''
+									}`}
+							>
+								{createManualAdminMutation.isPending ? (
+									<>
+										<svg
+											className="animate-spin h-5 w-5"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle
+												className="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												strokeWidth="4"
+											></circle>
+											<path
+												className="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+											></path>
+										</svg>
+										Creando...
+									</>
+								) : (
+									<>
+										<UserPlus size={20} />
+										Crear Administrador
+									</>
+								)}
+							</button>
+						</div>
+					</div>
+				</form>
+			</Modal>
+
 			{/* Modal para cargar Excel */}
 			<Modal
 				isOpen={isExcelModalOpen}
@@ -2184,7 +2455,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</div>
 						<div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
 							<p className="text-xs text-yellow-800">
-								⚠️ <strong>Formato de ejemplo:</strong>
+								<strong>Formato de ejemplo:</strong>
 							</p>
 							<div className="mt-2 bg-white p-2 rounded text-xs font-mono overflow-x-auto">
 								<table className="min-w-full">

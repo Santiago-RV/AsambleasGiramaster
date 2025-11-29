@@ -629,7 +629,7 @@
                         <div class="quorum-bar">
                             <div class="quorum-progress" style="width: 87.5%"></div>
                         </div>
-                        <div>✅ Válido para Votar</div>
+                        <div>Válido para Votar</div>
                     </div>
                 </div>
 
@@ -678,8 +678,8 @@
                             <strong>Detalles:</strong> Incluye reparación de fachada, impermeabilización terraza y pintura áreas comunes
                         </div>
                         <div class="voting-options">
-                            <button class="vote-btn" onclick="selectVote(1, 'favor')">✅ A FAVOR</button>
-                            <button class="vote-btn" onclick="selectVote(1, 'contra')">❌ EN CONTRA</button>
+                            <button class="vote-btn" onclick="selectVote(1, 'favor')">A FAVOR</button>
+                            <button class="vote-btn" onclick="selectVote(1, 'contra')">EN CONTRA</button>
                             <button class="vote-btn" onclick="selectVote(1, 'abstencion')">⚪ ABSTENCIÓN</button>
                         </div>
                         <div style="margin-top: 15px;">
@@ -710,7 +710,7 @@
                                 <div class="voting-question">Aprobación del acta de la asamblea anterior</div>
                                 <div class="voting-meta">Tema 2 de la agenda • Completada</div>
                             </div>
-                            <div class="voting-timer completed">✅ Finalizada</div>
+                            <div class="voting-timer completed">Finalizada</div>
                         </div>
                         <div style="background: #f8fff9; padding: 15px; border-radius: 8px; margin-top: 15px;">
                             <div style="margin-bottom: 10px;"><strong>Resultado:</strong> Aprobada</div>
@@ -720,7 +720,7 @@
                                 <span>Abstenciones: 10%</span>
                             </div>
                             <div style="margin-top: 10px; color: #155724;">
-                                <strong>Mi voto:</strong> ✅ A FAVOR (5.6%)
+                                <strong>Mi voto:</strong> A FAVOR (5.6%)
                             </div>
                         </div>
                     </div>
@@ -885,7 +885,7 @@
         function connectToZoom() {
             // Simular validación de duplicidad
             if (Math.random() > 0.9) { // 10% chance de conflicto
-                alert('⚠️ Error de Duplicidad\n\nYa existe una sesión activa con sus credenciales.\n\nSi experimentó una caída de conexión, espere 30 segundos e intente nuevamente.');
+                alert('Error de Duplicidad\n\nYa existe una sesión activa con sus credenciales.\n\nSi experimentó una caída de conexión, espere 30 segundos e intente nuevamente.');
                 return;
             }
 
@@ -911,7 +911,7 @@
                 document.getElementById('connectBtn').style.display = 'none';
                 document.getElementById('disconnectBtn').style.display = 'inline-flex';
                 
-                alert('✅ Conectado exitosamente\n\nYa está participando en la asamblea.\nLas votaciones aparecerán automáticamente en la sección correspondiente.');
+                alert('Conectado exitosamente\n\nYa está participando en la asamblea.\nLas votaciones aparecerán automáticamente en la sección correspondiente.');
                 
             }, 2500);
         }
@@ -971,7 +971,7 @@
             };
 
             if (confirm(`Confirmar voto:\n\n"${voteLabels[vote]}"\n\nPeso del voto: 5.6%\n(Incluye su coeficiente + poder de Carlos Rodríguez)\n\n¿Confirmar?`)) {
-                alert(`✅ Voto registrado exitosamente\n\nSu voto: ${voteLabels[vote]}\nPeso: 5.6%\n\nGracias por su participación.`);
+                alert(`Voto registrado exitosamente\n\nSu voto: ${voteLabels[vote]}\nPeso: 5.6%\n\nGracias por su participación.`);
                 
                 // Deshabilitar votación
                 const confirmBtn = document.getElementById(`confirmBtn${votingId}`);

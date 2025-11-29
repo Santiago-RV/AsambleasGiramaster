@@ -22,14 +22,14 @@ def main():
     print("📋 PASO 1: VERIFICANDO CREDENCIALES")
     print("=" * 70)
     
-    print(f"\n✅ ZOOM_SDK_KEY: {settings.ZOOM_SDK_KEY[:15]}... (oculto)")
-    print(f"✅ ZOOM_SDK_SECRET: {settings.ZOOM_SDK_SECRET[:15]}... (oculto)")
-    print(f"✅ ZOOM_ACCOUNT_ID: {settings.ZOOM_ACCOUNT_ID[:15] if settings.ZOOM_ACCOUNT_ID else 'NO CONFIGURADO'}... (oculto)")
-    print(f"✅ ZOOM_CLIENT_ID: {settings.ZOOM_CLIENT_ID[:15] if settings.ZOOM_CLIENT_ID else 'NO CONFIGURADO'}... (oculto)")
-    print(f"✅ ZOOM_CLIENT_SECRET: {settings.ZOOM_CLIENT_SECRET[:15] if settings.ZOOM_CLIENT_SECRET else 'NO CONFIGURADO'}... (oculto)")
+    print(f"\nZOOM_SDK_KEY: {settings.ZOOM_SDK_KEY[:15]}... (oculto)")
+    print(f"ZOOM_SDK_SECRET: {settings.ZOOM_SDK_SECRET[:15]}... (oculto)")
+    print(f"ZOOM_ACCOUNT_ID: {settings.ZOOM_ACCOUNT_ID[:15] if settings.ZOOM_ACCOUNT_ID else 'NO CONFIGURADO'}... (oculto)")
+    print(f"ZOOM_CLIENT_ID: {settings.ZOOM_CLIENT_ID[:15] if settings.ZOOM_CLIENT_ID else 'NO CONFIGURADO'}... (oculto)")
+    print(f"ZOOM_CLIENT_SECRET: {settings.ZOOM_CLIENT_SECRET[:15] if settings.ZOOM_CLIENT_SECRET else 'NO CONFIGURADO'}... (oculto)")
     
     if not settings.ZOOM_ACCOUNT_ID or not settings.ZOOM_CLIENT_ID or not settings.ZOOM_CLIENT_SECRET:
-        print("\n❌ ERROR: Credenciales OAuth no configuradas")
+        print("\nERROR: Credenciales OAuth no configuradas")
         print("\n💡 Ejecuta: bash configurar_zoom_oauth.sh")
         sys.exit(1)
     
@@ -43,12 +43,12 @@ def main():
         print("\n🔄 Solicitando token de acceso...")
         token = zoom_service._get_access_token()
         
-        print(f"\n✅ Token obtenido exitosamente!")
+        print(f"\nToken obtenido exitosamente!")
         print(f"   Token (truncado): {token[:50]}...")
         print(f"   Longitud: {len(token)} caracteres")
         
     except Exception as e:
-        print(f"\n❌ Error al obtener token: {str(e)}")
+        print(f"\nError al obtener token: {str(e)}")
         print("\n💡 Posibles causas:")
         print("   1. Las credenciales son incorrectas")
         print("   2. La app no está activa en Zoom Marketplace")
@@ -86,7 +86,7 @@ def main():
             agenda=agenda
         )
         
-        print(f"\n✅ ¡REUNIÓN CREADA EXITOSAMENTE!")
+        print(f"\n¡REUNIÓN CREADA EXITOSAMENTE!")
         print(f"\n📋 Información de la reunión:")
         print(f"   ID: {meeting_info.get('id')}")
         print(f"   URL: {meeting_info.get('join_url')}")
@@ -108,14 +108,14 @@ def main():
         success = zoom_service.delete_meeting(str(meeting_id))
         
         if success:
-            print(f"✅ Reunión {meeting_id} eliminada exitosamente")
+            print(f"Reunión {meeting_id} eliminada exitosamente")
         else:
-            print(f"⚠️  No se pudo eliminar la reunión {meeting_id}")
+            print(f" No se pudo eliminar la reunión {meeting_id}")
             print(f"   Puedes eliminarla manualmente desde https://zoom.us")
         
         # Resultado final
         print("\n" + "=" * 70)
-        print("✅ ¡TODAS LAS PRUEBAS PASARON!")
+        print("¡TODAS LAS PRUEBAS PASARON!")
         print("=" * 70)
         print("\n🎉 La integración OAuth Server-to-Server está funcionando correctamente")
         print("\n📝 Próximos pasos:")
@@ -127,7 +127,7 @@ def main():
         sys.exit(0)
         
     except Exception as e:
-        print(f"\n❌ Error al crear reunión: {str(e)}")
+        print(f"\nError al crear reunión: {str(e)}")
         print(f"\n💡 Posibles causas:")
         print(f"   1. La app no tiene permisos para crear reuniones")
         print(f"   2. Faltan los scopes: meeting:write:admin")
@@ -144,9 +144,9 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n❌ Operación cancelada por el usuario")
+        print("\n\nOperación cancelada por el usuario")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Error inesperado: {str(e)}")
+        print(f"\nError inesperado: {str(e)}")
         sys.exit(1)
 

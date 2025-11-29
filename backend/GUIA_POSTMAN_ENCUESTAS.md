@@ -46,7 +46,7 @@ Content-Type: application/json
 }
 ```
 
-**⚠️ IMPORTANTE:**
+**IMPORTANTE:**
 - Cambia `username` y `password` por credenciales reales de tu sistema
 - El script automáticamente guardará el token en `{{admin_token}}`
 
@@ -127,7 +127,7 @@ Content-Type: application/json
 GET http://localhost:8000/api/v1/polls/code/{{poll_code}}
 ```
 
-**⚠️ IMPORTANTE:**
+**IMPORTANTE:**
 - **NO incluyas** el header `Authorization`
 - Este endpoint es público
 
@@ -159,7 +159,7 @@ GET http://localhost:8000/api/v1/polls/code/{{poll_code}}
 
 **Endpoint:** `5. Votar (Público) → Votar - A Favor (Público)`
 
-**⚠️ IMPORTANTE:** Cambia `int_option_id` por el ID real de la opción que obtuviste en el paso anterior.
+**IMPORTANTE:** Cambia `int_option_id` por el ID real de la opción que obtuviste en el paso anterior.
 
 **Request:**
 ```http
@@ -401,7 +401,7 @@ Para simular a un copropietario real:
 
 ---
 
-## ✅ CHECKLIST DE PRUEBAS
+## CHECKLIST DE PRUEBAS
 
 - [ ] Login como admin exitoso
 - [ ] Crear encuesta tipo single

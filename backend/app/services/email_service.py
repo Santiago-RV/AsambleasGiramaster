@@ -16,8 +16,8 @@ from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.residential_unit_model import ResidentialUnitModel
 from app.utils.email_sender import email_sender
 from app.services.email_notification_service import EmailNotificationService
-
-
+from jinja2 import Template
+        
 logger = logging.getLogger(__name__)
 
 
@@ -191,7 +191,7 @@ class EmailService:
             notification_mapping = {}  # {email: notification_id}
             
             for user, data_user in users_data:
-                # 1️⃣ CREAR NOTIFICACIÓN EN ESTADO "PENDING"
+                # CREAR NOTIFICACIÓN EN ESTADO "PENDING"
                 notification = await notification_service.create_notification(
                     user_id=user.id,
                     template="meeting_invite",
@@ -202,7 +202,7 @@ class EmailService:
                 # Guardar mapeo email -> notification_id para actualizar después
                 notification_mapping[data_user.str_email] = notification.id
                 
-                # 2️⃣ PREPARAR DATOS PARA LA PLANTILLA
+                # PREPARAR DATOS PARA LA PLANTILLA
                 template_data = {
                     "user_name": f"{data_user.str_firstname} {data_user.str_lastname}",
                     "meeting_title": meeting.str_title,
@@ -222,17 +222,17 @@ class EmailService:
                 # Renderizar plantilla
                 html_content = self._render_template(template, template_data)
                 
-                # 3️⃣ AGREGAR A LA LISTA DE ENVÍOS
+                # AGREGAR A LA LISTA DE ENVÍOS
                 emails_to_send.append({
                     "to_emails": [data_user.str_email],
                     "subject": f"Invitación: {meeting.str_title}",
                     "html_content": html_content
                 })
             
-            # 4️⃣ ENVIAR EMAILS
+            # ENVIAR EMAILS
             stats = email_sender.send_bulk_emails(emails_to_send)
             
-            # 5️⃣ ACTUALIZAR ESTADO DE NOTIFICACIONES
+            # ACTUALIZAR ESTADO DE NOTIFICACIONES
             # Necesito identificar cuáles emails se enviaron exitosamente
             # send_bulk_emails retorna: {'exitosos': int, 'fallidos': int, 'detalles': list}
             
@@ -250,7 +250,7 @@ class EmailService:
             if stats.get('fallidos', 0) > 0:
                 # Si hay fallidos pero no tenemos detalles, log de advertencia
                 logger.warning(
-                    f"⚠️ {stats['fallidos']} emails fallaron. "
+                    f" {stats['fallidos']} emails fallaron. "
                     f"No se puede actualizar estado individual de notificaciones."
                 )
             
@@ -258,7 +258,7 @@ class EmailService:
             await db.commit()
             
             logger.info(
-                f"✅ Invitaciones enviadas para reunión {meeting_id}: "
+                f"Invitaciones enviadas para reunión {meeting_id}: "
                 f"{stats['exitosos']} exitosos, {stats['fallidos']} fallidos. "
                 f"📧 {len(notification_mapping)} notificaciones registradas."
             )
@@ -270,7 +270,7 @@ class EmailService:
             
         except Exception as e:
             await db.rollback()
-            logger.error(f"❌ Error al enviar invitaciones: {str(e)}")
+            logger.error(f"Error al enviar invitaciones: {str(e)}")
             return {"error": str(e)}
     
     async def send_meeting_reminder(
@@ -287,6 +287,71 @@ class EmailService:
         # pero con una plantilla de recordatorio
         # Por ahora reutiliza el mismo método
         return await self.send_meeting_invitation(db, meeting_id, user_ids)
+    
+    async def send_administrator_credentials_email(
+        self,
+        to_email: str,
+        firstname: str,
+        lastname: str,
+        username: str,
+        password: str,
+        residential_unit_name: str
+    ) -> bool:
+        """
+        Envía un email con las credenciales de acceso para un nuevo administrador.
+
+        Args:
+            to_email: Email del administrador
+            firstname: Nombre del administrador
+            lastname: Apellido del administrador
+            username: Username para acceso
+            password: Contraseña temporal
+            residential_unit_name: Nombre de la unidad residencial
+
+        Returns:
+            bool: True si se envió exitosamente, False en caso contrario
+        """
+        try:
+            # Cargar el template HTML
+            template_path = self.templates_dir / "admin_invitation.html"
+            
+            with open(template_path, 'r', encoding='utf-8') as file:
+                template_content = file.read()
+            
+            # Renderizar el template con los datos usando Jinja2
+            template = Template(template_content)
+            html_content = template.render(
+                firstname=firstname,
+                lastname=lastname,
+                username=username,
+                password=password,
+                residential_unit_name=residential_unit_name
+            )
+            
+            # Asunto del email
+            subject = f"Credenciales de Acceso - Administrador {residential_unit_name}"
+            
+            # Enviar el email usando email_sender (como en send_meeting_invitation)
+            result = email_sender.send_email(
+                to_emails=[to_email],
+                subject=subject,
+                html_content=html_content
+            )
+            
+            if result:
+                logger.info(f"Email de credenciales enviado exitosamente a {to_email}")
+                return True
+            else:
+                logger.warning(f"No se pudo enviar email a {to_email}")
+                return False
+            
+        except FileNotFoundError as e:
+            logger.error(f"Template no encontrado: {e}")
+            return False
+        
+        except Exception as e:
+            logger.error(f"Error al enviar email de credenciales: {e}")
+            return False
 
 
 # Instancia global del servicio de email

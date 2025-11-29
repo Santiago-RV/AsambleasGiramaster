@@ -21,7 +21,7 @@ def main():
     print(f"   ZOOM_SDK_SECRET: {settings.ZOOM_SDK_SECRET[:20]}... (oculto)")
     
     if not settings.ZOOM_SDK_KEY or not settings.ZOOM_SDK_SECRET:
-        print("\n❌ ERROR: Las credenciales SDK no están configuradas")
+        print("\nERROR: Las credenciales SDK no están configuradas")
         sys.exit(1)
     
     # Meeting number de prueba (el que creamos con OAuth)
@@ -43,7 +43,7 @@ def main():
             expire_hours=2
         )
         
-        print("\n✅ JWT Signature generado!")
+        print("\nJWT Signature generado!")
         print(f"   Signature (truncado): {signature[:60]}...")
         print(f"   Longitud: {len(signature)} caracteres")
         
@@ -66,9 +66,9 @@ def main():
                 settings.ZOOM_SDK_SECRET,
                 algorithms=["HS256"]
             )
-            print("   ✅ Firma matemáticamente válida")
+            print("   Firma matemáticamente válida")
             print("\n" + "=" * 70)
-            print("✅ LAS CREDENCIALES SDK ESTÁN BIEN CONFIGURADAS")
+            print("LAS CREDENCIALES SDK ESTÁN BIEN CONFIGURADAS")
             print("=" * 70)
             print("\n💡 IMPORTANTE:")
             print("   - El signature se genera correctamente")
@@ -84,12 +84,12 @@ def main():
             print("   Sección: 'Obtener Credenciales Meeting SDK'")
             
         except Exception as e:
-            print(f"   ❌ Firma inválida: {str(e)}")
-            print("\n❌ LAS CREDENCIALES SDK NO FUNCIONARÁN")
+            print(f"   Firma inválida: {str(e)}")
+            print("\nLAS CREDENCIALES SDK NO FUNCIONARÁN")
             sys.exit(1)
         
     except Exception as e:
-        print(f"\n❌ Error: {str(e)}")
+        print(f"\nError: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":

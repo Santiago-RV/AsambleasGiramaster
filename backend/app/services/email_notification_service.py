@@ -59,7 +59,7 @@ class EmailNotificationService:
             return notification
             
         except Exception as e:
-            logger.error(f"❌ Error al crear notificación: {str(e)}")
+            logger.error(f"Error al crear notificación: {str(e)}")
             raise
     
     async def update_status(
@@ -98,18 +98,18 @@ class EmailNotificationService:
                     await self.db.refresh(notification)
                 
                 logger.info(
-                    f"✅ Notificación {notification_id} actualizada a {status}"
+                    f"Notificación {notification_id} actualizada a {status}"
                 )
             else:
                 logger.warning(
-                    f"⚠️ Notificación {notification_id} no encontrada"
+                    f"Notificación {notification_id} no encontrada"
                 )
             
             return notification
             
         except Exception as e:
             logger.error(
-                f"❌ Error al actualizar notificación {notification_id}: {str(e)}"
+                f"Error al actualizar notificación {notification_id}: {str(e)}"
             )
             raise
     
@@ -149,7 +149,7 @@ class EmailNotificationService:
             
         except Exception as e:
             logger.error(
-                f"❌ Error al obtener notificaciones del usuario {user_id}: {str(e)}"
+                f"Error al obtener notificaciones del usuario {user_id}: {str(e)}"
             )
             raise
     
@@ -178,6 +178,6 @@ class EmailNotificationService:
             
         except Exception as e:
             logger.error(
-                f"❌ Error al obtener notificaciones de reunión {meeting_id}: {str(e)}"
+                f"Error al obtener notificaciones de reunión {meeting_id}: {str(e)}"
             )
             raise

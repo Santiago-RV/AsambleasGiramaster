@@ -14,7 +14,7 @@ INSERT INTO tbl_data_users (
 ) VALUES (
     'Usuario',
     'Prueba Email',
-    'gomezjosedavid997@gmail.com',  -- ⚠️ REEMPLAZAR CON TU EMAIL REAL
+    'gomezjosedavid997@gmail.com',  -- REEMPLAZAR CON TU EMAIL REAL
     '+57 300 123 4567',
     NOW(),
     NOW()
@@ -62,7 +62,7 @@ INSERT INTO tbl_user_residential_units (
     updated_at
 ) VALUES (
     @user_id,
-    1,  -- ⚠️ ID de la unidad residencial (ajustar según tu base de datos)
+    1,  -- ID de la unidad residencial (ajustar según tu base de datos)
     'Apto 101 - Prueba',
     NOW(),
     NOW()
@@ -86,7 +86,7 @@ WHERE u.id = @user_id;
 
 -- Información del usuario creado
 SELECT 
-    CONCAT('✅ Usuario creado exitosamente') as resultado,
+    CONCAT('Usuario creado exitosamente') as resultado,
     CONCAT('Usuario: ', u.str_username) as username,
     CONCAT('Nombre: ', du.str_firstname, ' ', du.str_lastname) as nombre_completo,
     CONCAT('Email: ', du.str_email) as email,

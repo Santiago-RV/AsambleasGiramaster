@@ -31,7 +31,7 @@ Este documento explica cómo configurar el sistema de envío de correos electró
 6. Haz clic en **Generar**
 7. **Copia la contraseña de 16 caracteres** que aparece
 
-⚠️ **Importante**: Guarda esta contraseña de forma segura, ya que no podrás verla de nuevo.
+**Importante**: Guarda esta contraseña de forma segura, ya que no podrás verla de nuevo.
 
 ---
 
@@ -278,10 +278,10 @@ tail -f backend/logs/app.log | grep "Email"
 
 ## 🎯 Próximos Pasos
 
-1. ✅ Configurar Gmail
-2. ✅ Agregar variables al `.env`
-3. ✅ Probar envío de correos
-4. ✅ Personalizar plantilla HTML
+1. Configurar Gmail
+2. Agregar variables al `.env`
+3. Probar envío de correos
+4. Personalizar plantilla HTML
 5. ⬜ Configurar dominio personalizado (opcional)
 6. ⬜ Implementar sistema de colas para envíos masivos (opcional)
 7. ⬜ Agregar más plantillas de correo (recordatorios, resúmenes, etc.)

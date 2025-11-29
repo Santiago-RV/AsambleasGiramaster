@@ -33,11 +33,11 @@ export const uploadResidentsExcel = async (unitId, file) => {
       // NO agregar headers: { 'Content-Type': 'multipart/form-data' }
     );
 
-    console.log('✅ Respuesta exitosa:', response.data);
+    console.log('Respuesta exitosa:', response.data);
     return response.data;
 
   } catch (error) {
-    console.error('❌ Error uploading residents Excel:', error);
+    console.error('Error uploading residents Excel:', error);
     
     // Extraer mensaje de error detallado
     const errorMessage = error.response?.data?.detail 
