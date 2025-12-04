@@ -25,7 +25,8 @@ import {
 	UserCheck,
 	AlertCircle,
 	Download,
-	UserPlus
+	UserPlus,
+	Send
 } from 'lucide-react';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import { MeetingService } from '../../services/api/MeetingService';
@@ -51,6 +52,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
 	const [isCreateManualAdminModalOpen, setIsCreateManualAdminModalOpen] = useState(false);
+	const [selectedResidents, setSelectedResidents] = useState([]);
+	const [selectAll, setSelectAll] = useState(false);
 
 
 	// Estado para el administrador actual
@@ -416,6 +419,65 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		});
 	};
 
+	// Funciones para seleccionar a los copropietarios para enviar correos
+	const handleSelectAll = () => {
+		if (selectAll) {
+			setSelectedResidents([]);
+		} else {
+			setSelectedResidents(filteredResidents.map(r => r.id));
+		}
+		setSelectAll(!selectAll);
+	};
+
+	const handleSelectResident = (residentId) => {
+		setSelectedResidents(prev =>
+			prev.includes(residentId)
+				? prev.filter(id => id !== residentId)
+				: [...prev, residentId]
+		);
+	};
+
+	// Función para enviar credenciales masivas
+	const handleSendBulkCredentials = () => {
+		if (selectedResidents.length === 0) {
+			Swal.fire({
+				icon: 'warning',
+				title: 'Sin seleccion',
+				text: 'Debes seleccionar al menos un copropietario',
+				confirmButtonColor: '#3498db'
+			});
+			return;
+		}
+
+		Swal.fire({
+			title: '¿Enviar Credenciales?',
+			html: `
+			<div class="text-left">
+				<p class="mb-3">Se enviarán credenciales por correo electrónico a:</p>
+				<div class="bg-blue-50 p-3 rounded-lg">
+					<p class="text-lg font-bold text-blue-800">
+						${selectedResidents.length} copropietario(s) seleccionado(s)
+					</p>
+				</div>
+				<p class="text-xs text-gray-600 mt-3">
+					💡 Cada copropietario recibirá un correo con su contraseña temporal.
+				</p>
+			</div>
+		`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonColor: '#3498db',
+			cancelButtonColor: '#95a5a6',
+			confirmButtonText: 'Sí, enviar',
+			cancelButtonText: 'Cancelar',
+			width: '500px'
+		}).then((result) => {
+			if (result.isConfirmed) {
+				sendBulkCredentialsMutation.mutate(selectedResidents)
+			}
+		})
+	}
+
 	const handleCreateResident = () => {
 		setResidentModalMode('create');
 		resetResident();
@@ -537,6 +599,58 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				text: error.message || 'Error al cambiar el administrador',
 			});
 		},
+	});
+
+	// Mutación para el envio masivo de credenciales
+	const sendBulkCredentialsMutation = useMutation({
+		mutationFn: async (residentIds) => {
+			return await ResidentService.sendBulkCredentials(unitId, residentIds);
+		},
+		onSuccess: (response) => {
+			const { successful, failed, total_processed } = response.data;
+
+			Swal.fire({
+				icon: successful === total_processed ? 'success' : 'warning',
+				title: successful === total_processed ? '¡Credenciales Enviadas!' : 'Envío Parcial',
+				html: `
+				<div class="text-left">
+					<div class="bg-blue-50 p-3 rounded-lg mb-3">
+						<p class="text-sm text-blue-700">
+							<strong>Total procesados:</strong> ${total_processed}
+						</p>
+						<p class="text-sm text-green-700">
+							<strong>Exitosos:</strong> ${successful}
+						</p>
+						${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
+					</div>
+					${response.data.errors && response.data.errors.length > 0 ? `
+						<div class="bg-red-50 p-3 rounded-lg max-h-32 overflow-y-auto">
+							<p class="font-semibold text-red-800 mb-2">Errores:</p>
+							<ul class="text-sm text-red-700 space-y-1">
+								${response.data.errors.map(err =>
+					`<li>ID ${err.resident_id}: ${err.error}</li>`
+				).join('')}
+							</ul>
+						</div>
+					` : ''}
+				</div>
+			`,
+				confirmButtonColor: '#27ae60',
+				width: '500px'
+			});
+
+			// Limpiar selección
+			setSelectedResidents([]);
+			setSelectAll(false);
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al Enviar Credenciales',
+				text: error.response?.data?.message || error.message || 'Error al enviar credenciales masivamente',
+				confirmButtonColor: '#e74c3c'
+			});
+		}
 	});
 
 	const onSubmitResident = (data) => {
@@ -1140,62 +1254,109 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				{/* Listado de Residentes */}
 				<div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col" style={{ maxHeight: '700px' }}>
 					<div className="p-6 border-b border-gray-200 flex-shrink-0">
-						<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-							<UsersIcon size={24} />
-							Residentes ({filteredResidents?.length || 0})
-						</h2>
+						<div className="flex items-center justify-between mb-4">
+							<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+								<UsersIcon size={24} />
+								Residentes ({filteredResidents?.length || 0})
+							</h2>
+
+							{/* Botón de envío masivo */}
+							{selectedResidents.length > 0 && (
+								<button
+									onClick={handleSendBulkCredentials}
+									disabled={sendBulkCredentialsMutation.isPending}
+									className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									{sendBulkCredentialsMutation.isPending ? (
+										<>
+											<svg
+												className="animate-spin h-5 w-5"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+											>
+												<circle
+													className="opacity-25"
+													cx="12"
+													cy="12"
+													r="10"
+													stroke="currentColor"
+													strokeWidth="4"
+												></circle>
+												<path
+													className="opacity-75"
+													fill="currentColor"
+													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+												></path>
+											</svg>
+											<span>Enviando...</span>
+										</>
+									) : (
+										<>
+											<Send size={18} />
+											<span>Enviar Credenciales ({selectedResidents.length})</span>
+										</>
+									)}
+								</button>
+							)}
+						</div>
 					</div>
+
 					<div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ minHeight: 0 }}>
 						{isLoadingResidents ? (
 							<div className="flex items-center justify-center py-12">
-								<svg
-									className="animate-spin h-8 w-8 text-[#3498db]"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-								>
-									<circle
-										className="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										strokeWidth="4"
-									></circle>
-									<path
-										className="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									></path>
+								<svg className="animate-spin h-8 w-8 text-[#3498db]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+									<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 								</svg>
 							</div>
-						) : filteredResidents &&
-							filteredResidents.length > 0 ? (
-							<div className="divide-y divide-gray-200">
-								{filteredResidents.map((resident) => (
-									<div
-										key={resident.id}
-										className="p-4 hover:bg-gray-50 transition-colors relative"
-										onClick={() => {
-											if (selectedResidentMenu && selectedResidentMenu !== resident.id) {
-												setSelectedResidentMenu(null);
-											}
-										}}
-									>
-										<div className="flex items-center justify-between">
-											<div className="flex-1">
-												<p className="font-semibold text-gray-800">
-													{resident.firstname}{' '}
-													{resident.lastname}
-												</p>
-												<p className="text-sm text-gray-600 mt-1">
-													Apt.{' '}
-													{resident.apartment_number}
-												</p>
-											</div>
-											<div className="relative">
-												<div className="flex items-center gap-2">
-													{/* Botón para enviar credenciales */}
+						) : filteredResidents && filteredResidents.length > 0 ? (
+							<>
+								{/* Checkbox para seleccionar todos */}
+								<div className="px-4 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+									<label className="flex items-center gap-3 cursor-pointer">
+										<input
+											type="checkbox"
+											checked={selectAll}
+											onChange={handleSelectAll}
+											className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+										/>
+										<span className="text-sm font-semibold text-gray-700">
+											Seleccionar todos ({filteredResidents.length})
+										</span>
+									</label>
+								</div>
+
+								{/* Lista de residentes */}
+								<div className="divide-y divide-gray-200">
+									{filteredResidents.map((resident) => (
+										<div
+											key={resident.id}
+											className="p-4 hover:bg-gray-50 transition-colors relative"
+										>
+											<div className="flex items-center gap-3">
+												{/* Checkbox individual */}
+												<input
+													type="checkbox"
+													checked={selectedResidents.includes(resident.id)}
+													onChange={() => handleSelectResident(resident.id)}
+													onClick={(e) => e.stopPropagation()}
+													className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+												/>
+
+												{/* Información del residente */}
+												<div className="flex-1 min-w-0">
+													<p className="font-semibold text-gray-800 truncate">
+														{resident.firstname} {resident.lastname}
+													</p>
+													<p className="text-sm text-gray-600 mt-1">
+														Apt. {resident.apartment_number}
+													</p>
+												</div>
+
+												{/* Botones de acción */}
+												<div className="flex items-center gap-2 flex-shrink-0">
+													{/* Botón para enviar credenciales individual */}
 													<button
 														onClick={(e) => {
 															e.stopPropagation();
@@ -1204,13 +1365,10 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 														className="p-2 hover:bg-blue-100 rounded-lg transition-colors group"
 														title="Enviar credenciales por correo"
 													>
-														<Mail
-															size={20}
-															className="text-blue-600 group-hover:text-blue-700"
-														/>
+														<Mail size={20} className="text-blue-600 group-hover:text-blue-700" />
 													</button>
 
-													{/* Botón del menú de 3 puntos (mantener el código existente) */}
+													{/* Botón del menú de 3 puntos */}
 													<button
 														ref={(el) => {
 															if (el) {
@@ -1255,146 +1413,19 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 														}}
 														className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
 													>
-														<MoreVertical
-															size={20}
-															className="text-gray-600"
-														/>
+														<MoreVertical size={20} className="text-gray-600" />
 													</button>
 												</div>
 											</div>
 										</div>
-									</div>
-								))}
-							</div>
+									))}
+								</div>
+							</>
 						) : (
 							<div className="text-center py-12">
-								<UsersIcon
-									className="mx-auto text-gray-400 mb-4"
-									size={48}
-								/>
+								<UsersIcon className="mx-auto text-gray-400 mb-4" size={48} />
 								<p className="text-gray-600">
-									{searchTerm
-										? 'No se encontraron residentes con ese criterio'
-										: 'No hay residentes registrados'}
-								</p>
-							</div>
-						)}
-					</div>
-				</div>
-
-				{/* Vista de Reuniones */}
-				<div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col" style={{ maxHeight: '700px' }}>
-					<div className="p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-						<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-							<Calendar size={24} />
-							Reuniones ({meetingsData?.length || 0})
-						</h2>
-						<button
-							onClick={() => setIsMeetingModalOpen(true)}
-							className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
-						>
-							<Plus size={18} />
-							Nueva Reunión
-						</button>
-					</div>
-					<div className="flex-1 overflow-y-auto overflow-x-hidden p-4" style={{ minHeight: 0 }}>
-						{isLoadingMeetings ? (
-							<div className="flex items-center justify-center py-12">
-								<svg
-									className="animate-spin h-8 w-8 text-[#3498db]"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-								>
-									<circle
-										className="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										strokeWidth="4"
-									></circle>
-									<path
-										className="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									></path>
-								</svg>
-							</div>
-						) : meetingsData && meetingsData.length > 0 ? (
-							<div className="space-y-4">
-								{meetingsData.map((reunion) => (
-									<div
-										key={reunion.id}
-										className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
-									>
-										<div className="flex items-start justify-between mb-3">
-											<div className="flex-1">
-												<h3 className="font-bold text-gray-800 mb-1">
-													{reunion.titulo}
-												</h3>
-												<span
-													className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${getEstadoColor(
-														reunion.estado
-													)}`}
-												>
-													{reunion.estado}
-												</span>
-											</div>
-										</div>
-										<div className="space-y-2 mb-3">
-											<div className="flex items-center gap-2 text-sm text-gray-600">
-												<Calendar size={14} />
-												{new Date(
-													reunion.fecha
-												).toLocaleDateString('es-ES', {
-													day: '2-digit',
-													month: 'short',
-													year: 'numeric',
-												})}
-											</div>
-											<div className="flex items-center gap-2 text-sm text-gray-600">
-												<Clock size={14} />
-												{reunion.hora}
-											</div>
-											<div className="flex items-center gap-2 text-sm text-gray-600">
-												<UsersIcon size={14} />
-												{reunion.asistentes} asistentes
-											</div>
-										</div>
-										{(reunion.estado?.toLowerCase() ===
-											'en curso' ||
-											reunion.estado?.toLowerCase() ===
-											'activa' ||
-											reunion.estado?.toLowerCase() ===
-											'programada') && (
-												<button
-													onClick={() =>
-														onStartMeeting &&
-														onStartMeeting(reunion)
-													}
-													className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
-												>
-													<PlayCircle size={18} />
-													{reunion.estado?.toLowerCase() ===
-														'en curso' ||
-														reunion.estado?.toLowerCase() ===
-														'activa'
-														? 'Unirse'
-														: 'Acceder a la Reunión'}
-												</button>
-											)}
-									</div>
-								))}
-							</div>
-						) : (
-							<div className="text-center py-12">
-								<Calendar
-									className="mx-auto text-gray-400 mb-4"
-									size={48}
-								/>
-								<p className="text-gray-600">
-									No hay reuniones programadas
+									{searchTerm ? 'No se encontraron residentes con ese criterio' : 'No hay residentes registrados'}
 								</p>
 							</div>
 						)}

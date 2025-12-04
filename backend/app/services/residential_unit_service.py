@@ -330,23 +330,21 @@ class ResidentialUnitService:
         - tbl_data_users: Información personal
         - tbl_users: Credenciales y permisos
         - tbl_user_residential_units: Relación con unidad residencial
-        - tbl_email_notifications: Registro de correos enviados
-        
-        Después de crear cada usuario, envía un correo de bienvenida con sus credenciales.
-        
+
+        Los copropietarios se crean con acceso deshabilitado. El Super Admin puede 
+        habilitar el acceso y enviar credenciales posteriormente mediante selección masiva.
+
         Args:
             file_content: Contenido del archivo Excel en bytes
             unit_id: ID de la unidad residencial
             created_by: ID del usuario que está creando los registros
-        
+
         Returns:
             Dict con estadísticas del proceso:
             - total_rows: Total de filas procesadas
             - successful: Copropietarios creados exitosamente
             - failed: Filas que fallaron
             - users_created: Número de usuarios creados
-            - emails_sent: Número de correos enviados exitosamente
-            - emails_failed: Número de correos que fallaron
             - errors: Lista de errores detallados
         """
         try:
@@ -375,13 +373,13 @@ class ResidentialUnitService:
                 'successful': 0,
                 'failed': 0,
                 'users_created': 0,
-                'emails_sent': 0,
-                'emails_failed': 0,
+                # 'emails_sent': 0,
+                # 'emails_failed': 0,
                 'errors': []
             }
             
             # Crear instancia del servicio de notificaciones
-            notification_service = EmailNotificationService(self.db)
+            # notification_service = EmailNotificationService(self.db)
 
             # Procesar cada fila
             for index, row in df.iterrows():
@@ -417,7 +415,7 @@ class ResidentialUnitService:
                     # Verificar si el usuario ya existe por email
                     existing_user = await self._get_user_by_email(email)
                     user_was_created = False
-                    password_to_send = password  # Guardar contraseña antes de hashear
+                    # password_to_send = password  # Guardar contraseña antes de hashear
                     
                     if not existing_user:
                         # ============================================
@@ -524,54 +522,54 @@ class ResidentialUnitService:
                     # ============================================
                     # PASO 4: Enviar correo de bienvenida (solo si es usuario nuevo)
                     # ============================================
-                    if user_was_created:
-                        try:
-                            # Crear notificación en estado "pending"
-                            notification = await notification_service.create_notification(
-                                user_id=user.id,
-                                template="welcome_coproprietario_bulk",
-                                status="pending",
-                                meeting_id=None
-                            )
+                    # if user_was_created:
+                    #     try:
+                    #         # Crear notificación en estado "pending"
+                    #         notification = await notification_service.create_notification(
+                    #             user_id=user.id,
+                    #             template="welcome_coproprietario_bulk",
+                    #             status="pending",
+                    #             meeting_id=None
+                    #         )
                             
-                            # Enviar correo de bienvenida
-                            email_sent = self._send_welcome_email(
-                                user_email=email,
-                                user_name=f"{firstname} {lastname}",
-                                username=username,
-                                password=password_to_send,  # Contraseña sin hashear
-                                residential_unit_name=residential_unit_name,
-                                apartment_number=apartment_number,
-                                voting_weight=voting_weight,
-                                phone=phone
-                            )
+                    #         # Enviar correo de bienvenida
+                    #         email_sent = self._send_welcome_email(
+                    #             user_email=email,
+                    #             user_name=f"{firstname} {lastname}",
+                    #             username=username,
+                    #             password=password_to_send,  # Contraseña sin hashear
+                    #             residential_unit_name=residential_unit_name,
+                    #             apartment_number=apartment_number,
+                    #             voting_weight=voting_weight,
+                    #             phone=phone
+                    #         )
                             
-                            # Actualizar estado de la notificación
-                            status = "sent" if email_sent else "failed"
-                            await notification_service.update_status(
-                                notification_id=notification.id,
-                                status=status,
-                                commit=False  # No hacer commit individual
-                            )
+                    #         # Actualizar estado de la notificación
+                    #         status = "sent" if email_sent else "failed"
+                    #         await notification_service.update_status(
+                    #             notification_id=notification.id,
+                    #             status=status,
+                    #             commit=False  # No hacer commit individual
+                    #         )
                             
-                            if email_sent:
-                                results['emails_sent'] += 1
-                                logger.info(
-                                    f"Correo enviado a {email} - "
-                                    f"Notificación ID: {notification.id}"
-                                )
-                            else:
-                                results['emails_failed'] += 1
-                                logger.warning(
-                                    f"No se pudo enviar correo a {email} - "
-                                    f"Notificación ID: {notification.id} marcada como 'failed'"
-                                )
+                    #         if email_sent:
+                    #             results['emails_sent'] += 1
+                    #             logger.info(
+                    #                 f"Correo enviado a {email} - "
+                    #                 f"Notificación ID: {notification.id}"
+                    #             )
+                    #         else:
+                    #             results['emails_failed'] += 1
+                    #             logger.warning(
+                    #                 f"No se pudo enviar correo a {email} - "
+                    #                 f"Notificación ID: {notification.id} marcada como 'failed'"
+                    #             )
                                 
-                        except Exception as email_error:
-                            results['emails_failed'] += 1
-                            logger.error(
-                                f"Error al enviar correo/notificación a {email}: {str(email_error)}"
-                            )
+                    #     except Exception as email_error:
+                    #         results['emails_failed'] += 1
+                    #         logger.error(
+                    #             f"Error al enviar correo/notificación a {email}: {str(email_error)}"
+                    #         )
 
                     results['successful'] += 1
 
@@ -590,8 +588,7 @@ class ResidentialUnitService:
                 await self.db.commit()
                 logger.info(
                     f"Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
-                    f"{results['users_created']} usuarios nuevos creados, "
-                    f"{results['emails_sent']} correos enviados"
+                    f"{results['users_created']} usuarios nuevos creados"
                 )
             else:
                 await self.db.rollback()
