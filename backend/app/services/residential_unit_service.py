@@ -593,6 +593,8 @@ class ResidentialUnitService:
         - Marca bool_is_admin = True para el nuevo administrador
         - Actualiza bln_allow_entry = True para el nuevo administrador
         - Actualiza bln_allow_entry = False para el anterior (solo si era admin)
+        - Actualiza int_id_rol = 2 (Administrador) para el nuevo administrador
+        - Actualiza int_id_rol = 3 (Copropietario) para el anterior administrador
 
         Args:
             unit_id: ID de la unidad residencial
@@ -654,11 +656,12 @@ class ResidentialUnitService:
                 old_admin_unit.updated_at = datetime.now()
 
                 old_admin_user.bln_allow_entry = False
+                old_admin_user.int_id_rol = 3  # Cambiar rol a Copropietario
                 old_admin_user.updated_at = datetime.now()
 
                 logger.info(
                     f"Privilegios de administrador removidos del usuario {old_admin_user.id} "
-                    f"en la unidad {unit_id}"
+                    f"en la unidad {unit_id}. Rol cambiado a Copropietario (3)"
                 )
 
             # Asignar privilegios al nuevo administrador
@@ -666,11 +669,12 @@ class ResidentialUnitService:
             new_admin_unit.updated_at = datetime.now()
 
             new_admin_user.bln_allow_entry = True
+            new_admin_user.int_id_rol = 2  # Cambiar rol a Administrador
             new_admin_user.updated_at = datetime.now()
 
             logger.info(
                 f"Usuario {new_admin_user_id} asignado como administrador "
-                f"de la unidad {unit_id}"
+                f"de la unidad {unit_id}. Rol cambiado a Administrador (2)"
             )
 
             # Confirmar cambios

@@ -6,6 +6,7 @@ import React from 'react';
 import Login from './pages/Login';
 import HomeSA from './pages/HomeSA';
 import AppAdmin from './pages/AdDashboard.jsx'
+import AppCopropietario from './pages/CoDashboard.jsx'
 import NotFound from './pages/NotFound';
 import './App.css';
 
@@ -34,6 +35,16 @@ function App() {
 						element={
 							<RoleBasedRoute allowedRoles={['Administrador']}>
 								<AppAdmin />
+							</RoleBasedRoute>
+						}
+					/>
+
+					{/* Ruta para Administrador */}
+					<Route
+						path="copropietario"
+						element={
+							<RoleBasedRoute allowedRoles={['Usuario']}>
+								<AppCopropietario />
 							</RoleBasedRoute>
 						}
 					/>

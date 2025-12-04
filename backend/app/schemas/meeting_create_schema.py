@@ -10,8 +10,9 @@ class MeetingCreateRequest(BaseModel):
     str_description: Optional[str] = Field(None, max_length=1000, description="Descripción de la reunión")
     str_meeting_type: str = Field(..., description="Tipo de reunión (Ordinaria, Extraordinaria, etc.)")
     dat_schedule_date: datetime = Field(..., description="Fecha y hora programada")
-    int_estimated_duration: int = Field(..., ge=15, le=480, description="Duración estimada en minutos")
-    bln_allow_delegates: bool = Field(default=False, description="Permite delegados")
+    int_estimated_duration: int = Field(default=0, ge=0, le=480, description="Duración estimada en minutos (0 = indefinida, 15-480 = con límite)")
+    int_meeting_leader_id: int = Field(..., description="ID del líder/moderador de la reunión")
+    bln_allow_delegates: bool = Field(default=True, description="Permite delegados")
 
 
 class ResidentialUnitBasic(BaseModel):
@@ -34,12 +35,12 @@ class MeetingResponse(BaseModel):
     str_description: str
     str_meeting_type: str
     dat_schedule_date: datetime
-    int_estimated_duration: int
+    int_estimated_duration: int  # 0 = duración indefinida, >0 = duración en minutos
     int_organizer_id: int
     int_meeting_leader_id: int
-    int_zoom_meeting_id: int
-    str_zoom_join_url: str
-    str_zoom_start_url: str
+    int_zoom_meeting_id: Optional[int]  # Puede ser None si no se creó en Zoom
+    str_zoom_join_url: Optional[str]  # Puede ser None si no se creó en Zoom
+    str_zoom_start_url: Optional[str]  # Puede ser None si no se creó en Zoom
     str_zoom_password: Optional[str]
     bln_allow_delegates: bool
     str_status: str
@@ -53,7 +54,7 @@ class MeetingResponse(BaseModel):
     created_by: int
     updated_by: int
     residential_unit: Optional[ResidentialUnitBasic] = None
-    
+
     class Config:
         from_attributes = True
 

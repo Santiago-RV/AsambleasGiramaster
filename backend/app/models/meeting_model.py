@@ -13,18 +13,18 @@ class MeetingModel(Base):
     str_description = Column(String(1000), nullable=True)
     str_meeting_type = Column(String(50), index=True, nullable=False)
     dat_schedule_date = Column(DateTime, nullable=False)
-    int_estimated_duration = Column(Integer, nullable=False)
+    int_estimated_duration = Column(Integer, nullable=False, default=0)  # 0 = duración indefinida
     int_organizer_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
     int_meeting_leader_id = Column(Integer, nullable=False)
-    int_zoom_meeting_id = Column(BigInteger, nullable=False)
-    str_zoom_join_url = Column(String(500), nullable=False)
-    str_zoom_start_url = Column(String(500), nullable=False)
+    int_zoom_meeting_id = Column(BigInteger, nullable=True)  # Se completa al crear en Zoom
+    str_zoom_join_url = Column(String(500), nullable=True)  # Se completa al crear en Zoom
+    str_zoom_start_url = Column(String(500), nullable=True)  # Se completa al crear en Zoom
     str_zoom_password = Column(String(50), nullable=True)
-    bln_allow_delegates = Column(Boolean, default=False)
-    str_status = Column(String(50), index=True, nullable=False)
+    bln_allow_delegates = Column(Boolean, default=True)
+    str_status = Column(String(50), index=True, nullable=False, default="Programada")
     bln_quorum_reached = Column(Boolean, default=False)
-    int_total_invitated = Column(Integer, nullable=False)
-    int_total_confirmed = Column(Integer, nullable=False)
+    int_total_invitated = Column(Integer, nullable=False, default=0)
+    int_total_confirmed = Column(Integer, nullable=False, default=0)
     dat_actual_start_time = Column(DateTime, nullable=True)
     dat_actual_end_time = Column(DateTime, nullable=True)
 

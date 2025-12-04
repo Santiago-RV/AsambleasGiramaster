@@ -147,7 +147,16 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		queryFn: () => MeetingService.getMeetingsByResidentialUnit(unitId),
 		select: (response) => {
 			if (response.success && response.data) {
-				return response.data.map((reunion) => {
+				const ahora = new Date();
+				const inicioDelDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
+
+				// Filtrar solo reuniones del día actual o futuras
+				const reunionesFiltradas = response.data.filter((reunion) => {
+					const fechaReunion = new Date(reunion.dat_schedule_date);
+					return fechaReunion >= inicioDelDia;
+				});
+
+				return reunionesFiltradas.map((reunion) => {
 					const fechaObj = new Date(reunion.dat_schedule_date);
 					return {
 						...reunion,
@@ -162,6 +171,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						}),
 						asistentes: reunion.int_total_confirmed || 0,
 						estado: reunion.str_status || 'Programada',
+						fechaCompleta: fechaObj,
 						tipo: reunion.str_meeting_type,
 						descripcion: reunion.str_description,
 						codigo: reunion.str_meeting_code,
@@ -206,34 +216,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			str_description: '',
 			str_meeting_type: 'Ordinaria',
 			dat_schedule_start: '',
-			dat_schedule_end: '',
-			bln_allow_delegates: false,
+			bln_allow_delegates: true,
 		},
 	});
 
 	const watchStart = watch('dat_schedule_start');
-	const watchEnd = watch('dat_schedule_end');
-
-	const calculateDuration = () => {
-		if (!watchStart || !watchEnd) return 'No calculado';
-
-		const start = new Date(watchStart);
-		const end = new Date(watchEnd);
-		const diffMs = end - start;
-
-		if (diffMs <= 0) return 'Fecha final debe ser posterior';
-
-		const diffMinutes = Math.floor(diffMs / 60000);
-		const hours = Math.floor(diffMinutes / 60);
-		const minutes = diffMinutes % 60;
-
-		if (hours > 0) {
-			return `${hours}h ${minutes}min`;
-		}
-		return `${minutes} minutos`;
-	};
-
-	const estimatedDuration = calculateDuration();
 
 	// Formulario para editar residente
 	const {
@@ -282,20 +269,25 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const isSubmitting = createMeetingMutation.isPending;
 
 	const onSubmitMeeting = (data) => {
-		const start = new Date(data.dat_schedule_start);
-		const end = new Date(data.dat_schedule_end);
-		const durationMinutes = Math.floor((end - start) / 60000);
-
 		const meetingData = {
 			int_id_residential_unit: parseInt(unitId),
 			str_title: data.str_title,
 			str_description: data.str_description || '',
 			str_meeting_type: data.str_meeting_type,
 			bln_allow_delegates: data.bln_allow_delegates,
-			int_estimated_duration: durationMinutes,
+			int_estimated_duration: 0, // Duración indefinida (0 = sin límite)
+			int_meeting_leader_id: parseInt(data.int_meeting_leader_id),
 			dat_schedule_date: data.dat_schedule_start,
 		};
 		createMeetingMutation.mutate(meetingData);
+	};
+
+	// Función para verificar si el botón de acceso debe estar habilitado
+	// Se habilita 1 hora antes de la reunión programada
+	const puedeAccederReunion = (fechaReunion) => {
+		const ahora = new Date();
+		const unaHoraAntes = new Date(fechaReunion.getTime() - 60 * 60 * 1000); // 1 hora antes
+		return ahora >= unaHoraAntes;
 	};
 
 	// Filtrar residentes por búsqueda
@@ -1060,12 +1052,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 												{reunion.asistentes} asistentes
 											</div>
 										</div>
-										{(reunion.estado?.toLowerCase() ===
-											'en curso' ||
-											reunion.estado?.toLowerCase() ===
-											'activa' ||
-											reunion.estado?.toLowerCase() ===
-											'programada') && (
+										{/* Botón para reuniones en curso o activas */}
+										{(reunion.estado?.toLowerCase() === 'en curso' ||
+											reunion.estado?.toLowerCase() === 'activa') && (
 												<button
 													onClick={() =>
 														onStartMeeting &&
@@ -1074,14 +1063,44 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 													className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
 												>
 													<PlayCircle size={18} />
-													{reunion.estado?.toLowerCase() ===
-														'en curso' ||
-														reunion.estado?.toLowerCase() ===
-														'activa'
-														? 'Unirse'
-														: 'Acceder a la Reunión'}
+													Unirse a la Reunión
 												</button>
 											)}
+
+										{/* Botón para reuniones programadas - habilitado 1 hora antes */}
+										{reunion.estado?.toLowerCase() === 'programada' && (
+											puedeAccederReunion(reunion.fechaCompleta) ? (
+												<button
+													onClick={() =>
+														onStartMeeting &&
+														onStartMeeting(reunion)
+													}
+													className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold text-sm"
+												>
+													<PlayCircle size={18} />
+													Acceder a la Reunión
+												</button>
+											) : (
+												<div className="w-full">
+													<button
+														disabled
+														className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed font-semibold text-sm"
+													>
+														<Clock size={18} />
+														Disponible 1 hora antes
+													</button>
+													<p className="text-xs text-center text-gray-500 mt-2">
+														El acceso se habilitará a las{' '}
+														{new Date(
+															reunion.fechaCompleta.getTime() - 60 * 60 * 1000
+														).toLocaleTimeString('es-ES', {
+															hour: '2-digit',
+															minute: '2-digit',
+														})}
+													</p>
+												</div>
+											)
+										)}
 									</div>
 								))}
 							</div>
@@ -1276,98 +1295,42 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 					<div className="space-y-5">
 						<div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
 							<Calendar className="w-5 h-5 text-emerald-600" />
-							<h3 className="text-lg font-bold text-gray-800">Fecha y Hora</h3>
+							<h3 className="text-lg font-bold text-gray-800">Fecha y Hora de Inicio</h3>
 						</div>
 
-						<div className="grid gap-5 grid-cols-1 md:grid-cols-2">
-
-							{/* Fecha y Hora de Inicio */}
-							<div className="group">
-								<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-									<Calendar className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-									Fecha y Hora de Inicio *
-								</label>
-								<input
-									type="datetime-local"
-									{...registerMeeting('dat_schedule_start', {
-										required: 'La fecha y hora de inicio son obligatorias',
-										validate: (value) => {
-											const selectedDate = new Date(value);
-											const now = new Date();
-											if (selectedDate < now) {
-												return 'La fecha no puede ser en el pasado';
-											}
-											return true;
+						{/* Fecha y Hora de Inicio */}
+						<div className="group">
+							<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+								<Calendar className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+								Fecha y Hora de Inicio *
+							</label>
+							<input
+								type="datetime-local"
+								{...registerMeeting('dat_schedule_start', {
+									required: 'La fecha y hora de inicio son obligatorias',
+									validate: (value) => {
+										const selectedDate = new Date(value);
+										const now = new Date();
+										if (selectedDate < now) {
+											return 'La fecha no puede ser en el pasado';
 										}
-									})}
-									className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errorsMeeting.dat_schedule_start
-										? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-										: 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
-										}`}
-								/>
-								{errorsMeeting.dat_schedule_start && (
-									<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-										<AlertCircle className="w-3.5 h-3.5" />
-										{errorsMeeting.dat_schedule_start.message}
-									</p>
-								)}
-							</div>
-
-							{/* Fecha y Hora de Finalización */}
-							<div className="group">
-								<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-									<Clock className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-									Fecha y Hora de Finalización *
-								</label>
-								<input
-									type="datetime-local"
-									{...registerMeeting('dat_schedule_end', {
-										required: 'La fecha y hora de finalización son obligatorias',
-										validate: (value) => {
-											if (!watchStart) return true;
-											const start = new Date(watchStart);
-											const end = new Date(value);
-											if (end <= start) {
-												return 'Debe ser posterior a la fecha de inicio';
-											}
-											const diffMinutes = (end - start) / 60000;
-											if (diffMinutes < 15) {
-												return 'La reunión debe durar al menos 15 minutos';
-											}
-											if (diffMinutes > 480) {
-												return 'La reunión no puede durar más de 8 horas';
-											}
-											return true;
-										}
-									})}
-									className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errorsMeeting.dat_schedule_end
-										? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-										: 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
-										}`}
-								/>
-								{errorsMeeting.dat_schedule_end && (
-									<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-										<AlertCircle className="w-3.5 h-3.5" />
-										{errorsMeeting.dat_schedule_end.message}
-									</p>
-								)}
-							</div>
-
-						</div>
-
-						{/* Duración Calculada */}
-						<div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-							<div className="flex items-center gap-3">
-								<Clock className="w-5 h-5 text-emerald-600 shrink-0" />
-								<div>
-									<p className="text-sm font-medium text-emerald-900">
-										Duración Estimada
-									</p>
-									<p className="text-lg font-bold text-emerald-700">
-										{estimatedDuration}
-									</p>
-								</div>
-							</div>
+										return true;
+									}
+								})}
+								className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errorsMeeting.dat_schedule_start
+									? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+									: 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
+									}`}
+							/>
+							{errorsMeeting.dat_schedule_start && (
+								<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+									<AlertCircle className="w-3.5 h-3.5" />
+									{errorsMeeting.dat_schedule_start.message}
+								</p>
+							)}
+							<p className="text-xs text-gray-500 mt-1.5">
+								La reunión puede tener una duración indefinida
+							</p>
 						</div>
 					</div>
 

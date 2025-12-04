@@ -1,5 +1,15 @@
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  Video,
+  FileText,
+  Settings,
+  LogOut
+} from 'lucide-react';
+
 export default function SidebarAdmin({ section, setSection }) {
-  const navItem = (id, icon, label) => (
+  const navItem = (id, Icon, label) => (
     <li>
       <button
         onClick={() => setSection(id)}
@@ -7,7 +17,7 @@ export default function SidebarAdmin({ section, setSection }) {
           section === id ? "bg-white/10 border-l-4 border-yellow-400 pl-6" : "hover:bg-white/5"
         }`}
       >
-        <span className="text-xl">{icon}</span>
+        <Icon size={20} />
         {label}
       </button>
     </li>
@@ -22,19 +32,20 @@ export default function SidebarAdmin({ section, setSection }) {
       </div>
 
       <ul className="mt-4 space-y-2 px-2">
-        {navItem("dashboard", "Dashboard")}
-        {navItem("users", "Gestión de Usuarios")}
-        {navItem("assemblies", "Gestión de Asambleas")}
-        {navItem("live", "Reunión en Vivo")}
-        {navItem("reports", "Reportes")}
-        {navItem("settings", "Configuración")}
+        {navItem("dashboard", LayoutDashboard, "Dashboard")}
+        {navItem("users", Users, "Gestión de Usuarios")}
+        {navItem("assemblies", Calendar, "Gestión de Asambleas")}
+        {navItem("live", Video, "Reunión en Vivo")}
+        {navItem("reports", FileText, "Reportes")}
+        {navItem("settings", Settings, "Configuración")}
 
         <li className="mt-6 border-t border-white/10 pt-4">
           <button
             onClick={() => { if (confirm("¿Cerrar sesión?")) alert("Sesión cerrada"); }}
             className="w-full text-left flex items-center gap-3 p-4 rounded hover:bg-white/5"
           >
-            <span className="text-xl"></span> Cerrar Sesión
+            <LogOut size={20} />
+            Cerrar Sesión
           </button>
         </li>
       </ul>

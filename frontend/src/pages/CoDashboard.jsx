@@ -1,10 +1,10 @@
 import { useState } from "react";
-import Sidebar from "./components/layout/Sidebar";
-import AssemblyPage from "./components/CoDashboard/AssemblyPage";
-import VotingPage from "./components/CoDashboard/VotingPage";
-import ProfilePage from "./components/CoDashboard/ProfilePage";
+import Sidebar from "../components/layout/SidebarCO";
+import AssemblyPage from "../components/CoDashboard/AssemblyPage";
+import VotingPage from "../components/CoDashboard/VotingPage";
+import ProfilePage from "../components/CoDashboard/ProfilePage";
 
-export default function App() {
+export default function AppCopropietario() {
   const [section, setSection] = useState("assembly");
 
   return (

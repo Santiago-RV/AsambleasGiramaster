@@ -75,6 +75,7 @@ class MeetingService:
         meeting_type: str,
         schedule_date: datetime,
         estimated_duration: int,
+        meeting_leader_id: int,
         allow_delegates: bool,
         user_id: int
     ) -> MeetingModel:
@@ -88,32 +89,44 @@ class MeetingService:
             logger.info(f"Creando reunión de Zoom: {title}")
             
             # Intentar crear reunión REAL en Zoom usando OAuth API
+            zoom_meeting_id = None
+            zoom_join_url = None
+            zoom_start_url = None
+
             try:
                 zoom_service = ZoomAPIService()
+
+                # Determinar duración: si es 0, usar 60 min por defecto para Zoom
+                # 0 = duración indefinida en la aplicación
+                zoom_duration = estimated_duration if estimated_duration > 0 else 60
+
                 zoom_meeting = zoom_service.create_meeting(
                     topic=title,
                     start_time=schedule_date,
-                    duration=estimated_duration,
+                    duration=zoom_duration,
                     agenda=description,
                     timezone="America/Bogota"
                 )
-                
+
                 # Extraer información de la reunión creada
                 zoom_meeting_id = zoom_meeting.get('id')
                 zoom_join_url = zoom_meeting.get('join_url')
                 zoom_start_url = zoom_meeting.get('start_url')
-                
-                logger.info(f"✅ Reunión REAL de Zoom creada: ID {zoom_meeting_id}")
-                
+
+                if estimated_duration > 0:
+                    logger.info(f"✅ Reunión REAL de Zoom creada: ID {zoom_meeting_id} (duración: {estimated_duration} min)")
+                else:
+                    logger.info(f"✅ Reunión REAL de Zoom creada: ID {zoom_meeting_id} (duración indefinida, creada con {zoom_duration} min en Zoom)")
+
             except Exception as zoom_error:
                 # Si falla, usar ID temporal
                 logger.error(f"❌ Error al crear reunión en Zoom: {str(zoom_error)}")
                 logger.warning("Usando ID temporal. La reunión no existirá realmente en Zoom.")
-                
+
                 zoom_meeting_id = int(time.time() * 1000) % 10000000000
                 zoom_join_url = f"https://zoom.us/j/{zoom_meeting_id}"
                 zoom_start_url = f"https://zoom.us/s/{zoom_meeting_id}"
-                
+
                 logger.info(
                     "SOLUCIÓN: Configura ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID y ZOOM_CLIENT_SECRET "
                     "en el .env para crear reuniones reales."
@@ -129,7 +142,7 @@ class MeetingService:
                 dat_schedule_date=schedule_date,
                 int_estimated_duration=estimated_duration,
                 int_organizer_id=user_id,
-                int_meeting_leader_id=user_id,
+                int_meeting_leader_id=meeting_leader_id,
                 int_zoom_meeting_id=zoom_meeting_id,
                 str_zoom_join_url=zoom_join_url,
                 str_zoom_start_url=zoom_start_url,
