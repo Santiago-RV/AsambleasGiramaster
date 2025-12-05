@@ -17,17 +17,17 @@ def test_health_check():
     try:
         response = requests.get(f"{BASE_URL}{API_PREFIX}/health", timeout=5)
         if response.status_code == 200:
-            print("✅ Servidor corriendo correctamente")
+            print("Servidor corriendo correctamente")
             return True
         else:
-            print(f"⚠️ Servidor respondió con código: {response.status_code}")
+            print(f"Servidor respondió con código: {response.status_code}")
             return False
     except requests.exceptions.ConnectionError:
-        print("❌ No se puede conectar al servidor")
+        print("No se puede conectar al servidor")
         print(f"   Asegúrate de que el servidor esté corriendo en {BASE_URL}")
         return False
     except Exception as e:
-        print(f"❌ Error al conectar: {str(e)}")
+        print(f"Error al conectar: {str(e)}")
         return False
 
 def test_login(username: str = "admin", password: str = "admin123") -> Optional[str]:
@@ -44,22 +44,22 @@ def test_login(username: str = "admin", password: str = "admin123") -> Optional[
             data = response.json()
             if data.get("success") and data.get("data", {}).get("access_token"):
                 token = data["data"]["access_token"]
-                print("✅ Login exitoso")
+                print("Login exitoso")
                 print(f"   Token: {token[:50]}...")
                 return token
             else:
-                print("⚠️ Login exitoso pero sin token en respuesta")
+                print("Login exitoso pero sin token en respuesta")
                 print(f"   Response: {json.dumps(data, indent=2)}")
                 return None
         else:
-            print(f"❌ Login falló con código: {response.status_code}")
+            print(f"Login falló con código: {response.status_code}")
             try:
                 print(f"   Response: {response.json()}")
             except:
                 print(f"   Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error en login: {str(e)}")
+        print(f"Error en login: {str(e)}")
         return None
 
 def test_create_poll(token: str, meeting_id: int = 1):
@@ -93,14 +93,14 @@ def test_create_poll(token: str, meeting_id: int = 1):
 
         if response.status_code == 201:
             data = response.json()
-            print("✅ Encuesta creada exitosamente")
+            print("Encuesta creada exitosamente")
             poll_code = data.get("data", {}).get("poll_code")
             poll_id = data.get("data", {}).get("id")
             print(f"   Poll ID: {poll_id}")
             print(f"   Poll Code: {poll_code}")
             return poll_id, poll_code
         else:
-            print(f"❌ Error al crear encuesta: {response.status_code}")
+            print(f"Error al crear encuesta: {response.status_code}")
             try:
                 error_data = response.json()
                 print(f"   Error: {error_data.get('message', 'Sin mensaje')}")
@@ -109,7 +109,7 @@ def test_create_poll(token: str, meeting_id: int = 1):
                 print(f"   Response: {response.text}")
             return None, None
     except Exception as e:
-        print(f"❌ Error al crear encuesta: {str(e)}")
+        print(f"Error al crear encuesta: {str(e)}")
         return None, None
 
 def test_get_poll_by_code(poll_code: str):
@@ -123,7 +123,7 @@ def test_get_poll_by_code(poll_code: str):
         )
 
         if response.status_code == 200:
-            print("✅ Encuesta obtenida exitosamente (sin autenticación)")
+            print("Encuesta obtenida exitosamente (sin autenticación)")
             data = response.json()
             poll_data = data.get("data", {})
             print(f"   Título: {poll_data.get('str_title')}")
@@ -131,10 +131,10 @@ def test_get_poll_by_code(poll_code: str):
             print(f"   Opciones: {len(poll_data.get('options', []))}")
             return True
         else:
-            print(f"❌ Error al obtener encuesta: {response.status_code}")
+            print(f"Error al obtener encuesta: {response.status_code}")
             return False
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         return False
 
 def main():
@@ -145,7 +145,7 @@ def main():
 
     # 1. Verificar servidor
     if not test_health_check():
-        print("\n⚠️ El servidor no está disponible. Asegúrate de iniciarlo:")
+        print("\nEl servidor no está disponible. Asegúrate de iniciarlo:")
         print("   cd backend")
         print("   uvicorn app.main:app --reload")
         return
@@ -157,7 +157,7 @@ def main():
     token = test_login("admin", "admin123")
 
     if not token:
-        print("\n⚠️ No se pudo obtener el token de autenticación")
+        print("\nNo se pudo obtener el token de autenticación")
         print("   Verifica las credenciales en la función test_login()")
         return
 
@@ -168,7 +168,7 @@ def main():
     poll_id, poll_code = test_create_poll(token, meeting_id=1)
 
     if not poll_id or not poll_code:
-        print("\n⚠️ No se pudo crear la encuesta")
+        print("\nNo se pudo crear la encuesta")
         print("   Posibles causas:")
         print("   - El meeting_id no existe en la BD")
         print("   - El usuario no tiene permisos de admin en esa reunión")
@@ -180,7 +180,7 @@ def main():
 
     # Resumen
     print("\n" + "=" * 60)
-    print("✅ PRUEBAS COMPLETADAS EXITOSAMENTE")
+    print("PRUEBAS COMPLETADAS EXITOSAMENTE")
     print("=" * 60)
     print(f"\n📋 Datos para usar en Postman:")
     print(f"   - poll_id: {poll_id}")
@@ -195,8 +195,8 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n⚠️ Prueba cancelada por el usuario")
+        print("\n\nPrueba cancelada por el usuario")
     except Exception as e:
-        print(f"\n\n❌ Error inesperado: {str(e)}")
+        print(f"\n\nError inesperado: {str(e)}")
         import traceback
         traceback.print_exc()

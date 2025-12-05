@@ -26,7 +26,7 @@ help:
 install:
 	@echo "$(YELLOW)📦 Instalando dependencias...$(NC)"
 	$(RUN) install
-	@echo "$(GREEN)✅ Dependencias instaladas$(NC)"
+	@echo "$(GREEN)Dependencias instaladas$(NC)"
 
 dev:
 	@echo "$(GREEN)🚀 Iniciando servidor de desarrollo...$(NC)"
@@ -44,7 +44,7 @@ test:
 lint:
 	@echo "$(GREEN)🔍 Verificando código...$(NC)"
 	$(RUN) lint
-	@echo "$(GREEN)✅ Código verificado$(NC)"
+	@echo "$(GREEN)Código verificado$(NC)"
 
 clean:
 	@echo "$(YELLOW)🧹 Limpiando archivos temporales...$(NC)"
@@ -52,4 +52,4 @@ clean:
 	rm -rf dist/
 	rm -rf .vite/
 	rm -rf node_modules/
-	@echo "$(GREEN)✅ Archivos temporales limpiados$(NC)"
+	@echo "$(GREEN)Archivos temporales limpiados$(NC)"

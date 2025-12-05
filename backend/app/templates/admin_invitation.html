@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credenciales de Administrador - GIRAMASTER</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .email-container {
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            color: white;
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            margin: 0;
+            font-size: 16px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .greeting {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .intro-text {
+            margin-bottom: 25px;
+            color: #555;
+        }
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .info-box strong {
+            color: #0c5460;
+        }
+        .credentials-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 25px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+        .credentials-box h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #667eea;
+            font-size: 20px;
+        }
+        .credential-item {
+            margin: 15px 0;
+            padding: 12px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .credential-label {
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .credential-value {
+            font-size: 18px;
+            color: #333;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            word-break: break-all;
+            font-weight: 600;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        .warning-box strong {
+            color: #856404;
+        }
+        .warning-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+        .steps-section {
+            margin: 25px 0;
+        }
+        .steps-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        .steps-section ol {
+            padding-left: 20px;
+            margin: 0;
+        }
+        .steps-section li {
+            margin: 10px 0;
+            color: #555;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .footer strong {
+            color: #495057;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎉 ¡Bienvenido a GIRAMASTER!</h1>
+            <p>Has sido asignado como Administrador</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <p class="greeting">Hola <strong>{{ firstname }} {{ lastname }}</strong>,</p>
+
+            <p class="intro-text">
+                Te damos la bienvenida a <strong>GIRAMASTER</strong>. Has sido asignado como 
+                <strong>Administrador</strong> de <strong>{{ residential_unit_name }}</strong>.
+            </p>
+
+            <div class="info-box">
+                <strong>📋 Tu Rol:</strong> Como administrador, tendrás acceso completo para gestionar reuniones, 
+                copropietarios, votaciones y todas las funciones administrativas de la unidad residencial.
+            </div>
+
+            <!-- Credentials Box -->
+            <div class="credentials-box">
+                <h3>🔐 Tus Credenciales de Acceso</h3>
+
+                <div class="credential-item">
+                    <span class="credential-label">👤 Usuario</span>
+                    <div class="credential-value">{{ username }}</div>
+                </div>
+
+                <div class="credential-item">
+                    <span class="credential-label">🔑 Contraseña Temporal</span>
+                    <div class="credential-value">{{ password }}</div>
+                </div>
+
+                <div class="credential-item">
+                    <span class="credential-label">🏢 Unidad Residencial</span>
+                    <div class="credential-value">{{ residential_unit_name }}</div>
+                </div>
+            </div>
+
+            <!-- Warning -->
+            <div class="warning-box">
+                <span class="warning-icon">⚠️</span>
+                <strong>Importante:</strong> Por razones de seguridad, te recomendamos 
+                <strong>cambiar tu contraseña</strong> en tu primer inicio de sesión. Esta contraseña 
+                es temporal y debes actualizarla desde tu perfil.
+            </div>
+
+            <!-- Next Steps -->
+            <div class="steps-section">
+                <h3>📌 Próximos Pasos:</h3>
+                <ol>
+                    <li>Ingresa a la plataforma con tus credenciales</li>
+                    <li>Cambia tu contraseña temporal por una segura</li>
+                    <li>Explora el panel de administración</li>
+                    <li>Configura los parámetros de la unidad residencial</li>
+                    <li>Comienza a gestionar reuniones y copropietarios</li>
+                </ol>
+            </div>
+
+            <div class="info-box">
+                <strong>💡 ¿Necesitas ayuda?</strong><br>
+                Si tienes alguna pregunta o necesitas asistencia, no dudes en contactar al equipo de soporte.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>GIRAMASTER</strong> - Sistema de Gestión de Asambleas Residenciales</p>
+            <p>Este es un mensaje automático, por favor no respondas a este email.</p>
+        </div>
+    </div>
+</body>
+</html>

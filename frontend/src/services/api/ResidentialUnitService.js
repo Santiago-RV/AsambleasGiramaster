@@ -57,6 +57,62 @@ export class ResidentialUnitService {
     }
   }
 
+  static async createManualAdministrator(unitId, adminData) {
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+
+      if (!token) {
+        throw new Error('No hay sesión activa. Por favor inicia sesión nuevamente.');
+      }
+
+      const response = await axiosInstance.post(
+        `/super-admin/residential-units/${unitId}/administrator/manual`,
+        adminData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Error al crear el administrador');
+      }
+
+      return {
+        success: true,
+        message: response.data.message,
+        data: response.data.data,
+      };
+    } catch (error) {
+      console.error('Error creating manual administrator:', error);
+
+      if (error.response?.status === 401) {
+        throw new Error('Token inválido o expirado');
+      }
+
+      if (error.response?.status === 403) {
+        throw new Error('No tienes permisos para realizar esta acción');
+      }
+
+      if (error.response?.status === 400) {
+        const errorDetail = error.response?.data?.detail;
+        if (errorDetail && errorDetail.includes('Ya existe un usuario')) {
+          throw new Error(errorDetail);
+        }
+      }
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al crear el administrador';
+
+      throw new Error(errorMessage);
+    }
+  }
+
   /**
    * Obtiene todas las unidades residenciales
    * @returns {Promise} Lista de unidades residenciales

@@ -8,9 +8,10 @@ from app.services.user_service import UserService
 from app.services.residential_unit_service import ResidentialUnitService
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
+from app.schemas.residential_unit_schema import AdministratorData
+from app.schemas.email_notification_schema import BulkSendCredentialsRequest
 
 router = APIRouter()
-
 
 @router.post(
     "/residential-units/{unit_id}/upload-residents-excel",
@@ -169,6 +170,85 @@ async def get_unit_administrator(
             message=f"Error al obtener el administrador: {str(e)}",
             details={"original_error": str(e)}
         )
+        
+@router.post(
+    "/residential-units/{unit_id}/administrator/manual",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear administrador manual y asignarlo a la unidad",
+    description="Crea un nuevo usuario con rol Administrador y lo asigna a la unidad residencial"
+)
+async def create_manual_administrator(
+    unit_id: int,
+    admin_data: AdministratorData,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Crea un administrador manual (no copropietario) y lo asigna a una unidad residencial.
+
+    Realiza las siguientes acciones:
+    1. Valida que el email no exista en el sistema
+    2. Crea registro en tbl_data_users
+    3. Crea registro en tbl_users con rol 2 (Administrador)
+    4. Crea registro en tbl_user_residential_units con bool_is_admin = True
+    5. Marca como False al administrador anterior (si existe)
+    6. Envía email con credenciales de acceso
+
+    Args:
+        unit_id: ID de la unidad residencial
+        admin_data: Datos del nuevo administrador (nombre, apellido, email, teléfono)
+
+    Returns:
+        SuccessResponse con información del administrador creado
+    """
+    try:
+        # Verificar que el usuario actual sea super admin
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+
+        if not user or user.int_id_rol != 1:  # 1: Super Admin
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para realizar esta acción."
+            )
+
+        # Validar que la unidad residencial exista
+        residential_service = ResidentialUnitService(db)
+        unit = await residential_service.get_residential_unit_by_id(unit_id)
+
+        if not unit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"La unidad residencial con ID {unit_id} no existe"
+            )
+
+        # Crear el administrador manual
+        result = await residential_service.create_manual_administrator(
+            unit_id=unit_id,
+            admin_data=admin_data,
+            created_by_user_id=user.id
+        )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_201_CREATED,
+            message="Administrador creado y asignado exitosamente",
+            data=result
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al crear el administrador: {str(e)}",
+            details={"original_error": str(e)}
+        )
 
 
 @router.put(
@@ -237,3 +317,115 @@ async def change_unit_administrator(
             message=f"Error al cambiar el administrador: {str(e)}",
             details={"original_error": str(e)}
         )
+        
+@router.post(
+    "/residential-units/{unit_id}/residents/send-credentials-bulk",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Enviar credenciales a múltiples copropietarios",
+    description="Envía credenciales por correo a múltiples copropietarios seleccionados"
+)
+async def send_credentials_bulk(
+    unit_id: int,
+    request_data: BulkSendCredentialsRequest,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Envía credenciales por correo a múltiples copropietarios.
+    
+    Procesa cada copropietario de forma individual y retorna:
+    - Total de copropietarios procesados
+    - Correos enviados exitosamente
+    - Correos fallidos
+    - Lista detallada de errores (si los hay)
+    
+    Args:
+        unit_id: ID de la unidad residencial
+        request_data: Lista de IDs de copropietarios (resident_ids)
+        
+    Returns:
+        SuccessResponse con estadísticas del envío masivo
+    """
+    try:
+        # Verificar que el usuario actual sea Super Admin
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user or user.int_id_rol != 1:  # 1: Super Admin
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para realizar esta acción. Solo Super Admin puede enviar credenciales."
+            )
+        
+        # Validar que la unidad residencial exista
+        residential_service = ResidentialUnitService(db)
+        unit = await residential_service.get_residential_unit_by_id(unit_id)
+        
+        if not unit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"La unidad residencial con ID {unit_id} no existe"
+            )
+        
+        # Validar que se hayan enviado IDs
+        if not request_data.resident_ids or len(request_data.resident_ids) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe proporcionar al menos un ID de copropietario"
+            )
+        
+        # Inicializar contadores
+        results = {
+            'total': len(request_data.resident_ids),
+            'successful': 0,
+            'failed': 0,
+            'errors': []
+        }
+        
+        # Procesar cada copropietario
+        for resident_id in request_data.resident_ids:
+            try:
+                # Intentar enviar credenciales usando el método existente
+                await residential_service.resend_resident_credentials(
+                    user_id=resident_id,
+                    unit_id=unit_id
+                )
+                results['successful'] += 1
+                
+            except Exception as e:
+                results['failed'] += 1
+                results['errors'].append({
+                    'resident_id': resident_id,
+                    'error': str(e)
+                })
+        
+        # Preparar mensaje de respuesta
+        if results['successful'] == results['total']:
+            message = f"✅ Credenciales enviadas exitosamente a {results['successful']} copropietarios"
+        elif results['successful'] > 0:
+            message = f"⚠️ Proceso completado: {results['successful']} exitosos, {results['failed']} fallidos"
+        else:
+            message = f"❌ No se pudo enviar credenciales a ningún copropietario"
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=message,
+            data={
+                "total_processed": results['total'],
+                "successful": results['successful'],
+                "failed": results['failed'],
+                "errors": results['errors'],
+                "residential_unit": unit.str_name
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al enviar credenciales masivamente: {str(e)}",
+            details={"original_error": str(e)}
+        )
+    # Implementación similar a resend_credentials pero para múltiples usuarios

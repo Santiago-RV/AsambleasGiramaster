@@ -24,13 +24,16 @@ import {
 	FileText,
 	UserCheck,
 	AlertCircle,
-	Download
+	Download,
+	UserPlus,
+	Send
 } from 'lucide-react';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import { MeetingService } from '../../services/api/MeetingService';
 import Modal from '../common/Modal';
 import Swal from 'sweetalert2';
 import { uploadResidentsExcel, downloadResidentsExcelTemplate } from '../../services/residentialUnitService';
+import { ResidentService } from '../../services/api/ResidentService';
 
 
 const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
@@ -44,9 +47,14 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [isUploading, setIsUploading] = useState(false);
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
 	const [selectedResident, setSelectedResident] = useState(null);
+	const [residentModalMode, setResidentModalMode] = useState('create');
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const menuButtonRefs = useRef({});
 	const queryClient = useQueryClient();
+	const [isCreateManualAdminModalOpen, setIsCreateManualAdminModalOpen] = useState(false);
+	const [selectedResidents, setSelectedResidents] = useState([]);
+	const [selectAll, setSelectAll] = useState(false);
+
 
 	// Estado para el administrador actual
 	const [currentAdmin, setCurrentAdmin] = useState(null);
@@ -196,6 +204,21 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		enabled: !!unitId,
 	});
 
+	// Crear administrador de manera manual, formulario
+	const {
+		register: registerManualAdmin,
+		handleSubmit: handleSubmitManualAdmin,
+		reset: resetManualAdmin,
+		formState: { errors: errorsManualAdmin },
+	} = useForm({
+		defaultValues: {
+			str_firstname: '',
+			str_lastname: '',
+			str_email: '',
+			str_phone: '',
+		},
+	});
+
 	// Sincronizar el estado local con los datos del administrador
 	useEffect(() => {
 		if (administratorData !== undefined) {
@@ -238,6 +261,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			phone: '',
 			apartment_number: '',
 			is_active: true,
+			password: '',
 		},
 	});
 
@@ -265,6 +289,42 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		},
 	});
 
+	// Crear la mutación para crear el administrador manual
+	const createManualAdminMutation = useMutation({
+		mutationFn: ({ unitId, adminData }) =>
+			ResidentialUnitService.createManualAdministrator(unitId, adminData),
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['administrator', unitId] });
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			resetManualAdmin();
+			setIsCreateManualAdminModalOpen(false);
+			setIsChangeAdminModalOpen(false);
+			Swal.fire({
+				icon: 'success',
+				title: '¡Administrador Creado!',
+				html: `
+				<p>${response.message}</p>
+				<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+					<p style="margin: 5px 0;"><strong>Usuario:</strong> ${response.data.username}</p>
+					<p style="margin: 5px 0;"><strong>Contraseña Temporal:</strong> ${response.data.temporary_password}</p>
+					<p style="margin: 5px 0; color: #6c757d; font-size: 14px;">Se envió un email con las credenciales</p>
+				</div>
+			`,
+				confirmButtonText: 'Entendido',
+				confirmButtonColor: '#3498db',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al Crear Administrador',
+				text: error.message || 'Hubo un problema al crear el administrador',
+				confirmButtonText: 'Entendido',
+				confirmButtonColor: '#e74c3c',
+			});
+		},
+	});
+
 	// Estado de envío del formulario de reunión
 	const isSubmitting = createMeetingMutation.isPending;
 
@@ -288,6 +348,35 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		const ahora = new Date();
 		const unaHoraAntes = new Date(fechaReunion.getTime() - 60 * 60 * 1000); // 1 hora antes
 		return ahora >= unaHoraAntes;
+	};
+
+	// Handler para enviar el formulario del administrador local
+	const onSubmitManualAdmin = (data) => {
+		Swal.fire({
+			title: '¿Crear Nuevo Administrador?',
+			html: `
+			<p>Se creará un usuario administrador con los siguientes datos:</p>
+			<div style="text-align: left; margin: 20px 0;">
+				<p><strong>Nombre:</strong> ${data.str_firstname} ${data.str_lastname}</p>
+				<p><strong>Email:</strong> ${data.str_email}</p>
+				${data.str_phone ? `<p><strong>Teléfono:</strong> ${data.str_phone}</p>` : ''}
+			</div>
+			<p style="color: #6c757d; font-size: 14px;">Se enviará un email con las credenciales de acceso.</p>
+		`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonText: 'Sí, Crear',
+			cancelButtonText: 'Cancelar',
+			confirmButtonColor: '#3498db',
+			cancelButtonColor: '#6c757d',
+		}).then((result) => {
+			if (result.isConfirmed) {
+				createManualAdminMutation.mutate({
+					unitId: unitId,
+					adminData: data,
+				});
+			}
+		});
 	};
 
 	// Filtrar residentes por búsqueda
@@ -322,9 +411,79 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		});
 	};
 
+	// Funciones para seleccionar a los copropietarios para enviar correos
+	const handleSelectAll = () => {
+		if (selectAll) {
+			setSelectedResidents([]);
+		} else {
+			setSelectedResidents(filteredResidents.map(r => r.id));
+		}
+		setSelectAll(!selectAll);
+	};
+
+	const handleSelectResident = (residentId) => {
+		setSelectedResidents(prev =>
+			prev.includes(residentId)
+				? prev.filter(id => id !== residentId)
+				: [...prev, residentId]
+		);
+	};
+
+	// Función para enviar credenciales masivas
+	const handleSendBulkCredentials = () => {
+		if (selectedResidents.length === 0) {
+			Swal.fire({
+				icon: 'warning',
+				title: 'Sin seleccion',
+				text: 'Debes seleccionar al menos un copropietario',
+				confirmButtonColor: '#3498db'
+			});
+			return;
+		}
+
+		Swal.fire({
+			title: '¿Enviar Credenciales?',
+			html: `
+			<div class="text-left">
+				<p class="mb-3">Se enviarán credenciales por correo electrónico a:</p>
+				<div class="bg-blue-50 p-3 rounded-lg">
+					<p class="text-lg font-bold text-blue-800">
+						${selectedResidents.length} copropietario(s) seleccionado(s)
+					</p>
+				</div>
+				<p class="text-xs text-gray-600 mt-3">
+					💡 Cada copropietario recibirá un correo con su contraseña temporal.
+				</p>
+			</div>
+		`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonColor: '#3498db',
+			cancelButtonColor: '#95a5a6',
+			confirmButtonText: 'Sí, enviar',
+			cancelButtonText: 'Cancelar',
+			width: '500px'
+		}).then((result) => {
+			if (result.isConfirmed) {
+				sendBulkCredentialsMutation.mutate(selectedResidents)
+			}
+		})
+	}
+
+	const handleCreateResident = () => {
+		setResidentModalMode('create');
+		resetResident();
+		// Establecer valores por defecto para crear
+		setResidentValue('is_active', true);
+		setResidentValue('password', '');
+		setIsResidentModalOpen(true);
+	};
+
+	// Para editar (modificar la función existente)
 	const handleEditResident = (resident) => {
 		setSelectedResidentMenu(null);
 		setSelectedResident(resident);
+		setResidentModalMode('edit');
 		// Cargar los datos del residente en el formulario
 		setResidentValue('firstname', resident.firstname || '');
 		setResidentValue('lastname', resident.lastname || '');
@@ -332,30 +491,30 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		setResidentValue('email', resident.email || '');
 		setResidentValue('phone', resident.phone || '');
 		setResidentValue('apartment_number', resident.apartment_number || '');
+		setResidentValue('voting_weight', resident.voting_weight || '');
 		setResidentValue('is_active', resident.is_active !== undefined ? resident.is_active : true);
-		setIsEditResidentModalOpen(true);
+		setResidentValue('password', ''); // Vacío para edición
+		setIsResidentModalOpen(true);
 	};
 
 	// Mutación para actualizar residente
 	const updateResidentMutation = useMutation({
 		mutationFn: async (data) => {
-			// TODO: Implementar actualización en el backend
-			// Por ahora solo mostramos un mensaje de éxito
-			return new Promise((resolve) => {
-				setTimeout(() => {
-					resolve({ success: true, message: 'Residente actualizado exitosamente' });
-				}, 1000);
-			});
+			return await ResidentService.updateResident(
+				unitId,
+				selectedResident.id,
+				data
+			);
 		},
 		onSuccess: (response) => {
 			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
 			resetResident();
-			setIsEditResidentModalOpen(false);
+			setIsResidentModalOpen(false);
 			setSelectedResident(null);
 			Swal.fire({
 				icon: 'success',
 				title: '¡Éxito!',
-				text: response.message || 'Residente actualizado exitosamente',
+				text: response.message || 'Copropietario actualizado exitosamente',
 				showConfirmButton: false,
 				timer: 2000,
 				toast: true,
@@ -366,7 +525,35 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			Swal.fire({
 				icon: 'error',
 				title: 'Error',
-				text: error.message || 'Error al actualizar el residente',
+				text: error.response?.data?.message || error.message || 'Error al actualizar el copropietario',
+			});
+		},
+	});
+
+	// Mutación para crear residente
+	const createResidentMutation = useMutation({
+		mutationFn: async (data) => {
+			return await ResidentService.createResident(unitId, data);
+		},
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			resetResident();
+			setIsResidentModalOpen(false);
+			Swal.fire({
+				icon: 'success',
+				title: '¡Éxito!',
+				text: response.message || 'Copropietario creado exitosamente',
+				showConfirmButton: false,
+				timer: 2000,
+				toast: true,
+				position: 'top-end',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: error.response?.data?.message || error.message || 'Error al crear el copropietario',
 			});
 		},
 	});
@@ -406,42 +593,255 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		},
 	});
 
-	const onSubmitResident = (data) => {
-		if (!selectedResident) return;
+	// Mutación para el envio masivo de credenciales
+	const sendBulkCredentialsMutation = useMutation({
+		mutationFn: async (residentIds) => {
+			return await ResidentService.sendBulkCredentials(unitId, residentIds);
+		},
+		onSuccess: (response) => {
+			const { successful, failed, total_processed } = response.data;
 
+			Swal.fire({
+				icon: successful === total_processed ? 'success' : 'warning',
+				title: successful === total_processed ? '¡Credenciales Enviadas!' : 'Envío Parcial',
+				html: `
+				<div class="text-left">
+					<div class="bg-blue-50 p-3 rounded-lg mb-3">
+						<p class="text-sm text-blue-700">
+							<strong>Total procesados:</strong> ${total_processed}
+						</p>
+						<p class="text-sm text-green-700">
+							<strong>Exitosos:</strong> ${successful}
+						</p>
+						${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
+					</div>
+					${response.data.errors && response.data.errors.length > 0 ? `
+						<div class="bg-red-50 p-3 rounded-lg max-h-32 overflow-y-auto">
+							<p class="font-semibold text-red-800 mb-2">Errores:</p>
+							<ul class="text-sm text-red-700 space-y-1">
+								${response.data.errors.map(err =>
+					`<li>ID ${err.resident_id}: ${err.error}</li>`
+				).join('')}
+							</ul>
+						</div>
+					` : ''}
+				</div>
+			`,
+				confirmButtonColor: '#27ae60',
+				width: '500px'
+			});
+
+			// Limpiar selección
+			setSelectedResidents([]);
+			setSelectAll(false);
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al Enviar Credenciales',
+				text: error.response?.data?.message || error.message || 'Error al enviar credenciales masivamente',
+				confirmButtonColor: '#e74c3c'
+			});
+		}
+	});
+
+	const onSubmitResident = (data) => {
+		if (residentModalMode === 'create') {
+			// Modo crear
+			const residentData = {
+				firstname: data.firstname,
+				lastname: data.lastname,
+				username: data.username,
+				email: data.email,
+				phone: data.phone || null,
+				apartment_number: data.apartment_number,
+				is_active: data.is_active,
+				password: data.password || 'Temporal123!',
+				voting_weight: data.voting_weight || 0.0,
+			};
+			createResidentMutation.mutate(residentData);
+		} else {
+			// Modo editar
+			if (!selectedResident) return;
+
+			const residentData = {};
+
+			if (data.firstname !== selectedResident.firstname) {
+				residentData.firstname = data.firstname;
+			}
+			if (data.lastname !== selectedResident.lastname) {
+				residentData.lastname = data.lastname;
+			}
+			if (data.email !== selectedResident.email) {
+				residentData.email = data.email;
+			}
+			if (data.phone !== selectedResident.phone) {
+				residentData.phone = data.phone || null;
+			}
+			if (data.apartment_number !== selectedResident.apartment_number) {
+				residentData.apartment_number = data.apartment_number;
+			}
+			if (data.is_active !== selectedResident.is_active) {
+				residentData.is_active = data.is_active;
+			}
+			if (data.voting_weight !== selectedResident.voting_weight) {
+				residentData.voting_weight = data.voting_weight || 0.0;
+			}
+			if (data.password && data.password.trim() !== '') {
+				residentData.password = data.password;
+			}
+
+			if (Object.keys(residentData).length === 0) {
+				Swal.fire({
+					icon: 'info',
+					title: 'Sin cambios',
+					text: 'No se detectaron cambios para guardar',
+					toast: true,
+					position: 'top-end',
+					timer: 2000,
+					showConfirmButton: false,
+				});
+				return;
+			}
+
+			updateResidentMutation.mutate(residentData);
+		}
+	};
+
+	const onSubmitCreateResident = (data) => {
 		const residentData = {
-			id: selectedResident.id,
 			firstname: data.firstname,
 			lastname: data.lastname,
-			username: data.username,
+			username: data.username || undefined, // Opcional, se generará automáticamente
 			email: data.email,
-			phone: data.phone || '',
+			phone: data.phone || null,
 			apartment_number: data.apartment_number,
 			is_active: data.is_active,
+			password: data.password || 'Temporal123!',
+			voting_weight: data.voting_weight || 0.0,  // Agregar este campo
 		};
 
-		updateResidentMutation.mutate(residentData);
+		createResidentMutation.mutate(residentData);
 	};
 
 	const handleDeleteResident = (resident) => {
 		setSelectedResidentMenu(null);
 		Swal.fire({
 			title: '¿Estás seguro?',
-			text: `¿Deseas eliminar a ${resident.firstname} ${resident.lastname}?`,
+			html: `
+				<p>¿Deseas eliminar a <strong>${resident.firstname} ${resident.lastname}</strong>?</p>
+				<br>
+				<div class="text-left bg-red-50 p-3 rounded">
+					<p class="text-sm text-red-700"><strong>Advertencia:</strong></p>
+					<p class="text-sm text-red-600">Esta acción eliminará completamente:</p>
+					<ul class="text-sm text-red-600 list-disc list-inside mt-2">
+						<li>Su cuenta de usuario</li>
+						<li>Todos sus datos personales</li>
+						<li>Su relación con la unidad residencial</li>
+					</ul>
+					<p class="text-sm text-red-700 mt-2"><strong>Esta acción NO se puede deshacer.</strong></p>
+				</div>
+			`,
 			icon: 'warning',
 			showCancelButton: true,
 			confirmButtonColor: '#d33',
 			cancelButtonColor: '#3085d6',
 			confirmButtonText: 'Sí, eliminar',
 			cancelButtonText: 'Cancelar',
-		}).then((result) => {
+			width: '600px'
+		}).then(async (result) => {
 			if (result.isConfirmed) {
-				// TODO: Implementar eliminación de residente
-				Swal.fire(
-					'Eliminado',
-					'El residente ha sido eliminado',
-					'success'
-				);
+				try {
+					await ResidentService.deleteResident(unitId, resident.id);
+
+					// Actualizar la lista de residentes
+					queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+
+					Swal.fire({
+						icon: 'success',
+						title: 'Eliminado',
+						text: `${resident.firstname} ${resident.lastname} ha sido eliminado exitosamente`,
+						showConfirmButton: false,
+						timer: 2000,
+						toast: true,
+						position: 'top-end',
+					});
+				} catch (error) {
+					Swal.fire({
+						icon: 'error',
+						title: 'Error',
+						text: error.response?.data?.message || error.message || 'Error al eliminar el copropietario',
+					});
+				}
+			}
+		});
+	};
+
+	const handleResendCredentials = async (resident) => {
+		setSelectedResidentMenu(null);
+
+		Swal.fire({
+			title: '¿Enviar credenciales?',
+			html: `
+				<div class="text-left">
+					<p class="mb-3">Se generará una nueva contraseña temporal y se enviará por correo a:</p>
+					<div class="bg-blue-50 p-3 rounded-lg">
+						<p class="font-semibold text-blue-800">${resident.firstname} ${resident.lastname}</p>
+						<p class="text-sm text-blue-700 mt-1">
+							<strong>Email:</strong> ${resident.email}
+						</p>
+						<p class="text-sm text-blue-700">
+							<strong>Usuario:</strong> ${resident.username}
+						</p>
+					</div>
+					<p class="text-xs text-gray-600 mt-3">
+						💡 La contraseña actual será reemplazada por una nueva contraseña temporal.
+					</p>
+				</div>
+			`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonColor: '#3498db',
+			cancelButtonColor: '#95a5a6',
+			confirmButtonText: 'Sí, enviar',
+			cancelButtonText: 'Cancelar',
+			width: '500px',
+			showLoaderOnConfirm: true,
+			preConfirm: async () => {
+				try {
+					const response = await ResidentService.resendCredentials(unitId, resident.id);
+					return response;
+				} catch (error) {
+					Swal.showValidationMessage(
+						error.response?.data?.message || error.message || 'Error al enviar credenciales'
+					);
+				}
+			},
+			allowOutsideClick: () => !Swal.isLoading()
+		}).then((result) => {
+			if (result.isConfirmed && result.value?.success) {
+				Swal.fire({
+					icon: 'success',
+					title: '¡Credenciales Enviadas!',
+					html: `
+						<div class="text-left">
+							<p class="mb-2">Las credenciales han sido enviadas exitosamente a:</p>
+							<div class="bg-green-50 p-3 rounded-lg">
+								<p class="text-sm text-green-700">
+									<strong>Email:</strong> ${resident.email}
+								</p>
+								<p class="text-sm text-green-700 mt-1">
+									<strong>Usuario:</strong> ${resident.username}
+								</p>
+							</div>
+							<p class="text-xs text-gray-600 mt-3">
+								📧 El copropietario recibirá un correo con su nueva contraseña temporal.
+							</p>
+						</div>
+					`,
+					confirmButtonColor: '#27ae60',
+					width: '500px'
+				});
 			}
 		});
 	};
@@ -532,7 +932,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			if (errors && errors.length > 0) {
 				htmlContent += `
 				<div class="bg-red-50 p-3 rounded-lg max-h-48 overflow-y-auto">
-					<p class="font-semibold text-red-800 mb-2">❌ Errores Encontrados:</p>
+					<p class="font-semibold text-red-800 mb-2">Errores Encontrados:</p>
 					<ul class="text-sm text-red-700 space-y-1">
 			`;
 
@@ -809,7 +1209,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				{/* Botones de acción para residentes */}
 				<div className="flex gap-3 pt-4 border-t border-gray-200">
 					<button
-						onClick={() => setIsResidentModalOpen(true)}
+						onClick={handleCreateResident}
 						className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 					>
 						<Plus size={18} />
@@ -846,122 +1246,176 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				{/* Listado de Residentes */}
 				<div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col" style={{ maxHeight: '700px' }}>
 					<div className="p-6 border-b border-gray-200 flex-shrink-0">
-						<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-							<UsersIcon size={24} />
-							Residentes ({filteredResidents?.length || 0})
-						</h2>
+						<div className="flex items-center justify-between mb-4">
+							<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+								<UsersIcon size={24} />
+								Residentes ({filteredResidents?.length || 0})
+							</h2>
+
+							{/* Botón de envío masivo */}
+							{selectedResidents.length > 0 && (
+								<button
+									onClick={handleSendBulkCredentials}
+									disabled={sendBulkCredentialsMutation.isPending}
+									className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									{sendBulkCredentialsMutation.isPending ? (
+										<>
+											<svg
+												className="animate-spin h-5 w-5"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+											>
+												<circle
+													className="opacity-25"
+													cx="12"
+													cy="12"
+													r="10"
+													stroke="currentColor"
+													strokeWidth="4"
+												></circle>
+												<path
+													className="opacity-75"
+													fill="currentColor"
+													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+												></path>
+											</svg>
+											<span>Enviando...</span>
+										</>
+									) : (
+										<>
+											<Send size={18} />
+											<span>Enviar Credenciales ({selectedResidents.length})</span>
+										</>
+									)}
+								</button>
+							)}
+						</div>
 					</div>
+
 					<div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ minHeight: 0 }}>
 						{isLoadingResidents ? (
 							<div className="flex items-center justify-center py-12">
-								<svg
-									className="animate-spin h-8 w-8 text-[#3498db]"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-								>
-									<circle
-										className="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										strokeWidth="4"
-									></circle>
-									<path
-										className="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									></path>
+								<svg className="animate-spin h-8 w-8 text-[#3498db]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+									<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 								</svg>
 							</div>
-						) : filteredResidents &&
-							filteredResidents.length > 0 ? (
-							<div className="divide-y divide-gray-200">
-								{filteredResidents.map((resident) => (
-									<div
-										key={resident.id}
-										className="p-4 hover:bg-gray-50 transition-colors relative"
-										onClick={() => {
-											if (selectedResidentMenu && selectedResidentMenu !== resident.id) {
-												setSelectedResidentMenu(null);
-											}
-										}}
-									>
-										<div className="flex items-center justify-between">
-											<div className="flex-1">
-												<p className="font-semibold text-gray-800">
-													{resident.firstname}{' '}
-													{resident.lastname}
-												</p>
-												<p className="text-sm text-gray-600 mt-1">
-													Apt.{' '}
-													{resident.apartment_number}
-												</p>
-											</div>
-											<div className="relative">
-												<button
-													ref={(el) => {
-														if (el) {
-															menuButtonRefs.current[resident.id] = el;
-														}
-													}}
-													onClick={(e) => {
-														e.stopPropagation();
-														const button = e.currentTarget;
+						) : filteredResidents && filteredResidents.length > 0 ? (
+							<>
+								{/* Checkbox para seleccionar todos */}
+								<div className="px-4 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+									<label className="flex items-center gap-3 cursor-pointer">
+										<input
+											type="checkbox"
+											checked={selectAll}
+											onChange={handleSelectAll}
+											className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+										/>
+										<span className="text-sm font-semibold text-gray-700">
+											Seleccionar todos ({filteredResidents.length})
+										</span>
+									</label>
+								</div>
 
-														if (selectedResidentMenu === resident.id) {
-															setSelectedResidentMenu(null);
-														} else {
-															const rect = button.getBoundingClientRect();
-															const menuWidth = 192;
-															const viewportWidth = window.innerWidth;
-															const viewportHeight = window.innerHeight;
+								{/* Lista de residentes */}
+								<div className="divide-y divide-gray-200">
+									{filteredResidents.map((resident) => (
+										<div
+											key={resident.id}
+											className="p-4 hover:bg-gray-50 transition-colors relative"
+										>
+											<div className="flex items-center gap-3">
+												{/* Checkbox individual */}
+												<input
+													type="checkbox"
+													checked={selectedResidents.includes(resident.id)}
+													onChange={() => handleSelectResident(resident.id)}
+													onClick={(e) => e.stopPropagation()}
+													className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+												/>
 
-															// Calcular posición izquierda
-															let left = rect.right - menuWidth;
-															if (left < 8) {
-																left = 8;
-															}
-															if (rect.right > viewportWidth - 8) {
-																left = viewportWidth - menuWidth - 8;
-															}
+												{/* Información del residente */}
+												<div className="flex-1 min-w-0">
+													<p className="font-semibold text-gray-800 truncate">
+														{resident.firstname} {resident.lastname}
+													</p>
+													<p className="text-sm text-gray-600 mt-1">
+														Apt. {resident.apartment_number}
+													</p>
+												</div>
 
-															// Calcular posición superior
-															let top = rect.bottom + 8;
-															const menuHeight = 120;
-															if (top + menuHeight > viewportHeight - 8) {
-																top = rect.top - menuHeight - 8;
-															}
-															if (top < 8) {
-																top = 8;
-															}
+												{/* Botones de acción */}
+												<div className="flex items-center gap-2 flex-shrink-0">
+													{/* Botón para enviar credenciales individual */}
+													<button
+														onClick={(e) => {
+															e.stopPropagation();
+															handleResendCredentials(resident);
+														}}
+														className="p-2 hover:bg-blue-100 rounded-lg transition-colors group"
+														title="Enviar credenciales por correo"
+													>
+														<Mail size={20} className="text-blue-600 group-hover:text-blue-700" />
+													</button>
 
-															setMenuPosition({
-																top: top,
-																left: left,
-															});
-															setSelectedResidentMenu(resident.id);
-														}
-													}}
-													className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-												>
-													<MoreVertical
-														size={20}
-														className="text-gray-600"
-													/>
-												</button>
+													{/* Botón del menú de 3 puntos */}
+													<button
+														ref={(el) => {
+															if (el) {
+																menuButtonRefs.current[resident.id] = el;
+															}
+														}}
+														onClick={(e) => {
+															e.stopPropagation();
+															const button = e.currentTarget;
+
+															if (selectedResidentMenu === resident.id) {
+																setSelectedResidentMenu(null);
+															} else {
+																const rect = button.getBoundingClientRect();
+																const menuWidth = 192;
+																const viewportWidth = window.innerWidth;
+																const viewportHeight = window.innerHeight;
+
+																let left = rect.right - menuWidth;
+																if (left < 8) {
+																	left = 8;
+																}
+																if (rect.right > viewportWidth - 8) {
+																	left = viewportWidth - menuWidth - 8;
+																}
+
+																let top = rect.bottom + 8;
+																const menuHeight = 120;
+																if (top + menuHeight > viewportHeight - 8) {
+																	top = rect.top - menuHeight - 8;
+																}
+																if (top < 8) {
+																	top = 8;
+																}
+
+																setMenuPosition({
+																	top: top,
+																	left: left,
+																});
+																setSelectedResidentMenu(resident.id);
+															}
+														}}
+														className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+													>
+														<MoreVertical size={20} className="text-gray-600" />
+													</button>
+												</div>
 											</div>
 										</div>
-									</div>
-								))}
-							</div>
+									))}
+								</div>
+							</>
 						) : (
 							<div className="text-center py-12">
-								<UsersIcon
-									className="mx-auto text-gray-400 mb-4"
-									size={48}
-								/>
+								<UsersIcon className="mx-auto text-gray-400 mb-4" size={48} />
 								<p className="text-gray-600">
 									{searchTerm
 										? 'No se encontraron residentes con ese criterio'
@@ -1402,15 +1856,15 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				</form>
 			</Modal>
 
-			{/* Modal para editar residente */}
+			{/* Modal unificado para crear/editar residente */}
 			<Modal
-				isOpen={isEditResidentModalOpen}
+				isOpen={isResidentModalOpen}
 				onClose={() => {
-					setIsEditResidentModalOpen(false);
+					setIsResidentModalOpen(false);
 					resetResident();
 					setSelectedResident(null);
 				}}
-				title="Editar Copropietario"
+				title={residentModalMode === 'create' ? 'Agregar Nuevo Copropietario' : 'Editar Copropietario'}
 				size="lg"
 			>
 				<form
@@ -1482,11 +1936,17 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 								})}
 								placeholder="Ej: juan.perez"
 								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+								disabled={residentModalMode === 'edit'}
 							/>
 							{errorsResident.username && (
 								<span className="text-red-500 text-sm">
 									{errorsResident.username.message}
 								</span>
+							)}
+							{residentModalMode === 'edit' && (
+								<p className="text-xs text-gray-500 mt-1">
+									El usuario no se puede modificar
+								</p>
 							)}
 						</div>
 
@@ -1548,6 +2008,76 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</div>
 					</div>
 
+					{/* Peso de Votación */}
+					<div>
+						<label className="block mb-2 font-semibold text-gray-700">
+							Peso de Votación (Coeficiente)
+						</label>
+						<input
+							type="number"
+							step="0.01"
+							min="0"
+							max="1"
+							{...registerResident('voting_weight')}
+							placeholder="Ej: 0.25 (25%)"
+							className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+						/>
+						<p className="text-sm text-gray-500 mt-1">
+							💡 Coeficiente de copropiedad (ej: 0.25 = 25%). Dejar vacío para 0.0
+						</p>
+					</div>
+
+					{/* Contraseña */}
+					<div>
+						<label className="block mb-2 font-semibold text-gray-700">
+							{residentModalMode === 'create' ? 'Contraseña *' : 'Nueva Contraseña (opcional)'}
+						</label>
+						<input
+							type="password"
+							{...registerResident('password',
+								residentModalMode === 'create'
+									? {
+										// Modo CREAR: contraseña obligatoria
+										required: 'La contraseña es obligatoria',
+										minLength: {
+											value: 8,
+											message: 'La contraseña debe tener mínimo 8 caracteres',
+										},
+									}
+									: {
+										// Modo EDITAR: contraseña opcional, pero si se proporciona debe ser válida
+										validate: (value) => {
+											// Si está vacío, es válido (opcional en edición)
+											if (!value || value.trim() === '') {
+												return true;
+											}
+											// Si tiene valor, validar que tenga al menos 8 caracteres
+											if (value.length < 8) {
+												return 'La contraseña debe tener mínimo 8 caracteres';
+											}
+											return true;
+										}
+									}
+							)}
+							placeholder={
+								residentModalMode === 'create'
+									? 'Contraseña inicial del copropietario'
+									: 'Dejar en blanco para mantener la actual'
+							}
+							className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+						/>
+						{errorsResident.password && (
+							<span className="text-red-500 text-sm">
+								{errorsResident.password.message}
+							</span>
+						)}
+						<p className="text-sm text-gray-500 mt-1">
+							💡 {residentModalMode === 'create'
+								? 'Si no especificas una contraseña, se usará: Temporal123!'
+								: 'Solo se actualizará si proporcionas una nueva contraseña'}
+						</p>
+					</div>
+
 					{/* Estado activo */}
 					<div>
 						<label className="flex items-center gap-3 cursor-pointer">
@@ -1560,18 +2090,25 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 								Activo
 							</span>
 						</label>
+						<p className="text-sm text-gray-500 mt-1 ml-8">
+							Los copropietarios activos pueden iniciar sesión en el sistema
+						</p>
 					</div>
 
 					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
 						<button
 							type="submit"
-							disabled={updateResidentMutation.isPending}
-							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${updateResidentMutation.isPending
+							disabled={
+								residentModalMode === 'create'
+									? createResidentMutation.isPending
+									: updateResidentMutation.isPending
+							}
+							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending)
 								? 'opacity-50 cursor-not-allowed'
 								: ''
 								}`}
 						>
-							{updateResidentMutation.isPending ? (
+							{(residentModalMode === 'create' ? createResidentMutation.isPending : updateResidentMutation.isPending) ? (
 								<>
 									<svg
 										className="animate-spin h-5 w-5"
@@ -1593,12 +2130,12 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 										></path>
 									</svg>
-									Guardando...
+									{residentModalMode === 'create' ? 'Creando...' : 'Guardando...'}
 								</>
 							) : (
 								<>
-									<Edit size={20} />
-									Guardar Cambios
+									{residentModalMode === 'create' ? <Plus size={20} /> : <Edit size={20} />}
+									{residentModalMode === 'create' ? 'Crear Copropietario' : 'Guardar Cambios'}
 								</>
 							)}
 						</button>
@@ -1606,11 +2143,15 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						<button
 							type="button"
 							onClick={() => {
-								setIsEditResidentModalOpen(false);
+								setIsResidentModalOpen(false);
 								resetResident();
 								setSelectedResident(null);
 							}}
-							disabled={updateResidentMutation.isPending}
+							disabled={
+								residentModalMode === 'create'
+									? createResidentMutation.isPending
+									: updateResidentMutation.isPending
+							}
 							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							Cancelar
@@ -1634,6 +2175,23 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						<p className="text-sm text-blue-700">
 							Selecciona un residente de la lista para asignarlo como
 							administrador de esta unidad residencial.
+						</p>
+					</div>
+
+					<div className="mb-4">
+						<button
+							type="button"
+							onClick={() => {
+								setIsChangeAdminModalOpen(false);
+								setIsCreateManualAdminModalOpen(true);
+							}}
+							className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold px-4 py-3 rounded-lg hover:shadow-lg transition-all"
+						>
+							<UserPlus size={20} />
+							Crear Administrador Manual (No Copropietario)
+						</button>
+						<p className="text-sm text-gray-600 mt-2 text-center">
+							O selecciona un residente existente como administrador:
 						</p>
 					</div>
 
@@ -1760,6 +2318,177 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				</div>
 			</Modal>
 
+			{/* Modal para crear administrador manual */}
+			<Modal
+				isOpen={isCreateManualAdminModalOpen}
+				onClose={() => {
+					setIsCreateManualAdminModalOpen(false);
+					resetManualAdmin();
+				}}
+				title="Crear Administrador Manual"
+				size="lg"
+			>
+				<form onSubmit={handleSubmitManualAdmin(onSubmitManualAdmin)}>
+					<div className="space-y-6">
+						<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+							<h3 className="font-semibold text-blue-800 mb-2">
+								👤 Nuevo Administrador
+							</h3>
+							<p className="text-sm text-blue-700">
+								Crea un usuario con rol de administrador que NO está asociado a ningún apartamento.
+								Este usuario tendrá acceso completo para gestionar la unidad residencial.
+							</p>
+						</div>
+
+						{/* Nombres */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Nombres *
+							</label>
+							<input
+								type="text"
+								{...registerManualAdmin('str_firstname', {
+									required: 'Los nombres son obligatorios',
+									minLength: {
+										value: 2,
+										message: 'Mínimo 2 caracteres',
+									},
+								})}
+								placeholder="Ej: Juan Carlos"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsManualAdmin.str_firstname && (
+								<span className="text-red-500 text-sm">
+									{errorsManualAdmin.str_firstname.message}
+								</span>
+							)}
+						</div>
+
+						{/* Apellidos */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Apellidos *
+							</label>
+							<input
+								type="text"
+								{...registerManualAdmin('str_lastname', {
+									required: 'Los apellidos son obligatorios',
+									minLength: {
+										value: 2,
+										message: 'Mínimo 2 caracteres',
+									},
+								})}
+								placeholder="Ej: Pérez García"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsManualAdmin.str_lastname && (
+								<span className="text-red-500 text-sm">
+									{errorsManualAdmin.str_lastname.message}
+								</span>
+							)}
+						</div>
+
+						{/* Email */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Email *
+							</label>
+							<input
+								type="email"
+								{...registerManualAdmin('str_email', {
+									required: 'El email es obligatorio',
+									pattern: {
+										value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+										message: 'Email inválido',
+									},
+								})}
+								placeholder="Ej: admin@correo.com"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+							{errorsManualAdmin.str_email && (
+								<span className="text-red-500 text-sm">
+									{errorsManualAdmin.str_email.message}
+								</span>
+							)}
+						</div>
+
+						{/* Teléfono (opcional) */}
+						<div>
+							<label className="block mb-2 font-semibold text-gray-700">
+								Teléfono (Opcional)
+							</label>
+							<input
+								type="tel"
+								{...registerManualAdmin('str_phone')}
+								placeholder="Ej: +57 300 123 4567"
+								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+							/>
+						</div>
+
+						<div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+							<p className="text-sm text-yellow-800">
+								<strong>📧 Nota:</strong> Se generará un usuario y contraseña temporal automáticamente.
+								El administrador recibirá un email con sus credenciales de acceso.
+							</p>
+						</div>
+
+						{/* Botones */}
+						<div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+							<button
+								type="button"
+								onClick={() => {
+									setIsCreateManualAdminModalOpen(false);
+									resetManualAdmin();
+								}}
+								disabled={createManualAdminMutation.isPending}
+								className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								Cancelar
+							</button>
+							<button
+								type="submit"
+								disabled={createManualAdminMutation.isPending}
+								className={`flex items-center gap-2 bg-gradient-to-br from-[#3498db] to-[#2980b9] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${createManualAdminMutation.isPending
+									? 'opacity-50 cursor-not-allowed'
+									: ''
+									}`}
+							>
+								{createManualAdminMutation.isPending ? (
+									<>
+										<svg
+											className="animate-spin h-5 w-5"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle
+												className="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												strokeWidth="4"
+											></circle>
+											<path
+												className="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+											></path>
+										</svg>
+										Creando...
+									</>
+								) : (
+									<>
+										<UserPlus size={20} />
+										Crear Administrador
+									</>
+								)}
+							</button>
+						</div>
+					</div>
+				</form>
+			</Modal>
+
 			{/* Modal para cargar Excel */}
 			<Modal
 				isOpen={isExcelModalOpen}
@@ -1841,7 +2570,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</div>
 						<div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
 							<p className="text-xs text-yellow-800">
-								⚠️ <strong>Formato de ejemplo:</strong>
+								<strong>Formato de ejemplo:</strong>
 							</p>
 							<div className="mt-2 bg-white p-2 rounded text-xs font-mono overflow-x-auto">
 								<table className="min-w-full">
@@ -1892,10 +2621,10 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							<label
 								htmlFor="excel-file-input"
 								className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-all ${isUploading
-										? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-										: selectedFile
-											? 'border-green-300 bg-green-50'
-											: 'border-gray-300 bg-gray-50 hover:border-[#3498db] hover:bg-blue-50'
+									? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+									: selectedFile
+										? 'border-green-300 bg-green-50'
+										: 'border-gray-300 bg-gray-50 hover:border-[#3498db] hover:bg-blue-50'
 									}`}
 							>
 								{selectedFile ? (

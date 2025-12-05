@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 
 class EmailNotificationBase(BaseModel):
@@ -16,3 +16,7 @@ class EmailNotificationCreate(EmailNotificationBase):
 
 class EmailNotificationUpdate(EmailNotificationBase):
     updated_at: datetime = Field(..., description="Fecha de actualización")
+    
+class BulkSendCredentialsRequest(BaseModel):
+    """Schema para envío masivo de credenciales"""
+    resident_ids: List[int]

@@ -44,15 +44,15 @@ def main():
     zoom_url = input("1️⃣  URL de la reunión (ej: https://zoom.us/j/1234567890?pwd=abc123): ").strip()
     
     if not zoom_url:
-        print("❌ Error: La URL es requerida")
+        print("Error: La URL es requerida")
         sys.exit(1)
     
     # Extraer número de reunión y password
     meeting_number = extract_meeting_number(zoom_url)
     password = extract_password(zoom_url)
     
-    print(f"\n✅ Número de reunión extraído: {meeting_number}")
-    print(f"✅ Password extraído: {password if password else '(sin password)'}")
+    print(f"\nNúmero de reunión extraído: {meeting_number}")
+    print(f"Password extraído: {password if password else '(sin password)'}")
     
     # Si no se pudo extraer, pedirlo manualmente
     if not meeting_number:
@@ -65,8 +65,8 @@ def main():
     
     # Otros datos
     print("\n📋 Datos de la reunión:")
-    titulo = input("4️⃣  Título de la reunión: ").strip() or "Reunión de Prueba Zoom"
-    descripcion = input("5️⃣  Descripción (opcional): ").strip() or "Reunión de prueba para verificar integración con Zoom"
+    titulo = input(" Título de la reunión: ").strip() or "Reunión de Prueba Zoom"
+    descripcion = input(" Descripción (opcional): ").strip() or "Reunión de prueba para verificar integración con Zoom"
     
     # Datos fijos para prueba
     int_id_residential_unit = 4
@@ -107,7 +107,7 @@ def main():
     confirmar = input("\n¿Crear esta reunión? (s/n): ").strip().lower()
     
     if confirmar != 's':
-        print("❌ Operación cancelada")
+        print("Operación cancelada")
         sys.exit(0)
     
     # Conectar a la base de datos
@@ -124,12 +124,12 @@ def main():
                 AFTER str_zoom_start_url
             """))
             conn.commit()
-            print("✅ Campo str_zoom_password agregado")
+            print("Campo str_zoom_password agregado")
         except Exception as e:
             if "Duplicate column" in str(e):
-                print("✅ Campo str_zoom_password ya existe")
+                print("Campo str_zoom_password ya existe")
             else:
-                print(f"⚠️  Error al agregar campo (puede que ya exista): {str(e)}")
+                print(f" Error al agregar campo (puede que ya exista): {str(e)}")
     
     # Insertar la reunión
     print("\n🔄 Insertando reunión en la base de datos...")
@@ -215,7 +215,7 @@ def main():
             meeting_id = result.lastrowid
             
             print("\n" + "=" * 70)
-            print("✅ ¡REUNIÓN CREADA EXITOSAMENTE!")
+            print("¡REUNIÓN CREADA EXITOSAMENTE!")
             print("=" * 70)
             print(f"ID de la reunión: {meeting_id}")
             print(f"Código: {str_meeting_code}")
@@ -229,7 +229,7 @@ def main():
             print("=" * 70)
             
     except Exception as e:
-        print(f"\n❌ Error al insertar reunión: {str(e)}")
+        print(f"\nError al insertar reunión: {str(e)}")
         print("\n💡 Posibles causas:")
         print("   - No existe la unidad residencial con ID 1")
         print("   - No existe el usuario con ID 1")
@@ -240,9 +240,9 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n❌ Operación cancelada por el usuario")
+        print("\n\nOperación cancelada por el usuario")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Error inesperado: {str(e)}")
+        print(f"\nError inesperado: {str(e)}")
         sys.exit(1)
 

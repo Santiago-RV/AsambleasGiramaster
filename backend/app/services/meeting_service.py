@@ -120,7 +120,7 @@ class MeetingService:
 
             except Exception as zoom_error:
                 # Si falla, usar ID temporal
-                logger.error(f"❌ Error al crear reunión en Zoom: {str(zoom_error)}")
+                logger.error(f"Error al crear reunión en Zoom: {str(zoom_error)}")
                 logger.warning("Usando ID temporal. La reunión no existirá realmente en Zoom.")
 
                 zoom_meeting_id = int(time.time() * 1000) % 10000000000
@@ -179,15 +179,15 @@ class MeetingService:
                 )
                 
                 if "error" in email_stats:
-                    logger.warning(f"⚠️ Error al enviar invitaciones: {email_stats['error']}")
+                    logger.warning(f"Error al enviar invitaciones: {email_stats['error']}")
                 else:
                     logger.info(
-                        f"✅ Invitaciones enviadas: {email_stats.get('exitosos', 0)} exitosos, "
+                        f"Invitaciones enviadas: {email_stats.get('exitosos', 0)} exitosos, "
                         f"{email_stats.get('fallidos', 0)} fallidos"
                     )
             except Exception as email_error:
                 # No fallar la creación de la reunión si falla el envío de emails
-                logger.error(f"❌ Error al enviar invitaciones (no crítico): {str(email_error)}")
+                logger.error(f"Error al enviar invitaciones (no crítico): {str(email_error)}")
             
             return meeting_with_relations
             

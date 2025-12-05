@@ -29,7 +29,7 @@ help:
 install:
 	@echo "$(GREEN)📦 Instalando dependencias...$(NC)"
 	$(PIP) install -r requirements.txt
-	@echo "$(GREEN)✅ Dependencias instaladas$(NC)"
+	@echo "$(GREEN)Dependencias instaladas$(NC)"
 
 ## Desarrollo
 dev:
@@ -49,7 +49,7 @@ migration:
 
 # Rollback de migración
 rollback:
-	@echo "$(YELLOW)⚠️  Rollback de última migración...$(NC)"
+	@echo "$(YELLOW) Rollback de última migración...$(NC)"
 	alembic downgrade -1
 
 ## Testing
@@ -93,7 +93,7 @@ clean:
 	find . -type f -name ".coverage" -delete
 	rm -rf htmlcov/
 	rm -rf .pytest_cache/
-	@echo "$(GREEN)✅ Limpieza completada$(NC)"
+	@echo "$(GREEN)Limpieza completada$(NC)"
 
 ## Utilidades
 shell:
@@ -103,7 +103,7 @@ shell:
 requirements:
 	@echo "$(YELLOW)📋 Actualizando requirements.txt...$(NC)"
 	pip freeze > requirements.txt
-	@echo "$(GREEN)✅ requirements.txt actualizado$(NC)"
+	@echo "$(GREEN)requirements.txt actualizado$(NC)"
 
 check-env:
 	@echo "$(GREEN)🔍 Verificando variables de entorno...$(NC)"
@@ -111,7 +111,7 @@ check-env:
 
 ## Configuración inicial del proyecto
 setup: install migrate
-	@echo "$(GREEN)✅ Proyecto configurado$(NC)"
+	@echo "$(GREEN)Proyecto configurado$(NC)"
 
 ## Para desarrollo diario
 refresh: clean install migrate dev
