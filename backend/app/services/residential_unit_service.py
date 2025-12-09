@@ -1089,8 +1089,15 @@ class ResidentialUnitService:
     #             details={"original_error": str(e)}
     #         )
     
-    async def delete_resident(self, user_id: int, unit_id: int):
-        """Elimina un copropietario (eliminación en cascada)"""
+    async def delete_resident(self, user_id: int, unit_id: int, deleting_user_role: int):
+        """
+        Elimina un copropietario (eliminación en cascada)
+        
+        Args:
+            user_id: ID del usuario a eliminar
+            unit_id: ID de la unidad residencial
+            deleting_user_role: Rol del usuario que está eliminando (1=SuperAdmin, 2=Admin, etc)
+        """
         try:
             # PASO 1: Verificar que existe la relación usuario-unidad
             query = (
@@ -1100,9 +1107,7 @@ class ResidentialUnitService:
                 .where(
                     and_(
                         UserModel.id == user_id,
-                        UserResidentialUnitModel.int_residential_unit_id == unit_id,
-                        # 🔥 CAMBIO: Verificar que NO sea administrador en lugar de verificar rol
-                        UserResidentialUnitModel.bool_is_admin == False
+                        UserResidentialUnitModel.int_residential_unit_id == unit_id
                     )
                 )
             )
@@ -1111,56 +1116,28 @@ class ResidentialUnitService:
             user_data = result.first()
             
             if not user_data:
-                # 🔥 NUEVO: Query de diagnóstico para dar mejor información del error
-                diagnostic_query = (
-                    select(UserModel, UserResidentialUnitModel)
-                    .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
-                    .where(
-                        and_(
-                            UserModel.id == user_id,
-                            UserResidentialUnitModel.int_residential_unit_id == unit_id
-                        )
-                    )
+                raise ResourceNotFoundException(
+                    message=f"Usuario no encontrado en esta unidad",
+                    error_code="RESIDENT_NOT_FOUND"
                 )
-                diagnostic_result = await self.db.execute(diagnostic_query)
-                diagnostic_data = diagnostic_result.first()
-                
-                if diagnostic_data:
-                    user, user_unit = diagnostic_data
-                    if user_unit.bool_is_admin:
-                        raise ServiceException(
-                            message="No se puede eliminar: el usuario es administrador de esta unidad",
-                            details={
-                                "user_id": user_id,
-                                "unit_id": unit_id,
-                                "is_admin": True
-                            }
-                        )
-                    else:
-                        raise ServiceException(
-                            message=f"Usuario encontrado pero no se puede eliminar (Rol: {user.int_id_rol})",
-                            details={
-                                "user_id": user_id,
-                                "unit_id": unit_id,
-                                "role": user.int_id_rol
-                            }
-                        )
-                else:
-                    raise ResourceNotFoundException(
-                        message=f"Copropietario no encontrado en esta unidad",
-                        error_code="RESIDENT_NOT_FOUND"
-                    )
             
             user, data_user, user_unit = user_data
             username = user.str_username
             email = data_user.str_email
             data_user_id = user.int_data_user_id
             
-            # 🔥 VALIDACIÓN ADICIONAL: No permitir eliminar si es admin
-            if user_unit.bool_is_admin:
+            # VALIDACIÓN: Solo Super Admins (rol 1) pueden eliminar administradores
+            is_target_admin = (user_unit.bool_is_admin == True) or (user.int_id_rol == 2)
+            
+            if is_target_admin and deleting_user_role != 1:
                 raise ServiceException(
-                    message="No se puede eliminar un administrador. Primero debe remover sus privilegios.",
-                    details={"user_id": user_id, "is_admin": True}
+                    message="No tienes permisos para eliminar un administrador. Solo el Super Administrador puede hacerlo.",
+                    details={
+                        "user_id": user_id,
+                        "is_admin": user_unit.bool_is_admin,
+                        "user_role": user.int_id_rol,
+                        "deleting_user_role": deleting_user_role
+                    }
                 )
             
             # Eliminar en orden: relación -> usuario -> datos
@@ -1178,19 +1155,18 @@ class ResidentialUnitService:
             
             await self.db.commit()
             
-            logger.info(f"Copropietario eliminado: {username} ({email})")
+            admin_label = "administrador" if is_target_admin else "copropietario"
+            logger.info(f"{admin_label.capitalize()} eliminado: {username} ({email})")
             
             return True
             
-        except ResourceNotFoundException:
-            raise
-        except ServiceException:
+        except (ResourceNotFoundException, ServiceException):
             raise
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Error al eliminar: {str(e)}")
             raise ServiceException(
-                message=f"Error al eliminar copropietario: {str(e)}",
+                message=f"Error al eliminar usuario: {str(e)}",
                 details={"original_error": str(e)}
             )
                 
@@ -1248,7 +1224,7 @@ class ResidentialUnitService:
             
             await self.db.commit()
             
-            # 🔥 REGISTRAR NOTIFICACIÓN Y ENVIAR CORREO
+            # REGISTRAR NOTIFICACIÓN Y ENVIAR CORREO
             notification_service = EmailNotificationService(self.db)
             
             try:

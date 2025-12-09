@@ -713,58 +713,55 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		createResidentMutation.mutate(residentData);
 	};
 
-	const handleDeleteResident = (resident) => {
-		setSelectedResidentMenu(null);
-		Swal.fire({
-			title: '¿Estás seguro?',
-			html: `
-				<p>¿Deseas eliminar a <strong>${resident.firstname} ${resident.lastname}</strong>?</p>
-				<br>
-				<div class="text-left bg-red-50 p-3 rounded">
-					<p class="text-sm text-red-700"><strong>Advertencia:</strong></p>
-					<p class="text-sm text-red-600">Esta acción eliminará completamente:</p>
-					<ul class="text-sm text-red-600 list-disc list-inside mt-2">
-						<li>Su cuenta de usuario</li>
-						<li>Todos sus datos personales</li>
-						<li>Su relación con la unidad residencial</li>
-					</ul>
-					<p class="text-sm text-red-700 mt-2"><strong>Esta acción NO se puede deshacer.</strong></p>
-				</div>
-			`,
+	const handleDeleteResident = async (residentId, residentName, isAdmin = false) => {
+		// NUEVO: Advertencia especial para administradores
+		const warningText = isAdmin
+			? `⚠️ ATENCIÓN: Estás a punto de eliminar un ADMINISTRADOR.\n\n¿Estás seguro de eliminar a ${residentName}?`
+			: `¿Estás seguro de eliminar a ${residentName}?`;
+
+		const result = await Swal.fire({
+			title: isAdmin ? '⚠️ Eliminar Administrador' : 'Eliminar Copropietario',
+			text: warningText,
 			icon: 'warning',
 			showCancelButton: true,
-			confirmButtonColor: '#d33',
-			cancelButtonColor: '#3085d6',
+			confirmButtonColor: '#ef4444',
+			cancelButtonColor: '#6b7280',
 			confirmButtonText: 'Sí, eliminar',
 			cancelButtonText: 'Cancelar',
-			width: '600px'
-		}).then(async (result) => {
-			if (result.isConfirmed) {
-				try {
-					await ResidentService.deleteResident(unitId, resident.id);
-
-					// Actualizar la lista de residentes
-					queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
-
-					Swal.fire({
-						icon: 'success',
-						title: 'Eliminado',
-						text: `${resident.firstname} ${resident.lastname} ha sido eliminado exitosamente`,
-						showConfirmButton: false,
-						timer: 2000,
-						toast: true,
-						position: 'top-end',
-					});
-				} catch (error) {
-					Swal.fire({
-						icon: 'error',
-						title: 'Error',
-						text: error.response?.data?.message || error.message || 'Error al eliminar el copropietario',
-					});
-				}
-			}
 		});
+
+		if (result.isConfirmed) {
+			deleteResidentMutation.mutate({ userId: residentId, unitId });
+		}
 	};
+
+	// Mutación para eliminar residente
+	const deleteResidentMutation = useMutation({
+		mutationFn: ({ userId, unitId }) =>
+			ResidentService.deleteResident(unitId, userId),
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			queryClient.invalidateQueries({ queryKey: ['administrator', unitId] });
+			setSelectedResidentMenu(null);
+			Swal.fire({
+				icon: 'success',
+				title: '¡Eliminado!',
+				text: response.message || 'El usuario ha sido eliminado exitosamente',
+				showConfirmButton: false,
+				timer: 2000,
+				toast: true,
+				position: 'top-end',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al Eliminar',
+				text: error.response?.data?.message || error.message || 'No se pudo eliminar el usuario',
+				confirmButtonColor: '#ef4444',
+			});
+		},
+	});
 
 	const handleResendCredentials = async (resident) => {
 		setSelectedResidentMenu(null);
@@ -2558,7 +2555,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 										</button>
 										<button
 											onClick={() => {
-												handleDeleteResident(resident);
+												handleDeleteResident(
+													resident.id,
+													`${resident.firstname} ${resident.lastname}`,
+													resident.apartment_number === "ADMIN"  // Debe ser coma, no punto y coma
+												);
 												setSelectedResidentMenu(null);
 											}}
 											className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"

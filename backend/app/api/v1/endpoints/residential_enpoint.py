@@ -213,51 +213,56 @@ async def update_resident(
             message=f"Error: {str(e)}",
             details={"original_error": str(e)}
         )
-        
+
 @router.delete(
     "/units/{unit_id}/residents/{user_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
     summary="Eliminar copropietario",
-    description="Elimina un copropietario (eliminación completa)"
+    description="Elimina un copropietario de una unidad residencial"
 )
 async def delete_resident(
     unit_id: int,
     user_id: int,
-    current_user: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)  # Es un string (username)
 ):
     """Elimina un copropietario"""
     try:
-        # Verificar permisos
-        user_service = UserService(db)
-        current_user_data = await user_service.get_user_by_username(current_user)
-        
-        if current_user_data.int_id_rol not in [1, 2]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos"
-            )
+        from sqlalchemy import select
+        from app.models.user_model import UserModel
         
         residential_unit_service = ResidentialUnitService(db)
         
+        # OBTENER EL ROL DEL USUARIO ACTUAL
+        # Buscar el usuario por username para obtener su rol
+        query = select(UserModel).where(UserModel.str_username == current_user)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+        
+        # Si no se encuentra el usuario o no está autenticado, usar rol 3 por defecto
+        deleting_user_role = user.int_id_rol if user else 3
+        
+        # Llamar al servicio con el rol
         await residential_unit_service.delete_resident(
             user_id=user_id,
-            unit_id=unit_id
+            unit_id=unit_id,
+            deleting_user_role=deleting_user_role
         )
         
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
-            message="Copropietario eliminado exitosamente",
-            data={"user_id": user_id, "unit_id": unit_id, "deleted": True}
+            message="Usuario eliminado exitosamente",
+            data=None
         )
-        
-    except (ResourceNotFoundException, HTTPException, ServiceException):
+    except ResourceNotFoundException as e:
+        raise
+    except ServiceException as e:
         raise
     except Exception as e:
         raise ServiceException(
-            message=f"Error: {str(e)}",
+            message=f"Error al eliminar el usuario: {str(e)}",
             details={"original_error": str(e)}
         )
         
