@@ -19,6 +19,7 @@ import MeetingModal from './components/modals/MeetingModal';
 import ResidentModal from './components/modals/ResidentModal';
 import ChangeAdminModal from './components/modals/ChangeAdminModal';
 import ExcelUploadModal from './components/modals/ExcelUploadModal';
+import CreateManualAdminModal from './components/modals/CreateManualAdminModal';
 
 const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const queryClient = useQueryClient();
@@ -34,6 +35,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
 	const [isChangeAdminModalOpen, setIsChangeAdminModalOpen] = useState(false);
 	const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+	const [isCreateManualAdminModalOpen, setIsCreateManualAdminModalOpen] = useState(false);
 
 	// Obtener datos usando el hook personalizado
 	const {
@@ -214,6 +216,45 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		});
 	};
 
+	const handleOpenCreateManualAdmin = () => {
+		setIsChangeAdminModalOpen(false);
+		setIsCreateManualAdminModalOpen(true);
+	};
+
+	const handleSubmitManualAdmin = (data, resetForm) => {
+		Swal.fire({
+			title: '¿Crear Nuevo Administrador?',
+			html: `
+			<p>Se creará un usuario administrador con los siguientes datos:</p>
+			<div style="text-align: left; margin: 20px 0;">
+				<p><strong>Nombre:</strong> ${data.str_firstname} ${data.str_lastname}</p>
+				<p><strong>Email:</strong> ${data.str_email}</p>
+				${data.str_phone ? `<p><strong>Teléfono:</strong> ${data.str_phone}</p>` : ''}
+			</div>
+			<p style="color: #6c757d; font-size: 14px;">Se enviará un email con las credenciales de acceso.</p>
+		`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonText: 'Sí, Crear',
+			cancelButtonText: 'Cancelar',
+			confirmButtonColor: '#3498db',
+			cancelButtonColor: '#6c757d',
+		}).then((result) => {
+			if (result.isConfirmed) {
+				createManualAdminMutation.mutate(
+					{ unitId: unitId, adminData: data },
+					{
+						onSuccess: () => {
+							resetForm();
+							setIsCreateManualAdminModalOpen(false);
+							setIsChangeAdminModalOpen(false);
+						},
+					}
+				);
+			}
+		});
+	};
+
 	const handleExcelUploadSuccess = () => {
 		queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
 	};
@@ -333,6 +374,14 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				isLoadingResidents={isLoadingResidents}
 				onChangeAdmin={handleChangeAdmin}
 				isChanging={changeAdminMutation.isPending}
+				onOpenCreateManualAdmin={handleOpenCreateManualAdmin}
+			/>
+
+			<CreateManualAdminModal
+				isOpen={isCreateManualAdminModalOpen}
+				onClose={() => setIsCreateManualAdminModalOpen(false)}
+				onSubmit={handleSubmitManualAdmin}
+				isSubmitting={createManualAdminMutation.isPending}
 			/>
 
 			<ExcelUploadModal

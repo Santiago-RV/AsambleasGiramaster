@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from '../../../common/Modal';
-import { UsersIcon as UsersIcon, Mail, Phone } from 'lucide-react';
+import { UsersIcon as UsersIcon, Mail, Phone, UserPlus } from 'lucide-react';
 
 const ChangeAdminModal = ({
 	isOpen,
@@ -10,6 +10,7 @@ const ChangeAdminModal = ({
 	isLoadingResidents,
 	onChangeAdmin,
 	isChanging,
+	onOpenCreateManualAdmin,
 }) => {
 	const handleChangeAdmin = (residentId) => {
 		onChangeAdmin(residentId);
@@ -30,6 +31,21 @@ const ChangeAdminModal = ({
 					<p className="text-sm text-blue-700">
 						Selecciona un residente de la lista para asignarlo como
 						administrador de esta unidad residencial.
+					</p>
+				</div>
+
+				{/* Botón para crear administrador manual */}
+				<div className="mb-4">
+					<button
+						type="button"
+						onClick={onOpenCreateManualAdmin}
+						className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold px-4 py-3 rounded-lg hover:shadow-lg transition-all"
+					>
+						<UserPlus size={20} />
+						Crear Administrador Manual (No Copropietario)
+					</button>
+					<p className="text-sm text-gray-600 mt-2 text-center">
+						O selecciona un residente existente como administrador:
 					</p>
 				</div>
 
