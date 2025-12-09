@@ -9,6 +9,30 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-09
+- **Gestión avanzada de copropietarios desde panel de administrador**:
+  - Endpoints completos para CRUD de copropietarios (`admin_coowners.py`)
+  - Modal mejorado con validación completa de campos
+  - Servicio de copropietario para administradores (`coownerService.js`)
+  - Integración con sistema de notificaciones por correo
+
+- **Sistema de notificaciones por correo mejorado**:
+  - Servicio dedicado de notificaciones (`email_notification_service.py`)
+  - Registro de notificaciones en tabla `tbl_email_notifications`
+  - Plantillas HTML de correo profesionales:
+    - `admin_invitation.html`: Invitación para nuevos administradores
+    - `coowner_disabled.html`: Notificación de deshabilitación
+    - `coowner_update.html`: Notificación de actualización de datos
+    - `welcome_coproprietario.html`: Bienvenida para copropietarios
+  - Botón para enviar credenciales manualmente desde interfaz
+
+- **Mejoras en gestión de unidades residenciales**:
+  - Funcionalidad completa de edición de copropietarios
+  - Opción para editar sin cambiar contraseña
+  - Visualización y edición de coeficiente de participación
+  - Servicio mejorado de residentes (`ResidentService.js`)
+  - Validación de eliminación (no permite eliminar administradores activos)
+
 #### 2025-12-04
 - **Reuniones con duración indefinida**:
   - Soporte para crear reuniones sin duración específica usando valor 0
@@ -33,6 +57,29 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   - Documentación de migraciones en `backend/migrations/README.md`
 
 ### Cambiado
+
+#### 2025-12-09
+- **Arquitectura de notificaciones**:
+  - Envío de correos movido del registro automático al panel de super admin
+  - Modelo `email_notification_model.py` actualizado para soportar múltiples tipos
+  - Schema `email_notification_schema.py` con campos adicionales de seguimiento
+
+- **Componente UnidadResidencialDetalles**:
+  - Refactorización completa con más de 1400 líneas mejoradas
+  - Integración con múltiples servicios (ResidentService, ResidentialUnitService, coownerService)
+  - Mejoras en manejo de estado y validación de formularios
+  - UI mejorada con indicadores de carga y mensajes de error descriptivos
+
+- **Servicios de API en frontend**:
+  - `ResidentService.js`: Nuevo servicio para gestión de residentes (61 líneas)
+  - `ResidentialUnitService.js`: Ampliado con 179 líneas de funcionalidad
+  - `coownerService.js`: Nuevo servicio para operaciones de copropietarios (96 líneas)
+  - `axiosconfig.js`: Configuración mejorada de interceptores
+
+- **Configuración de navegación**:
+  - Sidebare actualizados con nuevas rutas y permisos
+  - `SidebarAD.jsx`: Navegación mejorada para administradores
+  - `SidebarCO.jsx`: Panel simplificado para copropietarios
 
 #### 2025-12-04
 - **Modal de nuevas reuniones**:
@@ -123,6 +170,28 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Corregido
 
+#### 2025-12-09
+- **Generación de reuniones**:
+  - Corrección en creación de reuniones desde panel de administrador
+  - Ajuste en validación de campos requeridos
+  - Mejora en manejo de errores al crear reunión en Zoom
+
+- **Asignación de administrador**:
+  - Corrección en lógica de asignación de administrador a unidad residencial
+  - Validación mejorada de permisos antes de asignar
+  - Fix en actualización de rol de usuario al convertirse en administrador
+
+- **Servicio de unidades residenciales** (`residential_unit_service.py`):
+  - Corrección en endpoint de eliminación de copropietarios
+  - Validación que previene eliminar administradores activos
+  - Fix en procesamiento de archivo Excel (`process_residents_excel_file`)
+  - Corrección en actualización de copropietarios sin cambiar contraseña
+
+- **Autenticación y autorización**:
+  - Ajustes en `auth_endpoint.py` para manejo correcto de roles
+  - Corrección en `auth.py` para validación de tokens
+  - Fix en redirección según rol de usuario después del login
+
 #### 2025-11-26
 - **Login y administrador**: Corrección en asignación de administrador y ajustes en login para entrar a vistas diferentes según rol
 
@@ -162,8 +231,23 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Eliminado
 
+#### 2025-12-09
+- **Archivos de documentación obsoletos del backend**:
+  - `CAMBIOS_SISTEMA_ENCUESTAS.md` (280 líneas)
+  - `CONFIGURAR_EMAIL.md` (292 líneas)
+  - `EJEMPLO_USO_ENCUESTAS.md` (498 líneas)
+  - `GUIA_POSTMAN_ENCUESTAS.md` (432 líneas)
+  - `SISTEMA_EMAIL_README.md` (330 líneas)
+  - `Postman_Collection_Encuestas.json` (483 líneas)
+
+- **Scripts SQL obsoletos**:
+  - `MIGRATION_POLL_FIX.sql` (38 líneas)
+  - `agregar_campo_password.sql` (12 líneas)
+  - `crear_multiples_usuarios_prueba.sql` (93 líneas)
+  - `crear_usuario_prueba_email.sql` (98 líneas)
+
 #### 2025-12-04
-- Archivo de ejemplo `EJEMPLO_USO_POLLSERVICE.md` del frontend
+- Archivo de ejemplo `EJEMPLO_USO_POLLSERVICE.md` del frontend (532 líneas)
 
 ---
 

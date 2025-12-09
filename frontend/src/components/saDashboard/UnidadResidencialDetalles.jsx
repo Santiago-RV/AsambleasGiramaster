@@ -55,7 +55,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	const [selectedResidents, setSelectedResidents] = useState([]);
 	const [selectAll, setSelectAll] = useState(false);
 
-
 	// Estado para el administrador actual
 	const [currentAdmin, setCurrentAdmin] = useState(null);
 
@@ -261,7 +260,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			phone: '',
 			apartment_number: '',
 			is_active: true,
-			password: '',
 		},
 	});
 
@@ -342,14 +340,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		createMeetingMutation.mutate(meetingData);
 	};
 
-	// Función para verificar si el botón de acceso debe estar habilitado
-	// Se habilita 1 hora antes de la reunión programada
-	const puedeAccederReunion = (fechaReunion) => {
-		const ahora = new Date();
-		const unaHoraAntes = new Date(fechaReunion.getTime() - 60 * 60 * 1000); // 1 hora antes
-		return ahora >= unaHoraAntes;
-	};
-
 	// Handler para enviar el formulario del administrador local
 	const onSubmitManualAdmin = (data) => {
 		Swal.fire({
@@ -411,6 +401,14 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 		});
 	};
 
+	// Función para verificar si el botón de acceso debe estar habilitado
+	// Se habilita 1 hora antes de la reunión programada
+	const puedeAccederReunion = (fechaReunion) => {
+		const ahora = new Date();
+		const unaHoraAntes = new Date(fechaReunion.getTime() - 60 * 60 * 1000); // 1 hora antes
+		return ahora >= unaHoraAntes;
+	};
+
 	// Funciones para seleccionar a los copropietarios para enviar correos
 	const handleSelectAll = () => {
 		if (selectAll) {
@@ -469,15 +467,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			}
 		})
 	}
-
-	const handleCreateResident = () => {
-		setResidentModalMode('create');
-		resetResident();
-		// Establecer valores por defecto para crear
-		setResidentValue('is_active', true);
-		setResidentValue('password', '');
-		setIsResidentModalOpen(true);
-	};
 
 	// Para editar (modificar la función existente)
 	const handleEditResident = (resident) => {
@@ -932,7 +921,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			if (errors && errors.length > 0) {
 				htmlContent += `
 				<div class="bg-red-50 p-3 rounded-lg max-h-48 overflow-y-auto">
-					<p class="font-semibold text-red-800 mb-2">Errores Encontrados:</p>
+					<p class="font-semibold text-red-800 mb-2">❌ Errores Encontrados:</p>
 					<ul class="text-sm text-red-700 space-y-1">
 			`;
 
@@ -1209,7 +1198,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				{/* Botones de acción para residentes */}
 				<div className="flex gap-3 pt-4 border-t border-gray-200">
 					<button
-						onClick={handleCreateResident}
+						onClick={() => setIsResidentModalOpen(true)}
 						className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 					>
 						<Plus size={18} />
@@ -1417,9 +1406,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 							<div className="text-center py-12">
 								<UsersIcon className="mx-auto text-gray-400 mb-4" size={48} />
 								<p className="text-gray-600">
-									{searchTerm
-										? 'No se encontraron residentes con ese criterio'
-										: 'No hay residentes registrados'}
+									{searchTerm ? 'No se encontraron residentes con ese criterio' : 'No hay residentes registrados'}
 								</p>
 							</div>
 						)}
@@ -2178,23 +2165,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</p>
 					</div>
 
-					<div className="mb-4">
-						<button
-							type="button"
-							onClick={() => {
-								setIsChangeAdminModalOpen(false);
-								setIsCreateManualAdminModalOpen(true);
-							}}
-							className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold px-4 py-3 rounded-lg hover:shadow-lg transition-all"
-						>
-							<UserPlus size={20} />
-							Crear Administrador Manual (No Copropietario)
-						</button>
-						<p className="text-sm text-gray-600 mt-2 text-center">
-							O selecciona un residente existente como administrador:
-						</p>
-					</div>
-
 					{/* Administrador actual */}
 					{currentAdmin && (
 						<div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -2318,177 +2288,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				</div>
 			</Modal>
 
-			{/* Modal para crear administrador manual */}
-			<Modal
-				isOpen={isCreateManualAdminModalOpen}
-				onClose={() => {
-					setIsCreateManualAdminModalOpen(false);
-					resetManualAdmin();
-				}}
-				title="Crear Administrador Manual"
-				size="lg"
-			>
-				<form onSubmit={handleSubmitManualAdmin(onSubmitManualAdmin)}>
-					<div className="space-y-6">
-						<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-							<h3 className="font-semibold text-blue-800 mb-2">
-								👤 Nuevo Administrador
-							</h3>
-							<p className="text-sm text-blue-700">
-								Crea un usuario con rol de administrador que NO está asociado a ningún apartamento.
-								Este usuario tendrá acceso completo para gestionar la unidad residencial.
-							</p>
-						</div>
-
-						{/* Nombres */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-700">
-								Nombres *
-							</label>
-							<input
-								type="text"
-								{...registerManualAdmin('str_firstname', {
-									required: 'Los nombres son obligatorios',
-									minLength: {
-										value: 2,
-										message: 'Mínimo 2 caracteres',
-									},
-								})}
-								placeholder="Ej: Juan Carlos"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errorsManualAdmin.str_firstname && (
-								<span className="text-red-500 text-sm">
-									{errorsManualAdmin.str_firstname.message}
-								</span>
-							)}
-						</div>
-
-						{/* Apellidos */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-700">
-								Apellidos *
-							</label>
-							<input
-								type="text"
-								{...registerManualAdmin('str_lastname', {
-									required: 'Los apellidos son obligatorios',
-									minLength: {
-										value: 2,
-										message: 'Mínimo 2 caracteres',
-									},
-								})}
-								placeholder="Ej: Pérez García"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errorsManualAdmin.str_lastname && (
-								<span className="text-red-500 text-sm">
-									{errorsManualAdmin.str_lastname.message}
-								</span>
-							)}
-						</div>
-
-						{/* Email */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-700">
-								Email *
-							</label>
-							<input
-								type="email"
-								{...registerManualAdmin('str_email', {
-									required: 'El email es obligatorio',
-									pattern: {
-										value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-										message: 'Email inválido',
-									},
-								})}
-								placeholder="Ej: admin@correo.com"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-							{errorsManualAdmin.str_email && (
-								<span className="text-red-500 text-sm">
-									{errorsManualAdmin.str_email.message}
-								</span>
-							)}
-						</div>
-
-						{/* Teléfono (opcional) */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-700">
-								Teléfono (Opcional)
-							</label>
-							<input
-								type="tel"
-								{...registerManualAdmin('str_phone')}
-								placeholder="Ej: +57 300 123 4567"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-							/>
-						</div>
-
-						<div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-							<p className="text-sm text-yellow-800">
-								<strong>📧 Nota:</strong> Se generará un usuario y contraseña temporal automáticamente.
-								El administrador recibirá un email con sus credenciales de acceso.
-							</p>
-						</div>
-
-						{/* Botones */}
-						<div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-							<button
-								type="button"
-								onClick={() => {
-									setIsCreateManualAdminModalOpen(false);
-									resetManualAdmin();
-								}}
-								disabled={createManualAdminMutation.isPending}
-								className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								Cancelar
-							</button>
-							<button
-								type="submit"
-								disabled={createManualAdminMutation.isPending}
-								className={`flex items-center gap-2 bg-gradient-to-br from-[#3498db] to-[#2980b9] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${createManualAdminMutation.isPending
-									? 'opacity-50 cursor-not-allowed'
-									: ''
-									}`}
-							>
-								{createManualAdminMutation.isPending ? (
-									<>
-										<svg
-											className="animate-spin h-5 w-5"
-											xmlns="http://www.w3.org/2000/svg"
-											fill="none"
-											viewBox="0 0 24 24"
-										>
-											<circle
-												className="opacity-25"
-												cx="12"
-												cy="12"
-												r="10"
-												stroke="currentColor"
-												strokeWidth="4"
-											></circle>
-											<path
-												className="opacity-75"
-												fill="currentColor"
-												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-											></path>
-										</svg>
-										Creando...
-									</>
-								) : (
-									<>
-										<UserPlus size={20} />
-										Crear Administrador
-									</>
-								)}
-							</button>
-						</div>
-					</div>
-				</form>
-			</Modal>
-
 			{/* Modal para cargar Excel */}
 			<Modal
 				isOpen={isExcelModalOpen}
@@ -2570,7 +2369,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 						</div>
 						<div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
 							<p className="text-xs text-yellow-800">
-								<strong>Formato de ejemplo:</strong>
+								⚠️ <strong>Formato de ejemplo:</strong>
 							</p>
 							<div className="mt-2 bg-white p-2 rounded text-xs font-mono overflow-x-auto">
 								<table className="min-w-full">
@@ -2719,59 +2518,61 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 			</Modal>
 
 			{/* Menú desplegable con posición fixed para evitar cortes */}
-			{selectedResidentMenu && (
-				<>
-					<div
-						className="fixed inset-0 z-40"
-						onClick={() => setSelectedResidentMenu(null)}
-					></div>
-					<div
-						className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
-						style={{
-							top: `${menuPosition.top}px`,
-							left: `${menuPosition.left}px`,
-						}}
-						onClick={(e) => e.stopPropagation()}
-					>
-						{filteredResidents
-							?.filter((r) => r.id === selectedResidentMenu)
-							.map((resident) => (
-								<React.Fragment key={resident.id}>
-									<button
-										onClick={() => {
-											handleViewResident(resident);
-											setSelectedResidentMenu(null);
-										}}
-										className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 rounded-t-lg"
-									>
-										<Eye size={16} />
-										Ver detalles
-									</button>
-									<button
-										onClick={() => {
-											handleEditResident(resident);
-										}}
-										className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-									>
-										<Edit size={16} />
-										Editar
-									</button>
-									<button
-										onClick={() => {
-											handleDeleteResident(resident);
-											setSelectedResidentMenu(null);
-										}}
-										className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
-									>
-										<Trash2 size={16} />
-										Eliminar
-									</button>
-								</React.Fragment>
-							))}
-					</div>
-				</>
-			)}
-		</div>
+			{
+				selectedResidentMenu && (
+					<>
+						<div
+							className="fixed inset-0 z-40"
+							onClick={() => setSelectedResidentMenu(null)}
+						></div>
+						<div
+							className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
+							style={{
+								top: `${menuPosition.top}px`,
+								left: `${menuPosition.left}px`,
+							}}
+							onClick={(e) => e.stopPropagation()}
+						>
+							{filteredResidents
+								?.filter((r) => r.id === selectedResidentMenu)
+								.map((resident) => (
+									<React.Fragment key={resident.id}>
+										<button
+											onClick={() => {
+												handleViewResident(resident);
+												setSelectedResidentMenu(null);
+											}}
+											className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 rounded-t-lg"
+										>
+											<Eye size={16} />
+											Ver detalles
+										</button>
+										<button
+											onClick={() => {
+												handleEditResident(resident);
+											}}
+											className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+										>
+											<Edit size={16} />
+											Editar
+										</button>
+										<button
+											onClick={() => {
+												handleDeleteResident(resident);
+												setSelectedResidentMenu(null);
+											}}
+											className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
+										>
+											<Trash2 size={16} />
+											Eliminar
+										</button>
+									</React.Fragment>
+								))}
+						</div>
+					</>
+				)
+			}
+		</div >
 	);
 };
 
