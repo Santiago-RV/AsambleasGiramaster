@@ -14,6 +14,7 @@
     "@tanstack/react-query-devtools": "^5.90.2",
     "@zoom/meetingsdk": "^4.1.0",
     "axios": "^1.12.2",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.545.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

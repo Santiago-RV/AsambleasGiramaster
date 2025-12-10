@@ -7,6 +7,8 @@ from app.api.v1.endpoints import meeting_endpoint
 from app.api.v1.endpoints import zoom_endpoint
 from app.api.v1.endpoints import poll_endpoint
 from app.api.v1.endpoints import super_admin
+from app.api.v1.endpoints import user_endpoint
+from app.api.v1.endpoints import zoom_signature_endpoint
 from app.auth.auth import get_current_user 
 
 api_router = APIRouter()
@@ -45,7 +47,6 @@ api_router.include_router(
     dependencies=[Depends(get_current_user)]
 )
 
-# ← AGREGAR ESTO
 api_router.include_router(
     poll_endpoint.router,
     prefix="/polls",
@@ -58,4 +59,16 @@ api_router.include_router(
     prefix="/super-admin",
     tags=["Super Admin"],
     dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
+    user_endpoint.router,
+    prefix="/user",
+    tags=["co-propietario"],
+    dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
+    zoom_signature_endpoint.router,
+    tags=["zoom"]
 )

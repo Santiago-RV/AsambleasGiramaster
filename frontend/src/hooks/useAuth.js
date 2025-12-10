@@ -46,6 +46,8 @@ export const useAuth = () => {
         navigate('/super-admin');
       } else if (userData.role === 'Administrador') {
         navigate('/admin');
+      } else if (userData.role === 'Usuario'){
+        navigate('/copropietario');
       } else {
         navigate('/');
       }

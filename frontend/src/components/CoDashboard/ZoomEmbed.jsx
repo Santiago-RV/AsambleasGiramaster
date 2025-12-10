@@ -1,69 +1,278 @@
-import { useState } from "react";
+import React, { useEffect, useRef, useState } from 'react';
+import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
+import { X, Maximize2, Minimize2, Loader2 } from 'lucide-react';
+import axiosInstance from '../../services/api/axiosconfig';
 
-export default function ZoomEmbed() {
-  const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(false);
+/**
+ * Componente de Zoom usando SDK Embedded (igual que superadmin)
+ * Adaptado para copropietarios con sidebar visible
+ */
+const ZoomMeetingContainer = ({ 
+	meetingData, 
+	onClose,
+	startFullscreen = false 
+}) => {
+	const meetingSDKElement = useRef(null);
+	const clientRef = useRef(null);
+	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState(null);
+	const [isFullscreen, setIsFullscreen] = useState(startFullscreen);
 
-  const handleConnect = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setConnected(true);
-      setLoading(false);
-    }, 1500);
-  };
+	useEffect(() => {
+		if (!meetingData) {
+			setError('No hay datos de reunión disponibles');
+			setIsLoading(false);
+			return;
+		}
 
-  const handleDisconnect = () => {
-    setConnected(false);
-  };
+		if (!meetingSDKElement.current) {
+			setError('Error al cargar el contenedor de Zoom');
+			setIsLoading(false);
+			return;
+		}
 
-  return (
-    <div className="bg-gray-100 border-2 border-gray-300 p-6 rounded-xl mb-6">
-      <h3 className="text-xl font-semibold mb-4"> Reunión Virtual</h3>
+		const timer = setTimeout(() => {
+			initializeZoom();
+		}, 100);
 
-      <div className="w-full h-72 bg-black text-white rounded-lg flex items-center justify-center mb-4">
-        {!connected ? (
-          <div className="text-center opacity-80">
-            <div className="text-4xl mb-2">📹</div>
-            <p>Haz clic en “Conectar” para unirte</p>
-            <p className="text-sm opacity-70 mt-1">ID: 123-456-7890</p>
-          </div>
-        ) : (
-          <div className="text-center">
-            <div className="text-2xl mb-1">📹</div>
-            <p>Conectado a la Reunión</p>
-            <p className="opacity-70 text-sm">Asamblea Ordinaria 2025</p>
-            <div className="mt-3 bg-white/20 px-4 py-1 rounded-full text-sm">
-              <span className="w-2 h-2 inline-block bg-yellow-300 rounded-full mr-1 animate-pulse"></span>
-              EN VIVO
-            </div>
-          </div>
-        )}
-      </div>
+		return () => {
+			clearTimeout(timer);
+			if (clientRef.current) {
+				try {
+					clientRef.current.leaveMeeting();
+				} catch (err) {
+					console.error('Error leaving meeting:', err);
+				}
+			}
+		};
+	}, [meetingData]);
 
-      <div className="flex gap-3 justify-center">
-        {!connected ? (
-          <button
-            onClick={handleConnect}
-            disabled={loading}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-          >
-            {loading ? " Conectando..." : " Conectar"}
-          </button>
-        ) : (
-          <>
-            <button
-              onClick={handleDisconnect}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-               Desconectar
-            </button>
-          </>
-        )}
+	const initializeZoom = async () => {
+		try {
+			setIsLoading(true);
 
-        <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
-           Abrir en App
-        </button>
-      </div>
-    </div>
-  );
-}
+			if (!meetingSDKElement.current) {
+				throw new Error('El contenedor de Zoom no está disponible');
+			}
+
+			console.log('🔵 Inicializando Zoom SDK Embedded...');
+			const client = ZoomMtgEmbedded.createClient();
+			clientRef.current = client;
+
+			await client.init({
+				zoomAppRoot: meetingSDKElement.current,
+				language: 'es-ES',
+				patchJsMedia: true,
+				leaveOnPageUnload: true,
+			});
+
+			console.log('✅ Zoom SDK inicializado');
+			await joinMeeting(client);
+			setIsLoading(false);
+		} catch (err) {
+			console.error('❌ Error al inicializar:', err);
+			setError(err.message || 'Error al inicializar la reunión');
+			setIsLoading(false);
+		}
+	};
+
+	const joinMeeting = async (client) => {
+		try {
+			// Extraer meeting number de la URL
+			const meetingNumber = extractMeetingNumber(
+				meetingData.str_zoom_join_url || meetingData.int_zoom_meeting_id
+			);
+			
+			const password =
+				meetingData.str_zoom_password ||
+				extractPassword(meetingData.str_zoom_join_url);
+
+			if (!meetingNumber) {
+				throw new Error('No se pudo extraer el número de reunión');
+			}
+
+			console.log('🔵 Obteniendo configuración de Zoom...');
+
+			// Obtener SDK Key del backend
+			const configResponse = await axiosInstance.get('/zoom/config');
+			const sdkKey = configResponse.data.data.sdk_key;
+
+			console.log('🔵 Generando firma...');
+
+			// Generar firma (role: 0 para participantes)
+			const signature = await generateSignature(meetingNumber);
+
+			console.log('🔵 Uniéndose a la reunión...');
+
+			// Obtener nombre del usuario
+			const userName = localStorage.getItem('user') 
+				? JSON.parse(localStorage.getItem('user')).name 
+				: 'Usuario';
+
+			await client.join({
+				meetingNumber: meetingNumber,
+				password: password || '',
+				userName: userName,
+				signature: signature,
+				sdkKey: sdkKey,
+				tk: '',
+			});
+
+			console.log('✅ Conectado a la reunión');
+
+			// Escuchar evento de finalización
+			client.on('meeting-ended', () => {
+				console.log('📢 Reunión finalizada');
+				onClose();
+			});
+
+		} catch (error) {
+			console.error('❌ Error al unirse:', error);
+			throw error;
+		}
+	};
+
+	const extractMeetingNumber = (value) => {
+		if (!value) return '';
+		
+		// Si es un número directo
+		if (typeof value === 'number') return value.toString();
+		
+		// Si es string numérico
+		if (/^\d+$/.test(value)) return value;
+		
+		// Si es URL, extraer número
+		const match = value.match(/\/j\/(\d+)/);
+		return match ? match[1] : '';
+	};
+
+	const extractPassword = (url) => {
+		if (!url) return '';
+		const match = url.match(/pwd=([^&]+)/);
+		return match ? match[1] : '';
+	};
+
+	const generateSignature = async (meetingNumber) => {
+		try {
+			const response = await axiosInstance.post(
+				'/zoom/generate-signature',
+				{
+					meeting_number: meetingNumber,
+					role: 0, // 0 = participante (copropietario)
+				}
+			);
+
+			if (response.data.success) {
+				return response.data.data.signature;
+			} else {
+				throw new Error('No se pudo generar el signature');
+			}
+		} catch (error) {
+			console.error('❌ Error generando firma:', error);
+			throw error;
+		}
+	};
+
+	const toggleFullscreen = () => {
+		setIsFullscreen(!isFullscreen);
+	};
+
+	// Error
+	if (error) {
+		return (
+			<div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto my-8">
+				<div className="text-center">
+					<div className="text-red-500 text-5xl mb-4">⚠️</div>
+					<h3 className="text-xl font-bold text-gray-800 mb-2">
+						Error al cargar la reunión
+					</h3>
+					<p className="text-gray-600 mb-6">{error}</p>
+					<button
+						onClick={onClose}
+						className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+					>
+						Cerrar
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className={`
+			${isFullscreen 
+				? 'fixed inset-0 z-50' 
+				: 'relative w-full'
+			}
+		`}>
+			{/* Contenedor con tamaño ajustable */}
+			<div className={`
+				${isFullscreen 
+					? 'w-full h-full' 
+					: 'w-full rounded-lg shadow-2xl overflow-hidden'
+				}
+				bg-gray-900
+			`}
+			style={{
+				height: isFullscreen ? '100vh' : '600px'
+			}}
+			>
+				{/* Header con controles */}
+				<div className="absolute top-0 right-0 z-[70] p-4 flex gap-2">
+					<button
+						onClick={toggleFullscreen}
+						className="bg-gray-700 text-white p-3 rounded-lg hover:bg-gray-600 shadow-lg transition-colors"
+						title={isFullscreen ? 'Minimizar' : 'Pantalla completa'}
+					>
+						{isFullscreen ? (
+							<Minimize2 className="w-5 h-5" />
+						) : (
+							<Maximize2 className="w-5 h-5" />
+						)}
+					</button>
+					<button
+						onClick={onClose}
+						className="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 shadow-lg transition-colors"
+						title="Salir de la reunión"
+					>
+						<X className="w-5 h-5" />
+					</button>
+				</div>
+
+				{/* Loading overlay */}
+				{isLoading && (
+					<div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-[60]">
+						<div className="text-center max-w-md mx-4">
+							<Loader2 className="w-16 h-16 text-blue-500 animate-spin mx-auto mb-4" />
+							<p className="text-white text-xl font-semibold mb-2">
+								Iniciando reunión...
+							</p>
+							<p className="text-gray-400 text-sm">
+								{meetingData?.str_title || 'Cargando'}
+							</p>
+						</div>
+					</div>
+				)}
+
+				{/* Contenedor del SDK de Zoom */}
+				<div
+					ref={meetingSDKElement}
+					id="meetingSDKElement"
+					className="w-full h-full"
+				/>
+			</div>
+
+			{/* Info adicional cuando NO está en fullscreen */}
+			{!isFullscreen && (
+				<div className="mt-4 text-sm text-gray-600">
+					<p>💡 <strong>Tip:</strong> Usa el botón 
+						<Maximize2 className="inline w-4 h-4 mx-1" />
+						para ver en pantalla completa
+					</p>
+				</div>
+			)}
+		</div>
+	);
+};
+
+export default ZoomMeetingContainer;
