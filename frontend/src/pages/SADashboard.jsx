@@ -1,18 +1,56 @@
 import React, { useState } from "react";
-
-import Sidebar from "../../../frontend/src/components/Sidebar";
-import Header from "../../../frontend/src/components/Header";
-
-import DashboardSection from "../../../frontend/src/components/sections/DashboardSection";
-import ClientsSection from "../../../frontend/src/components/sections/ClientsSection";
-import AssembliesSection from "../../../frontend/src/components/sections/AssembliesSection";
-import CalendarSection from "../../../frontend/src/components/sections/CalendarSection";
-import MonitoringSection from "../../../frontend/src/components/sections/MonitoringSection";
-import ReportsSection from "../../../frontend/src/components/sections/ReportsSection";
-import UsersSection from "../../../frontend/src/components/sections/UsersSection";
+import { LayoutDashboard, Building2, Users, Calendar, MonitorSquare, FileText, UserCog } from 'lucide-react';
+import DashboardLayout from "../components/layout/DashboardLayout";
+import Header from "../components/layout/Header";
+import DashboardSection from "../components/sections/DashboardSection";
+import ClientsSection from "../components/sections/ClientsSection";
+import AssembliesSection from "../components/sections/AssembliesSection";
+import CalendarSection from "../components/sections/CalendarSection";
+import MonitoringSection from "../components/sections/MonitoringSection";
+import ReportsSection from "../components/sections/ReportsSection";
+import UsersSection from "../components/sections/UsersSection";
 
 export const SADashboard = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
+
+  // Configuración del menú del sidebar
+  const menuItems = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      id: 'clients',
+      label: 'Unidades Residenciales',
+      icon: Building2,
+    },
+    {
+      id: 'assemblies',
+      label: 'Residentes',
+      icon: Users,
+    },
+    {
+      id: 'calendar',
+      label: 'Asambleas',
+      icon: Calendar,
+    },
+    {
+      id: 'monitoring',
+      label: 'Monitoreo de Asambleas',
+      icon: MonitorSquare,
+    },
+    {
+      id: 'reports',
+      label: 'Informes y Reportes',
+      icon: FileText,
+    },
+    {
+      id: 'users',
+      label: 'Gestión de Usuarios',
+      icon: UserCog,
+    },
+  ];
 
   const titles = {
     dashboard: "Dashboard",
@@ -25,21 +63,25 @@ export const SADashboard = () => {
   };
 
   return (
-    <div className="dashboard-container">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} titles={titles} />
-      <div className="main-content">
-        <Header title={titles[activeSection]} />
+    <DashboardLayout
+      title="Giramaster"
+      subtitle="Super Administrador"
+      menuItems={menuItems}
+      activeTab={activeSection}
+      onTabChange={setActiveSection}
+      gradientFrom="#2c3e50"
+      gradientTo="#34495e"
+      accentColor="#3498db"
+    >
+      <Header title={titles[activeSection]} />
 
-        <div className="content">
-          {activeSection === "dashboard" && <DashboardSection />}
-          {activeSection === "clients" && <ClientsSection />}
-          {activeSection === "assemblies" && <AssembliesSection />}
-          {activeSection === "calendar" && <CalendarSection />}
-          {activeSection === "monitoring" && <MonitoringSection />}
-          {activeSection === "reports" && <ReportsSection />}
-          {activeSection === "users" && <UsersSection />}
-        </div>
-      </div>
-    </div>
+      {activeSection === "dashboard" && <DashboardSection />}
+      {activeSection === "clients" && <ClientsSection />}
+      {activeSection === "assemblies" && <AssembliesSection />}
+      {activeSection === "calendar" && <CalendarSection />}
+      {activeSection === "monitoring" && <MonitoringSection />}
+      {activeSection === "reports" && <ReportsSection />}
+      {activeSection === "users" && <UsersSection />}
+    </DashboardLayout>
   );
 };

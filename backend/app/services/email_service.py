@@ -158,7 +158,7 @@ class EmailService:
                 ).where(
                     UserResidentialUnitModel.int_residential_unit_id == meeting.int_id_residential_unit,
                     UserModel.id.in_(user_ids),
-                    UserModel.bln_is_active == True
+                    UserModel.bln_allow_entry == True
                 )
             else:
                 # Enviar a todos los usuarios de la unidad residencial
@@ -170,7 +170,7 @@ class EmailService:
                     UserModel.id == UserResidentialUnitModel.int_user_id
                 ).where(
                     UserResidentialUnitModel.int_residential_unit_id == meeting.int_id_residential_unit,
-                    UserModel.bln_is_active == True
+                    UserModel.bln_allow_entry == True
                 )
             
             result = await db.execute(query)
@@ -254,18 +254,25 @@ class EmailService:
                     f"No se puede actualizar estado individual de notificaciones."
                 )
             
-            # 6️⃣ COMMIT DE TODAS LAS NOTIFICACIONES
+            # 6️⃣ ACTUALIZAR CONTADOR DE INVITADOS EN LA REUNIÓN
+            total_invitados = len(notification_mapping)
+            meeting.int_total_invitated = total_invitados
+            meeting.updated_at = datetime.now()
+
+            # 7️⃣ COMMIT DE TODAS LAS NOTIFICACIONES Y ACTUALIZACIÓN DE REUNIÓN
             await db.commit()
-            
+
             logger.info(
                 f"Invitaciones enviadas para reunión {meeting_id}: "
                 f"{stats['exitosos']} exitosos, {stats['fallidos']} fallidos. "
-                f"📧 {len(notification_mapping)} notificaciones registradas."
+                f"📧 {len(notification_mapping)} notificaciones registradas. "
+                f"👥 Total de invitados registrados: {total_invitados}"
             )
-            
+
             # Agregar info de notificaciones al resultado
             stats['notifications_created'] = len(notification_mapping)
-            
+            stats['total_invitados'] = total_invitados
+
             return stats
             
         except Exception as e:

@@ -1,46 +1,337 @@
-import { useState } from "react";
-import UsersTable from "./UsersTable";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Upload, Plus } from 'lucide-react';
+import Swal from 'sweetalert2';
+import ResidentsList from "../saDashboard/components/ResidentsList";
+import MeetingsSection from "./MeetingsSection";
+import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
+import { ResidentService } from "../../services/api/ResidentService";
+import { MeetingService } from "../../services/api/MeetingService";
 
-export default function UsersPage({ onCreateUser, onTransferPower }) {
-  const [users] = useState([
-    { id: 1, name: "María González", email: "maria.gonzalez@email.com", apartment: "101", role: "Copropietario", coefficient: "2.5% (No editable)", active: true },
-    { id: 2, name: "Carlos Rodríguez", email: "carlos.rodriguez@email.com", apartment: "202", role: "Copropietario", coefficient: "3.1% (No editable)", active: true },
-    { id: 3, name: "Ana Martínez", email: "ana.martinez@email.com", apartment: "303", role: "Representante", coefficient: "1.8% (Poder cedido)", active: true },
-  ]);
+export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onTransferPower }) {
+  const queryClient = useQueryClient();
 
-  const handleEdit = (user) => {
-    alert(`Editar usuario ${user.name}`);
-    onCreateUser?.();
-  };
+  // Obtener los residentes de la unidad residencial
+  const {
+    data: residentsData,
+    isLoading,
+    isError,
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ['residential-unit-residents', residentialUnitId],
+    queryFn: () => ResidentialUnitService.getResidentsByResidentialUnit(residentialUnitId),
+    enabled: !!residentialUnitId,
+    retry: 1,
+  });
 
-  const handleTransferPower = (user) => {
-    onTransferPower?.(`${user.name} (Apt. ${user.apartment})`, (to, type) => {
-      console.log("Poder transferido", { from: user, to, type });
+  // Extraer los residentes del response
+  const residents = residentsData?.success && residentsData?.data ? residentsData.data : [];
+
+  // Obtener las reuniones de la unidad residencial
+  const {
+    data: meetingsData,
+    isLoading: isLoadingMeetings,
+  } = useQuery({
+    queryKey: ['meetings', residentialUnitId],
+    queryFn: () => MeetingService.getMeetingsByResidentialUnit(residentialUnitId),
+    enabled: !!residentialUnitId,
+    retry: 1,
+  });
+
+  // Transformar las reuniones al formato esperado
+  const meetings = meetingsData?.success && meetingsData?.data
+    ? meetingsData.data.map(meeting => ({
+        id: meeting.id,
+        titulo: meeting.str_title || 'Sin título',
+        estado: meeting.str_status || 'Programada',
+        fecha: meeting.dat_schedule_date,
+        hora: meeting.dat_schedule_date
+          ? new Date(meeting.dat_schedule_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+          : 'No definida',
+        asistentes: meeting.int_total_invitated || 0,
+        fechaCompleta: new Date(meeting.dat_schedule_date),
+        // Usar los campos correctos de Zoom
+        meeting_url: meeting.str_zoom_join_url,  // Corregido: era str_meeting_url (no existe)
+        zoom_meeting_id: meeting.int_zoom_meeting_id,  // Corregido: era str_zoom_meeting_id (tipo incorrecto)
+        zoom_password: meeting.str_zoom_password,  // Contraseña de la reunión
+      }))
+    : [];
+
+  // Mutación para eliminar residente
+  const deleteResidentMutation = useMutation({
+    mutationFn: ({ userId, unitId }) => ResidentService.deleteResident(unitId, userId),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+      Swal.fire({
+        icon: 'success',
+        title: '¡Eliminado!',
+        text: response.message || 'El usuario ha sido eliminado exitosamente',
+        showConfirmButton: false,
+        timer: 2000,
+        toast: true,
+        position: 'top-end',
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al Eliminar',
+        text: error.response?.data?.message || error.message || 'No se pudo eliminar el usuario',
+        confirmButtonColor: '#ef4444',
+      });
+    },
+  });
+
+  // Mutación para el envío masivo de credenciales
+  const sendBulkCredentialsMutation = useMutation({
+    mutationFn: async (residentIds) => {
+      return await ResidentService.sendBulkCredentials(residentialUnitId, residentIds);
+    },
+    onSuccess: (response) => {
+      const { successful, failed, total_processed } = response.data;
+
+      Swal.fire({
+        icon: successful === total_processed ? 'success' : 'warning',
+        title: successful === total_processed ? '¡Credenciales Enviadas!' : 'Envío Parcial',
+        html: `
+          <div class="text-left">
+            <div class="bg-blue-50 p-3 rounded-lg mb-3">
+              <p class="text-sm text-blue-700">
+                <strong>Total procesados:</strong> ${total_processed}
+              </p>
+              <p class="text-sm text-green-700">
+                <strong>Exitosos:</strong> ${successful}
+              </p>
+              ${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
+            </div>
+            ${
+              response.data.errors && response.data.errors.length > 0
+                ? `
+                <div class="bg-red-50 p-3 rounded-lg max-h-32 overflow-y-auto">
+                  <p class="font-semibold text-red-800 mb-2">Errores:</p>
+                  <ul class="text-sm text-red-700 space-y-1">
+                    ${response.data.errors.map((err) => `<li>ID ${err.resident_id}: ${err.error}</li>`).join('')}
+                  </ul>
+                </div>
+              `
+                : ''
+            }
+          </div>
+        `,
+        confirmButtonColor: '#27ae60',
+        width: '500px',
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al Enviar Credenciales',
+        text: error.response?.data?.message || error.message || 'Error al enviar credenciales masivamente',
+        confirmButtonColor: '#e74c3c',
+      });
+    },
+  });
+
+  // Función para reenviar credenciales individuales
+  const handleResendCredentials = async (resident) => {
+    const result = await Swal.fire({
+      title: '¿Enviar credenciales?',
+      html: `
+        <div class="text-left">
+          <p class="mb-3">Se generará una nueva contraseña temporal y se enviará por correo a:</p>
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <p class="font-semibold text-blue-800">${resident.firstname} ${resident.lastname}</p>
+            <p class="text-sm text-blue-700 mt-1">
+              <strong>Email:</strong> ${resident.email}
+            </p>
+            <p class="text-sm text-blue-700">
+              <strong>Usuario:</strong> ${resident.username}
+            </p>
+          </div>
+          <p class="text-xs text-gray-600 mt-3">
+            💡 La contraseña actual será reemplazada por una nueva contraseña temporal.
+          </p>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#3498db',
+      cancelButtonColor: '#95a5a6',
+      confirmButtonText: 'Sí, enviar',
+      cancelButtonText: 'Cancelar',
+      width: '500px',
+      showLoaderOnConfirm: true,
+      preConfirm: async () => {
+        try {
+          const response = await ResidentService.resendCredentials(residentialUnitId, resident.id);
+          return response;
+        } catch (error) {
+          Swal.showValidationMessage(
+            error.response?.data?.message || error.message || 'Error al enviar credenciales'
+          );
+        }
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
     });
-  };
 
-  const handleRevoke = (user) => {
-    if (confirm(`¿Revocar poder de ${user.name}?`)) {
-      alert("Poder revocado");
+    if (result.isConfirmed && result.value?.success) {
+      Swal.fire({
+        icon: 'success',
+        title: '¡Credenciales Enviadas!',
+        html: `
+          <div class="text-left">
+            <p class="mb-2">Las credenciales han sido enviadas exitosamente a:</p>
+            <div class="bg-green-50 p-3 rounded-lg">
+              <p class="text-sm text-green-700">
+                <strong>Email:</strong> ${resident.email}
+              </p>
+              <p class="text-sm text-green-700 mt-1">
+                <strong>Usuario:</strong> ${resident.username}
+              </p>
+            </div>
+            <p class="text-xs text-gray-600 mt-3">
+              📧 El copropietario recibirá un correo con su nueva contraseña temporal.
+            </p>
+          </div>
+        `,
+        confirmButtonColor: '#27ae60',
+        width: '500px',
+      });
     }
   };
 
+  // Función para eliminar residente con confirmación
+  const handleDeleteResident = async (residentId, residentName) => {
+    const result = await Swal.fire({
+      title: 'Eliminar Copropietario',
+      text: `¿Estás seguro de eliminar a ${residentName}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+    });
+
+    if (result.isConfirmed) {
+      deleteResidentMutation.mutate({ userId: residentId, unitId: residentialUnitId });
+    }
+  };
+
+  // Mostrar error
+  if (isError) {
+    return (
+      <section>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <div className="text-red-500 text-4xl mb-3">⚠️</div>
+          <h3 className="text-lg font-semibold text-red-800 mb-2">
+            Error al cargar usuarios
+          </h3>
+          <p className="text-red-600 mb-4">
+            {error?.message || 'No se pudieron cargar los usuarios de la unidad residencial'}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Intentar nuevamente
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Gestión de Usuarios</h2>
-        <button onClick={onCreateUser} className="px-4 py-2 bg-green-600 text-white rounded"> Crear Usuario</button>
+    <section className="space-y-6">
+      {/* Header con botones de acción */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Gestión de Copropietarios</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Total de copropietarios: <span className="font-semibold">{residents.length}</span>
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={onUploadExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg transition-all"
+          >
+            <Upload size={18} />
+            <span>Cargar Excel</span>
+          </button>
+          <button
+            onClick={onCreateUser}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:shadow-lg transition-all"
+          >
+            <Plus size={18} />
+            <span>Agregar Copropietario</span>
+          </button>
+        </div>
       </div>
 
-      <UsersTable
-        users={users}
-        onEdit={handleEdit}
-        onTransferPower={handleTransferPower}
-        onRevoke={handleRevoke}
-      />
+      {/* Grid con dos columnas: Residentes y Reuniones */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Columna izquierda: Lista de residentes */}
+        <div className="lg:col-span-1">
+          <ResidentsList
+            residents={residents}
+            isLoading={isLoading}
+            onResendCredentials={handleResendCredentials}
+            onEditResident={onEditUser}
+            onDeleteResident={handleDeleteResident}
+            onSendBulkCredentials={(selectedResidents) => {
+              if (selectedResidents.length === 0) {
+                Swal.fire({
+                  icon: 'warning',
+                  title: 'Sin selección',
+                  text: 'Debes seleccionar al menos un copropietario',
+                  confirmButtonColor: '#3498db',
+                });
+                return;
+              }
 
-      <div className="mt-4">
-        <p className="text-sm text-gray-500">Aquí puedes editar usuarios, ceder poderes o revocar.</p>
+              Swal.fire({
+                title: '¿Enviar Credenciales?',
+                html: `
+                  <div class="text-left">
+                    <p class="mb-3">Se enviarán credenciales por correo electrónico a:</p>
+                    <div class="bg-blue-50 p-3 rounded-lg">
+                      <p class="text-lg font-bold text-blue-800">
+                        ${selectedResidents.length} copropietario(s) seleccionado(s)
+                      </p>
+                    </div>
+                    <p class="text-xs text-gray-600 mt-3">
+                      💡 Cada copropietario recibirá un correo con su contraseña temporal.
+                    </p>
+                  </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3498db',
+                cancelButtonColor: '#95a5a6',
+                confirmButtonText: 'Sí, enviar',
+                cancelButtonText: 'Cancelar',
+                width: '500px',
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  sendBulkCredentialsMutation.mutate(selectedResidents);
+                }
+              });
+            }}
+            isSendingBulk={sendBulkCredentialsMutation.isPending}
+          />
+        </div>
+
+        {/* Columna derecha: Reuniones */}
+        <div className="lg:col-span-1">
+          <MeetingsSection
+            meetings={meetings}
+            isLoading={isLoadingMeetings}
+            onCreateMeeting={onCreateMeeting}
+            onJoinMeeting={onJoinMeeting}
+          />
+        </div>
       </div>
     </section>
   );

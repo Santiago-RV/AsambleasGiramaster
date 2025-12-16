@@ -1,0 +1,19 @@
+/**
+ * Estilos para proteger la aplicación de los estilos globales de Zoom
+ * Zoom inyecta estilos que pueden afectar toda la página
+ */
+
+/* Proteger todos los elementos dentro de #root */
+#root,
+#root * {
+  box-sizing: border-box;
+}
+
+/* Resetear margin y padding del body */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Los estilos de Zoom solo deben aplicarse dentro de #zmmtg-root */
+/* Cualquier estilo de Zoom fuera de este contenedor debe ser ignorado */

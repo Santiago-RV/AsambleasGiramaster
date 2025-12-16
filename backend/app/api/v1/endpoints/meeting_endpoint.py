@@ -105,7 +105,6 @@ async def create_meeting(
             meeting_type=meeting_data.str_meeting_type,
             schedule_date=meeting_data.dat_schedule_date,
             estimated_duration=meeting_data.int_estimated_duration,
-            meeting_leader_id=meeting_data.int_meeting_leader_id,
             allow_delegates=meeting_data.bln_allow_delegates,
             user_id=1  # TODO: Obtener el ID del usuario actual
         )

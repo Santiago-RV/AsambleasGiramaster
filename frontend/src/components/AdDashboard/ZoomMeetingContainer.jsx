@@ -1,0 +1,648 @@
+import React, { useEffect, useState } from 'react';
+import ReactDOM from 'react-dom';
+import { ZoomMtg } from '@zoom/meetingsdk';
+import { X, Loader2, CheckCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import axiosInstance from '../../services/api/axiosconfig';
+import { PollService } from '../../services/api/PollService';
+
+// NO precargar aquí para evitar que los estilos se carguen globalmente
+// ZoomMtg.preLoadWasm();
+// ZoomMtg.prepareWebSDK();
+
+/**
+ * Componente de Zoom usando SDK Web (pantalla completa) para Administradores
+ * Permite unirse a reuniones como anfitrión (role: 1)
+ */
+const ZoomMeetingContainer = ({
+	meetingData,
+	onClose,
+	startFullscreen = false
+}) => {
+	const [isLoading, setIsLoading] = useState(true);
+	const [loadingMessage, setLoadingMessage] = useState('Iniciando reunión...');
+	const [error, setError] = useState(null);
+	const [showPollButton, setShowPollButton] = useState(false); // Se activa cuando hay encuesta
+	const [showPollModal, setShowPollModal] = useState(false);
+	const [selectedOption, setSelectedOption] = useState(null);
+	const [isSubmittingVote, setIsSubmittingVote] = useState(false);
+
+	// Obtener encuestas activas de la reunión
+	const { data: pollsData, isLoading: isLoadingPolls, refetch: refetchPolls } = useQuery({
+		queryKey: ['meeting-polls', meetingData?.id],
+		queryFn: async () => {
+			if (!meetingData?.id) return { data: [] };
+			console.log('🔍 [ZoomMeetingContainer] Obteniendo encuestas para reunión:', meetingData.id);
+			const result = await PollService.getPollsByMeeting(meetingData.id);
+			console.log('📊 [ZoomMeetingContainer] Encuestas obtenidas:', result);
+			return result;
+		},
+		enabled: !!meetingData?.id,
+		refetchInterval: 5000, // Refrescar cada 5 segundos
+	});
+
+	// Obtener la encuesta activa (estado "Activa")
+	const activePoll = pollsData?.data?.find(poll => poll.str_status === 'Activa');
+
+	// Mostrar botón cuando hay encuesta activa
+	useEffect(() => {
+		console.log('🎯 [ZoomMeetingContainer] Evaluando mostrar botón:', {
+			pollsData: pollsData?.data,
+			activePoll,
+			showPollButton: !!activePoll
+		});
+		setShowPollButton(!!activePoll);
+	}, [activePoll, pollsData]);
+
+	useEffect(() => {
+		if (!meetingData) {
+			setError('No hay datos de reunión disponibles');
+			setIsLoading(false);
+			return;
+		}
+
+		// Precargar recursos de Zoom SOLO cuando se va a usar
+		ZoomMtg.preLoadWasm();
+		ZoomMtg.prepareWebSDK();
+
+		// Mostrar el contenedor root de Zoom
+		const zmmtgRoot = document.getElementById('zmmtg-root');
+		if (zmmtgRoot) {
+			zmmtgRoot.style.display = 'block';
+		}
+
+		const timer = setTimeout(() => {
+			initializeZoom();
+		}, 100);
+
+		return () => {
+			clearTimeout(timer);
+
+			// Si el componente se desmonta y aún hay una reunión activa, registrar fin
+			console.log('🧹 Limpiando componente de Zoom...');
+
+			// Limpiar Zoom al desmontar
+			const zmmtgRoot = document.getElementById('zmmtg-root');
+			if (zmmtgRoot) {
+				zmmtgRoot.style.display = 'none';
+				// Limpiar el contenido de Zoom
+				zmmtgRoot.innerHTML = '';
+			}
+		};
+	}, [meetingData]);
+
+	const initializeZoom = async () => {
+		try {
+			setIsLoading(true);
+			setLoadingMessage('Preparando reunión...');
+
+			// Extraer meeting number de la URL
+			const meetingNumber = extractMeetingNumber(
+				meetingData.str_zoom_join_url || meetingData.int_zoom_meeting_id
+			);
+
+			const password =
+				meetingData.str_zoom_password ||
+				extractPassword(meetingData.str_zoom_join_url);
+
+			if (!meetingNumber) {
+				throw new Error('No se pudo extraer el número de reunión');
+			}
+
+			console.log('🔵 Obteniendo configuración de Zoom...');
+			setLoadingMessage('Configurando conexión...');
+
+			// Obtener SDK Key del backend
+			const configResponse = await axiosInstance.get('/zoom/config');
+			const sdkKey = configResponse.data.data.sdk_key;
+
+			console.log('🔵 Generando firma...');
+			setLoadingMessage('Autenticando...');
+
+			// Generar firma (role: 1 para anfitriones/administradores)
+			const signature = await generateSignature(meetingNumber);
+
+			console.log('🔵 Iniciando Zoom SDK Web...');
+			setLoadingMessage('Cargando sala de reunión...');
+
+			// Obtener nombre del usuario
+			const userName = localStorage.getItem('user')
+				? JSON.parse(localStorage.getItem('user')).name
+				: 'Administrador';
+
+			// Configurar idioma español antes de inicializar
+			console.log('🌐 Configurando idioma español...');
+			ZoomMtg.i18n.load('es-ES');
+			ZoomMtg.i18n.reload('es-ES');
+
+			// Inicializar Zoom Meeting SDK
+			ZoomMtg.init({
+				leaveUrl: 'about:blank', // Evitar redirección automática
+				patchJsMedia: true,
+				leaveOnPageUnload: false, // No cerrar automáticamente al cambiar de página
+				success: (success) => {
+					console.log('✅ Zoom SDK inicializado', success);
+					setLoadingMessage('Conectando a la reunión...');
+					// NO quitar el loading aquí, esperar a que se una a la reunión
+
+					// Unirse a la reunión
+					ZoomMtg.join({
+						signature: signature,
+						sdkKey: sdkKey,
+						meetingNumber: meetingNumber,
+						passWord: password || '',
+						userName: userName,
+						userEmail: '',
+						tk: '',
+						zak: '',
+						success: (success) => {
+							console.log('✅ Conectado a la reunión como anfitrión', success);
+							setLoadingMessage('Cargando interfaz de Zoom...');
+
+							// Configurar listeners para detectar cuando se sale de la reunión
+							console.log('🎧 Configurando listeners de eventos de Zoom...');
+
+							// Listener cuando un usuario sale
+							ZoomMtg.inMeetingServiceListener('onUserLeave', (data) => {
+								console.log('👋 Usuario saliendo de la reunión:', data);
+							});
+
+							// Listener del estado de la reunión
+							ZoomMtg.inMeetingServiceListener('onMeetingStatus', (data) => {
+								console.log('📢 Estado de reunión cambió:', data);
+								// meetingStatus: 1 = connecting, 2 = connected, 3 = disconnected/ended
+								if (data.meetingStatus === 3) {
+									console.log('🔴 Reunión finalizada - disparando handleMeetingEnd');
+									handleMeetingEnd();
+								}
+							});
+
+							// Listener adicional para cuando el host deja la reunión
+							ZoomMtg.inMeetingServiceListener('onHostAskToUnMute', (data) => {
+								console.log('🎤 onHostAskToUnMute:', data);
+							});
+
+							console.log('✅ Listeners configurados correctamente');
+
+							// Esperar a que la interfaz de Zoom esté completamente cargada
+							// Observar cambios en el DOM de Zoom para detectar la sala de espera
+							let zoomLoadAttempts = 0;
+							const maxAttempts = 150; // 15 segundos (150 * 100ms)
+
+							const checkZoomLoaded = setInterval(() => {
+								zoomLoadAttempts++;
+								const zmmtgRoot = document.getElementById('zmmtg-root');
+
+								console.log(`🔍 Intento ${zoomLoadAttempts}: Buscando interfaz de Zoom...`);
+
+								// Verificar que Zoom haya renderizado contenido
+								if (zmmtgRoot && zmmtgRoot.children.length > 0) {
+									// Buscar elementos específicos de la sala de espera o interfaz de Zoom
+									const waitingRoom = zmmtgRoot.querySelector('[class*="waiting"]') ||
+									                    zmmtgRoot.querySelector('[class*="join"]') ||
+									                    zmmtgRoot.querySelector('[class*="preview"]');
+
+									const meetingContent = zmmtgRoot.querySelector('[class*="meeting-client"]') ||
+									                       zmmtgRoot.querySelector('[class*="main-layout"]') ||
+									                       zmmtgRoot.querySelector('[class*="meeting-app"]');
+
+									const anyZoomContent = zmmtgRoot.querySelector('[class*="zm-"]') ||
+									                       zmmtgRoot.querySelector('iframe') ||
+									                       zmmtgRoot.querySelector('video');
+
+									console.log('🔍 Elementos encontrados:', {
+										waitingRoom: !!waitingRoom,
+										meetingContent: !!meetingContent,
+										anyZoomContent: !!anyZoomContent,
+										totalChildren: zmmtgRoot.children.length
+									});
+
+									// Si encontramos sala de espera, contenido de reunión, o cualquier interfaz de Zoom
+									if (waitingRoom || meetingContent || (anyZoomContent && zmmtgRoot.children.length > 2)) {
+										console.log('✅ Interfaz de Zoom detectada, esperando renderizado completo...');
+										clearInterval(checkZoomLoaded);
+										// Delay adicional para asegurar que todo está renderizado
+										setTimeout(() => {
+											console.log('✅ Quitando pantalla de carga');
+											setIsLoading(false);
+										}, 1500);
+									}
+								}
+
+								// Timeout si llegamos al máximo de intentos
+								if (zoomLoadAttempts >= maxAttempts) {
+									console.log('⏱️ Timeout alcanzado: Quitando pantalla de carga');
+									clearInterval(checkZoomLoaded);
+									setIsLoading(false);
+								}
+							}, 100);
+						},
+						error: (error) => {
+							console.error('❌ Error al unirse:', error);
+							setError('Error al unirse a la reunión');
+							setIsLoading(false);
+						},
+					});
+				},
+				error: (error) => {
+					console.error('❌ Error al inicializar:', error);
+					setError(error.message || 'Error al inicializar la reunión');
+					setIsLoading(false);
+				},
+			});
+
+		} catch (err) {
+			console.error('❌ Error al inicializar:', err);
+			setError(err.message || 'Error al inicializar la reunión');
+			setIsLoading(false);
+		}
+	};
+
+	const extractMeetingNumber = (value) => {
+		if (!value) return '';
+
+		// Si es un número directo
+		if (typeof value === 'number') return value.toString();
+
+		// Si es string numérico
+		if (/^\d+$/.test(value)) return value;
+
+		// Si es URL, extraer número
+		const match = value.match(/\/j\/(\d+)/);
+		return match ? match[1] : '';
+	};
+
+	const extractPassword = (url) => {
+		if (!url) return '';
+		const match = url.match(/pwd=([^&]+)/);
+		return match ? match[1] : '';
+	};
+
+	const generateSignature = async (meetingNumber) => {
+		try {
+			const response = await axiosInstance.post(
+				'/zoom/generate-signature',
+				{
+					meeting_number: meetingNumber,
+					role: 1, // 1 = anfitrión (administrador)
+				}
+			);
+
+			if (response.data.success) {
+				return response.data.data.signature;
+			} else {
+				throw new Error('No se pudo generar el signature');
+			}
+		} catch (error) {
+			console.error('❌ Error generando firma:', error);
+			throw error;
+		}
+	};
+
+	const handleMeetingEnd = async () => {
+		// Primero cerrar el componente y volver al dashboard
+		console.log('🔄 Cerrando componente de Zoom y volviendo al dashboard');
+		onClose();
+
+		// Luego registrar la hora de finalización en segundo plano
+		// Esto evita que cualquier error (incluyendo 401) afecte la navegación
+		try {
+			console.log('📝 Registrando hora de finalización de la reunión en segundo plano...', {
+				meetingId: meetingData.id,
+				endpoint: `/meetings/${meetingData.id}/end`
+			});
+
+			const response = await axiosInstance.post(`/meetings/${meetingData.id}/end`);
+			console.log('✅ Hora de finalización registrada correctamente:', response.data);
+		} catch (error) {
+			// Silenciosamente capturar el error sin afectar la navegación
+			// No redirigir a login si hay error 401
+			console.error('❌ Error al registrar hora de finalización (no crítico):', {
+				error: error.message,
+				response: error.response?.data,
+				meetingId: meetingData.id
+			});
+		}
+	};
+
+	const handleViewPoll = () => {
+		console.log('📊 Abriendo modal de encuesta activa');
+		setSelectedOption(null);
+		setShowPollModal(true);
+	};
+
+	const handleClosePollModal = () => {
+		console.log('📊 Cerrando modal de encuesta');
+		setShowPollModal(false);
+		setSelectedOption(null);
+	};
+
+	const handleVote = async () => {
+		if (!activePoll || !selectedOption) return;
+
+		setIsSubmittingVote(true);
+		try {
+			const voteData = {
+				int_option_id: selectedOption,
+				bln_is_abstention: false,
+			};
+
+			await PollService.vote(activePoll.id, voteData);
+
+			console.log('✅ Voto registrado exitosamente');
+
+			// Refrescar encuestas
+			await refetchPolls();
+
+			// Cerrar modal
+			handleClosePollModal();
+
+			// Mostrar mensaje de éxito
+			alert('Tu voto ha sido registrado exitosamente');
+		} catch (error) {
+			console.error('❌ Error al votar:', error);
+			alert(error.response?.data?.message || 'Error al registrar el voto');
+		} finally {
+			setIsSubmittingVote(false);
+		}
+	};
+
+	// Error
+	if (error) {
+		return (
+			<div className="flex items-center justify-center min-h-screen bg-gray-900">
+				<div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
+					<div className="text-center">
+						<div className="text-red-500 text-5xl mb-4">⚠️</div>
+						<h3 className="text-xl font-bold text-gray-800 mb-2">
+							Error al cargar la reunión
+						</h3>
+						<p className="text-gray-600 mb-6">{error}</p>
+						<button
+							onClick={onClose}
+							className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+						>
+							Cerrar
+						</button>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	// Loading overlay - Solo se muestra mientras se inicializa
+	if (isLoading) {
+		return (
+			<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 10000 }}>
+				<div className="text-center max-w-md mx-4">
+					{/* Logo o icono de Zoom */}
+					<div className="mb-6">
+						<div className="w-20 h-20 mx-auto bg-blue-600 rounded-full flex items-center justify-center shadow-2xl">
+							<svg
+								className="w-12 h-12 text-white"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+								/>
+							</svg>
+						</div>
+					</div>
+
+					{/* Spinner animado */}
+					<Loader2 className="w-16 h-16 text-blue-400 animate-spin mx-auto mb-6" />
+
+					{/* Mensaje de estado dinámico */}
+					<p className="text-white text-2xl font-bold mb-3 animate-pulse">
+						{loadingMessage}
+					</p>
+
+					{/* Nombre de la reunión */}
+					<p className="text-gray-300 text-base mb-6">
+						{meetingData?.str_title || 'Cargando reunión'}
+					</p>
+
+					{/* Barra de progreso animada */}
+					<div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+						<div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 animate-pulse rounded-full" style={{ width: '70%' }}></div>
+					</div>
+
+					{/* Texto de ayuda */}
+					<p className="text-gray-400 text-xs mt-4">
+						Por favor espera mientras cargamos la sala de reunión
+					</p>
+				</div>
+			</div>
+		);
+	}
+
+	// Una vez que Zoom está cargado, el SDK maneja toda la UI
+	// Agregamos solo un botón flotante para ver encuestas activas usando Portal
+
+	// Log para debugging: verificar estado del botón
+	console.log('🔘 [ZoomMeetingContainer] Estado del botón:', { showPollButton, activePoll: !!activePoll, isLoading });
+
+	return (
+		<>
+			{/* Botón flotante renderizado directamente en body usando Portal */}
+			{showPollButton && ReactDOM.createPortal(
+				<button
+					onClick={handleViewPoll}
+					className="fixed bottom-24 right-8 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 rounded-full shadow-2xl hover:from-purple-700 hover:to-purple-800 transition-all duration-300 flex items-center gap-3 group hover:scale-105"
+					style={{ zIndex: 10001 }}
+					title="Ver encuesta activa"
+				>
+					<svg
+						className="w-6 h-6"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							strokeWidth={2}
+							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+						/>
+					</svg>
+					<span className="font-semibold">
+						Encuesta Activa
+					</span>
+					<div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+				</button>,
+				document.body
+			)}
+
+			{/* Modal de encuesta activa renderizado en body usando Portal */}
+			{showPollModal && ReactDOM.createPortal(
+				<div
+					className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+					style={{ zIndex: 10002 }}
+					onClick={handleClosePollModal}
+				>
+					<div
+						className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+						onClick={(e) => e.stopPropagation()}
+					>
+						{/* Header del modal */}
+						<div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 rounded-t-2xl flex items-center justify-between">
+							<h2 className="text-xl font-bold text-white">Encuesta Activa</h2>
+							<button
+								onClick={handleClosePollModal}
+								className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-all"
+							>
+								<X size={24} />
+							</button>
+						</div>
+
+						{/* Contenido del modal */}
+						<div className="p-6">
+							{isLoadingPolls ? (
+								<div className="text-center py-12">
+									<Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
+									<p className="text-gray-600">Cargando encuesta...</p>
+								</div>
+							) : activePoll ? (
+								<div className="space-y-6">
+									{/* Título y descripción */}
+									<div>
+										<h3 className="text-2xl font-bold text-gray-800 mb-2">
+											{activePoll.str_title}
+										</h3>
+										{activePoll.str_description && (
+											<p className="text-gray-600">
+												{activePoll.str_description}
+											</p>
+										)}
+									</div>
+
+									{/* Tipo de encuesta y configuración */}
+									<div className="flex flex-wrap gap-2">
+										<span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+											{activePoll.str_poll_type === 'single' ? 'Opción única' :
+											 activePoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
+											 activePoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
+										</span>
+										{activePoll.bln_is_anonymous && (
+											<span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+												Anónima
+											</span>
+										)}
+										{activePoll.bln_allows_abstention && (
+											<span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
+												Permite abstención
+											</span>
+										)}
+									</div>
+
+									{/* Opciones de votación */}
+									{activePoll.str_poll_type === 'single' || activePoll.str_poll_type === 'multiple' ? (
+										<div className="space-y-3">
+											<p className="font-semibold text-gray-700">Selecciona una opción:</p>
+											{activePoll.options?.map((option) => (
+												<button
+													key={option.id}
+													onClick={() => setSelectedOption(option.id)}
+													className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+														selectedOption === option.id
+															? 'border-purple-600 bg-purple-50'
+															: 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'
+													}`}
+												>
+													<div className="flex items-center justify-between">
+														<span className="font-medium text-gray-800">
+															{option.str_option_text}
+														</span>
+														{selectedOption === option.id && (
+															<CheckCircle className="text-purple-600" size={24} />
+														)}
+													</div>
+												</button>
+											))}
+										</div>
+									) : (
+										<div className="text-center py-8">
+											<p className="text-gray-600 mb-4">
+												Este tipo de encuesta ({activePoll.str_poll_type}) aún no está disponible para votación desde la reunión.
+											</p>
+										</div>
+									)}
+
+									{/* Botones de acción */}
+									<div className="flex gap-3 pt-4 border-t border-gray-200">
+										<button
+											onClick={handleClosePollModal}
+											className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold"
+										>
+											Cancelar
+										</button>
+										<button
+											onClick={handleVote}
+											disabled={!selectedOption || isSubmittingVote}
+											className={`flex-1 px-6 py-3 rounded-xl font-semibold transition-all ${
+												selectedOption && !isSubmittingVote
+													? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800 shadow-lg'
+													: 'bg-gray-300 text-gray-500 cursor-not-allowed'
+											}`}
+										>
+											{isSubmittingVote ? (
+												<span className="flex items-center justify-center gap-2">
+													<Loader2 className="animate-spin" size={20} />
+													Votando...
+												</span>
+											) : (
+												'Votar'
+											)}
+										</button>
+									</div>
+								</div>
+							) : (
+								<div className="text-center py-12">
+									<div className="inline-flex p-4 bg-gray-100 rounded-full mb-4">
+										<svg
+											className="w-12 h-12 text-gray-400"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth={2}
+												d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+											/>
+										</svg>
+									</div>
+									<h3 className="text-lg font-bold text-gray-800 mb-2">
+										No hay encuestas activas
+									</h3>
+									<p className="text-gray-600 mb-6">
+										No hay encuestas activas en este momento. El administrador puede crear encuestas desde la pestaña "Encuestas" del dashboard.
+									</p>
+									<button
+										onClick={handleClosePollModal}
+										className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold"
+									>
+										Cerrar
+									</button>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>,
+				document.body
+			)}
+
+			{/* Nota: El botón de salir de Zoom es nativo del SDK */}
+			{/* Cuando el usuario lo presiona, se dispara el evento onMeetingStatus */}
+			{/* y registramos la hora de finalización automáticamente */}
+		</>
+	);
+};
+
+export default ZoomMeetingContainer;

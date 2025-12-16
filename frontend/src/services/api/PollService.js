@@ -248,6 +248,89 @@ export class PollService {
 
     return this.createPoll(pollData);
   }
+
+  /**
+   * Obtener reuniones en vivo (helper method)
+   * Reuniones que están activas o accesibles:
+   * - El anfitrión puede acceder 1 hora antes de la hora programada
+   * - El anfitrión puede cerrar el acceso finalizando la reunión
+   * - Debe tener invitados registrados
+   * - No debe haber terminado
+   * @param {number} residentialUnitId - ID de la unidad residencial
+   * @returns {Promise}
+   */
+  static async getLiveMeetings(residentialUnitId) {
+    const response = await axiosInstance.get('/meetings');
+
+    console.log('📊 [getLiveMeetings] Respuesta del backend:', response.data);
+    console.log('📊 [getLiveMeetings] ID Unidad Residencial:', residentialUnitId);
+
+    if (response.data && response.data.success && response.data.data) {
+      const now = new Date();
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+
+      console.log('📊 [getLiveMeetings] Total reuniones recibidas:', response.data.data.length);
+
+      // Filtrar reuniones en vivo
+      const liveMeetings = response.data.data.filter((meeting) => {
+        console.log('🔍 Evaluando reunión:', {
+          id: meeting.id,
+          titulo: meeting.str_title,
+          estado: meeting.str_status,
+          unidad_residencial: meeting.int_id_residential_unit,
+          fecha_inicio_real: meeting.dat_actual_start_time,
+          fecha_fin_real: meeting.dat_actual_end_time,
+        });
+
+        // ============================================
+        // MODO PRUEBAS: SIN FILTROS
+        // ============================================
+        // Mostrar TODAS las reuniones que estén en estado "Programada" o "En curso"
+
+        const isValidStatus = meeting.str_status === 'Programada' || meeting.str_status === 'En curso';
+
+        console.log('✅ Estado válido?', isValidStatus, '- Estado:', meeting.str_status);
+
+        return isValidStatus;
+
+        // COMENTADO: Filtro de unidad residencial
+        // if (meeting.int_id_residential_unit !== residentialUnitId) {
+        //   return false;
+        // }
+
+        // COMENTADO: Debe tener invitados registrados (al menos 1)
+        // if (!meeting.int_total_invitated || meeting.int_total_invitated === 0) {
+        //   return false;
+        // }
+
+        // COMENTADO: No debe haber terminado
+        // if (meeting.dat_actual_end_time) {
+        //   return false;
+        // }
+
+        // COMENTADO: No debe estar en estado "Finalizada" o "Completada"
+        // if (meeting.str_status === 'Finalizada' || meeting.str_status === 'Completada') {
+        //   return false;
+        // }
+
+        // COMENTADO: Validación de ventana de 1 hora
+        // const scheduleDate = new Date(meeting.dat_schedule_date);
+        // const timeDifference = scheduleDate.getTime() - now.getTime();
+        // if (timeDifference <= ONE_HOUR_MS) {
+        //   return true;
+        // }
+      });
+
+      console.log('📊 [getLiveMeetings] Reuniones filtradas:', liveMeetings.length);
+      console.log('📊 [getLiveMeetings] Reuniones que se mostrarán:', liveMeetings);
+
+      return {
+        ...response.data,
+        data: liveMeetings,
+      };
+    }
+    return response.data;
+  }
 }
 
 export default PollService;

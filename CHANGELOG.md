@@ -9,6 +9,351 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-16
+
+- **CORRECCIÓN CRÍTICA: Navegación al salir de reunión sin cerrar sesión**:
+  - **Problema identificado**:
+    - Al salir de una reunión de Zoom, el usuario era deslogueado de la sesión
+    - Esto ocurría cuando el endpoint `/meetings/{id}/end` retornaba 401 antes de completar la navegación
+    - El interceptor de axios redirigía a `/login` automáticamente ante errores 401
+
+  - **Solución implementada**:
+    - Reorganizado el flujo en `handleMeetingEnd()` para ejecutar `onClose()` PRIMERO
+    - El registro de hora de finalización ahora ocurre en segundo plano DESPUÉS de la navegación
+    - Esto previene que errores de API (incluyendo 401) afecten el retorno al dashboard
+
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (líneas 271-295): Reordenamiento de operaciones
+      - ANTES: try { API call } catch { error } finally { onClose() }
+      - AHORA: onClose() primero, luego try { API call } catch { silent error }
+
+  - **Beneficios**:
+    - ✅ **Usuario regresa al dashboard inmediatamente** al salir de la reunión
+    - ✅ **Sesión se mantiene activa** sin importar el resultado del registro de finalización
+    - ✅ **Experiencia fluida** sin interrupciones inesperadas
+    - ✅ **Registro de finalización en segundo plano** no crítico para UX
+
+- **Sistema completo de votación en tiempo real durante reuniones**:
+  - **Problema resuelto**:
+    - El modal de encuesta mostraba un mensaje placeholder sin funcionalidad real
+    - No se cargaban las encuestas activas de la reunión
+    - Los usuarios no podían votar durante la reunión
+
+  - **Solución implementada**:
+    - Integración completa con React Query para obtener encuestas en tiempo real
+    - Query que se actualiza cada 5 segundos para detectar encuestas activas
+    - Detección automática de encuesta activa (estado "Activa")
+    - Botón flotante que solo aparece cuando hay encuesta activa
+    - Modal funcional con interfaz completa de votación
+
+  - **Funcionalidades del modal de encuesta**:
+    - **Información de encuesta**:
+      - Título y descripción
+      - Badges con tipo (opción única/múltiple/texto/numérica)
+      - Indicadores de configuración (anónima, permite abstención)
+    - **Interfaz de votación**:
+      - Lista de opciones con diseño interactivo
+      - Selección visual con check mark (CheckCircle icon)
+      - Estados hover y selección con colores diferenciados
+      - Soporte para encuestas single y multiple choice
+    - **Gestión de votos**:
+      - Validación de opción seleccionada antes de votar
+      - Loading state durante envío del voto
+      - Actualización automática después de votar
+      - Mensaje de confirmación al usuario
+      - Manejo de errores con mensajes claros
+
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx`:
+      - Línea 4: Agregado import `CheckCircle` de lucide-react
+      - Líneas 5-7: Imports de `useQuery` y `PollService`
+      - Líneas 25-28: Estados para votación (`selectedOption`, `isSubmittingVote`)
+      - Líneas 31-47: Query para obtener encuestas con refetch cada 5 segundos
+      - Líneas 320-337: Handler `handleVote()` para enviar votos
+      - Líneas 470-570: Modal completamente rediseñado con funcionalidad real
+
+  - **Beneficios**:
+    - ✅ **Votación en tiempo real** sin salir de la reunión de Zoom
+    - ✅ **Actualización automática** cada 5 segundos para detectar nuevas encuestas
+    - ✅ **Botón inteligente** que solo aparece cuando hay encuesta activa
+    - ✅ **Interfaz intuitiva** con feedback visual claro
+    - ✅ **Experiencia fluida** con loading states y mensajes de confirmación
+    - ✅ **Manejo robusto de errores** para mejor UX
+
+- **MIGRACIÓN A ZOOM SDK WEB (Pantalla Completa Real)**:
+  - **Problema identificado**:
+    - El SDK Embedded (`@zoom/meetingsdk/embedded`) tiene limitaciones de tamaño
+    - La ventana de Zoom aparecía diminuta y no se podía expandir al tamaño completo
+    - El SDK Embedded está diseñado para integraciones parciales, no pantalla completa
+
+  - **Solución implementada**:
+    - Migración completa de SDK Embedded a **SDK Web** (`@zoom/meetingsdk`)
+    - El SDK Web permite pantalla completa nativa sin restricciones de tamaño
+    - Utiliza el contenedor `#zmmtg-root` que Zoom renderiza en toda la pantalla
+    - Precarga de recursos con `ZoomMtg.preLoadWasm()` y `ZoomMtg.prepareWebSDK()`
+
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (reconstrucción completa):
+      - Implementación con `ZoomMtg.init()` y `ZoomMtg.join()`
+      - Precarga controlada de recursos
+      - Detección inteligente de carga completa (líneas 147-172)
+      - Pantalla de carga con z-index 10000 para estar siempre visible (línea 281)
+      - Mensajes dinámicos de estado durante la carga (líneas 280-326)
+      - Listeners de eventos de Zoom mejorados (líneas 120-143)
+      - Registro automático de hora de finalización con logs detallados (líneas 225-247)
+      - Botón flotante para ver encuestas activas (activado por defecto para pruebas, línea 22)
+    - `index.html` (líneas 8-24): Agregado contenedor `#zmmtg-root` con estilos de pantalla completa
+    - `override-zoom.css` (nuevo): CSS para proteger estilos de la aplicación de los estilos globales de Zoom
+    - `main.jsx` (línea 4): Importación del CSS de protección después de Tailwind
+
+  - **Diferencias técnicas**:
+    - ❌ SDK Embedded: `ZoomMtgEmbedded.createClient()` - ventana limitada en tamaño
+    - ✅ SDK Web: `ZoomMtg.init()` + `ZoomMtg.join()` - pantalla completa real
+    - El SDK Web renderiza su propia UI completa sin restricciones de contenedor
+    - Compatible con el ejemplo oficial de Zoom para aplicaciones web
+
+  - **Beneficios**:
+    - ✅ **Pantalla completa real**: Zoom ocupa 100% de la ventana del navegador
+    - ✅ **Sin limitaciones de tamaño**: No hay ventanas diminutas o restricciones
+    - ✅ **UI nativa de Zoom completa**: Todos los controles y funcionalidades disponibles
+    - ✅ **Mejor experiencia**: Igual que usar Zoom en su aplicación web oficial
+    - ✅ **Más estable**: SDK Web es el más usado y mejor mantenido por Zoom
+    - ✅ **Pantalla de carga profesional**: Gradiente animado, icono de Zoom, mensajes de estado dinámicos
+    - ✅ **Detección inteligente**: La pantalla de carga se oculta solo cuando Zoom está completamente renderizado
+    - ✅ **Sin pantalla negra**: El usuario ve una interfaz atractiva durante toda la carga
+    - ✅ **Botón nativo de Zoom**: Usa el botón de salir del propio SDK de Zoom
+    - ✅ **Registro automático de finalización**: Al salir de la reunión se registra automáticamente `dat_actual_end_time`
+    - ✅ **Botón flotante de encuestas**: Acceso rápido a encuestas activas sin salir de la reunión
+
+- **CORRECCIÓN CRÍTICA: Zoom Embebido para Administradores (Unificación con SuperAdmin)**:
+  - **Problema identificado**:
+    - Los administradores eran redirigidos a la aplicación externa de Zoom en lugar de usar el SDK Embebido
+    - Mapeo incorrecto de campos de Zoom en `UsersPage.jsx`
+    - Experiencia inconsistente entre SuperAdmin (SDK Embebido) y Admin (app externa)
+
+  - **Solución implementada**:
+    - Administradores ahora usan el **mismo componente `ZoomMeetingContainer`** que SuperAdmin
+    - **Experiencia unificada**: Zoom embebido en la página con pantalla de carga y controles nativos
+    - Eliminada la redirección a aplicación externa (`window.open`)
+    - Mapeo de campos corregido en `UsersPage.jsx`
+
+  - **Campos corregidos**:
+    - ❌ ANTES: `str_meeting_url` (no existe), `str_zoom_meeting_id` (tipo incorrecto)
+    - ✅ AHORA: `str_zoom_join_url`, `int_zoom_meeting_id`, `str_zoom_password`
+
+  - **Archivos modificados**:
+    - `AdDashboard.jsx` (líneas 16, 34, 252-291, 370-381): Handler y renderizado fullscreen
+    - `UsersPage.jsx` (líneas 54-56): Mapeo de campos de Zoom corregido
+    - `ZoomMeetingContainer.jsx` (líneas 58-85, 219-273): Configuración de tamaño máximo del viewport (100vw x 100vh) para SDK de Zoom
+
+  - **Beneficios**:
+    - ✅ **Pantalla completa automática**: Zoom ocupa toda la ventana del navegador (100vw x 100vh)
+    - ✅ **Experiencia consistente** entre SuperAdmin y Admin (mismo componente)
+    - ✅ **Controles nativos de Zoom** completamente visibles y funcionales
+    - ✅ **Botón de cerrar** siempre accesible en esquina superior derecha con z-index alto
+    - ✅ **Pantalla de carga profesional** con spinner animado y nombre de reunión
+    - ✅ **Registro automático** de hora de inicio (`dat_actual_start_time`)
+    - ✅ **Sin instalación** de app de Zoom necesaria - todo en el navegador
+
+- **Validación de datos de Zoom antes de acceder a reuniones**:
+  - Agregada validación para verificar que la reunión tenga `int_zoom_meeting_id` o `str_zoom_join_url` antes de intentar acceder
+  - Mensaje de error claro cuando no hay URL de Zoom disponible
+  - Botón "Acceder a la Reunión" deshabilitado visualmente si no hay datos de Zoom
+  - Texto del botón cambia a "Sin URL de Zoom" cuando no está disponible
+  - Previene errores al intentar unirse a reuniones sin configuración de Zoom
+  - Implementado en `LivePage.jsx` (líneas 167-206) y `LiveMeetingCard.jsx` (líneas 144-164)
+
+- **Corrección de visibilidad de controles de Zoom**:
+  - Ajustados los z-index de controles personalizados para no ocultar controles nativos de Zoom
+  - Altura del contenedor ajustada a `calc(100vh - 200px)` con altura mínima de 600px
+  - Controles personalizados ahora usan transparencia (`/80`) y backdrop-blur
+  - Controles personalizados solo se muestran cuando corresponde (no en loading, posicionamiento mejorado)
+  - Contenedor del SDK de Zoom configurado con `zIndex: 1` para correcta visualización
+  - Aplicado a `ZoomMeetingContainer.jsx` (Administrador) y `ZoomEmbed.jsx` (Copropietario)
+
+- **Migración completa a Zoom SDK Embedded (sin componentes)**:
+  - Todos los roles (SuperAdmin, Administrador, Copropietario) ahora usan Zoom SDK Embedded
+  - Eliminado el uso de componentes de Zoom en favor del SDK más moderno
+  - `ZoomMeetingView.jsx` del SuperAdmin actualizado para usar SDK Embedded
+  - Experiencia de usuario mejorada con controles nativos del SDK
+  - Mejor rendimiento y estabilidad en las reuniones
+
+- **Sistema de roles de Zoom configurado correctamente**:
+  - **SuperAdministrador**: role: 1 (anfitrión) - Permisos completos de host
+  - **Administrador**: role: 1 (anfitrión) - Permisos completos de host
+  - **Copropietario**: role: 0 (participante) - Permisos limitados
+  - Configuración implementada en:
+    - `ZoomMeetingView.jsx` (SuperAdmin, línea 173)
+    - `ZoomMeetingContainer.jsx` (Administrador, línea 169)
+    - `ZoomEmbed.jsx` (Copropietario, línea 161)
+
+- **Sistema de acceso a reuniones con Zoom SDK Embedded para Administradores**:
+  - Nuevo componente `ZoomMeetingContainer.jsx` para administradores usando SDK Embedded de Zoom
+  - Botón "Acceder a la Reunión" agregado a `LiveMeetingCard.jsx` para permitir a administradores unirse a reuniones en vivo
+  - Integración completa en `LivePage.jsx` con navegación entre lista de reuniones, creación de encuestas y vista de Zoom
+  - Los administradores se unen como anfitriones (role: 1) con permisos completos
+  - Interfaz con controles de pantalla completa, minimizar y cerrar reunión
+  - Vista colapsada de la reunión cuando se muestra el contenedor de Zoom
+  - Registro automático de hora de inicio al acceder a la reunión
+
+- **Registro automático de hora de inicio al ingresar a reunión**:
+  - Cuando un copropietario hace clic en "Unirse a la Reunión", ahora se registra automáticamente la hora de inicio (`dat_actual_start_time`) en la base de datos
+  - Cuando un administrador hace clic en "Acceder a la Reunión", también se registra la hora de inicio automáticamente
+  - Llamada al endpoint `/meetings/{meeting_id}/start` antes de cargar el contenedor de Zoom
+  - Estado de carga "Ingresando..." mostrado durante el proceso de registro
+  - Implementado en `MeetingCard.jsx` (copropietarios, líneas 60-86) y `LivePage.jsx` (administradores, líneas 166-184)
+  - Si falla el registro, la reunión se carga de todas formas para no interrumpir la experiencia del usuario
+
+#### 2025-12-15
+
+- **Mejoras en el sistema de creación de reuniones**:
+  - **Ancho del modal optimizado**: Modal de creación de reuniones reducido a 70% del ancho de pantalla (max-w-3xl) para mejor experiencia de usuario
+  - Diseño más compacto y fácil de usar en el formulario de creación
+
+- **Asignación automática de líder de reunión mejorada**:
+  - Backend ahora utiliza join con `RolModel` para buscar administradores correctamente
+  - Corrección del error `UserModel has no attribute 'str_role'`
+  - Filtrado por `RolModel.str_name == 'Administrador'` en lugar de campo inexistente
+  - Validación mejorada para asegurar existencia de administrador activo
+  - Imports actualizados en `meeting_service.py` para incluir `RolModel`
+
+- **Sistema de gestión de encuestas con control temporal mejorado**:
+  - **Ventana de creación de encuestas clarificada**:
+    - Administradores pueden crear encuestas desde 1 hora antes de `dat_schedule_date`
+    - Continúan creando encuestas durante toda la reunión (hasta que se cierre manualmente)
+    - Validación basada únicamente en `dat_actual_end_time` (cuando admin cierra la reunión)
+    - `dat_actual_start_time` usado solo para registro, NO para validación
+  - **Logging detallado en pool_service.py**:
+    - Información de zona horaria y tiempo actual
+    - Diferencia temporal calculada en horas
+    - Estado de la reunión (finalizada/accesible)
+    - Decisiones de acceso registradas
+  - **Manejo de zona horaria**:
+    - Comparaciones timezone-aware para evitar errores
+    - Conversión UTC para cálculos de tiempo consistentes
+  - **Filtro de reuniones en vivo optimizado** (`PollService.js`):
+    - Eliminado filtro restrictivo de "1 hora después"
+    - Ahora permite acceso desde 1 hora antes hasta que la reunión termine
+    - Lógica simplificada: `timeDifference <= ONE_HOUR_MS`
+
+- **Corrección en visualización de asistentes**:
+  - Campo `int_total_invitated` mostrado correctamente en vista de gestión de copropietarios
+  - Actualizado `UsersPage.jsx` línea 51 para usar el campo correcto de la base de datos
+
+- **Sistema completo de gestión de encuestas para reuniones en vivo**:
+  - Nuevo componente `LiveMeetingCard` para mostrar tarjetas de reuniones activas con:
+    - Estados visuales diferenciados (En Curso, Accesible, Esperando Inicio, Programada)
+    - Información detallada de invitados y confirmados
+    - Indicador de quórum alcanzado
+  - Componente `CreatePollView` para creación completa de encuestas con:
+    - Soporte para 4 tipos de encuestas: selección única, selección múltiple, texto libre y numérica
+    - Configuración de opciones dinámicas (agregar/eliminar opciones)
+    - Configuración de quórum, anonimato y abstención
+    - Duración personalizable en minutos
+    - Guardar como borrador o iniciar inmediatamente
+  - Actualización completa de `LivePage`:
+    - Carga automática de reuniones en vivo con validaciones estrictas
+    - Sistema de filtrado por estado de reunión
+    - Integración con React Query para gestión de estado
+    - Navegación fluida entre listado de reuniones y creación de encuestas
+  - Servicio `PollService` mejorado con:
+    - Método `getLiveMeetings` con validaciones de acceso:
+      - Acceso 1 hora antes de la reunión programada
+      - Verificación de invitados registrados (mínimo 1)
+      - Validación de estado (no finalizada, no terminada)
+      - Control temporal estricto
+    - Métodos completos para crear, iniciar y finalizar encuestas
+    - Obtener estadísticas y resultados
+    - Votación autenticada y pública
+    - Helpers para creación rápida de encuestas por tipo
+
+- **Mejoras en el sistema de reuniones**:
+  - **Asignación automática de líder**: El `int_meeting_leader_id` se asigna automáticamente al administrador de la unidad residencial
+    - Eliminado campo del formulario `MeetingModal`
+    - Backend busca y asigna el administrador activo de la unidad
+    - Logging con información del líder asignado
+    - Validación: error si no existe administrador activo
+  - **Registro automático de asistentes**: Al crear una reunión, `int_total_invitated` se establece automáticamente con el total de copropietarios activos de la unidad residencial
+  - **Conteo en tiempo de creación**: `MeetingService.create_meeting` cuenta los copropietarios antes de crear la reunión
+  - **Actualización por email**: `EmailService.send_meeting_invitation` también actualiza el contador si es necesario
+  - **Ventana de acceso clara**: Los administradores pueden acceder a reuniones:
+    - 1 hora ANTES de la hora programada
+    - Hasta 1 hora DESPUÉS de la hora programada
+    - Durante todo el tiempo que la reunión esté en curso
+  - **Control manual de acceso**:
+    - Botón "Cerrar Acceso" en cada tarjeta de reunión
+    - Confirmación con advertencia antes de cerrar
+    - Al cerrar, la reunión se marca como finalizada (`dat_actual_end_time`)
+    - La reunión deja de aparecer en la lista de reuniones en vivo
+  - Logging mejorado con información detallada de copropietarios
+  - Estadísticas de envío incluyen `total_invitados` en la respuesta
+
+#### 2025-12-11
+- **Dashboard de Administrador completamente renovado**:
+  - Nuevo componente `DashboardLayout` unificado para layouts consistentes
+  - Componentes `Header` y `Sidebar` reutilizables y modulares
+  - Sistema de navegación por pestañas mejorado con iconos de lucide-react
+  - Integración del nombre de unidad residencial en el título del sidebar
+  - Carga automática de información de unidad residencial del administrador logueado
+
+- **Gestión completa de copropietarios desde dashboard de administrador**:
+  - Integración de `ResidentModal` del superadmin (formulario profesional completo)
+  - Integración de `ExcelUploadModal` para carga masiva de copropietarios
+  - Reemplazo de `UsersTable` por `ResidentsList` con diseño profesional
+  - Lista de copropietarios filtrada automáticamente por unidad residencial del admin
+  - Funcionalidades completas:
+    - ✅ Crear copropietario individual con validación completa
+    - ✅ Editar copropietario existente (modo edición con datos prellenados)
+    - ✅ Eliminar copropietario con confirmación
+    - ✅ Reenviar credenciales individual (genera nueva contraseña temporal)
+    - ✅ Envío masivo de credenciales (selección múltiple con checkboxes)
+    - ✅ Carga masiva desde Excel con plantilla descargable
+  - Notificaciones con SweetAlert2 para todas las operaciones
+  - Invalidación automática de cache con React Query
+
+- **Sistema de reuniones virtuales mejorado**:
+  - Nuevo componente `MeetingsSection` con diseño moderno y amigable
+  - Sistema de pestañas para filtrar reuniones:
+    - 🔵 **Próximas**: Reuniones futuras o en curso (ordenadas de más cercana a lejana)
+    - 🕒 **Historial**: Reuniones pasadas (ordenadas de más reciente a antigua)
+  - Control de acceso estricto:
+    - Botón habilitado solo 1 hora antes de reuniones programadas
+    - Validación temporal con `canAccessMeeting()`
+    - Mensaje con hora exacta de disponibilidad
+  - Contador de tiempo dinámico:
+    - "En X días" para reuniones lejanas
+    - "En Xh Ym" para reuniones del mismo día
+    - "En X minutos" para reuniones próximas
+    - "Ahora" para reuniones inmediatas
+  - Estados visuales diferenciados:
+    - 🟢 En Curso: Verde esmeralda con botón "Unirse"
+    - 🔵 Programada: Azul con botón condicional
+    - ⚪ Finalizada: Gris (solo en historial)
+    - 🔴 Cancelada: Rojo (solo en historial)
+  - Integración de `MeetingModal` para crear reuniones de Zoom
+  - Header con degradado purple→indigo y estadísticas dinámicas
+  - Grid responsive con información clara (fecha, hora, asistentes)
+  - Estados vacíos diferenciados por pestaña
+
+- **Vista de gestión integrada (2 columnas)**:
+  - Layout en grid responsive:
+    - Desktop: 2 columnas (copropietarios | reuniones)
+    - Mobile/Tablet: 1 columna apilada
+  - Copropietarios (columna izquierda):
+    - Tabla profesional con selección múltiple
+    - Menú de acciones por residente (⋮)
+    - Botones: "Cargar Excel" y "Agregar Copropietario"
+  - Reuniones (columna derecha):
+    - Cards modernas con bordes y fondos según estado
+    - Pestañas para próximas/historial
+    - Botón "Nueva Reunión" en header
+
+- **Optimizaciones de rendimiento**:
+  - Uso de `useMemo` para filtrado de reuniones (evita recálculos innecesarios)
+  - React Query para cache y gestión de estados
+  - Invalidación selectiva de queries
+  - Ordenamiento inteligente de datos
+
 #### 2025-12-09
 - **Gestión avanzada de copropietarios desde panel de administrador**:
   - Endpoints completos para CRUD de copropietarios (`admin_coowners.py`)
@@ -169,6 +514,51 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - **Funcionalidad de administrador**: Endpoint y servicio de invitación a reuniones
 
 ### Corregido
+
+#### 2025-12-15
+
+- **Corrección crítica en asignación de líder de reunión**:
+  - Fix del error `type object 'UserModel' has no attribute 'str_role'` en `meeting_service.py`
+  - Solución: Implementado join con `RolModel` y filtrado por `RolModel.str_name`
+  - Estructura de base de datos correcta: `UserModel.int_id_rol` → FK a `RolModel.id`
+  - Query actualizada (líneas 86-113 de `meeting_service.py`):
+    ```python
+    admin_query = select(UserModel).join(
+        UserResidentialUnitModel,
+        UserModel.id == UserResidentialUnitModel.int_user_id
+    ).join(
+        RolModel,
+        UserModel.int_id_rol == RolModel.id
+    ).where(
+        UserResidentialUnitModel.int_residential_unit_id == residential_unit_id,
+        RolModel.str_name == 'Administrador',
+        UserModel.bln_allow_entry == True
+    )
+    ```
+
+- **Corrección en filtro de reuniones en vivo para creación de encuestas**:
+  - Problema: No aparecían reuniones disponibles para crear encuestas
+  - Causa: Filtro temporal demasiado restrictivo en `PollService.js`
+  - Solución: Cambio de lógica de validación temporal
+    - Antes (incorrecto): `timeDifference <= ONE_HOUR_MS && timeDifference >= -ONE_HOUR_MS`
+    - Ahora (correcto): `timeDifference <= ONE_HOUR_MS`
+  - Permite mostrar reuniones que están a menos de 1 hora de distancia O ya iniciadas
+
+- **Corrección en validación de creación de encuestas**:
+  - Clarificación del uso correcto de campos temporales de reunión:
+    - `dat_schedule_date`: Hora programada de la reunión
+    - `dat_actual_start_time`: Registro de cuando el admin inició la reunión (solo logging)
+    - `dat_actual_end_time`: Cuando el admin cerró el acceso (usado para validación)
+  - Lógica de validación simplificada y correcta:
+    1. Si `dat_actual_end_time` existe → reunión finalizada, no permitir encuestas
+    2. Si faltan más de 1 hora para `dat_schedule_date` → no permitir encuestas
+    3. De lo contrario → permitir encuestas
+  - Removed uso incorrecto de `dat_actual_start_time` para validaciones
+
+- **Corrección en visualización de asistentes en reuniones**:
+  - Campo incorrecto: `attendees_count` (no existente)
+  - Campo correcto: `int_total_invitated` (de la base de datos)
+  - Archivo actualizado: `frontend/src/components/AdDashboard/UsersPage.jsx:51`
 
 #### 2025-12-09
 - **Generación de reuniones**:

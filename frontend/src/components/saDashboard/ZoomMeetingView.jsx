@@ -5,6 +5,10 @@ import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import VotingModal from './VotingModal';
 
+/**
+ * Componente de Zoom usando SDK Embedded para SuperAdministradores
+ * Permite unirse a reuniones como anfitrión (role: 1)
+ */
 const ZoomMeetingView = ({ meetingData, onBack }) => {
 	const meetingSDKElement = useRef(null);
 	const clientRef = useRef(null);
@@ -36,7 +40,7 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 				try {
 					clientRef.current.leaveMeeting();
 				} catch (err) {
-					// Error al salir de la reunión
+					console.error('Error leaving meeting:', err);
 				}
 			}
 		};
@@ -50,6 +54,7 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 				throw new Error('El contenedor de Zoom no está disponible');
 			}
 
+			console.log('🔵 Inicializando Zoom SDK Embedded (SuperAdmin)...');
 			const client = ZoomMtgEmbedded.createClient();
 			clientRef.current = client;
 
@@ -60,9 +65,11 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 				leaveOnPageUnload: true,
 			});
 
+			console.log('✅ Zoom SDK inicializado');
 			await joinMeeting(client);
 			setIsLoading(false);
 		} catch (err) {
+			console.error('❌ Error al inicializar:', err);
 			setError(err.message || 'Error al inicializar la reunión');
 			setIsLoading(false);
 
@@ -77,35 +84,51 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 
 	const joinMeeting = async (client) => {
 		try {
+			// Extraer meeting number de la URL
 			const meetingNumber = extractMeetingNumber(
-				meetingData.str_zoom_join_url
+				meetingData.str_zoom_join_url || meetingData.int_zoom_meeting_id
 			);
+
 			const password =
 				meetingData.str_zoom_password ||
 				extractPassword(meetingData.str_zoom_join_url);
 
 			if (!meetingNumber) {
-				throw new Error(
-					'No se pudo extraer el número de reunión de la URL'
-				);
+				throw new Error('No se pudo extraer el número de reunión de la URL');
 			}
 
+			console.log('🔵 Obteniendo configuración de Zoom...');
+
+			// Obtener SDK Key del backend
 			const configResponse = await axiosInstance.get('/zoom/config');
 			const sdkKey = configResponse.data.data.sdk_key;
 
+			console.log('🔵 Generando firma...');
+
+			// Generar firma (role: 1 para anfitriones/superadmin)
 			const signature = await generateSignature(meetingNumber);
+
+			console.log('🔵 Uniéndose a la reunión como anfitrión...');
+
+			// Obtener nombre del usuario
+			const userName = localStorage.getItem('user')
+				? JSON.parse(localStorage.getItem('user')).name
+				: meetingData.userName || 'SuperAdmin';
 
 			await client.join({
 				meetingNumber: meetingNumber,
 				password: password || '',
-				userName: meetingData.userName || 'Anfitrión',
+				userName: userName,
 				signature: signature,
 				sdkKey: sdkKey,
 				tk: '',
 			});
 
+			console.log('✅ Conectado a la reunión como anfitrión');
+
 			// Escuchar evento de finalización de reunión
 			client.on('meeting-ended', () => {
+				console.log('📢 Reunión finalizada');
 				setMeetingEnded(true);
 			});
 
@@ -116,13 +139,22 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 				}
 			});
 		} catch (error) {
+			console.error('❌ Error al unirse:', error);
 			throw error;
 		}
 	};
 
-	const extractMeetingNumber = (url) => {
-		if (!url) return '';
-		const match = url.match(/\/j\/(\d+)/);
+	const extractMeetingNumber = (value) => {
+		if (!value) return '';
+
+		// Si es un número directo
+		if (typeof value === 'number') return value.toString();
+
+		// Si es string numérico
+		if (/^\d+$/.test(value)) return value;
+
+		// Si es URL, extraer número
+		const match = value.match(/\/j\/(\d+)/);
 		return match ? match[1] : '';
 	};
 
@@ -138,7 +170,7 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 				'/zoom/generate-signature',
 				{
 					meeting_number: meetingNumber,
-					role: 1,
+					role: 1, // 1 = anfitrión (superadmin)
 				}
 			);
 
@@ -148,6 +180,7 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 				throw new Error('No se pudo generar el signature');
 			}
 		} catch (error) {
+			console.error('❌ Error generando firma:', error);
 			Swal.fire({
 				icon: 'error',
 				title: 'Error de Autenticación',
@@ -177,11 +210,13 @@ const ZoomMeetingView = ({ meetingData, onBack }) => {
 				}
 				onBack();
 			} catch (err) {
+				console.error('Error ending meeting:', err);
 				onBack();
 			}
 		}
 	};
 
+	// Error
 	if (error) {
 		return (
 			<div className="flex items-center justify-center h-screen bg-gray-900">

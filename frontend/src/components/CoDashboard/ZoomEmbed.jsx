@@ -207,41 +207,53 @@ const ZoomMeetingContainer = ({
 		`}>
 			{/* Contenedor con tamaño ajustable */}
 			<div className={`
-				${isFullscreen 
-					? 'w-full h-full' 
+				${isFullscreen
+					? 'w-full h-full'
 					: 'w-full rounded-lg shadow-2xl overflow-hidden'
 				}
 				bg-gray-900
 			`}
 			style={{
-				height: isFullscreen ? '100vh' : '600px'
+				height: isFullscreen ? '100vh' : 'calc(100vh - 200px)',
+				minHeight: '600px'
 			}}
 			>
-				{/* Header con controles */}
-				<div className="absolute top-0 right-0 z-[70] p-4 flex gap-2">
-					<button
-						onClick={toggleFullscreen}
-						className="bg-gray-700 text-white p-3 rounded-lg hover:bg-gray-600 shadow-lg transition-colors"
-						title={isFullscreen ? 'Minimizar' : 'Pantalla completa'}
-					>
-						{isFullscreen ? (
-							<Minimize2 className="w-5 h-5" />
-						) : (
+				{/* Header con controles - Solo en modo NO fullscreen */}
+				{!isFullscreen && !isLoading && (
+					<div className="absolute top-4 right-4 z-10 flex gap-2">
+						<button
+							onClick={toggleFullscreen}
+							className="bg-gray-700/80 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-gray-600 shadow-lg transition-colors"
+							title="Pantalla completa"
+						>
 							<Maximize2 className="w-5 h-5" />
-						)}
-					</button>
-					<button
-						onClick={onClose}
-						className="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 shadow-lg transition-colors"
-						title="Salir de la reunión"
-					>
-						<X className="w-5 h-5" />
-					</button>
-				</div>
+						</button>
+						<button
+							onClick={onClose}
+							className="bg-red-600/80 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-red-700 shadow-lg transition-colors"
+							title="Salir de la reunión"
+						>
+							<X className="w-5 h-5" />
+						</button>
+					</div>
+				)}
+
+				{/* Botón para salir del fullscreen */}
+				{isFullscreen && !isLoading && (
+					<div className="absolute top-4 right-4 z-10">
+						<button
+							onClick={toggleFullscreen}
+							className="bg-gray-700/80 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-gray-600 shadow-lg transition-colors"
+							title="Salir de pantalla completa"
+						>
+							<Minimize2 className="w-5 h-5" />
+						</button>
+					</div>
+				)}
 
 				{/* Loading overlay */}
 				{isLoading && (
-					<div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-[60]">
+					<div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-50">
 						<div className="text-center max-w-md mx-4">
 							<Loader2 className="w-16 h-16 text-blue-500 animate-spin mx-auto mb-4" />
 							<p className="text-white text-xl font-semibold mb-2">
@@ -258,7 +270,8 @@ const ZoomMeetingContainer = ({
 				<div
 					ref={meetingSDKElement}
 					id="meetingSDKElement"
-					className="w-full h-full"
+					className="w-full h-full relative"
+					style={{ zIndex: 1 }}
 				/>
 			</div>
 

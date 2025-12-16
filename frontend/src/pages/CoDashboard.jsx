@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import Sidebar from '../components/layout/SidebarCO';
+import { Video, FileText, User, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import DashboardLayout from '../components/layout/DashboardLayout';
 import ProfilePage from '../components/CoDashboard/ProfilePage';
 import VotingPage from '../components/CoDashboard/VotingPage';
 import MeetingsPage from '../components/CoDashboard/MeetingsPage';
@@ -9,6 +11,31 @@ import { UserService } from '../services/api/UserService';
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');
   const [residentialUnitId, setResidentialUnitId] = useState(null);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    navigate('/login');
+  };
+
+  // Configuración del menú
+  const menuItems = [
+    {
+      id: 'meetings',
+      label: 'Reuniones',
+      icon: Video,
+    },
+    {
+      id: 'voting',
+      label: 'Encuestas',
+      icon: FileText,
+    },
+    {
+      id: 'profile',
+      label: 'Mi Perfil',
+      icon: User,
+    },
+  ];
 
   // Obtener la unidad residencial del usuario actual
   const {
@@ -85,17 +112,34 @@ export default function AppCopropietario() {
     );
   }
 
-  return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar section={section} setSection={setSection} />
+  // Footer personalizado con botón de cerrar sesión
+  const sidebarFooter = (
+    <button
+      onClick={handleLogout}
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-white hover:bg-red-500 transition-all"
+    >
+      <LogOut size={20} />
+      <span>Cerrar Sesión</span>
+    </button>
+  );
 
-      <main className="flex-1 ml-[280px] p-6">
-        {section === 'meetings' && (
-          <MeetingsPage residentialUnitId={residentialUnitId} />
-        )}
-        {section === 'voting' && <VotingPage />}
-        {section === 'profile' && <ProfilePage />}
-      </main>
-    </div>
+  return (
+    <DashboardLayout
+      title="GIRAMASTER"
+      subtitle="Dashboard Copropietario"
+      menuItems={menuItems}
+      activeTab={section}
+      onTabChange={setSection}
+      gradientFrom="#2563eb"
+      gradientTo="#1e40af"
+      accentColor="#ffffff"
+      sidebarFooter={sidebarFooter}
+    >
+      {section === 'meetings' && (
+        <MeetingsPage residentialUnitId={residentialUnitId} />
+      )}
+      {section === 'voting' && <VotingPage />}
+      {section === 'profile' && <ProfilePage />}
+    </DashboardLayout>
   );
 }

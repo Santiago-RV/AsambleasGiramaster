@@ -75,17 +75,45 @@ class MeetingService:
         meeting_type: str,
         schedule_date: datetime,
         estimated_duration: int,
-        meeting_leader_id: int,
         allow_delegates: bool,
         user_id: int
     ) -> MeetingModel:
         """
-        Crea una nueva reunión y genera la reunión en Zoom usando la API real
+        Crea una nueva reunión y genera la reunión en Zoom usando la API real.
+        El líder de la reunión se asigna automáticamente al administrador de la unidad residencial.
         """
         try:
+            # Obtener el administrador de la unidad residencial
+            from app.models.user_residential_unit_model import UserResidentialUnitModel
+            from app.models.user_model import UserModel
+            from app.models.rol_model import RolModel
+
+            admin_query = select(UserModel).join(
+                UserResidentialUnitModel,
+                UserModel.id == UserResidentialUnitModel.int_user_id
+            ).join(
+                RolModel,
+                UserModel.int_id_rol == RolModel.id
+            ).where(
+                UserResidentialUnitModel.int_residential_unit_id == residential_unit_id,
+                RolModel.str_name == 'Administrador',
+                UserModel.bln_allow_entry == True
+            )
+            admin_result = await self.db.execute(admin_query)
+            admin_user = admin_result.scalars().first()
+
+            if not admin_user:
+                raise ServiceException(
+                    message=f"No se encontró un administrador activo para la unidad residencial {residential_unit_id}",
+                    details={"residential_unit_id": residential_unit_id}
+                )
+
+            meeting_leader_id = admin_user.id
+            logger.info(f"Líder de reunión asignado automáticamente: {admin_user.str_username} (ID: {meeting_leader_id})")
+
             # Generar código de reunión
             meeting_code = self._generate_meeting_code(residential_unit_id, title)
-            
+
             logger.info(f"Creando reunión de Zoom: {title}")
             
             # Intentar crear reunión REAL en Zoom usando OAuth API
@@ -131,7 +159,23 @@ class MeetingService:
                     "SOLUCIÓN: Configura ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID y ZOOM_CLIENT_SECRET "
                     "en el .env para crear reuniones reales."
                 )
-            
+
+            # Contar copropietarios de la unidad residencial antes de crear la reunión
+            from app.models.user_residential_unit_model import UserResidentialUnitModel
+            from app.models.user_model import UserModel
+
+            count_query = select(UserModel).join(
+                UserResidentialUnitModel,
+                UserModel.id == UserResidentialUnitModel.int_user_id
+            ).where(
+                UserResidentialUnitModel.int_residential_unit_id == residential_unit_id,
+                UserModel.bln_allow_entry == True
+            )
+            count_result = await self.db.execute(count_query)
+            total_copropietarios = len(count_result.scalars().all())
+
+            logger.info(f"📊 Total de copropietarios en la unidad residencial: {total_copropietarios}")
+
             # Crear el modelo de reunión en la base de datos
             new_meeting = MeetingModel(
                 int_id_residential_unit=residential_unit_id,
@@ -149,7 +193,7 @@ class MeetingService:
                 bln_allow_delegates=allow_delegates,
                 str_status="Programada",
                 bln_quorum_reached=False,
-                int_total_invitated=0,
+                int_total_invitated=total_copropietarios,
                 int_total_confirmed=0,
                 created_by=user_id,
                 updated_by=user_id
@@ -171,13 +215,13 @@ class MeetingService:
             try:
                 from app.services.email_service import email_service
                 logger.info(f"📧 Enviando invitaciones automáticas para reunión ID {meeting_with_relations.id}")
-                
+
                 email_stats = await email_service.send_meeting_invitation(
                     db=self.db,
                     meeting_id=meeting_with_relations.id,
                     user_ids=None  # Enviar a todos los usuarios de la unidad residencial
                 )
-                
+
                 if "error" in email_stats:
                     logger.warning(f"Error al enviar invitaciones: {email_stats['error']}")
                 else:
@@ -188,8 +232,19 @@ class MeetingService:
             except Exception as email_error:
                 # No fallar la creación de la reunión si falla el envío de emails
                 logger.error(f"Error al enviar invitaciones (no crítico): {str(email_error)}")
-            
-            return meeting_with_relations
+
+            # Refrescar el objeto después del envío de emails para evitar MissingGreenlet
+            await self.db.refresh(meeting_with_relations)
+
+            # Recargar completamente con todas las relaciones necesarias
+            result = await self.db.execute(
+                select(MeetingModel).options(
+                    selectinload(MeetingModel.residential_unit)
+                ).where(MeetingModel.id == meeting_with_relations.id)
+            )
+            final_meeting = result.scalar_one()
+
+            return final_meeting
             
         except Exception as e:
             await self.db.rollback()

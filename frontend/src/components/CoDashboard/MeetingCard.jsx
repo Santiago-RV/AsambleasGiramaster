@@ -3,20 +3,22 @@ import { Calendar, Clock, Users, Video, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ZoomMeetingContainer from './ZoomEmbed';
+import { MeetingService } from '../../services/api/MeetingService';
 
 export default function MeetingCard({ meeting }) {
 	const [showZoom, setShowZoom] = useState(false);
+	const [isJoining, setIsJoining] = useState(false);
 
 	// Calcular estado de la reunión
 	const getStatus = () => {
 		const now = new Date();
 		const scheduledDate = new Date(meeting.dat_schedule_date);
 		const oneHourBefore = new Date(scheduledDate.getTime() - 60 * 60 * 1000);
-		
-		const duration = meeting.int_estimated_duration > 0 
-			? meeting.int_estimated_duration 
+
+		const duration = meeting.int_estimated_duration > 0
+			? meeting.int_estimated_duration
 			: 240;
-			
+
 		const meetingEnd = new Date(
 			scheduledDate.getTime() + duration * 60 * 1000
 		);
@@ -55,16 +57,32 @@ export default function MeetingCard({ meeting }) {
 		return mins > 0 ? `${hours}h ${mins}min` : `${hours} hora${hours > 1 ? 's' : ''}`;
 	};
 
-	const handleJoinMeeting = () => {
+	const handleJoinMeeting = async () => {
 		if (!status.canJoin) return;
-		
+
 		// Verificar que tenemos datos de Zoom
 		if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
 			alert('Esta reunión no tiene datos de Zoom válidos');
 			return;
 		}
-		
-		setShowZoom(true);
+
+		try {
+			setIsJoining(true);
+
+			// Registrar la hora de inicio en la base de datos
+			console.log('📝 Registrando hora de inicio de la reunión...');
+			await MeetingService.startMeeting(meeting.id);
+			console.log('✅ Hora de inicio registrada exitosamente');
+
+			// Mostrar el contenedor de Zoom
+			setShowZoom(true);
+		} catch (error) {
+			console.error('❌ Error al registrar inicio de reunión:', error);
+			// Mostrar Zoom de todas formas, el registro del inicio es secundario
+			setShowZoom(true);
+		} finally {
+			setIsJoining(false);
+		}
 	};
 
 	const handleCloseMeeting = () => {
@@ -170,14 +188,19 @@ export default function MeetingCard({ meeting }) {
 			{/* Botón para unirse */}
 			<button
 				onClick={handleJoinMeeting}
-				disabled={!status.canJoin}
+				disabled={!status.canJoin || isJoining}
 				className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
-					status.canJoin
+					status.canJoin && !isJoining
 						? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
 						: 'bg-gray-300 text-gray-500 cursor-not-allowed'
 				}`}
 			>
-				{status.canJoin ? '🎥 Unirse a la Reunión' : '📅 Reunión No Disponible'}
+				{isJoining
+					? '⏳ Ingresando...'
+					: status.canJoin
+						? '🎥 Unirse a la Reunión'
+						: '📅 Reunión No Disponible'
+				}
 			</button>
 		</div>
 	);

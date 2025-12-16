@@ -49,7 +49,7 @@ export class ResidentService {
     static async sendBulkCredentials(unitId, residentIds) {
         try {
             const response = await axiosInstance.post(
-                `/super-admin/residential-units/${unitId}/residents/send-credentials-bulk`,
+                `/residential/units/${unitId}/residents/send-credentials-bulk`,
                 { resident_ids: residentIds }
             );
             return response.data;
