@@ -206,7 +206,7 @@ async def get_meeting_polls(
     try:
         poll_service = PollService(db)
         polls = await poll_service.get_polls_by_meeting(meeting_id)
-        
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
@@ -216,12 +216,25 @@ async def get_meeting_polls(
                     "id": poll.id,
                     "str_poll_code": poll.str_poll_code,
                     "str_title": poll.str_title,
+                    "str_description": poll.str_description,
                     "str_poll_type": poll.str_poll_type,
                     "str_status": poll.str_status,
+                    "bln_is_anonymous": poll.bln_is_anonymous,
+                    "bln_allows_abstention": poll.bln_allows_abstention,
+                    "bln_requires_quorum": poll.bln_requires_quorum,
+                    "dec_minimum_quorum_percentage": poll.dec_minimum_quorum_percentage,
+                    "int_max_selections": poll.int_max_selections,
+                    "int_duration_minutes": poll.int_duration_minutes,
                     "created_at": poll.created_at,
                     "dat_started_at": poll.dat_started_at,
                     "dat_ended_at": poll.dat_ended_at,
-                    "options_count": len(poll.options)
+                    "options": [
+                        {
+                            "id": option.id,
+                            "str_option_text": option.str_option_text,
+                            "int_option_order": option.int_option_order
+                        } for option in poll.options
+                    ]
                 } for poll in polls
             ]
         )

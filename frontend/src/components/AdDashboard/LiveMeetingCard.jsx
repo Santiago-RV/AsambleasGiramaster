@@ -1,21 +1,8 @@
-import { Calendar, Clock, Users, Video, DoorClosed, LogIn } from 'lucide-react';
+import { Calendar, Clock, Users, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export default function LiveMeetingCard({ meeting, onClick, onCloseAccess, onJoinMeeting }) {
-  const handleCloseAccess = (e) => {
-    e.stopPropagation(); // Evitar que se dispare onClick
-    if (onCloseAccess) {
-      onCloseAccess(meeting);
-    }
-  };
-
-  const handleJoinMeeting = (e) => {
-    e.stopPropagation(); // Evitar que se dispare onClick
-    if (onJoinMeeting) {
-      onJoinMeeting(meeting);
-    }
-  };
+export default function LiveMeetingCard({ meeting, onClick }) {
   const getStatusBadge = () => {
     const now = new Date();
     const scheduleDate = new Date(meeting.dat_schedule_date);

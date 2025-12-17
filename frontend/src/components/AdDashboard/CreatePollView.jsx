@@ -79,7 +79,12 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
   };
 
   const handleSubmit = async (startImmediately = false) => {
-    if (!validateForm()) return;
+    console.log('📝 [CreatePollView] handleSubmit llamado:', { startImmediately });
+
+    if (!validateForm()) {
+      console.warn('⚠️ [CreatePollView] Validación fallida');
+      return;
+    }
 
     const pollData = {
       int_meeting_id: meeting.id,
@@ -97,8 +102,17 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
         : [],
     };
 
+    console.log('📊 [CreatePollView] Datos de la encuesta preparados:', {
+      pollData,
+      startImmediately,
+      onPollCreatedExists: !!onPollCreated
+    });
+
     if (onPollCreated) {
+      console.log('🚀 [CreatePollView] Llamando a onPollCreated...');
       onPollCreated(pollData, startImmediately);
+    } else {
+      console.error('❌ [CreatePollView] onPollCreated no está definido');
     }
   };
 

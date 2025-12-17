@@ -360,7 +360,53 @@ class PollService:
     async def _get_user_voting_weight(self, user_id: int, meeting_id: int) -> float:
         """Obtiene el peso de votación del usuario en la reunión"""
         from app.models.meeting_invitation_model import MeetingInvitationModel
+        from app.models.meeting_model import MeetingModel
+        from app.models.user_model import UserModel
+        from app.models.residential_unit_model import ResidentialUnitModel
 
+        # Obtener información de la reunión
+        meeting_result = await self.db.execute(
+            select(MeetingModel.int_organizer_id, MeetingModel.int_id_residential_unit, MeetingModel.created_by)
+            .where(MeetingModel.id == meeting_id)
+        )
+        meeting_info = meeting_result.one_or_none()
+
+        if not meeting_info:
+            raise ValidationException(
+                message="La reunión no existe",
+                error_code="MEETING_NOT_FOUND"
+            )
+
+        organizer_id, residential_unit_id, meeting_creator_id = meeting_info
+
+        # Si el usuario es el organizador, tiene peso de votación 1.0
+        if organizer_id == user_id:
+            return 1.0
+
+        # Si el usuario creó la reunión, tiene peso de votación 1.0
+        if meeting_creator_id == user_id:
+            return 1.0
+
+        # Verificar si el usuario es administrador (rol ID 2)
+        user_result = await self.db.execute(
+            select(UserModel.int_id_rol)
+            .where(UserModel.id == user_id)
+        )
+        user_role_id = user_result.scalar_one_or_none()
+
+        # Si es administrador, verificar si creó la unidad residencial
+        if user_role_id == 2:
+            residential_unit_result = await self.db.execute(
+                select(ResidentialUnitModel.created_by)
+                .where(ResidentialUnitModel.id == residential_unit_id)
+            )
+            residential_unit_creator_id = residential_unit_result.scalar_one_or_none()
+
+            # Si el administrador creó la unidad residencial, puede votar
+            if residential_unit_creator_id == user_id:
+                return 1.0
+
+        # Si no es organizador, creador ni administrador, buscar en la lista de invitados
         result = await self.db.execute(
             select(MeetingInvitationModel.dec_voting_weight)
             .where(and_(

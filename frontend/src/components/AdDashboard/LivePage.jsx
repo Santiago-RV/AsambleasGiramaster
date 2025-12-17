@@ -1,19 +1,13 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import Swal from 'sweetalert2';
 import LiveMeetingCard from "./LiveMeetingCard";
-import CreatePollView from "./CreatePollView";
-import ZoomMeetingContainer from "./ZoomMeetingContainer";
+import MeetingPollsView from "./MeetingPollsView";
 import { PollService } from "../../services/api/PollService";
 import { UserService } from "../../services/api/UserService";
-import { MeetingService } from "../../services/api/MeetingService";
 
 export default function LivePage() {
   const [selectedMeeting, setSelectedMeeting] = useState(null);
-  const [showZoomMeeting, setShowZoomMeeting] = useState(null);
-  const [isJoiningMeeting, setIsJoiningMeeting] = useState(false);
-  const queryClient = useQueryClient();
 
   // Obtener la unidad residencial del administrador
   const { data: residentialUnitData, isLoading: isLoadingUnit } = useQuery({
@@ -46,211 +40,12 @@ export default function LivePage() {
     refetchInterval: 30000,
   });
 
-  // Mutación para crear encuesta
-  const createPollMutation = useMutation({
-    mutationFn: async (pollData) => {
-      return await PollService.createPoll(pollData);
-    },
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
-      Swal.fire({
-        icon: 'success',
-        title: 'Encuesta Creada',
-        text: response.message || 'La encuesta ha sido creada exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
-        toast: true,
-        position: 'top-end',
-      });
-      setSelectedMeeting(null);
-    },
-    onError: (error) => {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.response?.data?.message || error.message || 'Error al crear la encuesta',
-      });
-    },
-  });
-
-  // Mutación para iniciar encuesta
-  const startPollMutation = useMutation({
-    mutationFn: async ({ pollId, durationMinutes }) => {
-      return await PollService.startPoll(pollId, durationMinutes);
-    },
-    onSuccess: (response) => {
-      Swal.fire({
-        icon: 'success',
-        title: 'Encuesta Iniciada',
-        text: response.message || 'La encuesta está activa',
-        showConfirmButton: false,
-        timer: 2000,
-        toast: true,
-        position: 'top-end',
-      });
-    },
-    onError: (error) => {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.response?.data?.message || error.message || 'Error al iniciar la encuesta',
-      });
-    },
-  });
-
-  // Mutación para cerrar acceso a la reunión
-  const endMeetingMutation = useMutation({
-    mutationFn: async (meetingId) => {
-      return await MeetingService.endMeeting(meetingId);
-    },
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
-      Swal.fire({
-        icon: 'success',
-        title: 'Acceso Cerrado',
-        text: 'El acceso a la reunión ha sido cerrado exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
-        toast: true,
-        position: 'top-end',
-      });
-    },
-    onError: (error) => {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.response?.data?.message || error.message || 'Error al cerrar el acceso',
-      });
-    },
-  });
-
-  // Handler para crear encuesta
-  const handlePollCreated = async (pollData, startImmediately) => {
-    try {
-      const response = await createPollMutation.mutateAsync(pollData);
-
-      if (startImmediately && response?.success && response?.data?.id) {
-        await startPollMutation.mutateAsync({
-          pollId: response.data.id,
-          durationMinutes: pollData.int_duration_minutes,
-        });
-      }
-    } catch (error) {
-      console.error('Error creating poll:', error);
-    }
-  };
-
-  // Handler para cerrar acceso a la reunión
-  const handleCloseAccess = async (meeting) => {
-    const result = await Swal.fire({
-      title: '¿Cerrar acceso a la reunión?',
-      html: `
-        <p>Al cerrar el acceso:</p>
-        <ul style="text-align: left; margin-top: 10px;">
-          <li>La reunión ya no aparecerá en la lista de reuniones en vivo</li>
-          <li>No se podrán crear más encuestas</li>
-          <li>Se marcará como finalizada</li>
-        </ul>
-      `,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Sí, cerrar acceso',
-      cancelButtonText: 'Cancelar',
-    });
-
-    if (result.isConfirmed) {
-      endMeetingMutation.mutate(meeting.id);
-    }
-  };
-
-  // Handler para unirse a la reunión
-  const handleJoinMeeting = async (meeting) => {
-    // Validar que la reunión tenga datos de Zoom
-    if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
-      Swal.fire({
-        icon: 'error',
-        title: 'URL no disponible',
-        text: 'La URL de la reunión no está disponible aún. Por favor, verifica que la reunión haya sido creada correctamente en Zoom.',
-        confirmButtonColor: '#3498db',
-      });
-      return;
-    }
-
-    try {
-      setIsJoiningMeeting(true);
-
-      // Registrar la hora de inicio en la base de datos
-      await MeetingService.startMeeting(meeting.id);
-
-      // Mostrar el contenedor de Zoom
-      setShowZoomMeeting(meeting);
-    } catch (error) {
-
-      // Verificar si el error es por falta de datos de Zoom
-      if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'No se puede acceder a la reunión porque no tiene datos de Zoom válidos.',
-          confirmButtonColor: '#3498db',
-        });
-      } else {
-        // Si hay datos de Zoom pero falló el registro, mostrar Zoom de todas formas
-        setShowZoomMeeting(meeting);
-      }
-    } finally {
-      setIsJoiningMeeting(false);
-    }
-  };
-
-  // Handler para cerrar el Zoom
-  const handleCloseZoom = () => {
-    setShowZoomMeeting(null);
-  };
-
-  // Vista de Zoom
-  if (showZoomMeeting) {
-    return (
-      <div className="space-y-4">
-        {/* Card colapsado con info básica */}
-        <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-600">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-800">
-                {showZoomMeeting.str_title}
-              </h3>
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
-                🔴 En vivo
-              </span>
-            </div>
-            <button
-              onClick={handleCloseZoom}
-              className="text-gray-500 hover:text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
-            >
-              Minimizar
-            </button>
-          </div>
-        </div>
-
-        {/* Zoom embebido usando SDK Embedded */}
-        <ZoomMeetingContainer
-          meetingData={showZoomMeeting}
-          onClose={handleCloseZoom}
-          startFullscreen={false}
-        />
-      </div>
-    );
-  }
-
-  // Vista de creación de encuesta
+  // Vista de encuestas de reunión seleccionada
   if (selectedMeeting) {
     return (
-      <CreatePollView
+      <MeetingPollsView
         meeting={selectedMeeting}
         onBack={() => setSelectedMeeting(null)}
-        onPollCreated={handlePollCreated}
       />
     );
   }
@@ -325,8 +120,6 @@ export default function LivePage() {
                     key={meeting.id}
                     meeting={meeting}
                     onClick={() => setSelectedMeeting(meeting)}
-                    onJoinMeeting={handleJoinMeeting}
-                    onCloseAccess={handleCloseAccess}
                   />
                 ))}
               </div>

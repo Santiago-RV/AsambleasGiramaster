@@ -4,7 +4,8 @@
       "Bash(python:*)",
       "Bash(node:*)",
       "Bash(npm run lint:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

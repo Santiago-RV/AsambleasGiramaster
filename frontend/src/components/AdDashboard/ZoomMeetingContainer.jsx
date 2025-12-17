@@ -3,8 +3,10 @@ import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
 import { X, Loader2, CheckCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
+import '../../styles/swal-custom.css';
 
 // NO precargar aquí para evitar que los estilos se carguen globalmente
 // ZoomMtg.preLoadWasm();
@@ -24,7 +26,7 @@ const ZoomMeetingContainer = ({
 	const [error, setError] = useState(null);
 	const [showPollButton, setShowPollButton] = useState(false); // Se activa cuando hay encuesta
 	const [showPollModal, setShowPollModal] = useState(false);
-	const [selectedOption, setSelectedOption] = useState(null);
+	const [selectedOptions, setSelectedOptions] = useState([]); // Array para soportar múltiples opciones
 	const [isSubmittingVote, setIsSubmittingVote] = useState(false);
 
 	// Obtener encuestas activas de la reunión
@@ -41,14 +43,41 @@ const ZoomMeetingContainer = ({
 		refetchInterval: 5000, // Refrescar cada 5 segundos
 	});
 
-	// Obtener la encuesta activa (estado "Activa")
-	const activePoll = pollsData?.data?.find(poll => poll.str_status === 'Activa');
+	// Obtener la encuesta activa (estado "Activa" o "active")
+	const activePoll = pollsData?.data?.find(poll => {
+		const isActive = poll.str_status === 'Activa' || poll.str_status === 'active';
+		console.log('🔍 [ZoomMeetingContainer] Evaluando encuesta:', {
+			id: poll.id,
+			title: poll.str_title,
+			status: poll.str_status,
+			statusType: typeof poll.str_status,
+			isActive
+		});
+		return isActive;
+	});
+
+	// Log completo de la encuesta activa y sus opciones
+	useEffect(() => {
+		if (activePoll) {
+			console.log('📊 [ZoomMeetingContainer] ENCUESTA ACTIVA COMPLETA:', {
+				id: activePoll.id,
+				title: activePoll.str_title,
+				type: activePoll.str_poll_type,
+				status: activePoll.str_status,
+				options: activePoll.options,
+				optionsLength: activePoll.options?.length,
+				fullPollData: activePoll
+			});
+		}
+	}, [activePoll]);
 
 	// Mostrar botón cuando hay encuesta activa
 	useEffect(() => {
+		const polls = pollsData?.data || [];
 		console.log('🎯 [ZoomMeetingContainer] Evaluando mostrar botón:', {
-			pollsData: pollsData?.data,
-			activePoll,
+			totalPolls: polls.length,
+			polls: polls.map(p => ({ id: p.id, title: p.str_title, status: p.str_status })),
+			activePoll: activePoll ? { id: activePoll.id, title: activePoll.str_title } : null,
 			showPollButton: !!activePoll
 		});
 		setShowPollButton(!!activePoll);
@@ -327,27 +356,64 @@ const ZoomMeetingContainer = ({
 
 	const handleViewPoll = () => {
 		console.log('📊 Abriendo modal de encuesta activa');
-		setSelectedOption(null);
+		setSelectedOptions([]);
 		setShowPollModal(true);
 	};
 
 	const handleClosePollModal = () => {
 		console.log('📊 Cerrando modal de encuesta');
 		setShowPollModal(false);
-		setSelectedOption(null);
+		setSelectedOptions([]);
+	};
+
+	// Manejar selección de opciones (single o multiple)
+	const handleOptionToggle = (optionId) => {
+		if (!activePoll) return;
+
+		if (activePoll.str_poll_type === 'single') {
+			// Para single choice, solo una opción
+			setSelectedOptions([optionId]);
+		} else if (activePoll.str_poll_type === 'multiple') {
+			// Para multiple choice, agregar/quitar de la lista
+			setSelectedOptions(prev => {
+				if (prev.includes(optionId)) {
+					// Si ya está seleccionada, quitarla
+					return prev.filter(id => id !== optionId);
+				} else {
+					// Si no está, agregarla (verificar límite máximo)
+					const maxSelections = activePoll.int_max_selections || 999;
+					if (prev.length < maxSelections) {
+						return [...prev, optionId];
+					}
+					return prev; // Ya alcanzó el máximo
+				}
+			});
+		}
 	};
 
 	const handleVote = async () => {
-		if (!activePoll || !selectedOption) return;
+		if (!activePoll || selectedOptions.length === 0) return;
 
 		setIsSubmittingVote(true);
 		try {
-			const voteData = {
-				int_option_id: selectedOption,
-				bln_is_abstention: false,
-			};
-
-			await PollService.vote(activePoll.id, voteData);
+			// Para single choice: enviar solo una opción
+			// Para multiple choice: enviar múltiples votos
+			if (activePoll.str_poll_type === 'single') {
+				const voteData = {
+					int_option_id: selectedOptions[0],
+					bln_is_abstention: false,
+				};
+				await PollService.vote(activePoll.id, voteData);
+			} else if (activePoll.str_poll_type === 'multiple') {
+				// Enviar un voto por cada opción seleccionada
+				for (const optionId of selectedOptions) {
+					const voteData = {
+						int_option_id: optionId,
+						bln_is_abstention: false,
+					};
+					await PollService.vote(activePoll.id, voteData);
+				}
+			}
 
 			console.log('✅ Voto registrado exitosamente');
 
@@ -357,11 +423,60 @@ const ZoomMeetingContainer = ({
 			// Cerrar modal
 			handleClosePollModal();
 
-			// Mostrar mensaje de éxito
-			alert('Tu voto ha sido registrado exitosamente');
+			// Mostrar mensaje de éxito con SweetAlert2
+			Swal.fire({
+				icon: 'success',
+				title: '¡Voto Registrado!',
+				html: '<p style="color: #6b7280; margin: 0;">Tu voto ha sido registrado exitosamente</p>',
+				showConfirmButton: false,
+				timer: 3000,
+				toast: true,
+				position: 'top-end',
+				background: '#ffffff',
+				customClass: {
+					popup: 'poll-success-toast',
+					title: 'poll-toast-title',
+					icon: 'poll-toast-icon'
+				},
+				didOpen: (toast) => {
+					toast.style.borderLeft = '4px solid #9333ea';
+					toast.style.boxShadow = '0 10px 15px -3px rgba(147, 51, 234, 0.3)';
+				}
+			});
 		} catch (error) {
 			console.error('❌ Error al votar:', error);
-			alert(error.response?.data?.message || 'Error al registrar el voto');
+			const errorMessage = error.response?.data?.message || 'Error al registrar el voto';
+
+			// Cerrar el modal de votación primero
+			handleClosePollModal();
+
+			// Mostrar el error con z-index muy alto para que aparezca sobre Zoom
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al Votar',
+				html: `<p style="color: #6b7280; margin: 0; font-size: 1rem;">${errorMessage}</p>`,
+				confirmButtonText: 'Entendido',
+				confirmButtonColor: '#9333ea',
+				background: '#ffffff',
+				backdrop: true,
+				allowOutsideClick: true,
+				allowEscapeKey: true,
+				customClass: {
+					container: 'swal2-zoom-override',
+					popup: 'poll-error-modal',
+					title: 'poll-modal-title',
+					confirmButton: 'poll-confirm-button'
+				},
+				didOpen: (modal) => {
+					// Asegurar que el modal aparezca sobre todo
+					const container = modal.parentElement;
+					if (container) {
+						container.style.zIndex = '99999';
+					}
+					modal.style.borderTop = '4px solid #ef4444';
+					modal.style.zIndex = '99999';
+				}
+			});
 		} finally {
 			setIsSubmittingVote(false);
 		}
@@ -445,7 +560,13 @@ const ZoomMeetingContainer = ({
 	// Agregamos solo un botón flotante para ver encuestas activas usando Portal
 
 	// Log para debugging: verificar estado del botón
-	console.log('🔘 [ZoomMeetingContainer] Estado del botón:', { showPollButton, activePoll: !!activePoll, isLoading });
+	console.log('🔘 [ZoomMeetingContainer] Estado del botón:', {
+		showPollButton,
+		activePoll: activePoll ? { id: activePoll.id, title: activePoll.str_title, status: activePoll.str_status } : null,
+		isLoading,
+		pollsDataExists: !!pollsData,
+		totalPolls: pollsData?.data?.length || 0
+	});
 
 	return (
 		<>
@@ -453,27 +574,48 @@ const ZoomMeetingContainer = ({
 			{showPollButton && ReactDOM.createPortal(
 				<button
 					onClick={handleViewPoll}
-					className="fixed bottom-24 right-8 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 rounded-full shadow-2xl hover:from-purple-700 hover:to-purple-800 transition-all duration-300 flex items-center gap-3 group hover:scale-105"
+					className="fixed bottom-40 right-8 group"
 					style={{ zIndex: 10001 }}
 					title="Ver encuesta activa"
 				>
-					<svg
-						className="w-6 h-6"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							strokeWidth={2}
-							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-						/>
-					</svg>
-					<span className="font-semibold">
-						Encuesta Activa
-					</span>
-					<div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+					{/* Efecto de resplandor animado */}
+					<div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-2xl blur-xl opacity-75 animate-pulse"></div>
+
+					{/* Contenedor del botón */}
+					<div className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white px-6 py-4 rounded-2xl shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 flex items-center gap-3 hover:scale-105 hover:-translate-y-1">
+						{/* Icono de encuesta */}
+						<div className="relative">
+							<svg
+								className="w-7 h-7 animate-bounce"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2.5}
+									d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+								/>
+							</svg>
+							{/* Badge con número */}
+							<div className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+								!
+							</div>
+						</div>
+
+						{/* Texto */}
+						<div className="flex flex-col items-start">
+							<span className="font-bold text-sm leading-tight">Encuesta Activa</span>
+							<span className="text-xs text-purple-100 leading-tight">Click para votar</span>
+						</div>
+
+						{/* Indicador pulsante */}
+						<div className="relative">
+							<div className="w-3 h-3 bg-white rounded-full animate-ping absolute"></div>
+							<div className="w-3 h-3 bg-white rounded-full"></div>
+						</div>
+					</div>
 				</button>,
 				document.body
 			)}
@@ -481,60 +623,120 @@ const ZoomMeetingContainer = ({
 			{/* Modal de encuesta activa renderizado en body usando Portal */}
 			{showPollModal && ReactDOM.createPortal(
 				<div
-					className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
-					style={{ zIndex: 10002 }}
+					style={{
+						position: 'fixed',
+						top: 0,
+						left: 0,
+						right: 0,
+						bottom: 0,
+						backgroundColor: 'rgba(0, 0, 0, 0.75)',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						padding: '16px',
+						zIndex: 10002
+					}}
 					onClick={handleClosePollModal}
 				>
 					<div
-						className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+						style={{
+							backgroundColor: '#ffffff',
+							borderRadius: '16px',
+							boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+							maxWidth: '672px',
+							width: '100%',
+							maxHeight: '90vh',
+							overflowY: 'auto'
+						}}
 						onClick={(e) => e.stopPropagation()}
 					>
 						{/* Header del modal */}
-						<div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 rounded-t-2xl flex items-center justify-between">
-							<h2 className="text-xl font-bold text-white">Encuesta Activa</h2>
+						<div style={{
+							background: 'linear-gradient(to right, #9333ea, #7e22ce)',
+							padding: '16px 24px',
+							borderTopLeftRadius: '16px',
+							borderTopRightRadius: '16px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'space-between'
+						}}>
+							<h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#ffffff', margin: 0 }}>
+								Encuesta Activa
+							</h2>
 							<button
 								onClick={handleClosePollModal}
-								className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-all"
+								style={{
+									color: '#ffffff',
+									background: 'transparent',
+									border: 'none',
+									borderRadius: '8px',
+									padding: '8px',
+									cursor: 'pointer',
+									transition: 'all 0.2s'
+								}}
+								onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+								onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
 							>
 								<X size={24} />
 							</button>
 						</div>
 
 						{/* Contenido del modal */}
-						<div className="p-6">
+						<div style={{ padding: '24px' }}>
 							{isLoadingPolls ? (
-								<div className="text-center py-12">
-									<Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
-									<p className="text-gray-600">Cargando encuesta...</p>
+								<div style={{ textAlign: 'center', padding: '48px 0' }}>
+									<Loader2 style={{ width: '48px', height: '48px', color: '#9333ea', margin: '0 auto 16px' }} className="animate-spin" />
+									<p style={{ color: '#4b5563', margin: 0 }}>Cargando encuesta...</p>
 								</div>
 							) : activePoll ? (
-								<div className="space-y-6">
+								<div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 									{/* Título y descripción */}
 									<div>
-										<h3 className="text-2xl font-bold text-gray-800 mb-2">
+										<h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px', marginTop: 0 }}>
 											{activePoll.str_title}
 										</h3>
 										{activePoll.str_description && (
-											<p className="text-gray-600">
+											<p style={{ color: '#4b5563', margin: 0 }}>
 												{activePoll.str_description}
 											</p>
 										)}
 									</div>
 
 									{/* Tipo de encuesta y configuración */}
-									<div className="flex flex-wrap gap-2">
-										<span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+									<div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+										<span style={{
+											padding: '4px 12px',
+											backgroundColor: '#f3e8ff',
+											color: '#7e22ce',
+											borderRadius: '9999px',
+											fontSize: '14px',
+											fontWeight: '500'
+										}}>
 											{activePoll.str_poll_type === 'single' ? 'Opción única' :
 											 activePoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
 											 activePoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
 										</span>
 										{activePoll.bln_is_anonymous && (
-											<span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+											<span style={{
+												padding: '4px 12px',
+												backgroundColor: '#dbeafe',
+												color: '#1e40af',
+												borderRadius: '9999px',
+												fontSize: '14px',
+												fontWeight: '500'
+											}}>
 												Anónima
 											</span>
 										)}
 										{activePoll.bln_allows_abstention && (
-											<span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
+											<span style={{
+												padding: '4px 12px',
+												backgroundColor: '#f3f4f6',
+												color: '#374151',
+												borderRadius: '9999px',
+												fontSize: '14px',
+												fontWeight: '500'
+											}}>
 												Permite abstención
 											</span>
 										)}
@@ -542,61 +744,139 @@ const ZoomMeetingContainer = ({
 
 									{/* Opciones de votación */}
 									{activePoll.str_poll_type === 'single' || activePoll.str_poll_type === 'multiple' ? (
-										<div className="space-y-3">
-											<p className="font-semibold text-gray-700">Selecciona una opción:</p>
-											{activePoll.options?.map((option) => (
-												<button
-													key={option.id}
-													onClick={() => setSelectedOption(option.id)}
-													className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-														selectedOption === option.id
-															? 'border-purple-600 bg-purple-50'
-															: 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'
-													}`}
-												>
-													<div className="flex items-center justify-between">
-														<span className="font-medium text-gray-800">
+										<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+											<p style={{ fontWeight: '600', color: '#374151', margin: 0 }}>
+												{activePoll.str_poll_type === 'single'
+													? 'Selecciona una opción:'
+													: `Selecciona hasta ${activePoll.int_max_selections || 'todas las'} opciones:`}
+											</p>
+											{console.log('🎯 [ZoomMeetingContainer] Renderizando opciones:', {
+												options: activePoll.options,
+												isArray: Array.isArray(activePoll.options),
+												length: activePoll.options?.length,
+												selectedOptions,
+												pollType: activePoll.str_poll_type
+											})}
+											{activePoll.options?.map((option) => {
+												console.log('🔘 [ZoomMeetingContainer] Opción individual:', option);
+												const isSelected = selectedOptions.includes(option.id);
+												return (
+													<button
+														key={option.id}
+														onClick={() => handleOptionToggle(option.id)}
+														style={{
+															width: '100%',
+															textAlign: 'left',
+															padding: '16px',
+															borderRadius: '12px',
+															border: `2px solid ${isSelected ? '#9333ea' : '#e5e7eb'}`,
+															backgroundColor: isSelected ? '#f3e8ff' : '#ffffff',
+															transition: 'all 0.2s',
+															cursor: 'pointer',
+															display: 'flex',
+															alignItems: 'center',
+															justifyContent: 'space-between'
+														}}
+														onMouseEnter={(e) => {
+															if (!isSelected) {
+																e.currentTarget.style.borderColor = '#c084fc';
+																e.currentTarget.style.backgroundColor = '#f9fafb';
+															}
+														}}
+														onMouseLeave={(e) => {
+															if (!isSelected) {
+																e.currentTarget.style.borderColor = '#e5e7eb';
+																e.currentTarget.style.backgroundColor = '#ffffff';
+															}
+														}}
+													>
+														<span style={{ fontWeight: '500', color: '#1f2937' }}>
 															{option.str_option_text}
 														</span>
-														{selectedOption === option.id && (
-															<CheckCircle className="text-purple-600" size={24} />
+														{isSelected && (
+															<CheckCircle style={{ color: '#9333ea' }} size={24} />
 														)}
-													</div>
-												</button>
-											))}
+													</button>
+												);
+											})}
+											{activePoll.str_poll_type === 'multiple' && selectedOptions.length > 0 && (
+												<p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0', textAlign: 'center' }}>
+													{selectedOptions.length} de {activePoll.int_max_selections || activePoll.options?.length} seleccionada(s)
+												</p>
+											)}
 										</div>
 									) : (
-										<div className="text-center py-8">
-											<p className="text-gray-600 mb-4">
+										<div style={{ textAlign: 'center', padding: '32px 0' }}>
+											<p style={{ color: '#4b5563', marginBottom: '16px' }}>
 												Este tipo de encuesta ({activePoll.str_poll_type}) aún no está disponible para votación desde la reunión.
 											</p>
 										</div>
 									)}
 
 									{/* Botones de acción */}
-									<div className="flex gap-3 pt-4 border-t border-gray-200">
+									<div style={{
+										display: 'flex',
+										gap: '12px',
+										paddingTop: '16px',
+										borderTop: '1px solid #e5e7eb'
+									}}>
 										<button
 											onClick={handleClosePollModal}
-											className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold"
+											style={{
+												flex: 1,
+												padding: '12px 24px',
+												backgroundColor: '#e5e7eb',
+												color: '#374151',
+												borderRadius: '12px',
+												border: 'none',
+												fontWeight: '600',
+												cursor: 'pointer',
+												transition: 'all 0.2s'
+											}}
+											onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d1d5db'}
+											onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
 										>
 											Cancelar
 										</button>
 										<button
 											onClick={handleVote}
-											disabled={!selectedOption || isSubmittingVote}
-											className={`flex-1 px-6 py-3 rounded-xl font-semibold transition-all ${
-												selectedOption && !isSubmittingVote
-													? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800 shadow-lg'
-													: 'bg-gray-300 text-gray-500 cursor-not-allowed'
-											}`}
+											disabled={selectedOptions.length === 0 || isSubmittingVote}
+											style={{
+												flex: 1,
+												padding: '12px 24px',
+												background: selectedOptions.length > 0 && !isSubmittingVote
+													? 'linear-gradient(to right, #9333ea, #7e22ce)'
+													: '#d1d5db',
+												color: selectedOptions.length > 0 && !isSubmittingVote ? '#ffffff' : '#6b7280',
+												borderRadius: '12px',
+												border: 'none',
+												fontWeight: '600',
+												cursor: selectedOptions.length > 0 && !isSubmittingVote ? 'pointer' : 'not-allowed',
+												transition: 'all 0.2s',
+												boxShadow: selectedOptions.length > 0 && !isSubmittingVote ? '0 10px 15px -3px rgba(147, 51, 234, 0.3)' : 'none',
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+												gap: '8px'
+											}}
+											onMouseEnter={(e) => {
+												if (selectedOptions.length > 0 && !isSubmittingVote) {
+													e.currentTarget.style.background = 'linear-gradient(to right, #7e22ce, #6b21a8)';
+												}
+											}}
+											onMouseLeave={(e) => {
+												if (selectedOptions.length > 0 && !isSubmittingVote) {
+													e.currentTarget.style.background = 'linear-gradient(to right, #9333ea, #7e22ce)';
+												}
+											}}
 										>
 											{isSubmittingVote ? (
-												<span className="flex items-center justify-center gap-2">
+												<>
 													<Loader2 className="animate-spin" size={20} />
-													Votando...
-												</span>
+													<span>Votando...</span>
+												</>
 											) : (
-												'Votar'
+												`Votar${selectedOptions.length > 1 ? ` (${selectedOptions.length})` : ''}`
 											)}
 										</button>
 									</div>
