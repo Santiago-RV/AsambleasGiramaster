@@ -28,21 +28,27 @@ export default function MeetingPollsView({ meeting, onBack }) {
   // Mutación para iniciar encuesta
   const startPollMutation = useMutation({
     mutationFn: async ({ pollId, durationMinutes }) => {
+      console.log('🚀 [MeetingPollsView] Iniciando encuesta:', { pollId, durationMinutes });
       return await PollService.startPoll(pollId, durationMinutes);
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      console.log('✅ [MeetingPollsView] Encuesta iniciada exitosamente:', response);
+      // Invalidar TODAS las queries de encuestas para actualizar en todos lados
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
+      queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
+
       Swal.fire({
         icon: 'success',
         title: 'Encuesta Iniciada',
-        text: 'La encuesta está activa',
+        text: 'La encuesta está activa y disponible en la reunión',
         showConfirmButton: false,
-        timer: 2000,
+        timer: 3000,
         toast: true,
         position: 'top-end',
       });
     },
     onError: (error) => {
+      console.error('❌ [MeetingPollsView] Error al iniciar encuesta:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -54,10 +60,15 @@ export default function MeetingPollsView({ meeting, onBack }) {
   // Mutación para finalizar encuesta
   const endPollMutation = useMutation({
     mutationFn: async (pollId) => {
+      console.log('🛑 [MeetingPollsView] Finalizando encuesta:', { pollId });
       return await PollService.endPoll(pollId);
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      console.log('✅ [MeetingPollsView] Encuesta finalizada exitosamente:', response);
+      // Invalidar TODAS las queries de encuestas
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
+      queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
+
       Swal.fire({
         icon: 'success',
         title: 'Encuesta Finalizada',
@@ -69,6 +80,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
       });
     },
     onError: (error) => {
+      console.error('❌ [MeetingPollsView] Error al finalizar encuesta:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -80,10 +92,15 @@ export default function MeetingPollsView({ meeting, onBack }) {
   // Mutación para crear encuesta
   const createPollMutation = useMutation({
     mutationFn: async (pollData) => {
+      console.log('📝 [MeetingPollsView] Creando encuesta:', pollData);
       return await PollService.createPoll(pollData);
     },
     onSuccess: (response) => {
+      console.log('✅ [MeetingPollsView] Encuesta creada exitosamente:', response);
+      // Invalidar TODAS las queries de encuestas
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
+      queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
+
       Swal.fire({
         icon: 'success',
         title: 'Encuesta Creada',
@@ -96,6 +113,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
       setShowCreatePoll(false);
     },
     onError: (error) => {
+      console.error('❌ [MeetingPollsView] Error al crear encuesta:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -142,17 +160,45 @@ export default function MeetingPollsView({ meeting, onBack }) {
   };
 
   const handlePollCreated = async (pollData, startImmediately) => {
-    try {
-      const response = await createPollMutation.mutateAsync(pollData);
+    console.log('🎯 [MeetingPollsView] handlePollCreated llamado:', {
+      pollData,
+      startImmediately,
+      pollTitle: pollData.str_title
+    });
 
-      if (startImmediately && response?.success && response?.data?.id) {
-        await startPollMutation.mutateAsync({
-          pollId: response.data.id,
-          durationMinutes: pollData.int_duration_minutes,
+    try {
+      console.log('📝 [MeetingPollsView] Creando encuesta...');
+      const response = await createPollMutation.mutateAsync(pollData);
+      console.log('✅ [MeetingPollsView] Encuesta creada, respuesta:', response);
+
+      if (startImmediately) {
+        console.log('🚀 [MeetingPollsView] startImmediately es TRUE, verificando datos...');
+        console.log('🔍 [MeetingPollsView] Datos de respuesta:', {
+          success: response?.success,
+          hasData: !!response?.data,
+          pollId: response?.data?.id,
+          durationMinutes: pollData.int_duration_minutes
         });
+
+        if (response?.success && response?.data?.id) {
+          console.log('✅ [MeetingPollsView] Iniciando encuesta automáticamente...');
+          await startPollMutation.mutateAsync({
+            pollId: response.data.id,
+            durationMinutes: pollData.int_duration_minutes,
+          });
+          console.log('✅ [MeetingPollsView] Encuesta iniciada exitosamente');
+        } else {
+          console.warn('⚠️ [MeetingPollsView] No se puede iniciar automáticamente:', {
+            reason: !response?.success ? 'response.success is falsy' :
+                    !response?.data ? 'response.data is falsy' :
+                    !response?.data?.id ? 'response.data.id is falsy' : 'unknown'
+          });
+        }
+      } else {
+        console.log('ℹ️ [MeetingPollsView] startImmediately es FALSE, guardando como borrador');
       }
     } catch (error) {
-      console.error('Error creating poll:', error);
+      console.error('❌ [MeetingPollsView] Error en handlePollCreated:', error);
     }
   };
 
