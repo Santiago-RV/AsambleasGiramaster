@@ -47,15 +47,30 @@ export class ResidentService {
     }
 
     static async sendBulkCredentials(unitId, residentIds) {
-        try {
-            const response = await axiosInstance.post(
-                `/residential/units/${unitId}/residents/send-credentials-bulk`,
-                { resident_ids: residentIds }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error sending bulk credentials:', error);
-            throw error;
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+
+        if (!token) {
+            throw new Error('No hay sesión activa');
         }
+
+        const response = await axiosInstance.post(
+            `/super-admin/residential-units/${unitId}/residents/send-credentials-bulk`,  //Correcto
+            { resident_ids: residentIds },
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
+
+        if (!response.data || !response.data.success) {
+            throw new Error(response.data?.message || 'Error al enviar credenciales');
+        }
+
+        return {
+            success: true,
+            message: response.data.message,
+            data: response.data.data,
+        };
     }
 }

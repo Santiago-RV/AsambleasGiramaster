@@ -28,10 +28,10 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
       - AHORA: onClose() primero, luego try { API call } catch { silent error }
 
   - **Beneficios**:
-    - ✅ **Usuario regresa al dashboard inmediatamente** al salir de la reunión
-    - ✅ **Sesión se mantiene activa** sin importar el resultado del registro de finalización
-    - ✅ **Experiencia fluida** sin interrupciones inesperadas
-    - ✅ **Registro de finalización en segundo plano** no crítico para UX
+    -**Usuario regresa al dashboard inmediatamente** al salir de la reunión
+    -**Sesión se mantiene activa** sin importar el resultado del registro de finalización
+    -**Experiencia fluida** sin interrupciones inesperadas
+    -**Registro de finalización en segundo plano** no crítico para UX
 
 - **Sistema completo de votación en tiempo real durante reuniones**:
   - **Problema resuelto**:
@@ -73,12 +73,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
       - Líneas 470-570: Modal completamente rediseñado con funcionalidad real
 
   - **Beneficios**:
-    - ✅ **Votación en tiempo real** sin salir de la reunión de Zoom
-    - ✅ **Actualización automática** cada 5 segundos para detectar nuevas encuestas
-    - ✅ **Botón inteligente** que solo aparece cuando hay encuesta activa
-    - ✅ **Interfaz intuitiva** con feedback visual claro
-    - ✅ **Experiencia fluida** con loading states y mensajes de confirmación
-    - ✅ **Manejo robusto de errores** para mejor UX
+    -**Votación en tiempo real** sin salir de la reunión de Zoom
+    -**Actualización automática** cada 5 segundos para detectar nuevas encuestas
+    -**Botón inteligente** que solo aparece cuando hay encuesta activa
+    -**Interfaz intuitiva** con feedback visual claro
+    -**Experiencia fluida** con loading states y mensajes de confirmación
+    -**Manejo robusto de errores** para mejor UX
 
 - **MIGRACIÓN A ZOOM SDK WEB (Pantalla Completa Real)**:
   - **Problema identificado**:
@@ -108,22 +108,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
   - **Diferencias técnicas**:
     - ❌ SDK Embedded: `ZoomMtgEmbedded.createClient()` - ventana limitada en tamaño
-    - ✅ SDK Web: `ZoomMtg.init()` + `ZoomMtg.join()` - pantalla completa real
+    -SDK Web: `ZoomMtg.init()` + `ZoomMtg.join()` - pantalla completa real
     - El SDK Web renderiza su propia UI completa sin restricciones de contenedor
     - Compatible con el ejemplo oficial de Zoom para aplicaciones web
 
   - **Beneficios**:
-    - ✅ **Pantalla completa real**: Zoom ocupa 100% de la ventana del navegador
-    - ✅ **Sin limitaciones de tamaño**: No hay ventanas diminutas o restricciones
-    - ✅ **UI nativa de Zoom completa**: Todos los controles y funcionalidades disponibles
-    - ✅ **Mejor experiencia**: Igual que usar Zoom en su aplicación web oficial
-    - ✅ **Más estable**: SDK Web es el más usado y mejor mantenido por Zoom
-    - ✅ **Pantalla de carga profesional**: Gradiente animado, icono de Zoom, mensajes de estado dinámicos
-    - ✅ **Detección inteligente**: La pantalla de carga se oculta solo cuando Zoom está completamente renderizado
-    - ✅ **Sin pantalla negra**: El usuario ve una interfaz atractiva durante toda la carga
-    - ✅ **Botón nativo de Zoom**: Usa el botón de salir del propio SDK de Zoom
-    - ✅ **Registro automático de finalización**: Al salir de la reunión se registra automáticamente `dat_actual_end_time`
-    - ✅ **Botón flotante de encuestas**: Acceso rápido a encuestas activas sin salir de la reunión
+    -**Pantalla completa real**: Zoom ocupa 100% de la ventana del navegador
+    -**Sin limitaciones de tamaño**: No hay ventanas diminutas o restricciones
+    -**UI nativa de Zoom completa**: Todos los controles y funcionalidades disponibles
+    -**Mejor experiencia**: Igual que usar Zoom en su aplicación web oficial
+    -**Más estable**: SDK Web es el más usado y mejor mantenido por Zoom
+    -**Pantalla de carga profesional**: Gradiente animado, icono de Zoom, mensajes de estado dinámicos
+    -**Detección inteligente**: La pantalla de carga se oculta solo cuando Zoom está completamente renderizado
+    -**Sin pantalla negra**: El usuario ve una interfaz atractiva durante toda la carga
+    -**Botón nativo de Zoom**: Usa el botón de salir del propio SDK de Zoom
+    -**Registro automático de finalización**: Al salir de la reunión se registra automáticamente `dat_actual_end_time`
+    -**Botón flotante de encuestas**: Acceso rápido a encuestas activas sin salir de la reunión
 
 - **CORRECCIÓN CRÍTICA: Zoom Embebido para Administradores (Unificación con SuperAdmin)**:
   - **Problema identificado**:
@@ -139,7 +139,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
   - **Campos corregidos**:
     - ❌ ANTES: `str_meeting_url` (no existe), `str_zoom_meeting_id` (tipo incorrecto)
-    - ✅ AHORA: `str_zoom_join_url`, `int_zoom_meeting_id`, `str_zoom_password`
+    -AHORA: `str_zoom_join_url`, `int_zoom_meeting_id`, `str_zoom_password`
 
   - **Archivos modificados**:
     - `AdDashboard.jsx` (líneas 16, 34, 252-291, 370-381): Handler y renderizado fullscreen
@@ -147,13 +147,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
     - `ZoomMeetingContainer.jsx` (líneas 58-85, 219-273): Configuración de tamaño máximo del viewport (100vw x 100vh) para SDK de Zoom
 
   - **Beneficios**:
-    - ✅ **Pantalla completa automática**: Zoom ocupa toda la ventana del navegador (100vw x 100vh)
-    - ✅ **Experiencia consistente** entre SuperAdmin y Admin (mismo componente)
-    - ✅ **Controles nativos de Zoom** completamente visibles y funcionales
-    - ✅ **Botón de cerrar** siempre accesible en esquina superior derecha con z-index alto
-    - ✅ **Pantalla de carga profesional** con spinner animado y nombre de reunión
-    - ✅ **Registro automático** de hora de inicio (`dat_actual_start_time`)
-    - ✅ **Sin instalación** de app de Zoom necesaria - todo en el navegador
+    -**Pantalla completa automática**: Zoom ocupa toda la ventana del navegador (100vw x 100vh)
+    -**Experiencia consistente** entre SuperAdmin y Admin (mismo componente)
+    -**Controles nativos de Zoom** completamente visibles y funcionales
+    -**Botón de cerrar** siempre accesible en esquina superior derecha con z-index alto
+    -**Pantalla de carga profesional** con spinner animado y nombre de reunión
+    -**Registro automático** de hora de inicio (`dat_actual_start_time`)
+    -**Sin instalación** de app de Zoom necesaria - todo en el navegador
 
 - **Validación de datos de Zoom antes de acceder a reuniones**:
   - Agregada validación para verificar que la reunión tenga `int_zoom_meeting_id` o `str_zoom_join_url` antes de intentar acceder
@@ -302,12 +302,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   - Reemplazo de `UsersTable` por `ResidentsList` con diseño profesional
   - Lista de copropietarios filtrada automáticamente por unidad residencial del admin
   - Funcionalidades completas:
-    - ✅ Crear copropietario individual con validación completa
-    - ✅ Editar copropietario existente (modo edición con datos prellenados)
-    - ✅ Eliminar copropietario con confirmación
-    - ✅ Reenviar credenciales individual (genera nueva contraseña temporal)
-    - ✅ Envío masivo de credenciales (selección múltiple con checkboxes)
-    - ✅ Carga masiva desde Excel con plantilla descargable
+    -Crear copropietario individual con validación completa
+    -Editar copropietario existente (modo edición con datos prellenados)
+    -Eliminar copropietario con confirmación
+    -Reenviar credenciales individual (genera nueva contraseña temporal)
+    -Envío masivo de credenciales (selección múltiple con checkboxes)
+    -Carga masiva desde Excel con plantilla descargable
   - Notificaciones con SweetAlert2 para todas las operaciones
   - Invalidación automática de cache con React Query
 

@@ -60,7 +60,7 @@ class PollService:
 
         logger.info(f"📅 Verificando acceso a reunión ID {meeting_id}")
         logger.info(f"   ⚠️ MODO PRUEBAS: Validaciones temporales deshabilitadas")
-        logger.info(f"   ✅ Acceso permitido para crear encuestas (sin validaciones)")
+        logger.info(f"  Acceso permitido para crear encuestas (sin validaciones)")
 
         # COMENTADO: Verificación de reunión finalizada
         # now = datetime.now()

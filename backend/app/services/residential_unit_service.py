@@ -1170,13 +1170,35 @@ class ResidentialUnitService:
                 details={"original_error": str(e)}
             )
                 
-    async def resend_resident_credentials(self, user_id: int, unit_id: int):
+    async def resend_resident_credentials(
+        self, 
+        user_id: int, 
+        unit_id: int,
+        auto_commit: bool = True
+    ):
         """
         Reenvía las credenciales de acceso por correo electrónico a un copropietario.
         Genera una nueva contraseña temporal y registra la notificación en BD.
+        
+        Args:
+            user_id: ID del usuario copropietario
+            unit_id: ID de la unidad residencial
+            auto_commit: Si True, hace commit automático. Si False, solo flush (para operaciones bulk)
+        
+        Returns:
+            Dict con información del envío:
+            - email: Email del copropietario
+            - username: Usuario para login
+            - email_sent: True si el correo se envió correctamente
+            - notification_id: ID de la notificación registrada
+            - message: Mensaje descriptivo del resultado
+        
+        Raises:
+            ResourceNotFoundException: Si el copropietario no existe o no pertenece a la unidad
+            ServiceException: Si ocurre un error durante el proceso
         """
         try:
-            # Verificar que el usuario existe y pertenece a la unidad
+            #CAMBIO: Remover restricción de rol
             query = (
                 select(UserModel, DataUserModel, UserResidentialUnitModel)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
@@ -1184,8 +1206,8 @@ class ResidentialUnitService:
                 .where(
                     and_(
                         UserModel.id == user_id,
-                        UserResidentialUnitModel.int_residential_unit_id == unit_id,
-                        (UserModel.int_id_rol == 3) | (UserResidentialUnitModel.bool_is_admin == False)  # Solo copropietarios
+                        UserResidentialUnitModel.int_residential_unit_id == unit_id
+                        #QUITAMOS la restricción: (UserModel.int_id_rol == 3) | (UserResidentialUnitModel.bool_is_admin == False)
                     )
                 )
             )
@@ -1195,13 +1217,15 @@ class ResidentialUnitService:
             
             if not user_data:
                 raise ResourceNotFoundException(
-                    message=f"Copropietario no encontrado",
+                    message=f"Copropietario no encontrado en la unidad {unit_id}",
                     error_code="RESIDENT_NOT_FOUND"
                 )
             
             user, data_user, user_unit = user_data
             
-            # Obtener información de la unidad residencial
+            # ============================================
+            # PASO 2: Obtener información de la unidad residencial
+            # ============================================
             residential_unit = await self.get_residential_unit_by_id(unit_id)
             if not residential_unit:
                 raise ResourceNotFoundException(
@@ -1209,22 +1233,36 @@ class ResidentialUnitService:
                     error_code="RESIDENTIAL_UNIT_NOT_FOUND"
                 )
             
-            # Generar nueva contraseña temporal
+            # ============================================
+            # PASO 3: Generar nueva contraseña temporal
+            # ============================================
             import secrets
             import string
             
-            # Generar contraseña aleatoria de 12 caracteres
+            # Generar contraseña aleatoria segura de 12 caracteres
             alphabet = string.ascii_letters + string.digits + "!@#$%"
             temporary_password = ''.join(secrets.choice(alphabet) for i in range(12))
             
-            # Actualizar contraseña en la base de datos
+            logger.info(f"🔐 Contraseña temporal generada para {data_user.str_email}")
+            
+            # ============================================
+            # PASO 4: Actualizar contraseña en la base de datos
+            # ============================================
             hashed_password = security_manager.create_password_hash(temporary_password)
             user.str_password_hash = hashed_password
             user.updated_at = datetime.now()
             
-            await self.db.commit()
+            #COMMIT O FLUSH según el modo
+            if auto_commit:
+                await self.db.commit()
+                logger.info(f"Contraseña actualizada y confirmada (commit) para user_id={user_id}")
+            else:
+                await self.db.flush()
+                logger.info(f"Contraseña actualizada (flush) para user_id={user_id}")
             
-            # REGISTRAR NOTIFICACIÓN Y ENVIAR CORREO
+            # ============================================
+            # PASO 5: Registrar notificación y enviar correo
+            # ============================================
             notification_service = EmailNotificationService(self.db)
             
             try:
@@ -1236,7 +1274,13 @@ class ResidentialUnitService:
                     meeting_id=None
                 )
                 
-                # Enviar correo con las nuevas credenciales
+                logger.info(
+                    f"📧 Notificación creada (ID: {notification.id}) para {data_user.str_email}"
+                )
+                
+                # ============================================
+                # PASO 6: Enviar correo con las nuevas credenciales
+                # ============================================
                 email_sent = self._send_welcome_email(
                     user_email=data_user.str_email,
                     user_name=f"{data_user.str_firstname} {data_user.str_lastname}",
@@ -1248,17 +1292,22 @@ class ResidentialUnitService:
                     phone=data_user.str_phone
                 )
                 
-                # Actualizar estado de la notificación según resultado
+                # ============================================
+                # PASO 7: Actualizar estado de la notificación según resultado
+                # ============================================
                 status = "sent" if email_sent else "failed"
                 await notification_service.update_status(
                     notification_id=notification.id,
                     status=status,
-                    commit=True  # Commit de la notificación
+                    commit=auto_commit  #Pasar el parámetro de commit
                 )
                 
+                # ============================================
+                # PASO 8: Retornar resultado
+                # ============================================
                 if email_sent:
                     logger.info(
-                        f"Credenciales reenviadas a {data_user.str_email} "
+                        f"✅ Credenciales reenviadas exitosamente a {data_user.str_email} "
                         f"- Notificación ID: {notification.id} registrada como '{status}'"
                     )
                     return {
@@ -1270,7 +1319,7 @@ class ResidentialUnitService:
                     }
                 else:
                     logger.warning(
-                        f"No se pudo enviar correo a {data_user.str_email} "
+                        f"⚠️ No se pudo enviar correo a {data_user.str_email} "
                         f"- Notificación ID: {notification.id} marcada como 'failed'"
                     )
                     raise ServiceException(
@@ -1284,22 +1333,29 @@ class ResidentialUnitService:
             except ServiceException:
                 raise
             except Exception as e:
-                logger.error(f"Error al enviar correo/notificación: {str(e)}")
+                logger.error(f"❌ Error al enviar correo/notificación: {str(e)}")
                 raise ServiceException(
                     message=f"Error al procesar el envío de credenciales: {str(e)}",
                     details={"original_error": str(e)}
                 )
-                
+                    
         except (ResourceNotFoundException, ServiceException):
-            await self.db.rollback()
+            # Solo hacer rollback si estamos en modo auto_commit
+            if auto_commit:
+                await self.db.rollback()
+                logger.warning(f"Rollback ejecutado para user_id={user_id}")
             raise
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Error al reenviar credenciales: {str(e)}")
+            # Solo hacer rollback si estamos en modo auto_commit
+            if auto_commit:
+                await self.db.rollback()
+                logger.error(f"❌ Rollback ejecutado por error inesperado: {str(e)}")
+            
+            logger.error(f"Error al reenviar credenciales a user_id={user_id}: {str(e)}")
             raise ServiceException(
                 message=f"Error al reenviar credenciales: {str(e)}",
                 details={"original_error": str(e)}
-            )    
+            )
             
     async def get_unit_administrator(self, unit_id: int) -> Optional[dict]:
         """

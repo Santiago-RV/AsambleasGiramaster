@@ -15,7 +15,7 @@ export const publicAxios = axios.create({
 // Instancia de Axios privada (con token) - para endpoints protegidos
 const axiosInstance = axios.create({
 	baseURL: API_BASE_URL,
-	// ✅ NO establecer Content-Type por defecto
+	//NO establecer Content-Type por defecto
 	// Axios lo configurará automáticamente según el tipo de datos
 	timeout: 10000,
 });
@@ -28,7 +28,7 @@ axiosInstance.interceptors.request.use(
 			config.headers.Authorization = `Bearer ${token}`;
 		}
 
-		// ✅ Solo establecer Content-Type si no es FormData
+		//Solo establecer Content-Type si no es FormData
 		// Esto permite que FormData configure su propio Content-Type con boundary
 		if (!(config.data instanceof FormData)) {
 			config.headers['Content-Type'] = 'application/json';

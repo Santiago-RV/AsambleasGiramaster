@@ -234,7 +234,7 @@ export class ResidentialUnitService {
   }
 
   /**
-   * ✅ CARGA MASIVA DE COPROPIETARIOS DESDE EXCEL
+   *CARGA MASIVA DE COPROPIETARIOS DESDE EXCEL
    * @param {number} unitId - ID de la unidad residencial
    * @param {File} file - Archivo Excel
    * @returns {Promise} Resultado de la carga
@@ -264,7 +264,7 @@ export class ResidentialUnitService {
         console.log(`   ${key}:`, value);
       }
 
-      // ✅ CLAVE: NO especificar Content-Type manualmente
+      //CLAVE: NO especificar Content-Type manualmente
       // Axios lo configura automáticamente con el boundary correcto
       const response = await axiosInstance.post(
         `/super-admin/residential-units/${unitId}/upload-residents-excel`,
