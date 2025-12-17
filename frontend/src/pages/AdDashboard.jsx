@@ -76,7 +76,7 @@ export default function AppAdmin() {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'Gestión de Copropietarios', icon: Users },
-    { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
+    // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
     { id: 'reports', label: 'Reportes', icon: FileText },
     { id: 'settings', label: 'Configuración', icon: Settings },
@@ -86,7 +86,7 @@ export default function AppAdmin() {
   const sectionTitles = {
     dashboard: "Dashboard",
     users: "Gestión de Copropietarios",
-    assemblies: "Gestión de Asambleas",
+    // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
     reports: "Reportes",
     settings: "Configuración",
