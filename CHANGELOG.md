@@ -9,6 +9,138 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-17
+
+- **Sistema de votación con soporte completo para múltiples selecciones**:
+  - **Problema resuelto**: Las encuestas de múltiple selección solo permitían seleccionar una opción
+  - **Funcionalidades implementadas**:
+    - Soporte completo para encuestas "single choice" (una sola opción)
+    - Soporte completo para encuestas "multiple choice" (múltiples opciones)
+    - Sistema de toggle inteligente para agregar/quitar opciones
+    - Respeto del límite `int_max_selections` configurado en cada encuesta
+    - Contador visual de opciones seleccionadas
+    - Texto dinámico en instrucciones según tipo de encuesta
+    - Botón de votar muestra contador cuando hay múltiples selecciones: "Votar (3)"
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx`:
+      - Línea 29: Estado cambiado de `selectedOption` a `selectedOptions` (array)
+      - Líneas 357-367: Funciones de apertura/cierre de modal actualizadas
+      - Líneas 369-392: Nueva función `handleOptionToggle()` para gestión de selecciones
+      - Líneas 394-416: Función `handleVote()` actualizada para enviar múltiples votos
+      - Líneas 746-807: Renderizado de opciones mejorado con lógica de selección múltiple
+      - Líneas 841-881: Botón de votar con validación y contador visual
+  - **Beneficios**:
+    - ✅ Encuestas single choice funcionan correctamente (una sola opción)
+    - ✅ Encuestas multiple choice permiten seleccionar varias opciones
+    - ✅ Validación del límite máximo de selecciones
+    - ✅ Feedback visual claro con contador de selecciones
+    - ✅ Interfaz intuitiva para agregar/quitar opciones
+
+- **Corrección de permisos de votación para administradores y organizadores**:
+  - **Problema resuelto**: Solo el organizador de la reunión podía votar, otros administradores recibían error "Usuario no está invitado"
+  - **Solución implementada**:
+    - Sistema de permisos multinivel en `_get_user_voting_weight()`
+    - Verificación 1: ¿Es el organizador de la reunión? → Puede votar
+    - Verificación 2: ¿Creó la reunión? → Puede votar
+    - Verificación 3: ¿Es admin que creó la unidad residencial? → Puede votar
+    - Verificación 4: ¿Está en lista de invitados? → Puede votar con su peso
+  - **Archivos modificados**:
+    - `pool_service.py` (líneas 360-425):
+      - Query extendida para obtener `created_by` de la reunión
+      - Verificación de administrador con rol ID 2
+      - Check de `ResidentialUnitModel.created_by` para validar admin
+  - **Beneficios**:
+    - ✅ Organizador puede votar sin estar en invitaciones
+    - ✅ Admin creador de reunión puede votar
+    - ✅ Admin creador de unidad residencial puede votar
+    - ✅ Copropietarios invitados votan con su peso de votación
+
+- **Rediseño completo de SweetAlert2 con tema púrpura moderno**:
+  - **Estilos globales mejorados**:
+    - Modales con bordes redondeados de 20px
+    - Sombras suaves y elegantes
+    - Fuente Inter para consistencia
+    - Padding generoso (2rem)
+  - **Botones con gradientes y efectos**:
+    - Confirmar: Gradiente púrpura (#9333ea → #7e22ce)
+    - Cancelar: Gris elegante (#e5e7eb)
+    - Negar: Gradiente rojo (#ef4444 → #dc2626)
+    - Efecto lift (translateY) al hacer hover
+    - Sombras con color del botón para profundidad
+  - **Iconos personalizados**:
+    - Éxito: Púrpura (#9333ea) en lugar de verde
+    - Error: Rojo (#ef4444)
+    - Advertencia: Naranja (#f59e0b)
+    - Info: Azul (#3b82f6)
+    - Pregunta: Púrpura (#9333ea)
+  - **Toasts con diseño moderno**:
+    - Bordes laterales de 4px según tipo
+    - Fondo blanco con sombras flotantes
+    - Bordes redondeados de 16px
+  - **Efectos visuales**:
+    - Backdrop blur de 6px
+    - Animaciones suaves (0.2-0.3s)
+    - Focus states con anillos de color
+  - **Archivos modificados**:
+    - `swal-custom.css`: Reescrito completamente con 309 líneas de estilos organizados
+  - **Beneficios**:
+    - ✅ Diseño consistente con tema púrpura de la aplicación
+    - ✅ Experiencia visual premium con animaciones suaves
+    - ✅ Mejor accesibilidad con focus states
+    - ✅ Modales y toasts más atractivos y profesionales
+
+- **Corrección de SweetAlert en reuniones de Zoom**:
+  - **Problema resuelto**: Los SweetAlert de error no se mostraban en la reunión de Zoom
+  - **Causa**: El z-index del SDK de Zoom bloqueaba los modales
+  - **Solución implementada**:
+    - Z-index muy alto (99999) para contenedor y popup
+    - Clase CSS `swal2-zoom-override` específica para Zoom
+    - Cierre automático del modal de votación antes de mostrar error
+    - Configuración de backdrop y permisos de cierre mejorados
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (líneas 409-442): Error handler mejorado con z-index
+    - `swal-custom.css` (líneas 226-233): Estilos override para Zoom
+  - **Beneficios**:
+    - ✅ Errores de votación visibles sobre interfaz de Zoom
+    - ✅ Diseño mejorado con bordes redondeados y colores púrpura
+    - ✅ Experiencia de usuario consistente
+
+- **Menú desplegable para cerrar sesión mejorado**:
+  - **Problema resuelto**: Al hacer clic en cerrar sesión, el usuario era deslogueado cuando solo quería volver al inicio
+  - **Solución implementada**:
+    - Menú desplegable con dos opciones al hacer hover
+    - "Volver al Inicio": Regresa al dashboard sin cerrar sesión
+    - "Cerrar Sesión": Cierra sesión completamente
+  - **Archivos modificados**:
+    - `AdDashboard.jsx` (líneas 388-412): Botón convertido en menú con dos opciones
+  - **Beneficios**:
+    - ✅ Navegación más intuitiva al dashboard
+    - ✅ Previene cierres de sesión accidentales
+    - ✅ Mejor experiencia de usuario
+
+- **Corrección de redirección al salir de reunión**:
+  - **Problema resuelto**: Al cerrar la reunión de Zoom, se redirigía a una página en blanco (`about:blank`)
+  - **Solución implementada**:
+    - Cambiado `leaveUrl` de `'about:blank'` a `window.location.origin + '/admin'`
+    - Redirección automática al dashboard del administrador
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (línea 169): URL de salida actualizada
+  - **Beneficios**:
+    - ✅ Regreso automático al dashboard al salir de reunión
+    - ✅ Sin páginas en blanco confusas
+    - ✅ Flujo de navegación mejorado
+
+- **Ajuste de posición del botón flotante de encuestas**:
+  - **Problema resuelto**: El botón flotante de encuestas tapaba el menú desplegable de cerrar sesión
+  - **Solución implementada**:
+    - Posición cambiada de `bottom-24` (96px) a `bottom-40` (160px)
+    - Mayor espacio para el menú desplegable
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (línea 397): Clase de posición actualizada
+  - **Beneficios**:
+    - ✅ Menú de cerrar sesión completamente visible
+    - ✅ Sin superposición de elementos
+
 #### 2025-12-16
 
 - **CORRECCIÓN CRÍTICA: Navegación al salir de reunión sin cerrar sesión**:

@@ -166,7 +166,7 @@ const ZoomMeetingContainer = ({
 
 			// Inicializar Zoom Meeting SDK
 			ZoomMtg.init({
-				leaveUrl: 'about:blank', // Evitar redirección automática
+				leaveUrl: window.location.origin + '/admin', // Redirigir al dashboard del admin
 				patchJsMedia: true,
 				leaveOnPageUnload: false, // No cerrar automáticamente al cambiar de página
 				success: (success) => {
