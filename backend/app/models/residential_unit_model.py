@@ -16,7 +16,7 @@ class ResidentialUnitModel(Base):
     str_city = Column(String(100), nullable=False)
     str_state = Column(String(100), nullable=False)
     bln_is_active = Column(Boolean, default=True)
-    int_max_concurrent_meetings = Column(Integer, nullable=False)
+    int_max_concurrent_meetings = Column(Integer, nullable=True)
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now)

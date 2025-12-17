@@ -32,7 +32,7 @@ class ResidentialUnitBase(BaseModel):
   str_city: str = Field(..., description="Ciudad de la unidad residencial")
   str_state: str = Field(..., description="Estado de la unidad residencial")
   bln_is_active: bool = Field(default=True, description="Estado de la unidad residencial")
-  int_max_concurrent_meetings: int = Field(..., description="Máximo de reuniones concurrentes")
+  int_max_concurrent_meetings: Optional[int] = Field(None, description="Máximo de reuniones concurrentes")
 
   model_config = ConfigDict(from_attributes=True)
 
