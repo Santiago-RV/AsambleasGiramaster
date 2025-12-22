@@ -65,6 +65,44 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
     - ✅ **Interfaz visible**: Zoom se muestra correctamente sin pantalla negra
     - ✅ **Inicialización exitosa**: SDK se inicializa sin conflictos de versión
 
+- **Corrección de errores de firma JWT en Zoom (3712 y 3705)**:
+  - **Problemas resueltos**:
+    - Error 3712: "Firma no es válida" (Invalid signature)
+    - Error 3705: "La firma ha expirado" (The signature has expired)
+  - **Causa identificada**: Formato de JWT incompatible con estándar y Zoom SDK 4.x
+    - Campo `appKey` obsoleto incluido en payload
+    - Confusión entre timestamps en segundos vs milisegundos
+    - Formato de payload desactualizado
+  - **Solución implementada**:
+    - **Timestamps en segundos** (líneas 48-49):
+      - JWT estándar usa segundos: `int(time.time())`
+      - Expiración calculada en segundos: `iat + (60 * 60 * expire_hours)`
+      - NO usar milisegundos (causaba error 3705)
+    - **Payload simplificado** (líneas 55-62):
+      - Eliminado campo `appKey` obsoleto
+      - Mantiene solo campos requeridos: `sdkKey`, `mn`, `role`, `iat`, `exp`, `tokenExp`
+      - Todos los timestamps en SEGUNDOS (estándar JWT)
+  - **Archivos modificados**:
+    - `backend/app/services/zoom_service.py`:
+      - Líneas 48-49: Timestamps en segundos
+      - Líneas 55-62: Payload compatible con SDK 4.x
+      - Líneas 52-54: Comentarios explicativos sobre formato correcto
+  - **Campos del payload JWT para Zoom SDK 4.x**:
+    - `sdkKey`: SDK Key de Zoom (String)
+    - `mn`: Número de reunión, solo dígitos (String)
+    - `role`: 0 = Participante, 1 = Anfitrión (Integer)
+    - `iat`: Timestamp de emisión en SEGUNDOS (Integer)
+    - `exp`: Timestamp de expiración en SEGUNDOS (Integer)
+    - `tokenExp`: Timestamp de expiración del token en SEGUNDOS (Integer)
+  - **Nota importante**: JWT estándar usa timestamps en segundos, no milisegundos
+  - **Referencia**: https://developers.zoom.us/docs/meeting-sdk/auth/
+  - **Beneficios**:
+    - ✅ **Firma válida**: JWT compatible con especificación de Zoom SDK 4.x
+    - ✅ **Sin expiración prematura**: Timestamps en formato correcto (segundos)
+    - ✅ **Autenticación exitosa**: Usuarios pueden unirse a reuniones sin errores
+    - ✅ **Payload optimizado**: Solo campos necesarios, sin campos obsoletos
+    - ✅ **Código documentado**: Comentarios claros sobre formato de timestamps
+
 - **Mejoras en manejo de errores de Zoom**:
   - **Problema identificado**: Error 3000 de Zoom ("Restricción del explorador o tiempo de espera de unión a la reunión")
   - **Causas comunes**:

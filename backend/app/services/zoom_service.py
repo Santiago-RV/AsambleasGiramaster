@@ -44,12 +44,14 @@ class ZoomService:
                 "Por favor, configura ZOOM_SDK_KEY y ZOOM_SDK_SECRET en las variables de entorno."
             )
 
-        # Tiempo actual y expiración (en milisegundos para Zoom SDK 4.x)
-        iat = int(time.time() * 1000)
-        exp = iat + (60 * 60 * expire_hours * 1000)  # Expira en X horas (en milisegundos)
+        # Tiempo actual y expiración (en segundos para JWT estándar)
+        iat = int(time.time())
+        exp = iat + (60 * 60 * expire_hours)  # Expira en X horas (en segundos)
 
         # Payload del JWT para Zoom SDK 4.x
         # Documentación: https://developers.zoom.us/docs/meeting-sdk/auth/
+        # Nota: Los timestamps deben estar en SEGUNDOS (no milisegundos)
+        # El JWT estándar usa segundos desde epoch
         payload = {
             "sdkKey": self.sdk_key,
             "mn": meeting_number,
