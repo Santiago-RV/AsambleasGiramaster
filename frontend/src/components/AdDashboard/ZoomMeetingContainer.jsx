@@ -164,11 +164,15 @@ const ZoomMeetingContainer = ({
 			ZoomMtg.i18n.load('es-ES');
 			ZoomMtg.i18n.reload('es-ES');
 
-			// Inicializar Zoom Meeting SDK
+			// Inicializar Zoom Meeting SDK con configuraciones mejoradas
 			ZoomMtg.init({
-				leaveUrl: 'about:blank', // Evitar redirección automática
+				leaveUrl: window.location.origin + '/admin', // Redirigir al dashboard del admin
 				patchJsMedia: true,
 				leaveOnPageUnload: false, // No cerrar automáticamente al cambiar de página
+				disableCORP: true, // Deshabilitar Cross-Origin-Resource-Policy
+				audioPanelAlwaysOpen: true,
+				showPureSharingContent: false,
+				isSupportAV: true,
 				success: (success) => {
 					console.log('✅ Zoom SDK inicializado', success);
 					setLoadingMessage('Conectando a la reunión...');
@@ -267,9 +271,25 @@ const ZoomMeetingContainer = ({
 							}, 100);
 						},
 						error: (error) => {
-							console.error('❌ Error al unirse:', error);
-							setError('Error al unirse a la reunión');
+							console.error('❌ Error al unirse a la reunión:', error);
+
+							// Manejar errores específicos
+							let errorMessage = 'Error al unirse a la reunión';
+							if (error && error.errorCode === 3000) {
+								errorMessage = 'Error de conexión (3000): Verifica tu conexión a internet y los permisos del navegador. Intenta recargar la página.';
+							} else if (error && error.reason) {
+								errorMessage = `Error: ${error.reason}`;
+							}
+
+							setError(errorMessage);
 							setIsLoading(false);
+
+							// Limpiar Zoom al fallar
+							const zmmtgRoot = document.getElementById('zmmtg-root');
+							if (zmmtgRoot) {
+								zmmtgRoot.style.display = 'none';
+								zmmtgRoot.innerHTML = '';
+							}
 						},
 					});
 				},
@@ -486,19 +506,42 @@ const ZoomMeetingContainer = ({
 	if (error) {
 		return (
 			<div className="flex items-center justify-center min-h-screen bg-gray-900">
-				<div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
+				<div className="bg-white rounded-lg shadow-lg p-8 max-w-3xl mx-auto">
 					<div className="text-center">
 						<div className="text-red-500 text-5xl mb-4">⚠️</div>
 						<h3 className="text-xl font-bold text-gray-800 mb-2">
 							Error al cargar la reunión
 						</h3>
 						<p className="text-gray-600 mb-6">{error}</p>
-						<button
-							onClick={onClose}
-							className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-						>
-							Cerrar
-						</button>
+
+						{/* Soluciones sugeridas */}
+						{error.includes('3000') && (
+							<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+								<h4 className="font-bold text-blue-900 mb-2">💡 Soluciones sugeridas:</h4>
+								<ul className="text-sm text-blue-800 space-y-2">
+									<li>✓ Verifica que tienes conexión a internet estable</li>
+									<li>✓ Permite el acceso a cámara y micrófono en tu navegador</li>
+									<li>✓ Desactiva extensiones de navegador que puedan bloquear Zoom</li>
+									<li>✓ Intenta usar otro navegador (Chrome recomendado)</li>
+									<li>✓ Verifica que no haya firewalls bloqueando Zoom</li>
+								</ul>
+							</div>
+						)}
+
+						<div className="flex gap-3 justify-center">
+							<button
+								onClick={() => window.location.reload()}
+								className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+							>
+								🔄 Reintentar
+							</button>
+							<button
+								onClick={onClose}
+								className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+							>
+								Volver al Dashboard
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>

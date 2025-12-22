@@ -9,6 +9,232 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-22
+
+- **Corrección de validación de campo `int_max_concurrent_meetings`**:
+  - **Problema resuelto**: Error 500 en endpoint `/api/v1/residential/units` por validación Pydantic
+  - **Causa**: Campo `int_max_concurrent_meetings` marcado como `Optional[int]` pero con `Field(...)` (requerido)
+  - **Error Pydantic**: "Input should be a valid integer [type=int_type, input_value=None, input_type=NoneType]"
+  - **Solución implementada**:
+    - Cambio de `Field(...)` a `Field(None, ...)` en línea 35 de `residential_unit_schema.py`
+    - Permite valores `None` desde la base de datos
+  - **Archivos modificados**:
+    - `backend/app/schemas/residential_unit_schema.py` (línea 35): Field con default None
+  - **Beneficios**:
+    - ✅ Endpoint funciona correctamente con registros que tienen NULL en el campo
+    - ✅ Modelo Pydantic acepta valores opcionales como debe ser
+    - ✅ Sin errores 500 al listar unidades residenciales
+
+- **Unificación de componente Zoom para SuperAdministrador**:
+  - **Cambio implementado**: SuperAdmin ahora usa el mismo componente de reuniones Zoom que el Administrador
+  - **Componente migrado**: De `ZoomMeetingView` a `ZoomMeetingContainer`
+  - **Archivos modificados**:
+    - `frontend/src/pages/HomeSA.jsx`:
+      - Línea 9: Importación cambiada a `ZoomMeetingContainer` del directorio AdDashboard
+      - Líneas 52-56: Callback renombrado de `handleBackFromMeeting` a `handleCloseZoomMeeting`
+      - Líneas 106-113: Componente actualizado con props `onClose` y `startFullscreen={true}`
+  - **Archivos eliminados**:
+    - `frontend/src/components/saDashboard/ZoomMeetingView.jsx` (componente obsoleto)
+    - `frontend/src/components/saDashboard/VotingModal.jsx` (modal obsoleto)
+  - **Beneficios**:
+    - ✅ **Funcionalidad unificada**: Ambos roles usan el mismo componente probado
+    - ✅ **Sistema de encuestas completo**: Polling cada 5 segundos para encuestas activas
+    - ✅ **Botón flotante animado**: Aparece cuando hay encuestas activas
+    - ✅ **Modal interactivo**: Votación single/multiple choice integrada
+    - ✅ **Mejor UX**: Interfaz de carga mejorada con mensajes dinámicos
+    - ✅ **Manejo robusto de errores**: Notificaciones visuales claras
+    - ✅ **Web SDK de Zoom**: Todas las características avanzadas disponibles
+    - ✅ **Código más limpio**: Sin componentes duplicados
+
+- **Corrección de pantalla negra en componente Zoom**:
+  - **Problema resuelto**: Pantalla negra al iniciar reunión de Zoom
+  - **Causa identificada**: Conflicto de versiones del SDK de Zoom
+    - Error en consola: "El recurso de 'https://source.zoom.us/3.8.10/lib/av/tp.min.js' fue bloqueado debido a una discordancia del tipo MIME ('text/plain')"
+    - `ZoomMtg.setZoomJSLib()` intentaba cargar recursos de versión 3.8.10
+    - El SDK ya usaba por defecto la versión 4.1.0
+    - Conflicto entre versiones impedía inicialización correcta
+  - **Solución implementada**:
+    - Eliminada línea `ZoomMtg.setZoomJSLib('https://source.zoom.us/3.8.10/lib', '/av')`
+    - SDK ahora usa configuración por defecto (versión 4.1.0)
+    - Recursos se cargan correctamente sin conflictos MIME
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx` (línea 167): Eliminada configuración de versión incompatible
+  - **Beneficios**:
+    - ✅ **Carga correcta de recursos**: SDK usa versión consistente (4.1.0)
+    - ✅ **Sin errores MIME**: Recursos se cargan con tipo de contenido correcto
+    - ✅ **Interfaz visible**: Zoom se muestra correctamente sin pantalla negra
+    - ✅ **Inicialización exitosa**: SDK se inicializa sin conflictos de versión
+
+- **Mejoras en manejo de errores de Zoom**:
+  - **Problema identificado**: Error 3000 de Zoom ("Restricción del explorador o tiempo de espera de unión a la reunión")
+  - **Causas comunes**:
+    - Problemas de red o firewall
+    - Configuración incorrecta del SDK
+    - Firma (signature) expirada
+    - CORS o políticas de seguridad del navegador
+    - Permisos de cámara/micrófono no otorgados
+  - **Mejoras implementadas**:
+    - **Configuración mejorada del SDK** (líneas 168-176):
+      - `disableCORP: true` para evitar problemas de Cross-Origin
+      - `audioPanelAlwaysOpen: true` para mejor experiencia de audio
+      - `isSupportAV: true` para soporte explícito de audio/video
+    - **Detección específica del error 3000** (líneas 269-289):
+      - Identifica código de error 3000 específicamente
+      - Mensaje personalizado y descriptivo para el usuario
+      - Limpieza del DOM de Zoom al fallar
+    - **Pantalla de error mejorada** (líneas 485-528):
+      - Lista de soluciones sugeridas para error 3000:
+        - ✓ Verificar conexión a internet estable
+        - ✓ Permitir acceso a cámara y micrófono
+        - ✓ Desactivar extensiones que bloqueen Zoom
+        - ✓ Usar Chrome (recomendado)
+        - ✓ Verificar firewalls
+      - Botón "Reintentar" para recargar la página
+      - Botón "Volver al Dashboard" para navegación alternativa
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx`:
+      - Líneas 168-176: Configuración SDK mejorada
+      - Líneas 269-289: Manejo específico de error 3000
+      - Líneas 485-528: UI de error mejorada con soluciones
+  - **Beneficios**:
+    - ✅ **Menos errores**: Configuración optimizada reduce incidencia
+    - ✅ **Mejor diagnóstico**: Usuario sabe qué hacer cuando ocurre un error
+    - ✅ **Recuperación fácil**: Botón de reintentar con un solo click
+    - ✅ **UI informativa**: Lista de pasos para solucionar problemas
+    - ✅ **Experiencia mejorada**: Usuario no se queda atascado sin opciones
+
+#### 2025-12-17
+
+- **Sistema de votación con soporte completo para múltiples selecciones**:
+  - **Problema resuelto**: Las encuestas de múltiple selección solo permitían seleccionar una opción
+  - **Funcionalidades implementadas**:
+    - Soporte completo para encuestas "single choice" (una sola opción)
+    - Soporte completo para encuestas "multiple choice" (múltiples opciones)
+    - Sistema de toggle inteligente para agregar/quitar opciones
+    - Respeto del límite `int_max_selections` configurado en cada encuesta
+    - Contador visual de opciones seleccionadas
+    - Texto dinámico en instrucciones según tipo de encuesta
+    - Botón de votar muestra contador cuando hay múltiples selecciones: "Votar (3)"
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx`:
+      - Línea 29: Estado cambiado de `selectedOption` a `selectedOptions` (array)
+      - Líneas 357-367: Funciones de apertura/cierre de modal actualizadas
+      - Líneas 369-392: Nueva función `handleOptionToggle()` para gestión de selecciones
+      - Líneas 394-416: Función `handleVote()` actualizada para enviar múltiples votos
+      - Líneas 746-807: Renderizado de opciones mejorado con lógica de selección múltiple
+      - Líneas 841-881: Botón de votar con validación y contador visual
+  - **Beneficios**:
+    - ✅ Encuestas single choice funcionan correctamente (una sola opción)
+    - ✅ Encuestas multiple choice permiten seleccionar varias opciones
+    - ✅ Validación del límite máximo de selecciones
+    - ✅ Feedback visual claro con contador de selecciones
+    - ✅ Interfaz intuitiva para agregar/quitar opciones
+
+- **Corrección de permisos de votación para administradores y organizadores**:
+  - **Problema resuelto**: Solo el organizador de la reunión podía votar, otros administradores recibían error "Usuario no está invitado"
+  - **Solución implementada**:
+    - Sistema de permisos multinivel en `_get_user_voting_weight()`
+    - Verificación 1: ¿Es el organizador de la reunión? → Puede votar
+    - Verificación 2: ¿Creó la reunión? → Puede votar
+    - Verificación 3: ¿Es admin que creó la unidad residencial? → Puede votar
+    - Verificación 4: ¿Está en lista de invitados? → Puede votar con su peso
+  - **Archivos modificados**:
+    - `pool_service.py` (líneas 360-425):
+      - Query extendida para obtener `created_by` de la reunión
+      - Verificación de administrador con rol ID 2
+      - Check de `ResidentialUnitModel.created_by` para validar admin
+  - **Beneficios**:
+    - ✅ Organizador puede votar sin estar en invitaciones
+    - ✅ Admin creador de reunión puede votar
+    - ✅ Admin creador de unidad residencial puede votar
+    - ✅ Copropietarios invitados votan con su peso de votación
+
+- **Rediseño completo de SweetAlert2 con tema púrpura moderno**:
+  - **Estilos globales mejorados**:
+    - Modales con bordes redondeados de 20px
+    - Sombras suaves y elegantes
+    - Fuente Inter para consistencia
+    - Padding generoso (2rem)
+  - **Botones con gradientes y efectos**:
+    - Confirmar: Gradiente púrpura (#9333ea → #7e22ce)
+    - Cancelar: Gris elegante (#e5e7eb)
+    - Negar: Gradiente rojo (#ef4444 → #dc2626)
+    - Efecto lift (translateY) al hacer hover
+    - Sombras con color del botón para profundidad
+  - **Iconos personalizados**:
+    - Éxito: Púrpura (#9333ea) en lugar de verde
+    - Error: Rojo (#ef4444)
+    - Advertencia: Naranja (#f59e0b)
+    - Info: Azul (#3b82f6)
+    - Pregunta: Púrpura (#9333ea)
+  - **Toasts con diseño moderno**:
+    - Bordes laterales de 4px según tipo
+    - Fondo blanco con sombras flotantes
+    - Bordes redondeados de 16px
+  - **Efectos visuales**:
+    - Backdrop blur de 6px
+    - Animaciones suaves (0.2-0.3s)
+    - Focus states con anillos de color
+  - **Archivos modificados**:
+    - `swal-custom.css`: Reescrito completamente con 309 líneas de estilos organizados
+  - **Beneficios**:
+    - ✅ Diseño consistente con tema púrpura de la aplicación
+    - ✅ Experiencia visual premium con animaciones suaves
+    - ✅ Mejor accesibilidad con focus states
+    - ✅ Modales y toasts más atractivos y profesionales
+
+- **Corrección de SweetAlert en reuniones de Zoom**:
+  - **Problema resuelto**: Los SweetAlert de error no se mostraban en la reunión de Zoom
+  - **Causa**: El z-index del SDK de Zoom bloqueaba los modales
+  - **Solución implementada**:
+    - Z-index muy alto (99999) para contenedor y popup
+    - Clase CSS `swal2-zoom-override` específica para Zoom
+    - Cierre automático del modal de votación antes de mostrar error
+    - Configuración de backdrop y permisos de cierre mejorados
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (líneas 409-442): Error handler mejorado con z-index
+    - `swal-custom.css` (líneas 226-233): Estilos override para Zoom
+  - **Beneficios**:
+    - ✅ Errores de votación visibles sobre interfaz de Zoom
+    - ✅ Diseño mejorado con bordes redondeados y colores púrpura
+    - ✅ Experiencia de usuario consistente
+
+- **Menú desplegable para cerrar sesión mejorado**:
+  - **Problema resuelto**: Al hacer clic en cerrar sesión, el usuario era deslogueado cuando solo quería volver al inicio
+  - **Solución implementada**:
+    - Menú desplegable con dos opciones al hacer hover
+    - "Volver al Inicio": Regresa al dashboard sin cerrar sesión
+    - "Cerrar Sesión": Cierra sesión completamente
+  - **Archivos modificados**:
+    - `AdDashboard.jsx` (líneas 388-412): Botón convertido en menú con dos opciones
+  - **Beneficios**:
+    - ✅ Navegación más intuitiva al dashboard
+    - ✅ Previene cierres de sesión accidentales
+    - ✅ Mejor experiencia de usuario
+
+- **Corrección de redirección al salir de reunión**:
+  - **Problema resuelto**: Al cerrar la reunión de Zoom, se redirigía a una página en blanco (`about:blank`)
+  - **Solución implementada**:
+    - Cambiado `leaveUrl` de `'about:blank'` a `window.location.origin + '/admin'`
+    - Redirección automática al dashboard del administrador
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (línea 169): URL de salida actualizada
+  - **Beneficios**:
+    - ✅ Regreso automático al dashboard al salir de reunión
+    - ✅ Sin páginas en blanco confusas
+    - ✅ Flujo de navegación mejorado
+
+- **Ajuste de posición del botón flotante de encuestas**:
+  - **Problema resuelto**: El botón flotante de encuestas tapaba el menú desplegable de cerrar sesión
+  - **Solución implementada**:
+    - Posición cambiada de `bottom-24` (96px) a `bottom-40` (160px)
+    - Mayor espacio para el menú desplegable
+  - **Archivos modificados**:
+    - `ZoomMeetingContainer.jsx` (línea 397): Clase de posición actualizada
+  - **Beneficios**:
+    - ✅ Menú de cerrar sesión completamente visible
+    - ✅ Sin superposición de elementos
+
 #### 2025-12-16
 
 - **CORRECCIÓN CRÍTICA: Navegación al salir de reunión sin cerrar sesión**:
