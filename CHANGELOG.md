@@ -9,6 +9,100 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-22
+
+- **Corrección de validación de campo `int_max_concurrent_meetings`**:
+  - **Problema resuelto**: Error 500 en endpoint `/api/v1/residential/units` por validación Pydantic
+  - **Causa**: Campo `int_max_concurrent_meetings` marcado como `Optional[int]` pero con `Field(...)` (requerido)
+  - **Error Pydantic**: "Input should be a valid integer [type=int_type, input_value=None, input_type=NoneType]"
+  - **Solución implementada**:
+    - Cambio de `Field(...)` a `Field(None, ...)` en línea 35 de `residential_unit_schema.py`
+    - Permite valores `None` desde la base de datos
+  - **Archivos modificados**:
+    - `backend/app/schemas/residential_unit_schema.py` (línea 35): Field con default None
+  - **Beneficios**:
+    - ✅ Endpoint funciona correctamente con registros que tienen NULL en el campo
+    - ✅ Modelo Pydantic acepta valores opcionales como debe ser
+    - ✅ Sin errores 500 al listar unidades residenciales
+
+- **Unificación de componente Zoom para SuperAdministrador**:
+  - **Cambio implementado**: SuperAdmin ahora usa el mismo componente de reuniones Zoom que el Administrador
+  - **Componente migrado**: De `ZoomMeetingView` a `ZoomMeetingContainer`
+  - **Archivos modificados**:
+    - `frontend/src/pages/HomeSA.jsx`:
+      - Línea 9: Importación cambiada a `ZoomMeetingContainer` del directorio AdDashboard
+      - Líneas 52-56: Callback renombrado de `handleBackFromMeeting` a `handleCloseZoomMeeting`
+      - Líneas 106-113: Componente actualizado con props `onClose` y `startFullscreen={true}`
+  - **Archivos eliminados**:
+    - `frontend/src/components/saDashboard/ZoomMeetingView.jsx` (componente obsoleto)
+    - `frontend/src/components/saDashboard/VotingModal.jsx` (modal obsoleto)
+  - **Beneficios**:
+    - ✅ **Funcionalidad unificada**: Ambos roles usan el mismo componente probado
+    - ✅ **Sistema de encuestas completo**: Polling cada 5 segundos para encuestas activas
+    - ✅ **Botón flotante animado**: Aparece cuando hay encuestas activas
+    - ✅ **Modal interactivo**: Votación single/multiple choice integrada
+    - ✅ **Mejor UX**: Interfaz de carga mejorada con mensajes dinámicos
+    - ✅ **Manejo robusto de errores**: Notificaciones visuales claras
+    - ✅ **Web SDK de Zoom**: Todas las características avanzadas disponibles
+    - ✅ **Código más limpio**: Sin componentes duplicados
+
+- **Corrección de pantalla negra en componente Zoom**:
+  - **Problema resuelto**: Pantalla negra al iniciar reunión de Zoom
+  - **Causa identificada**: Conflicto de versiones del SDK de Zoom
+    - Error en consola: "El recurso de 'https://source.zoom.us/3.8.10/lib/av/tp.min.js' fue bloqueado debido a una discordancia del tipo MIME ('text/plain')"
+    - `ZoomMtg.setZoomJSLib()` intentaba cargar recursos de versión 3.8.10
+    - El SDK ya usaba por defecto la versión 4.1.0
+    - Conflicto entre versiones impedía inicialización correcta
+  - **Solución implementada**:
+    - Eliminada línea `ZoomMtg.setZoomJSLib('https://source.zoom.us/3.8.10/lib', '/av')`
+    - SDK ahora usa configuración por defecto (versión 4.1.0)
+    - Recursos se cargan correctamente sin conflictos MIME
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx` (línea 167): Eliminada configuración de versión incompatible
+  - **Beneficios**:
+    - ✅ **Carga correcta de recursos**: SDK usa versión consistente (4.1.0)
+    - ✅ **Sin errores MIME**: Recursos se cargan con tipo de contenido correcto
+    - ✅ **Interfaz visible**: Zoom se muestra correctamente sin pantalla negra
+    - ✅ **Inicialización exitosa**: SDK se inicializa sin conflictos de versión
+
+- **Mejoras en manejo de errores de Zoom**:
+  - **Problema identificado**: Error 3000 de Zoom ("Restricción del explorador o tiempo de espera de unión a la reunión")
+  - **Causas comunes**:
+    - Problemas de red o firewall
+    - Configuración incorrecta del SDK
+    - Firma (signature) expirada
+    - CORS o políticas de seguridad del navegador
+    - Permisos de cámara/micrófono no otorgados
+  - **Mejoras implementadas**:
+    - **Configuración mejorada del SDK** (líneas 168-176):
+      - `disableCORP: true` para evitar problemas de Cross-Origin
+      - `audioPanelAlwaysOpen: true` para mejor experiencia de audio
+      - `isSupportAV: true` para soporte explícito de audio/video
+    - **Detección específica del error 3000** (líneas 269-289):
+      - Identifica código de error 3000 específicamente
+      - Mensaje personalizado y descriptivo para el usuario
+      - Limpieza del DOM de Zoom al fallar
+    - **Pantalla de error mejorada** (líneas 485-528):
+      - Lista de soluciones sugeridas para error 3000:
+        - ✓ Verificar conexión a internet estable
+        - ✓ Permitir acceso a cámara y micrófono
+        - ✓ Desactivar extensiones que bloqueen Zoom
+        - ✓ Usar Chrome (recomendado)
+        - ✓ Verificar firewalls
+      - Botón "Reintentar" para recargar la página
+      - Botón "Volver al Dashboard" para navegación alternativa
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx`:
+      - Líneas 168-176: Configuración SDK mejorada
+      - Líneas 269-289: Manejo específico de error 3000
+      - Líneas 485-528: UI de error mejorada con soluciones
+  - **Beneficios**:
+    - ✅ **Menos errores**: Configuración optimizada reduce incidencia
+    - ✅ **Mejor diagnóstico**: Usuario sabe qué hacer cuando ocurre un error
+    - ✅ **Recuperación fácil**: Botón de reintentar con un solo click
+    - ✅ **UI informativa**: Lista de pasos para solucionar problemas
+    - ✅ **Experiencia mejorada**: Usuario no se queda atascado sin opciones
+
 #### 2025-12-17
 
 - **Sistema de votación con soporte completo para múltiples selecciones**:

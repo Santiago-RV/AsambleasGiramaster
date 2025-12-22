@@ -6,7 +6,7 @@ import UnidadesResidencialesTab from '../components/saDashboard/UnidadesResidenc
 import ReunionActivaTab from '../components/saDashboard/ReunionActivaTab';
 import InformesTab from '../components/saDashboard/InformesTab';
 import ConfiguracionTab from '../components/saDashboard/ConfiguracionTab';
-import ZoomMeetingView from '../components/saDashboard/ZoomMeetingView';
+import ZoomMeetingContainer from '../components/AdDashboard/ZoomMeetingContainer';
 import UnidadResidencialDetalles from '../components/saDashboard/UnidadResidencialDetalles';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthContext } from '../providers/AuthProvider';
@@ -49,8 +49,8 @@ const HomeSA = () => {
 		setActiveTab('zoom-meeting');
 	};
 
-	// Función para volver de la reunión
-	const handleBackFromMeeting = () => {
+	// Función para cerrar la reunión (callback para ZoomMeetingContainer)
+	const handleCloseZoomMeeting = () => {
 		setMeetingData(null);
 		setActiveTab('reuniones');
 	};
@@ -105,9 +105,10 @@ const HomeSA = () => {
 				return <ConfiguracionTab onBack={handleBackFromSettings} />;
 			case 'zoom-meeting':
 				return (
-					<ZoomMeetingView
+					<ZoomMeetingContainer
 						meetingData={meetingData}
-						onBack={handleBackFromMeeting}
+						onClose={handleCloseZoomMeeting}
+						startFullscreen={true}
 					/>
 				);
 			default:
