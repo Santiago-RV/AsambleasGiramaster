@@ -138,9 +138,9 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			str_city: data.str_city,
 			str_state: data.str_state,
 			bln_is_active: data.bln_is_active,
-			int_max_concurrent_meetings: parseInt(
-				data.int_max_concurrent_meetings
-			),
+			// int_max_concurrent_meetings: parseInt(
+			// 	data.int_max_concurrent_meetings
+			// ),
 
 			administrator: {
         str_firstname: data.admin_str_firstname,
@@ -525,7 +525,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
         </div>
 
         {/* SECCIÓN: Configuración */}
-        <div className="space-y-5">
+        {/* <div className="space-y-5">
           <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
             <Calendar className="w-5 h-5 text-purple-600" />
             <h3 className="text-lg font-bold text-gray-800">Configuración</h3>
@@ -533,7 +533,6 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 
           <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
             
-            {/* Máximo de Reuniones */}
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <Calendar className="w-4 h-4 text-gray-400 group-hover:text-purple-500 transition-colors" />
@@ -566,16 +565,16 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
             </div>
 
           </div>
-        </div>
+        </div> */}
 
 				{/* SECCIÓN: Administrador de la Unidad */}
-        <div className="space-y-5">
+        {/* <div className="space-y-5">
           <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
             <UserCog className="w-5 h-5 text-amber-600" />
             <h3 className="text-lg font-bold text-gray-800">Administrador de la Unidad</h3>
           </div>
 
-          {/* Select de Personal Administrativo */}
+          
           <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
             <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
               <UserCog className="w-4 h-4 text-amber-600" />
@@ -626,7 +625,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 
           <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
             
-            {/* Nombres */}
+            
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <User className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -654,7 +653,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               )}
             </div>
 
-            {/* Apellidos */}
+            
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <User className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -682,7 +681,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               )}
             </div>
 
-            {/* Correo Electrónico */}
+            
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <Mail className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -710,7 +709,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               )}
             </div>
 
-            {/* Teléfono */}
+            
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <Phone className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -739,7 +738,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
             </div>
 
           </div>
-        </div>
+        </div> */}
 
         {/* BOTONES */}
         <div className="flex flex-wrap gap-3 pt-6 border-t-2 border-gray-100">

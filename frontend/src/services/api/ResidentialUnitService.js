@@ -11,7 +11,6 @@ export class ResidentialUnitService {
    */
   static async createResidentialUnit(unitData) {
     try {
-      // Obtener el usuario actual del localStorage
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
 
@@ -19,7 +18,6 @@ export class ResidentialUnitService {
         throw new Error('No se pudo obtener el ID del usuario');
       }
 
-      // Preparar los datos según el schema del backend
       const payload = {
         str_residential_code: unitData.str_residential_code,
         str_name: unitData.str_name,
@@ -37,7 +35,6 @@ export class ResidentialUnitService {
 
       const response = await axiosInstance.post('/residential/create_unit', payload);
 
-      // Validar que la respuesta tenga la estructura correcta
       if (!response.data || !response.data.success) {
         throw new Error(response.data?.message || 'Error al crear la unidad residencial');
       }
@@ -57,6 +54,12 @@ export class ResidentialUnitService {
     }
   }
 
+  /**
+   * Crea un administrador manualmente para una unidad residencial
+   * @param {number} unitId - ID de la unidad residencial
+   * @param {Object} adminData - Datos del administrador
+   * @returns {Promise} Respuesta del servidor
+   */
   static async createManualAdministrator(unitId, adminData) {
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
@@ -175,7 +178,6 @@ export class ResidentialUnitService {
    */
   static async getResidentialUnitById(id) {
     try {
-      // Obtener todas las unidades y filtrar por ID
       const response = await axiosInstance.get('/residential/units');
 
       if (!response.data || !response.data.success) {
@@ -232,35 +234,50 @@ export class ResidentialUnitService {
   }
 
   /**
-   * Carga masiva de copropietarios desde un archivo Excel
+   *CARGA MASIVA DE COPROPIETARIOS DESDE EXCEL
    * @param {number} unitId - ID de la unidad residencial
    * @param {File} file - Archivo Excel
    * @returns {Promise} Resultado de la carga
    */
   static async uploadResidentsExcel(unitId, file) {
     try {
-      // Verificar que hay un token
+      console.log('📤 Iniciando carga de Excel...');
+      console.log('   Unit ID:', unitId);
+      console.log('   Archivo:', file.name);
+      console.log('   Tamaño:', file.size, 'bytes');
+      console.log('   Tipo:', file.type);
+
+      // Verificar token
       const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
 
       if (!token) {
         throw new Error('No hay sesión activa. Por favor inicia sesión nuevamente.');
       }
 
-      // Crear FormData para enviar el archivo
+      // Crear FormData
       const formData = new FormData();
       formData.append('file', file);
 
-      // Realizar la petición con el token explícito
+      // Debug: Verificar contenido del FormData
+      console.log('📋 Contenido del FormData:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`   ${key}:`, value);
+      }
+
+      //CLAVE: NO especificar Content-Type manualmente
+      // Axios lo configura automáticamente con el boundary correcto
       const response = await axiosInstance.post(
         `/super-admin/residential-units/${unitId}/upload-residents-excel`,
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}` // Token explícito
+            'Authorization': `Bearer ${token}`
+            // ❌ NO agregar 'Content-Type': 'multipart/form-data'
           }
         }
       );
+
+      console.log('✅ Respuesta exitosa:', response.data);
 
       if (!response.data || !response.data.success) {
         throw new Error(response.data?.message || 'Error al cargar el archivo');
@@ -272,7 +289,7 @@ export class ResidentialUnitService {
         data: response.data.data,
       };
     } catch (error) {
-      console.error('Error uploading residents Excel:', error);
+      console.error('❌ Error uploading residents Excel:', error);
 
       // Manejo específico de errores
       if (error.response?.status === 401) {
@@ -281,6 +298,12 @@ export class ResidentialUnitService {
 
       if (error.response?.status === 403) {
         throw new Error('No tienes permisos para realizar esta acción');
+      }
+
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+        console.error('   Data:', error.response.data);
+        console.error('   Headers:', error.response.headers);
       }
 
       const errorMessage =
@@ -295,7 +318,6 @@ export class ResidentialUnitService {
 
   /**
    * Obtiene los usuarios disponibles (sin unidad residencial asociada)
-   * Útil para seleccionar personal administrativo al crear una unidad
    * @returns {Promise} Lista de usuarios disponibles
    */
   static async getAvailableUsers() {
@@ -415,5 +437,40 @@ export class ResidentialUnitService {
       throw new Error(errorMessage);
     }
   }
-}
 
+  /**
+   * Descarga plantilla de Excel para carga masiva de copropietarios
+   */
+  static downloadResidentsExcelTemplate() {
+    const headers = [
+      'email',
+      'firstname',
+      'lastname',
+      'phone',
+      'apartment_number',
+      'voting_weight',
+      'password'
+    ];
+
+    const exampleRows = [
+      ['juan.perez@example.com', 'Juan', 'Pérez', '+57 300 111 2222', '101', '0.25', 'Temporal123!'],
+      ['maria.garcia@example.com', 'María', 'García', '+57 300 222 3333', '102', '0.30', 'Temporal123!'],
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...exampleRows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.href = url;
+    link.download = 'plantilla_copropietarios.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+}

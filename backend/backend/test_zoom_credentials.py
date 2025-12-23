@@ -28,7 +28,7 @@ def test_zoom_credentials():
 
         print("\n2. Obteniendo access token...")
         token = zoom_service._get_access_token()
-        print(f"   ✅ Token obtenido: {token[:30]}...")
+        print(f"  Token obtenido: {token[:30]}...")
 
         print("\n3. Intentando crear reunión de prueba...")
         start_time = datetime.now() + timedelta(days=1)
@@ -39,7 +39,7 @@ def test_zoom_credentials():
             agenda="Esta es una reunión de prueba para verificar las credenciales de Zoom"
         )
 
-        print(f"   ✅ Reunión creada exitosamente!")
+        print(f"  Reunión creada exitosamente!")
         print(f"   ID: {meeting_data.get('id')}")
         print(f"   Join URL: {meeting_data.get('join_url')}")
         print(f"   Password: {meeting_data.get('password', 'Sin contraseña')}")
@@ -48,7 +48,7 @@ def test_zoom_credentials():
         print("\n4. Eliminando reunión de prueba...")
         meeting_id = str(meeting_data.get('id'))
         if zoom_service.delete_meeting(meeting_id):
-            print("   ✅ Reunión de prueba eliminada")
+            print("  Reunión de prueba eliminada")
 
         print("\n" + "=" * 60)
         print("✅ TODAS LAS PRUEBAS PASARON EXITOSAMENTE")

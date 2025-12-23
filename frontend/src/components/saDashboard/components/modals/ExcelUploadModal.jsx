@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Modal from '../../../common/Modal';
 import { FileSpreadsheet, Upload, Download, X } from 'lucide-react';
-import { uploadResidentsExcel, downloadResidentsExcelTemplate } from '../../../../services/residentialUnitService';
+import { ResidentialUnitService } from '../../../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
 
 const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
@@ -62,7 +62,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 		setIsUploading(true);
 
 		try {
-			const response = await uploadResidentsExcel(unitId, selectedFile);
+			const response = await ResidentialUnitService.uploadResidentsExcel(unitId, selectedFile);
 
 			const { total_rows, successful, failed, users_created, errors } =
 				response.data;
@@ -148,7 +148,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 
 	const handleDownloadTemplate = () => {
 		try {
-			downloadResidentsExcelTemplate();
+			ResidentialUnitService.downloadResidentsExcelTemplate();;
 
 			Swal.fire({
 				icon: 'success',
