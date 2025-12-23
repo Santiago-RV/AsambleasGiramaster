@@ -9,6 +9,80 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-23
+
+- **Dockerización completa del frontend**:
+  - **Dockerfile simplificado y optimizado**:
+    - Imagen base: Nginx Alpine (ultra-ligera ~15MB)
+    - Build local de la aplicación React + Vite
+    - Solo copia archivos compilados (`dist/`) a la imagen
+    - Enfoque pragmático: compilación en host, servido en Docker
+  - **Configuración de Nginx** ([nginx.conf](frontend/nginx.conf)):
+    - Servidor web en puerto 80 interno
+    - Compresión gzip habilitada para mejor rendimiento
+    - Configuración SPA (Single Page Application) con fallback a index.html
+    - Cache optimizado: archivos estáticos cacheados por 1 año
+    - index.html sin cache para actualizaciones inmediatas
+    - Logs de acceso y error configurados
+    - Preparado para proxy reverso a backend
+  - **Archivo `.dockerignore`**:
+    - Exclusión de node_modules, .env y archivos de desarrollo
+    - **NO** ignora `dist/` (necesario para Docker)
+    - Contexto de build mínimo
+  - **Archivo `.env.production`**:
+    - Variable `VITE_API_URL` configurada para el backend
+    - Listo para personalizar según el entorno de despliegue
+  - **Comandos Make para frontend**:
+    - `make docker-build`: Compila app localmente Y construye imagen Docker
+    - `make docker-run`: Ejecutar contenedor con logs visibles (puerto 3000)
+    - `make docker-run-detached`: Ejecutar en segundo plano (puerto 3000)
+    - `make docker-stop`: Detener y eliminar contenedor
+    - `make docker-logs`: Ver logs en tiempo real
+    - `make docker-clean`: Limpiar imágenes y caché
+    - Puerto configurable: `PORT=8080 make docker-run-detached`
+  - **Correcciones de código**:
+    - Corregida clave duplicada `showPollButton` en `ZoomEmbed.jsx`
+    - Componente `ZoomMeetingContainer` con export correcto
+  - **Frontend completamente funcional**:
+    - Aplicación React compilada y optimizada
+    - Servida por Nginx en puerto configurable (default: 3000)
+    - Healthcheck integrado con wget
+    - Imagen Docker de solo ~15MB
+    - Lista para producción y despliegue
+
+- **Dockerización completa del backend**:
+  - **Dockerfile optimizado**:
+    - Imagen base Python 3.11-slim para menor tamaño
+    - Variables de entorno optimizadas para producción (PYTHONUNBUFFERED, PIP_NO_CACHE_DIR)
+    - Usuario no-root (appuser) para mayor seguridad
+    - Healthcheck integrado para monitoreo automático de la aplicación
+    - Puerto 8000 expuesto para la API FastAPI
+    - Directorio de logs configurado con permisos adecuados
+    - Soporte para MySQL client y dependencias del sistema necesarias
+  - **Archivo `.dockerignore`**:
+    - Exclusión de archivos innecesarios (venv, __pycache__, logs, .env)
+    - Reducción del contexto de build para mayor velocidad
+    - Exclusión de directorios de test y documentación
+  - **Archivo `.env.production`**:
+    - Plantilla de configuración para producción
+    - Formato sin comillas para compatibilidad con Docker
+    - Variables para base de datos MySQL, SMTP, Zoom y Redis
+  - **Comandos Make mejorados**:
+    - `make docker-build`: Construir imagen Docker
+    - `make docker-run`: Ejecutar contenedor con logs en consola
+    - `make docker-run-detached`: Ejecutar contenedor en segundo plano
+    - `make docker-stop`: Detener y eliminar contenedor
+    - `make docker-logs`: Ver logs del contenedor en tiempo real
+    - `make docker-clean`: Limpiar imágenes y caché de Docker
+  - **Dependencias actualizadas**:
+    - Agregado `Jinja2==3.1.4` para renderizado de plantillas de email
+    - Todas las dependencias verificadas y funcionando en Docker
+  - **Backend completamente funcional**:
+    - Conexión exitosa a base de datos MySQL remota
+    - API FastAPI corriendo en puerto 8000
+    - Sistema de logs operativo
+    - Healthcheck validando disponibilidad
+
 #### 2025-12-22
 
 - **Corrección de validación de campo `int_max_concurrent_meetings`**:

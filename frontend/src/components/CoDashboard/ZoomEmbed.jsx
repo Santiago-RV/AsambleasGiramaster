@@ -524,7 +524,7 @@ const ZoomEmbed = ({
 	console.log('🔘 [ZoomEmbed] Estado del botón:', {
 		showPollButton,
 		activePoll: activePoll ? { id: activePoll.id, title: activePoll.str_title } : null,
-		showPollButton: !!activePoll
+		hasActivePoll: !!activePoll
 	});
 
 	return (
