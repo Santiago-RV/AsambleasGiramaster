@@ -6,10 +6,17 @@ from app.auth.auth import get_current_user
 from app.schemas.responses_schema import SuccessResponse, ErrorResponse
 from app.services.user_service import UserService
 from app.services.residential_unit_service import ResidentialUnitService
+from app.services.dashboard_service import DashboardService
+from app.services.active_meeting_service import ActiveMeetingService
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
 from app.schemas.residential_unit_schema import AdministratorData
 from app.schemas.email_notification_schema import BulkSendCredentialsRequest
+from app.schemas.dashboard_schema import DashboardDataResponse
+from app.schemas.active_meeting_schema import (
+    ActiveMeetingsListResponse,
+    ActiveMeetingDetailsSchema
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -531,5 +538,276 @@ async def send_credentials_bulk(
         await db.rollback()  #Rollback en caso de error
         raise ServiceException(
             message=f"Error al enviar credenciales masivamente: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
+    "/dashboard/statistics",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener estadísticas del dashboard de SuperAdmin",
+    description="Obtiene todas las estadísticas necesarias para el dashboard: stats generales, reuniones recientes y próximas"
+)
+async def get_dashboard_statistics(
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene estadísticas completas del dashboard de SuperAdmin.
+
+    Retorna:
+    - stats: Estadísticas generales (unidades, residentes, reuniones activas, asistencia promedio)
+    - recent_meetings: Últimas 5 reuniones completadas
+    - upcoming_meetings: Próximas 5 reuniones programadas
+
+    Solo usuarios Super Admin pueden acceder a este endpoint.
+    """
+    try:
+        # Verificar que el usuario actual sea super admin
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+
+        if not user or user.int_id_rol != 1:  # 1: Super Admin
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para acceder a esta información. Solo Super Admin."
+            )
+
+        # Obtener estadísticas del dashboard
+        dashboard_service = DashboardService(db)
+        dashboard_data = await dashboard_service.get_dashboard_statistics()
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Estadísticas del dashboard obtenidas exitosamente",
+            data={
+                "stats": {
+                    "total_residential_units": dashboard_data.stats.total_residential_units,
+                    "total_residents": dashboard_data.stats.total_residents,
+                    "active_meetings": dashboard_data.stats.active_meetings,
+                    "average_attendance": dashboard_data.stats.average_attendance
+                },
+                "recent_meetings": [
+                    {
+                        "id": meeting.id,
+                        "title": meeting.title,
+                        "residential_unit_name": meeting.residential_unit_name,
+                        "status": meeting.status,
+                        "completed_at": meeting.completed_at.isoformat() if meeting.completed_at else None,
+                        "total_participants": meeting.total_participants,
+                        "attendance_percentage": meeting.attendance_percentage
+                    }
+                    for meeting in dashboard_data.recent_meetings
+                ],
+                "upcoming_meetings": [
+                    {
+                        "id": meeting.id,
+                        "title": meeting.title,
+                        "residential_unit_name": meeting.residential_unit_name,
+                        "scheduled_date": meeting.scheduled_date.isoformat(),
+                        "meeting_type": meeting.meeting_type,
+                        "total_invited": meeting.total_invited
+                    }
+                    for meeting in dashboard_data.upcoming_meetings
+                ]
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al obtener estadísticas del dashboard: {str(e)}")
+        raise ServiceException(
+            message=f"Error al obtener estadísticas del dashboard: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
+    "/active-meetings",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener lista de reuniones activas",
+    description="Obtiene todas las reuniones que están en curso actualmente"
+)
+async def get_active_meetings(
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene lista de reuniones activas (En Curso).
+
+    Retorna para cada reunión:
+    - Información básica (título, tipo, unidad residencial)
+    - Cantidad de usuarios conectados
+    - Total de invitados
+    - Estado de quórum
+    - Cantidad de encuestas activas
+
+    Solo usuarios Super Admin pueden acceder a este endpoint.
+    """
+    try:
+        # Verificar que el usuario actual sea super admin
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+
+        if not user or user.int_id_rol != 1:  # 1: Super Admin
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para acceder a esta información. Solo Super Admin."
+            )
+
+        # Obtener reuniones activas
+        active_meeting_service = ActiveMeetingService(db)
+        active_meetings = await active_meeting_service.get_active_meetings_list()
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Se encontraron {active_meetings.total_count} reuniones activas",
+            data={
+                "active_meetings": [
+                    {
+                        "meeting_id": meeting.meeting_id,
+                        "title": meeting.title,
+                        "residential_unit_name": meeting.residential_unit_name,
+                        "meeting_type": meeting.meeting_type,
+                        "status": meeting.status,
+                        "started_at": meeting.started_at.isoformat() if meeting.started_at else None,
+                        "connected_users_count": meeting.connected_users_count,
+                        "total_invited": meeting.total_invited,
+                        "quorum_reached": meeting.quorum_reached,
+                        "active_polls_count": meeting.active_polls_count
+                    }
+                    for meeting in active_meetings.active_meetings
+                ],
+                "total_count": active_meetings.total_count
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al obtener reuniones activas: {str(e)}")
+        raise ServiceException(
+            message=f"Error al obtener reuniones activas: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
+    "/active-meetings/{meeting_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener detalles de una reunión activa",
+    description="Obtiene todos los detalles de una reunión específica incluyendo usuarios conectados, encuestas y administrador"
+)
+async def get_active_meeting_details(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene detalles completos de una reunión activa.
+
+    Incluye:
+    - Información completa de la reunión
+    - Información de la unidad residencial
+    - Datos del administrador de la unidad
+    - Lista de usuarios conectados con sus datos
+    - Lista de encuestas creadas para la reunión
+    - URLs de Zoom
+
+    Solo usuarios Super Admin pueden acceder a este endpoint.
+    """
+    try:
+        # Verificar que el usuario actual sea super admin
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+
+        if not user or user.int_id_rol != 1:  # 1: Super Admin
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para acceder a esta información. Solo Super Admin."
+            )
+
+        # Obtener detalles de la reunión
+        active_meeting_service = ActiveMeetingService(db)
+        meeting_details = await active_meeting_service.get_meeting_details(meeting_id)
+
+        if not meeting_details:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"La reunión con ID {meeting_id} no existe"
+            )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Detalles de la reunión obtenidos exitosamente",
+            data={
+                "meeting_id": meeting_details.meeting_id,
+                "title": meeting_details.title,
+                "description": meeting_details.description,
+                "residential_unit": {
+                    "id": meeting_details.residential_unit_id,
+                    "name": meeting_details.residential_unit_name,
+                    "nit": meeting_details.residential_unit_nit
+                },
+                "meeting_type": meeting_details.meeting_type,
+                "status": meeting_details.status,
+                "scheduled_date": meeting_details.scheduled_date.isoformat(),
+                "actual_start_time": meeting_details.actual_start_time.isoformat() if meeting_details.actual_start_time else None,
+                "actual_end_time": meeting_details.actual_end_time.isoformat() if meeting_details.actual_end_time else None,
+                "total_invited": meeting_details.total_invited,
+                "total_confirmed": meeting_details.total_confirmed,
+                "quorum_reached": meeting_details.quorum_reached,
+                "zoom_join_url": meeting_details.zoom_join_url,
+                "zoom_meeting_id": meeting_details.zoom_meeting_id,
+                "administrator": {
+                    "user_id": meeting_details.administrator.user_id,
+                    "full_name": meeting_details.administrator.full_name,
+                    "email": meeting_details.administrator.email,
+                    "phone": meeting_details.administrator.phone
+                } if meeting_details.administrator else None,
+                "connected_users": [
+                    {
+                        "user_id": user.user_id,
+                        "full_name": user.full_name,
+                        "email": user.email,
+                        "apartment_number": user.apartment_number,
+                        "voting_weight": float(user.voting_weight),
+                        "is_present": user.is_present,
+                        "joined_at": user.joined_at.isoformat() if user.joined_at else None,
+                        "attendance_type": user.attendance_type
+                    }
+                    for user in meeting_details.connected_users
+                ],
+                "polls": [
+                    {
+                        "poll_id": poll.poll_id,
+                        "title": poll.title,
+                        "description": poll.description,
+                        "poll_type": poll.poll_type,
+                        "status": poll.status,
+                        "started_at": poll.started_at.isoformat() if poll.started_at else None,
+                        "ended_at": poll.ended_at.isoformat() if poll.ended_at else None,
+                        "total_votes": poll.total_votes,
+                        "requires_quorum": poll.requires_quorum,
+                        "minimum_quorum_percentage": float(poll.minimum_quorum_percentage)
+                    }
+                    for poll in meeting_details.polls
+                ]
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al obtener detalles de la reunión: {str(e)}")
+        raise ServiceException(
+            message=f"Error al obtener detalles de la reunión: {str(e)}",
             details={"original_error": str(e)}
         )

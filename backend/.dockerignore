@@ -58,4 +58,3 @@ Makefile
 # Test directory
 test/
 tests/
-backend/

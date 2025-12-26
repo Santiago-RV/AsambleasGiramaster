@@ -43,7 +43,6 @@ dev:
 prod:
 	@echo "$(YELLOW)🚀 Iniciando servidor de producción...$(NC)"
 	$(RUN) build
-	$(RUN) preview
 
 test:
 	@echo "$(GREEN)🧪 Ejecutando tests...$(NC)"

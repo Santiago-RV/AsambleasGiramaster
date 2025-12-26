@@ -9,6 +9,112 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-26
+
+- **Dashboard de SuperAdmin con estadísticas en tiempo real**:
+  - **Nuevo servicio de dashboard** (`backend/app/services/dashboard_service.py`):
+    - `get_dashboard_statistics()`: Obtiene todas las estadísticas necesarias
+    - `_get_general_stats()`: Calcula estadísticas generales del sistema
+    - `_calculate_average_attendance()`: Promedio de asistencia de las últimas 10 reuniones
+    - `_get_recent_meetings()`: Últimas 5 reuniones completadas
+    - `_get_upcoming_meetings()`: Próximas 5 reuniones programadas
+  - **Schemas de dashboard** (`backend/app/schemas/dashboard_schema.py`):
+    - `DashboardStatsResponse`: Estadísticas generales
+    - `RecentMeetingSchema`: Reuniones completadas recientemente
+    - `UpcomingMeetingSchema`: Reuniones programadas próximamente
+    - `DashboardDataResponse`: Respuesta completa del dashboard
+  - **Endpoint de API** (`GET /api/v1/super-admin/dashboard/statistics`):
+    - Retorna estadísticas completas del sistema
+    - Solo accesible para usuarios SuperAdmin (rol 1)
+    - Incluye unidades residenciales, residentes, reuniones activas y asistencia promedio
+  - **Servicio de dashboard en frontend** (`frontend/src/services/api/DashboardService.js`):
+    - `getDashboardStatistics()`: Obtiene estadísticas del backend
+    - Helpers para formateo de fechas, números y colores
+  - **DashboardTab actualizado** (`frontend/src/components/saDashboard/DashboardTab.jsx`):
+    - Carga datos reales desde el backend
+    - Tarjetas de estadísticas con datos dinámicos
+    - Lista de reuniones recientes con información completa
+    - Lista de próximas reuniones programadas
+    - Loader durante carga inicial
+    - Manejo de errores con SweetAlert2
+  - **Beneficios**:
+    - ✅ Estadísticas en tiempo real del sistema
+    - ✅ Conteo de unidades residenciales activas
+    - ✅ Conteo de residentes totales (copropietarios)
+    - ✅ Reuniones activas (en curso o programadas para hoy)
+    - ✅ Cálculo de asistencia promedio basado en datos reales
+    - ✅ Historial de reuniones con porcentajes de asistencia
+    - ✅ Calendario de próximas reuniones
+    - ✅ Formato de fechas y números localizados a español
+
+- **Sistema completo de monitoreo de reuniones activas para SuperAdmin**:
+  - **Schemas de reuniones activas** (`backend/app/schemas/active_meeting_schema.py`):
+    - `ConnectedUserSchema`: Datos de usuarios conectados
+    - `PollSummarySchema`: Resumen de encuestas
+    - `AdministratorInfoSchema`: Información del administrador
+    - `ActiveMeetingCardSchema`: Datos para tarjeta de reunión (vista de lista)
+    - `ActiveMeetingDetailsSchema`: Detalles completos de reunión
+    - `ActiveMeetingsListResponse`: Respuesta con lista de reuniones
+  - **Servicio de reuniones activas** (`backend/app/services/active_meeting_service.py`):
+    - `get_active_meetings_list()`: Obtiene todas las reuniones "En Curso"
+    - `get_meeting_details()`: Obtiene detalles completos de una reunión específica
+    - `_count_connected_users()`: Cuenta usuarios conectados
+    - `_count_active_polls()`: Cuenta encuestas activas
+    - `_get_unit_administrator()`: Obtiene administrador de la unidad
+    - `_get_connected_users()`: Obtiene lista detallada de usuarios conectados
+    - `_get_meeting_polls()`: Obtiene encuestas con estadísticas
+  - **Endpoints de API**:
+    - `GET /api/v1/super-admin/active-meetings`: Lista de reuniones activas
+    - `GET /api/v1/super-admin/active-meetings/{meeting_id}`: Detalles completos de reunión
+    - Incluyen información de usuarios conectados, encuestas, administrador y unidad residencial
+  - **Servicio de reuniones activas en frontend** (`frontend/src/services/api/ActiveMeetingService.js`):
+    - `getActiveMeetings()`: Obtiene reuniones activas
+    - `getActiveMeetingDetails()`: Obtiene detalles de reunión
+    - `calculateMeetingDuration()`: Calcula duración desde inicio
+    - `calculateAttendancePercentage()`: Calcula % de asistencia
+    - Helpers para formateo y colores
+  - **Componente ActiveMeetingCard** (`frontend/src/components/saDashboard/components/ActiveMeetingCard.jsx`):
+    - Tarjeta visual para cada reunión activa
+    - Header con gradiente verde y animación pulsante
+    - Estadísticas de usuarios conectados y asistencia
+    - Duración de la reunión en tiempo real
+    - Número de encuestas activas
+    - Click para ver detalles completos
+  - **Componente ActiveMeetingDetailsModal** (`frontend/src/components/saDashboard/components/ActiveMeetingDetailsModal.jsx`):
+    - Modal fullscreen con todos los detalles de la reunión
+    - Header con estadísticas rápidas (duración, conectados, quórum, encuestas)
+    - Información completa de la reunión con fechas
+    - Card del administrador con datos de contacto
+    - Lista de encuestas con estado, votos y requisitos
+    - Lista de participantes conectados con:
+      - Avatar con iniciales
+      - Nombre completo y email
+      - Número de apartamento
+      - Tipo de asistencia (Titular/Delegado)
+      - Peso de voto
+      - Indicador de presencia (punto verde pulsante)
+    - Información de la unidad residencial
+    - Botón para unirse a Zoom (si disponible)
+  - **ReunionActivaTab mejorado** (`frontend/src/components/saDashboard/ReunionActivaTab.jsx`):
+    - Auto-refresh cada 30 segundos
+    - Loader durante carga inicial
+    - Banner con contador de reuniones y participantes
+    - Grid de tarjetas de reuniones activas
+    - Modal de detalles al hacer click
+    - Estado vacío elegante cuando no hay reuniones
+    - Botón de actualización manual
+    - Manejo de errores con SweetAlert2
+  - **Beneficios**:
+    - ✅ Monitoreo en tiempo real de reuniones en curso
+    - ✅ Visualización de usuarios conectados
+    - ✅ Lista de encuestas creadas para cada reunión
+    - ✅ Información del administrador de la unidad
+    - ✅ Estadísticas de asistencia y quórum
+    - ✅ Acceso directo a Zoom
+    - ✅ Actualización automática cada 30 segundos
+    - ✅ Interface moderna y responsive
+    - ✅ Detalles completos en modal interactivo
+
 #### 2025-12-23
 
 - **Dockerización completa del frontend**:

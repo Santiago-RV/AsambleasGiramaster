@@ -80,7 +80,7 @@ format:
 ## Docker
 docker-build:
 	@echo "$(GREEN)🐳 Construyendo imagen Docker...$(NC)"
-	docker build -t $(PROJECT_NAME) .
+	docker build --no-cache -t $(PROJECT_NAME) .
 
 docker-run:
 	@echo "$(GREEN)🐳 Ejecutando contenedor Docker...$(NC)"
