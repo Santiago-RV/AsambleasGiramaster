@@ -7,7 +7,7 @@ class PollOptionModel(Base):
     __tablename__ = "tbl_poll_options"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    int_poll_id = Column(Integer, ForeignKey("tbl_polls.id"), nullable=False)
+    int_poll_id = Column(Integer, ForeignKey("tbl_polls.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     str_option_text = Column(String(500), index=True, nullable=False)
     int_option_order = Column(Integer, nullable=False)
     bln_is_active = Column(Boolean, default=True)
@@ -16,7 +16,7 @@ class PollOptionModel(Base):
     dec_percentage = Column(Numeric, nullable=False)
 
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     poll = relationship("PollModel", back_populates="options")
-    responses = relationship("PollResponseModel", back_populates="option")
+    responses = relationship("PollResponseModel", back_populates="option", cascade="all, delete-orphan")

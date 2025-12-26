@@ -7,13 +7,13 @@ class ZoomSessionModel(Base):
     __tablename__ = "tbl_zoom_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id"), nullable=False)
+    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     str_zoom_meeting_id = Column(String(50), index=True, nullable=False)
     str_zoom_uuid = Column(String(50), index=True, nullable=False)
     str_zoom_session_key = Column(String(50), nullable=False)
     int_host_user_id = Column(Integer, nullable=False)
     bln_recording_enabled = Column(Boolean, default=False)
-    bln_recording_consent_required = Column(Boolean, default=False)               
+    bln_recording_consent_required = Column(Boolean, default=False)
     int_max_participants = Column(Integer, nullable=False)
     int_total_unique_participants = Column(Integer, nullable=False)
     int_session_duration_minutes = Column(Integer, nullable=False)
@@ -28,4 +28,4 @@ class ZoomSessionModel(Base):
     json_participants_report = Column(JSON, nullable=False)
 
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

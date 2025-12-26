@@ -19,11 +19,11 @@ class ResidentialUnitModel(Base):
     int_max_concurrent_meetings = Column(Integer, nullable=True)
 
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now)
-    created_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
-    updated_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
 
     # Relationships
-    meetings = relationship("MeetingModel", back_populates="residential_unit")
+    meetings = relationship("MeetingModel", back_populates="residential_unit", cascade="all, delete-orphan")
     creator = relationship("UserModel", foreign_keys=[created_by], lazy="selectin")
     updater = relationship("UserModel", foreign_keys=[updated_by], lazy="selectin")

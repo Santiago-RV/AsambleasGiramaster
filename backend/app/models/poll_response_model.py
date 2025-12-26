@@ -7,9 +7,9 @@ class PollResponseModel(Base):
     __tablename__ = "tbl_poll_responses"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    int_poll_id = Column(Integer, ForeignKey("tbl_polls.id"), nullable=False)
-    int_user_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
-    int_option_id = Column(Integer, ForeignKey("tbl_poll_options.id"), nullable=False)
+    int_poll_id = Column(Integer, ForeignKey("tbl_polls.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    int_user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    int_option_id = Column(Integer, ForeignKey("tbl_poll_options.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     str_response_text = Column(String(1000), nullable=True)
     dec_response_number = Column(Numeric, nullable=True)
     dec_voting_weight = Column(Numeric, nullable=False)
