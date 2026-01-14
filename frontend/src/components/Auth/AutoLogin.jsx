@@ -1,0 +1,218 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { publicAxios } from '../../services/api/axiosconfig';
+import Swal from 'sweetalert2';
+
+/**
+ * Componente AutoLogin
+ * Procesa JWT de auto-login enviados por correo
+ * Autentica automáticamente al usuario y lo redirige al dashboard
+ */
+const AutoLogin = () => {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const [status, setStatus] = useState('processing'); // processing, success, error
+
+  useEffect(() => {
+    const processAutoLogin = async () => {
+      if (!token) {
+        setStatus('error');
+        await Swal.fire({
+          icon: 'error',
+          title: 'Token Inválido',
+          text: 'No se proporcionó un token de acceso válido.',
+          confirmButtonColor: '#e74c3c',
+        });
+        navigate('/login');
+        return;
+      }
+
+      try {
+        // Mostrar loading
+        Swal.fire({
+          title: 'Procesando...',
+          html: 'Validando tu acceso al sistema',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+
+        // Llamar al endpoint de auto-login
+        const response = await publicAxios.get(`/auth/auto-login/${token}`);
+
+        if (response.data.success) {
+          const { access_token, user } = response.data.data;
+
+          // Guardar token y datos del usuario en localStorage
+          localStorage.setItem('access_token', access_token);
+          localStorage.setItem('user', JSON.stringify(user));
+
+          setStatus('success');
+
+          // Mostrar mensaje de éxito
+          await Swal.fire({
+            icon: 'success',
+            title: '¡Bienvenido!',
+            html: `
+              <div style="text-align: left;">
+                <p style="margin-bottom: 8px;"><strong>Autenticación exitosa</strong></p>
+                <div style="background-color: #f0f8ff; padding: 12px; border-radius: 8px; border-left: 4px solid #3498db;">
+                  <p style="margin: 4px 0; color: #2c3e50; font-size: 14px;">
+                    <strong>Usuario:</strong> ${user.name || user.username}
+                  </p>
+                  <p style="margin: 4px 0; color: #2c3e50; font-size: 14px;">
+                    <strong>Rol:</strong> ${user.role}
+                  </p>
+                </div>
+                <p style="margin-top: 8px; color: #7f8c8d; font-size: 12px;">
+                  Serás redirigido al sistema en un momento...
+                </p>
+              </div>
+            `,
+            timer: 2000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+          });
+
+          // Redirigir según el rol del usuario
+          const roleRoutes = {
+            'Super Administrador': '/super-admin',
+            'Administrador': '/admin',
+            'Usuario': '/copropietario',
+            'Copropietario': '/copropietario',
+          };
+
+          const redirectPath = roleRoutes[user.role] || '/';
+          navigate(redirectPath, { replace: true });
+
+        } else {
+          throw new Error(response.data.message || 'Error desconocido');
+        }
+
+      } catch (error) {
+        console.error('Error en auto-login:', error);
+        setStatus('error');
+
+        let errorMessage = 'No se pudo procesar el acceso automático.';
+        let errorTitle = 'Error de Autenticación';
+
+        // Manejar diferentes tipos de errores
+        if (error.response) {
+          const status = error.response.status;
+          const detail = error.response.data?.detail || error.response.data?.message;
+
+          if (status === 404) {
+            if (detail?.includes('expirado') || detail?.includes('expir')) {
+              errorTitle = 'Enlace Expirado ⏰';
+              errorMessage = 'Este enlace de acceso ha expirado (48 horas). Por favor, solicita uno nuevo.';
+            } else {
+              errorTitle = 'Enlace Inválido ❌';
+              errorMessage = 'El enlace de acceso no es válido o no existe.';
+            }
+          } else if (status === 401) {
+            errorTitle = 'Credenciales Inválidas 🔒';
+            errorMessage = 'Las credenciales del enlace son incorrectas. Intenta ingresar manualmente.';
+          } else if (status === 403) {
+            errorTitle = 'Acceso Denegado 🚫';
+            errorMessage = 'Tu cuenta no tiene permisos para acceder al sistema. Contacta al administrador.';
+          } else {
+            errorMessage = detail || errorMessage;
+          }
+        } else if (error.request) {
+          errorTitle = 'Error de Conexión 📡';
+          errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión a internet.';
+        }
+
+        await Swal.fire({
+          icon: 'error',
+          title: errorTitle,
+          html: `
+            <div style="text-align: left;">
+              <p style="margin-bottom: 12px;">${errorMessage}</p>
+              <div style="background-color: #f0f8ff; padding: 12px; border-radius: 8px; border-left: 4px solid #3498db;">
+                <p style="margin: 4px 0; color: #2c3e50; font-size: 14px;">
+                  <strong>💡 Puedes intentar:</strong>
+                </p>
+                <ul style="margin: 8px 0; padding-left: 20px; color: #34495e; font-size: 13px;">
+                  <li>Solicitar un nuevo enlace de acceso</li>
+                  <li>Ingresar manualmente con tus credenciales</li>
+                  <li>Contactar al administrador si persiste el problema</li>
+                </ul>
+              </div>
+            </div>
+          `,
+          confirmButtonColor: '#3498db',
+          confirmButtonText: 'Ir al Login',
+          width: '500px',
+        });
+
+        navigate('/login');
+      }
+    };
+
+    processAutoLogin();
+  }, [token, navigate]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+        <div className="text-center">
+          {status === 'processing' && (
+            <>
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500 mx-auto mb-4"></div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                Procesando acceso...
+              </h2>
+              <p className="text-gray-600">
+                Por favor espera mientras validamos tu acceso al sistema
+              </p>
+              <div className="mt-4 text-sm text-gray-500">
+                🔒 Conexión segura
+              </div>
+            </>
+          )}
+
+          {status === 'success' && (
+            <>
+              <div className="text-green-500 text-6xl mb-4">✓</div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                ¡Autenticación Exitosa!
+              </h2>
+              <p className="text-gray-600">
+                Redirigiendo al sistema...
+              </p>
+            </>
+          )}
+
+          {status === 'error' && (
+            <>
+              <div className="text-red-500 text-6xl mb-4">✕</div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                Error de Autenticación
+              </h2>
+              <p className="text-gray-600 mb-4">
+                No se pudo procesar tu acceso automático
+              </p>
+              <button
+                onClick={() => navigate('/login')}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg transition duration-300 shadow-md hover:shadow-lg"
+              >
+                Ir al Login
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <p className="text-xs text-center text-gray-500">
+            🔒 Conexión segura - GIRAMASTER
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AutoLogin;
