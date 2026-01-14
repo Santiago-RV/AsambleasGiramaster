@@ -16,12 +16,13 @@ from app.models.user_model import UserModel
 from app.models.data_user_model import DataUserModel
 from app.schemas.residential_unit_schema import AdministratorData, ResidentialUnitCreate, ResidentialUnitResponse
 from app.core.exceptions import ServiceException, ResourceNotFoundException
-from app.core.security import security_manager
-from app.utils.email_sender import email_sender
+from app.core.security import security_manager 
 from app.services.email_notification_service import EmailNotificationService
 
+from app.services.simple_auto_login_service import simple_auto_login_service
+
 from app.models.email_notification_model import EmailNotificationModel
-from app.services.email_service import EmailService
+from app.services.email_service import EmailService, email_sender, email_service
 from sqlalchemy import select
 from datetime import datetime
 import logging
@@ -1175,10 +1176,10 @@ class ResidentialUnitService:
         user_id: int, 
         unit_id: int,
         auto_commit: bool = True
-    ):
+    ) -> dict:
         """
         Reenvía las credenciales de acceso por correo electrónico a un copropietario.
-        Genera una nueva contraseña temporal y registra la notificación en BD.
+        Genera una nueva contraseña temporal, JWT de auto-login y registra la notificación en BD.
         
         Args:
             user_id: ID del usuario copropietario
@@ -1198,7 +1199,12 @@ class ResidentialUnitService:
             ServiceException: Si ocurre un error durante el proceso
         """
         try:
-            #CAMBIO: Remover restricción de rol
+            logger.info(f"=== INICIO: Reenvío de credenciales ===")
+            logger.info(f"user_id={user_id}, unit_id={unit_id}, auto_commit={auto_commit}")
+            
+            # ============================================
+            # PASO 1: Obtener información del usuario
+            # ============================================
             query = (
                 select(UserModel, DataUserModel, UserResidentialUnitModel)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
@@ -1207,7 +1213,6 @@ class ResidentialUnitService:
                     and_(
                         UserModel.id == user_id,
                         UserResidentialUnitModel.int_residential_unit_id == unit_id
-                        #QUITAMOS la restricción: (UserModel.int_id_rol == 3) | (UserResidentialUnitModel.bool_is_admin == False)
                     )
                 )
             )
@@ -1217,11 +1222,13 @@ class ResidentialUnitService:
             
             if not user_data:
                 raise ResourceNotFoundException(
-                    message=f"Copropietario no encontrado en la unidad {unit_id}",
+                    message=f"Usuario no encontrado en la unidad {unit_id}",
                     error_code="RESIDENT_NOT_FOUND"
                 )
             
             user, data_user, user_unit = user_data
+            
+            logger.info(f"✅ Usuario encontrado: {user.str_username} ({data_user.str_email})")
             
             # ============================================
             # PASO 2: Obtener información de la unidad residencial
@@ -1232,6 +1239,8 @@ class ResidentialUnitService:
                     message=f"Unidad residencial no encontrada",
                     error_code="RESIDENTIAL_UNIT_NOT_FOUND"
                 )
+            
+            logger.info(f"✅ Unidad residencial: {residential_unit.str_name}")
             
             # ============================================
             # PASO 3: Generar nueva contraseña temporal
@@ -1246,22 +1255,33 @@ class ResidentialUnitService:
             logger.info(f"🔐 Contraseña temporal generada para {data_user.str_email}")
             
             # ============================================
-            # PASO 4: Actualizar contraseña en la base de datos
+            # PASO 4: Generar JWT de auto-login
+            # ============================================
+            auto_login_token = simple_auto_login_service.generate_auto_login_token(
+                username=user.str_username,
+                password=temporary_password,  # Contraseña en texto plano
+                expiration_hours=48
+            )
+            
+            logger.info(f"🔑 JWT de auto-login generado para {user.str_username}")
+            
+            # ============================================
+            # PASO 5: Actualizar contraseña en la base de datos
             # ============================================
             hashed_password = security_manager.create_password_hash(temporary_password)
             user.str_password_hash = hashed_password
             user.updated_at = datetime.now()
             
-            #COMMIT O FLUSH según el modo
+            # COMMIT O FLUSH según el modo
             if auto_commit:
                 await self.db.commit()
-                logger.info(f"Contraseña actualizada y confirmada (commit) para user_id={user_id}")
+                logger.info(f"✅ Contraseña actualizada y confirmada (commit) para user_id={user_id}")
             else:
                 await self.db.flush()
-                logger.info(f"Contraseña actualizada (flush) para user_id={user_id}")
+                logger.info(f"✅ Contraseña actualizada (flush) para user_id={user_id}")
             
             # ============================================
-            # PASO 5: Registrar notificación y enviar correo
+            # PASO 6: Registrar notificación en estado "pending"
             # ============================================
             notification_service = EmailNotificationService(self.db)
             
@@ -1279,31 +1299,33 @@ class ResidentialUnitService:
                 )
                 
                 # ============================================
-                # PASO 6: Enviar correo con las nuevas credenciales
+                # PASO 7: Enviar correo con credenciales y JWT
                 # ============================================
-                email_sent = self._send_welcome_email(
-                    user_email=data_user.str_email,
-                    user_name=f"{data_user.str_firstname} {data_user.str_lastname}",
+                email_sent = await email_service.send_coproprietor_credentials_email(
+                    to_email=data_user.str_email,
+                    firstname=data_user.str_firstname,
+                    lastname=data_user.str_lastname,
                     username=user.str_username,
                     password=temporary_password,  # Contraseña sin hashear
                     residential_unit_name=residential_unit.str_name,
                     apartment_number=user_unit.str_apartment_number,
                     voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
-                    phone=data_user.str_phone
+                    phone=data_user.str_phone,
+                    auto_login_token=auto_login_token  # ✨ PASAR EL JWT
                 )
                 
                 # ============================================
-                # PASO 7: Actualizar estado de la notificación según resultado
+                # PASO 8: Actualizar estado de la notificación según resultado
                 # ============================================
                 status = "sent" if email_sent else "failed"
                 await notification_service.update_status(
                     notification_id=notification.id,
                     status=status,
-                    commit=auto_commit  #Pasar el parámetro de commit
+                    commit=auto_commit  # Pasar el parámetro de commit
                 )
                 
                 # ============================================
-                # PASO 8: Retornar resultado
+                # PASO 9: Retornar resultado
                 # ============================================
                 if email_sent:
                     logger.info(
@@ -1343,7 +1365,7 @@ class ResidentialUnitService:
             # Solo hacer rollback si estamos en modo auto_commit
             if auto_commit:
                 await self.db.rollback()
-                logger.warning(f"Rollback ejecutado para user_id={user_id}")
+                logger.warning(f"⚠️ Rollback ejecutado para user_id={user_id}")
             raise
         except Exception as e:
             # Solo hacer rollback si estamos en modo auto_commit
@@ -1351,7 +1373,7 @@ class ResidentialUnitService:
                 await self.db.rollback()
                 logger.error(f"❌ Rollback ejecutado por error inesperado: {str(e)}")
             
-            logger.error(f"Error al reenviar credenciales a user_id={user_id}: {str(e)}")
+            logger.error(f"❌ Error al reenviar credenciales a user_id={user_id}: {str(e)}")
             raise ServiceException(
                 message=f"Error al reenviar credenciales: {str(e)}",
                 details={"original_error": str(e)}
@@ -1765,4 +1787,3 @@ class ResidentialUnitService:
                 message=f"Error al cambiar el administrador: {str(e)}",
                 details={"original_error": str(e)}
             )
-
