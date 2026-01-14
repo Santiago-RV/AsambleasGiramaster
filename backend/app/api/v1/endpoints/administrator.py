@@ -15,7 +15,11 @@ from app.services.residential_unit_service import ResidentialUnitService
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
 
-from app.schemas.residential_unit_schema import ResidentialUnitResponse
+from app.schemas.residential_unit_schema import BulkToggleAccessRequest, ResidentialUnitResponse
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -169,6 +173,186 @@ async def get_meeting_invitations(
     except Exception as e:
         raise ServiceException(
             message=f"Error al obtener las invitaciones: {str(e)}",
+            details={"original_error": str(e)}
+        )
+        
+@router.post(
+    "/{unit_id}/residents/{user_id}/toggle-access",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Toggle acceso individual (Super Admin)",
+    description="Habilita o deshabilita el acceso de un residente específico"
+)
+async def toggle_resident_access(
+    unit_id: int,
+    user_id: int,
+    enabled: bool = True,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Toggle acceso individual de un residente (Super Admin).
+    """
+    try:
+        from app.services.user_service import UserService
+        
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user or user.int_id_rol != 1:  # 1: Super Admin
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo los super administradores pueden acceder a esta función"
+            )
+        
+        # Habilitar o deshabilitar según el parámetro
+        if enabled:
+            result = await user_service.enable_coowner_access(
+                user_id=user_id,
+                unit_id=unit_id,
+                send_email=False
+            )
+        else:
+            result = await user_service.disable_coowner_access(
+                user_id=user_id,
+                unit_id=unit_id,
+                send_email=False
+            )
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Acceso {'habilitado' if enabled else 'deshabilitado'} exitosamente",
+            data=result
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al modificar acceso: {str(e)}")
+        raise ServiceException(
+            message=f"Error al modificar acceso: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.post(
+    "/{unit_id}/residents/toggle-access-bulk",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Toggle acceso masivo (Super Admin)",
+    description="Habilita o deshabilita el acceso de múltiples residentes seleccionados"
+)
+async def toggle_residents_access_bulk(
+    unit_id: int,
+    request_data: BulkToggleAccessRequest,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Toggle acceso masivo de residentes (Super Admin).
+    """
+    try:
+        from app.services.user_service import UserService
+        
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user or user.int_id_rol != 1:  # 1: Super Admin
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo los super administradores pueden acceder a esta función"
+            )
+        
+        if not request_data.user_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe proporcionar al menos un ID de usuario"
+            )
+        
+        # Procesar cada residente
+        successful = 0
+        failed = 0
+        already_in_state = 0
+        errors = []
+        processed_users = []
+        
+        for user_id in request_data.user_ids:
+            try:
+                if request_data.enabled:
+                    result = await user_service.enable_coowner_access(
+                        user_id=user_id,
+                        unit_id=unit_id,
+                        send_email=False
+                    )
+                else:
+                    result = await user_service.disable_coowner_access(
+                        user_id=user_id,
+                        unit_id=unit_id,
+                        send_email=False
+                    )
+                
+                if result['status'] in ['already_enabled', 'already_disabled']:
+                    already_in_state += 1
+                else:
+                    successful += 1
+                
+                processed_users.append({
+                    "user_id": result["user_id"],
+                    "username": result["username"],
+                    "name": result["name"],
+                    "email": result["email"],
+                    "status": result["status"]
+                })
+                
+            except Exception as e:
+                failed += 1
+                errors.append({
+                    "user_id": user_id,
+                    "error": str(e)
+                })
+        
+        action_text = "habilitados" if request_data.enabled else "deshabilitados"
+        
+        if successful == len(request_data.user_ids):
+            message = f"✅ {successful} residentes {action_text} exitosamente"
+        elif successful > 0:
+            message = f"⚠️ Proceso completado: {successful} exitosos"
+            if already_in_state > 0:
+                message += f", {already_in_state} sin cambios"
+            if failed > 0:
+                message += f", {failed} fallidos"
+        elif already_in_state == len(request_data.user_ids):
+            message = f"ℹ️ Todos los residentes ya estaban {action_text}"
+        else:
+            message = f"❌ No se pudo modificar el acceso de ningún residente"
+        
+        logger.info(
+            f"✅ Super Admin {current_user} modificó acceso masivo en unit_id={unit_id}: "
+            f"{successful} exitosos, {failed} fallidos, {already_in_state} sin cambios"
+        )
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=message,
+            data={
+                "total_processed": len(request_data.user_ids),
+                "successful": successful,
+                "failed": failed,
+                "already_in_state": already_in_state,
+                "errors": errors,
+                "processed_users": processed_users,
+                "action": "enabled" if request_data.enabled else "disabled"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al modificar acceso masivo: {str(e)}")
+        raise ServiceException(
+            message=f"Error al modificar acceso masivo: {str(e)}",
             details={"original_error": str(e)}
         )
 
