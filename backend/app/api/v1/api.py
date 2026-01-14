@@ -9,6 +9,7 @@ from app.api.v1.endpoints import poll_endpoint
 from app.api.v1.endpoints import super_admin
 from app.api.v1.endpoints import user_endpoint
 from app.api.v1.endpoints import zoom_signature_endpoint
+from app.api.v1.endpoints import simple_auto_login_endpoint
 from app.auth.auth import get_current_user 
 
 api_router = APIRouter()
@@ -71,4 +72,10 @@ api_router.include_router(
 api_router.include_router(
     zoom_signature_endpoint.router,
     tags=["zoom"]
+)
+
+api_router.include_router(
+    simple_auto_login_endpoint.router,
+    prefix="/auth",
+    tags=["authentication"]
 )

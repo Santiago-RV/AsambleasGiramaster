@@ -220,3 +220,75 @@ class UserService:
           message="Error al obtener el usuario",
           error_code="GET_USER_BY_USERNAME_ERROR"
         )
+    async def enable_all_coowners_by_meeting(self, meeting_id: int) -> dict:
+      """
+      Habilita todos los copropietarios de una reunión específica.
+      Actualiza bln_allow_entry = 1 para todos los usuarios invitados a la reunión.
+      
+      Args:
+          meeting_id: ID de la reunión
+      
+      Returns:
+          dict: Estadísticas de la operación
+      """
+      try:
+          from sqlalchemy import update
+          from app.models.meeting_invitation_model import MeetingInvitationModel
+          import logging
+          
+          logger = logging.getLogger(__name__)
+          
+          # 1. Obtener todos los user_ids de los copropietarios invitados a la reunión
+          query = select(MeetingInvitationModel.int_user_id).where(
+              MeetingInvitationModel.int_meeting_id == meeting_id
+          )
+          result = await self.db.execute(query)
+          user_ids = [row[0] for row in result.all()]
+          
+          if not user_ids:
+              return {
+                  "enabled_count": 0,
+                  "total_count": 0,
+                  "message": "No hay copropietarios invitados a esta reunión"
+              }
+          
+          # 2. Contar cuántos están actualmente deshabilitados
+          disabled_query = select(UserModel).where(
+              UserModel.id.in_(user_ids),
+              UserModel.bln_allow_entry == False
+          )
+          disabled_result = await self.db.execute(disabled_query)
+          disabled_count = len(disabled_result.scalars().all())
+          
+          if disabled_count == 0:
+              return {
+                  "enabled_count": 0,
+                  "total_count": len(user_ids),
+                  "message": "Todos los copropietarios ya están habilitados"
+              }
+          
+          # 3. Habilitar todos los copropietarios (actualizar bln_allow_entry = 1)
+          update_query = (
+              update(UserModel)
+              .where(UserModel.id.in_(user_ids))
+              .values(bln_allow_entry=True)
+          )
+          await self.db.execute(update_query)
+          await self.db.commit()
+          
+          logger.info(f"✅ Habilitados {disabled_count} copropietarios de la reunión {meeting_id}")
+          
+          return {
+              "enabled_count": disabled_count,
+              "total_count": len(user_ids),
+              "message": f"Se habilitaron {disabled_count} copropietarios exitosamente"
+          }
+          
+      except Exception as e:
+          await self.db.rollback()
+          logger.error(f"Error habilitando copropietarios: {str(e)}")
+          raise ServiceException(
+              message=f"Error al habilitar copropietarios: {str(e)}",
+              error_code="ENABLE_ALL_COOWNERS_ERROR"
+          )
+      

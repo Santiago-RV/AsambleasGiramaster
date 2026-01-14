@@ -128,6 +128,56 @@ export class PollService {
   }
 
   /**
+   * NUEVO - Enviar voto con soporte para múltiples opciones (requiere autenticación)
+   * Este método maneja tanto single como multiple choice
+   * @param {number} pollId - ID de la encuesta
+   * @param {Array<number>} selectedOptionIds - Array de IDs de opciones seleccionadas
+   * @returns {Promise}
+   */
+  static async submitVote(pollId, selectedOptionIds) {
+    console.log('📝 [PollService] submitVote llamado:', {
+      pollId,
+      selectedOptionIds,
+      isArray: Array.isArray(selectedOptionIds),
+      length: selectedOptionIds?.length
+    });
+
+    // Validar que selectedOptionIds sea un array
+    if (!Array.isArray(selectedOptionIds)) {
+      throw new Error('selectedOptionIds debe ser un array');
+    }
+
+    // Validar que tenga al menos una opción
+    if (selectedOptionIds.length === 0) {
+      throw new Error('Debes seleccionar al menos una opción');
+    }
+
+    try {
+      // Para single choice (1 opción) o multiple choice (múltiples opciones)
+      // Enviamos cada voto individualmente
+      const votePromises = selectedOptionIds.map(optionId => {
+        const voteData = {
+          int_option_id: optionId,
+          bln_is_abstention: false,
+        };
+        console.log('📤 [PollService] Enviando voto individual:', voteData);
+        return axiosInstance.post(`/polls/${pollId}/vote`, voteData);
+      });
+
+      // Esperar a que todos los votos se envíen
+      const responses = await Promise.all(votePromises);
+      
+      console.log('✅ [PollService] Todos los votos enviados:', responses.length);
+
+      // Retornar el último response (o el primero para single choice)
+      return responses[responses.length - 1].data;
+    } catch (error) {
+      console.error('❌ [PollService] Error en submitVote:', error);
+      throw error;
+    }
+  }
+
+  /**
    * ==================== ESTADÍSTICAS Y RESULTADOS ====================
    */
 
@@ -250,75 +300,19 @@ export class PollService {
   }
 
   /**
-   * Obtener reuniones en vivo (helper method)
-   * Reuniones que están activas o accesibles:
-   * - El anfitrión puede acceder 1 hora antes de la hora programada
-   * - El anfitrión puede cerrar el acceso finalizando la reunión
-   * - Debe tener invitados registrados
-   * - No debe haber terminado
-   * @param {number} residentialUnitId - ID de la unidad residencial
-   * @returns {Promise}
+   * Obtener reuniones en vivo para gestión de encuestas
    */
   static async getLiveMeetings(residentialUnitId) {
-    const response = await axiosInstance.get('/meetings');
+    const response = await axiosInstance.get(`/meetings/residential-unit/${residentialUnitId}`);
 
-    console.log('📊 [getLiveMeetings] Respuesta del backend:', response.data);
-    console.log('📊 [getLiveMeetings] ID Unidad Residencial:', residentialUnitId);
-
-    if (response.data && response.data.success && response.data.data) {
+    if (response.data.success) {
       const now = new Date();
       const ONE_HOUR_MS = 60 * 60 * 1000;
 
-      console.log('📊 [getLiveMeetings] Total reuniones recibidas:', response.data.data.length);
-
-      // Filtrar reuniones en vivo
       const liveMeetings = response.data.data.filter((meeting) => {
-        console.log('🔍 Evaluando reunión:', {
-          id: meeting.id,
-          titulo: meeting.str_title,
-          estado: meeting.str_status,
-          unidad_residencial: meeting.int_id_residential_unit,
-          fecha_inicio_real: meeting.dat_actual_start_time,
-          fecha_fin_real: meeting.dat_actual_end_time,
-        });
-
-        // ============================================
-        // MODO PRUEBAS: SIN FILTROS
-        // ============================================
-        // Mostrar TODAS las reuniones que estén en estado "Programada" o "En curso"
-
-        const isValidStatus = meeting.str_status === 'Programada' || meeting.str_status === 'En curso';
-
-        console.log('✅ Estado válido?', isValidStatus, '- Estado:', meeting.str_status);
-
+        const isValidStatus = meeting.str_status === 'Programada' || meeting.str_status === 'En Curso';
+        console.log('🔍 [getLiveMeetings] Reunión:', meeting.str_title, '- Status válido:', isValidStatus, '- Estado:', meeting.str_status);
         return isValidStatus;
-
-        // COMENTADO: Filtro de unidad residencial
-        // if (meeting.int_id_residential_unit !== residentialUnitId) {
-        //   return false;
-        // }
-
-        // COMENTADO: Debe tener invitados registrados (al menos 1)
-        // if (!meeting.int_total_invitated || meeting.int_total_invitated === 0) {
-        //   return false;
-        // }
-
-        // COMENTADO: No debe haber terminado
-        // if (meeting.dat_actual_end_time) {
-        //   return false;
-        // }
-
-        // COMENTADO: No debe estar en estado "Finalizada" o "Completada"
-        // if (meeting.str_status === 'Finalizada' || meeting.str_status === 'Completada') {
-        //   return false;
-        // }
-
-        // COMENTADO: Validación de ventana de 1 hora
-        // const scheduleDate = new Date(meeting.dat_schedule_date);
-        // const timeDifference = scheduleDate.getTime() - now.getTime();
-        // if (timeDifference <= ONE_HOUR_MS) {
-        //   return true;
-        // }
       });
 
       console.log('📊 [getLiveMeetings] Reuniones filtradas:', liveMeetings.length);
