@@ -91,6 +91,32 @@ const CoownerService = {
 		);
 		return response.data;
 	},
+
+	/**
+	 * Habilita o deshabilita el acceso de múltiples copropietarios SELECCIONADOS
+	 */
+
+	toggleCoownersAccessBulk: async (coownerIds, enabled) => {
+		const response = await axiosInstance.post(
+			'/admin/coowners/toggle-access-bulk',
+			{
+				user_ids: coownerIds,
+				enabled: enabled
+			}
+		);
+		return response.data;
+	},
+
+	/**
+	 * Helper: Toggle individual (decide si habilitar o deshabilitar)
+	 */
+	toggleCoownerAccess: async (coownerId, enable, sendEmail = false) => {
+		if (enable) {
+			return await CoownerService.enableCoowner(coownerId, sendEmail);
+		} else {
+			return await CoownerService.disableCoowner(coownerId, sendEmail);
+		}
+	},
 };
 
 export default CoownerService;

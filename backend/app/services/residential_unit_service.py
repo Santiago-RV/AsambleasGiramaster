@@ -1787,3 +1787,58 @@ class ResidentialUnitService:
                 message=f"Error al cambiar el administrador: {str(e)}",
                 details={"original_error": str(e)}
             )
+            
+    async def get_admin_residential_unit(self, user_id: int) -> Optional[dict]:
+        """
+        Obtiene la unidad residencial que administra un usuario específico.
+        Solo para administradores (rol 2).
+        
+        Args:
+            user_id: ID del usuario administrador
+        
+        Returns:
+            dict: Datos de la unidad residencial o None si no se encuentra
+        """
+        try:
+            from app.models.user_model import UserModel
+            from app.models.residential_unit_model import ResidentialUnitModel
+            from app.models.user_residential_unit_model import UserResidentialUnitModel
+            from sqlalchemy import select
+            
+            # Verificar que el usuario sea administrador (rol 2)
+            user_query = select(UserModel).where(UserModel.id == user_id)
+            user_result = await self.db.execute(user_query)
+            user = user_result.scalar_one_or_none()
+            
+            if not user or user.int_id_rol != 2:
+                logger.warning(f"Usuario {user_id} no es administrador o no existe")
+                return None
+            
+            # Obtener la unidad residencial del administrador
+            query = (
+                select(ResidentialUnitModel)
+                .join(
+                    UserResidentialUnitModel,
+                    UserResidentialUnitModel.int_residential_unit_id == ResidentialUnitModel.id
+                )
+                .where(UserResidentialUnitModel.int_user_id == user_id)
+            )
+            
+            result = await self.db.execute(query)
+            unit = result.scalar_one_or_none()
+            
+            if not unit:
+                logger.warning(f"No se encontró unidad residencial para el administrador {user_id}")
+                return None
+            
+            # Retornar solo el ID (lo mínimo necesario)
+            return {
+                "id": unit.id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error al obtener unidad residencial del administrador: {str(e)}")
+            raise ServiceException(
+                message=f"Error al obtener unidad residencial: {str(e)}",
+                details={"user_id": user_id}
+            )

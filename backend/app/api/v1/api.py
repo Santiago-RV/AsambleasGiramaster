@@ -10,6 +10,7 @@ from app.api.v1.endpoints import super_admin
 from app.api.v1.endpoints import user_endpoint
 from app.api.v1.endpoints import zoom_signature_endpoint
 from app.api.v1.endpoints import simple_auto_login_endpoint
+from app.api.v1.endpoints import admin_coowners
 from app.auth.auth import get_current_user 
 
 api_router = APIRouter()
@@ -78,4 +79,9 @@ api_router.include_router(
     simple_auto_login_endpoint.router,
     prefix="/auth",
     tags=["authentication"]
+)
+
+api_router.include_router(
+    admin_coowners.router,
+    prefix="/admin/coowners"
 )
