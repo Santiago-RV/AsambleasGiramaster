@@ -91,11 +91,14 @@ const ResidentsList = ({
 	};
 
 	const handleSelectResident = (residentId) => {
-		setSelectedResidents((prev) =>
-			prev.includes(residentId)
+		setSelectedResidents((prev) => {
+			const updated = prev.includes(residentId)
 				? prev.filter((id) => id !== residentId)
-				: [...prev, residentId]
-		);
+				: [...prev, residentId];
+
+			setSelectAll(updated.length === residents.length);
+			return updated;
+		});
 	};
 
 	const handleSendBulkCredentials = () => {

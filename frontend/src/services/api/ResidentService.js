@@ -76,7 +76,7 @@ export class ResidentService {
 
     static async toggleUsersAccessBulk(unitId, userIds, enabled) {
         const response = await axiosInstance.post(
-            `/super-admin/residential-units/${unitId}/residents/toggle-access-bulk`,
+            `/super-admin/${unitId}/residents/toggle-access-bulk`,
             {
                 user_ids: userIds,
                 enabled: enabled
@@ -87,7 +87,7 @@ export class ResidentService {
 
     static async toggleUserAccess(unitId, userId, enabled) {
         const response = await axiosInstance.post(
-            `/super-admin/residential-units/${unitId}/residents/${userId}/toggle-access`,
+            `/super-admin/${unitId}/residents/${userId}/toggle-access`,
             null,
             { params: { enabled } }
         );
