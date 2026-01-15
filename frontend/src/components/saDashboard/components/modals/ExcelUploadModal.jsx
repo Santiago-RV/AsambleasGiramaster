@@ -188,61 +188,6 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 			size="lg"
 		>
 			<div className="space-y-6">
-				{/* Botón para descargar plantilla */}
-				<div className="bg-green-50 p-4 rounded-lg border border-green-200">
-					<h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
-						<FileSpreadsheet size={20} />
-						Descargar Plantilla
-					</h3>
-					<p className="text-sm text-green-700 mb-3">
-						Descarga la plantilla de Excel para facilitar la carga de
-						copropietarios con sus pesos de votación.
-					</p>
-					<button
-						type="button"
-						onClick={handleDownloadTemplate}
-						className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
-					>
-						<Download size={18} />
-						Descargar Plantilla Excel
-					</button>
-				</div>
-
-				{/* Información sobre voting_weight */}
-				<div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-					<h3 className="font-semibold text-purple-800 mb-2 flex items-center gap-2">
-						⚖️ Sobre el Peso de Votación
-					</h3>
-					<div className="text-sm text-purple-700 space-y-2">
-						<p>
-							El <strong>voting_weight</strong> (peso de votación) representa el
-							coeficiente de copropiedad de cada propietario.
-						</p>
-						<div className="bg-purple-100 p-3 rounded">
-							<p className="font-semibold mb-1">Ejemplos:</p>
-							<ul className="list-disc list-inside space-y-1 ml-2">
-								<li>
-									<code className="bg-white px-2 py-0.5 rounded">0.25</code> =
-									25% (apartamento grande)
-								</li>
-								<li>
-									<code className="bg-white px-2 py-0.5 rounded">0.15</code> =
-									15% (apartamento mediano)
-								</li>
-								<li>
-									<code className="bg-white px-2 py-0.5 rounded">0.10</code> =
-									10% (apartamento pequeño)
-								</li>
-							</ul>
-						</div>
-						<p className="text-xs text-purple-600 mt-2">
-							💡 <strong>Importante:</strong> Este peso se usa para ponderar los
-							votos en las encuestas. La suma de todos los pesos debería ser 1.0
-							(100%).
-						</p>
-					</div>
-				</div>
-
 				{/* Información sobre formato */}
 				<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
 					<h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
@@ -286,10 +231,6 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 									<strong>phone</strong> - Teléfono del copropietario (puede
 									estar vacío)
 								</li>
-								<li>
-									<strong>password</strong> - Contraseña inicial (default:
-									Temporal123!)
-								</li>
 							</ul>
 						</div>
 					</div>
@@ -304,6 +245,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 										<th className="px-2">email</th>
 										<th className="px-2">firstname</th>
 										<th className="px-2">lastname</th>
+										<th className="px-2">phone</th>
 										<th className="px-2">apartment_number</th>
 										<th className="px-2">voting_weight</th>
 									</tr>
@@ -313,6 +255,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 										<td className="px-2">juan@email.com</td>
 										<td className="px-2">Juan</td>
 										<td className="px-2">Pérez</td>
+										<td className="px-2">3001231212</td>
 										<td className="px-2">101</td>
 										<td className="px-2 font-bold text-purple-600">0.25</td>
 									</tr>
@@ -320,6 +263,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 										<td className="px-2">maria@email.com</td>
 										<td className="px-2">María</td>
 										<td className="px-2">González</td>
+										<td className="px-2">3003213232</td>
 										<td className="px-2">102</td>
 										<td className="px-2 font-bold text-purple-600">0.30</td>
 									</tr>
@@ -391,6 +335,26 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 							Remover archivo
 						</button>
 					)}
+				</div>
+
+				{/* Botón para descargar plantilla */}
+				<div className="bg-green-50 p-4 rounded-lg border border-green-200">
+					<h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+						<FileSpreadsheet size={20} />
+						Descargar Plantilla
+					</h3>
+					<p className="text-sm text-green-700 mb-3">
+						Descarga la plantilla de Excel para facilitar la carga de
+						copropietarios con sus pesos de votación.
+					</p>
+					<button
+						type="button"
+						onClick={handleDownloadTemplate}
+						className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
+					>
+						<Download size={18} />
+						Descargar Plantilla Excel
+					</button>
 				</div>
 
 				{/* Botones de acción */}
