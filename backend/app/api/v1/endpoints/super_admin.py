@@ -61,7 +61,7 @@ async def upload_residents_excel(
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
         
-        if not user or user.int_id_rol != 1:  # 1: Super Admin
+        if not user or user.int_id_rol not in [1, 2]:  # 1: Super Admin, 2: Administrator
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para realizar esta acción. Solo Super Admin puede cargar copropietarios."

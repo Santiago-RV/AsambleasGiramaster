@@ -174,54 +174,7 @@ class UserService:
             return None
 
         return result
-
-        # Obtener los datos del usuario asociado
-        # data_user_query = select(DataUserModel).where(DataUserModel.id == result.int_data_user_id)
-        # data_user_result = await self.db.execute(data_user_query)
-        # data_user = data_user_result.scalar_one_or_none()
-        
-        # # Crear DataUserResponse si existe
-        # data_user_response = None
-        # if data_user:
-        #     data_user_response = DataUserResponse(
-        #         id=data_user.id,
-        #         str_firstname=data_user.str_firstname,
-        #         str_lastname=data_user.str_lastname,
-        #         str_email=data_user.str_email,
-        #         str_phone=data_user.str_phone,
-        #         created_at=data_user.created_at,
-        #         updated_at=data_user.updated_at
-        #     )
-
-        # # Obtener el rol asociado
-        # rol_query = select(RolModel).where(RolModel.id == result.int_id_rol)
-        # rol_result = await self.db.execute(rol_query)
-        # rol = rol_result.scalar_one_or_none()
-        
-        # # Crear RolResponse si existe
-        # rol_response = None
-        # if rol:
-        #     rol_response = RolResponse(
-        #         id=rol.id,
-        #         str_name=rol.str_name,
-        #         str_description=rol.str_description,
-        #         bln_is_active=rol.bln_is_active,
-        #         created_at=rol.created_at,
-        #         updated_at=rol.updated_at
-        #     )
-
-        # return UserResponse(
-        #   id=result.id,
-        #   str_username=result.str_username,
-        #   bln_is_external_delegate=result.bln_is_external_delegate,
-        #   bln_user_temporary=result.bln_user_temporary,
-        #   dat_temporary_expiration_date=result.dat_temporary_expiration_date,
-        #   bln_is_active=result.bln_is_active,
-        #   data_user=data_user_response,
-        #   rol=rol_response,
-        #   created_at=result.created_at,
-        #   updated_at=result.updated_at
-        # )
+    
       except Exception as e:
         raise ServiceException(
           message="Error al obtener el usuario",
