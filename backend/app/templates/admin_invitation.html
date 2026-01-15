@@ -1,213 +1,360 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Credenciales de Administrador - GIRAMASTER</title>
+    <title>Bienvenido Administrador - GIRAMASTER</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: #333333;
+            background-color: #f5f5f5;
+            padding: 20px 0;
+        }
+
+        .email-container {
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        .email-container {
-            background: #ffffff;
-            border-radius: 10px;
+            background-color: #ffffff;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
+
+        /* Header con Logo */
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
+            background-color: #ffffff;
+            padding: 30px 40px;
             text-align: center;
+            border-bottom: 3px solid #8BC53F;
         }
-        .header h1 {
-            color: white;
-            margin: 0 0 10px 0;
-            font-size: 28px;
+
+        .logo {
+            max-width: 280px;
+            height: auto;
+            margin: 0 auto;
         }
-        .header p {
-            color: rgba(255, 255, 255, 0.9);
-            margin: 0;
-            font-size: 16px;
-        }
+
+        /* Contenido Principal */
         .content {
-            padding: 30px;
+            padding: 40px;
         }
+
         .greeting {
             font-size: 16px;
-            margin-bottom: 20px;
-        }
-        .intro-text {
+            color: #333333;
             margin-bottom: 25px;
-            color: #555;
+            line-height: 1.7;
         }
-        .info-box {
-            background: #d1ecf1;
-            border-left: 4px solid #17a2b8;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
+
+        .greeting strong {
+            color: #1E3A8A;
+            font-size: 18px;
         }
-        .info-box strong {
-            color: #0c5460;
+
+        .intro-text {
+            color: #4B5563;
+            font-size: 15px;
+            line-height: 1.7;
+            margin-bottom: 25px;
         }
-        .credentials-box {
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-            padding: 25px;
-            margin: 25px 0;
-            border-radius: 8px;
+
+        /* Caja de Información de Rol */
+        .role-info {
+            background-color: #EFF6FF;
+            border-left: 3px solid #1E3A8A;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 25px;
         }
-        .credentials-box h3 {
-            margin-top: 0;
-            margin-bottom: 20px;
-            color: #667eea;
-            font-size: 20px;
-        }
-        .credential-item {
-            margin: 15px 0;
-            padding: 12px;
-            background: white;
-            border-radius: 5px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .credential-label {
-            font-weight: bold;
-            color: #667eea;
-            display: block;
-            margin-bottom: 8px;
+
+        .role-info-title {
+            color: #1E3A8A;
             font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .role-info-text {
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Sección de Credenciales */
+        .credentials-section {
+            background: linear-gradient(135deg, #8BC53F 0%, #7AB32F 100%);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            color: #ffffff;
+        }
+
+        .credentials-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .credential-box {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+
+        .credential-box:last-child {
+            margin-bottom: 0;
+        }
+
+        .credential-label {
+            color: #6B7280;
+            font-size: 12px;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-bottom: 6px;
         }
+
         .credential-value {
+            color: #1E3A8A;
             font-size: 18px;
-            color: #333;
-            font-family: 'Courier New', Courier, monospace;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 4px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
             word-break: break-all;
-            font-weight: 600;
         }
+
+        /* Caja de Advertencia */
         .warning-box {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin: 25px 0;
-            border-radius: 5px;
+            background-color: #FEF3C7;
+            border-left: 3px solid #F59E0B;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 25px;
         }
-        .warning-box strong {
-            color: #856404;
+
+        .warning-title {
+            color: #92400E;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
         }
-        .warning-icon {
-            font-size: 20px;
-            margin-right: 8px;
+
+        .warning-text {
+            color: #92400E;
+            font-size: 13px;
+            line-height: 1.6;
         }
+
+        /* Sección de Pasos */
         .steps-section {
-            margin: 25px 0;
+            background-color: #F9FAFB;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
         }
-        .steps-section h3 {
-            color: #667eea;
+
+        .steps-title {
+            color: #1E3A8A;
+            font-size: 16px;
+            font-weight: 600;
             margin-bottom: 15px;
         }
-        .steps-section ol {
-            padding-left: 20px;
-            margin: 0;
+
+        .steps-list {
+            list-style: none;
+            counter-reset: step-counter;
+            padding: 0;
         }
-        .steps-section li {
-            margin: 10px 0;
-            color: #555;
-        }
-        .footer {
-            text-align: center;
-            padding: 20px 30px;
-            background: #f8f9fa;
-            border-top: 1px solid #dee2e6;
-            color: #6c757d;
+
+        .steps-list li {
+            counter-increment: step-counter;
+            position: relative;
+            padding: 12px 0 12px 40px;
+            color: #4B5563;
             font-size: 14px;
+            line-height: 1.6;
         }
-        .footer p {
-            margin: 5px 0;
+
+        .steps-list li:before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 12px;
+            background-color: #8BC53F;
+            color: #ffffff;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 13px;
         }
-        .footer strong {
-            color: #495057;
+
+        /* Caja de Ayuda */
+        .help-box {
+            background-color: #F0F9FF;
+            border-left: 3px solid #6B4C9A;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 25px;
         }
-        .button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 30px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-weight: bold;
+
+        .help-title {
+            color: #6B4C9A;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .help-text {
+            color: #374151;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #1E3A8A;
+            color: #ffffff;
+            padding: 30px 40px;
             text-align: center;
         }
-        .button:hover {
+
+        .footer-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .footer-subtitle {
+            font-size: 13px;
             opacity: 0.9;
+            margin-bottom: 15px;
+        }
+
+        .footer-note {
+            font-size: 12px;
+            opacity: 0.7;
+            line-height: 1.6;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 0;
+            }
+
+            .email-container {
+                border-radius: 0;
+            }
+
+            .header,
+            .content,
+            .footer {
+                padding: 25px 20px;
+            }
+
+            .logo {
+                max-width: 220px;
+            }
+
+            .credential-value {
+                font-size: 16px;
+            }
+
+            .steps-list li {
+                padding-left: 35px;
+                font-size: 13px;
+            }
+
+            .steps-list li:before {
+                width: 24px;
+                height: 24px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
+
 <body>
     <div class="email-container">
-        <!-- Header -->
+
+        <!-- Header con Logo -->
         <div class="header">
-            <h1>🎉 ¡Bienvenido a GIRAMASTER!</h1>
-            <p>Has sido asignado como Administrador</p>
+            <img src="cid:logo" alt="GIRAMASTER" class="logo">
         </div>
 
-        <!-- Content -->
+        <!-- Contenido Principal -->
         <div class="content">
-            <p class="greeting">Hola <strong>{{ firstname }} {{ lastname }}</strong>,</p>
 
+            <!-- Saludo -->
+            <p class="greeting">
+                Hola <strong>{{ firstname }} {{ lastname }}</strong>,
+            </p>
+
+            <!-- Texto Introductorio -->
             <p class="intro-text">
-                Te damos la bienvenida a <strong>GIRAMASTER</strong>. Has sido asignado como 
+                Te damos la bienvenida a <strong>GIRAMASTER</strong>. Has sido asignado como
                 <strong>Administrador</strong> de <strong>{{ residential_unit_name }}</strong>.
             </p>
 
-            <div class="info-box">
-                <strong>📋 Tu Rol:</strong> Como administrador, tendrás acceso completo para gestionar reuniones, 
-                copropietarios, votaciones y todas las funciones administrativas de la unidad residencial.
+            <!-- Información del Rol -->
+            <div class="role-info">
+                <div class="role-info-title">Tu Rol como Administrador</div>
+                <div class="role-info-text">
+                    Tendrás acceso completo para gestionar reuniones, copropietarios, votaciones
+                    y todas las funciones administrativas de la unidad residencial.
+                </div>
             </div>
 
-            <!-- Credentials Box -->
-            <div class="credentials-box">
-                <h3>🔐 Tus Credenciales de Acceso</h3>
+            <!-- Credenciales de Acceso -->
+            <div class="credentials-section">
+                <div class="credentials-title">Tus Credenciales de Acceso</div>
 
-                <div class="credential-item">
-                    <span class="credential-label">👤 Usuario</span>
+                <div class="credential-box">
+                    <div class="credential-label">Usuario</div>
                     <div class="credential-value">{{ username }}</div>
                 </div>
 
-                <div class="credential-item">
-                    <span class="credential-label">🔑 Contraseña Temporal</span>
+                <div class="credential-box">
+                    <div class="credential-label">Contraseña Temporal</div>
                     <div class="credential-value">{{ password }}</div>
                 </div>
 
-                <div class="credential-item">
-                    <span class="credential-label">🏢 Unidad Residencial</span>
+                <div class="credential-box">
+                    <div class="credential-label">Unidad Residencial</div>
                     <div class="credential-value">{{ residential_unit_name }}</div>
                 </div>
             </div>
 
-            <!-- Warning -->
+            <!-- Advertencia de Seguridad -->
             <div class="warning-box">
-                <span class="warning-icon">⚠️</span>
-                <strong>Importante:</strong> Por razones de seguridad, te recomendamos 
-                <strong>cambiar tu contraseña</strong> en tu primer inicio de sesión. Esta contraseña 
-                es temporal y debes actualizarla desde tu perfil.
+                <div class="warning-title">Importante</div>
+                <div class="warning-text">
+                    Por razones de seguridad, te recomendamos <strong>cambiar tu contraseña</strong>
+                    en tu primer inicio de sesión. Esta contraseña es temporal y debes actualizarla
+                    desde tu perfil.
+                </div>
             </div>
 
-            <!-- Next Steps -->
+            <!-- Próximos Pasos -->
             <div class="steps-section">
-                <h3>📌 Próximos Pasos:</h3>
-                <ol>
+                <div class="steps-title">Próximos Pasos</div>
+                <ol class="steps-list">
                     <li>Ingresa a la plataforma con tus credenciales</li>
                     <li>Cambia tu contraseña temporal por una segura</li>
                     <li>Explora el panel de administración</li>
@@ -216,17 +363,27 @@
                 </ol>
             </div>
 
-            <div class="info-box">
-                <strong>💡 ¿Necesitas ayuda?</strong><br>
-                Si tienes alguna pregunta o necesitas asistencia, no dudes en contactar al equipo de soporte.
+            <!-- Caja de Ayuda -->
+            <div class="help-box">
+                <div class="help-title">¿Necesitas ayuda?</div>
+                <div class="help-text">
+                    Si tienes alguna pregunta o necesitas asistencia, no dudes en contactar
+                    al equipo de soporte.
+                </div>
             </div>
+
         </div>
 
         <!-- Footer -->
         <div class="footer">
-            <p><strong>GIRAMASTER</strong> - Sistema de Gestión de Asambleas Residenciales</p>
-            <p>Este es un mensaje automático, por favor no respondas a este email.</p>
+            <div class="footer-title">GIRAMASTER</div>
+            <div class="footer-subtitle">Sistema de Gestión de Asambleas Residenciales</div>
+            <div class="footer-note">
+                Este es un mensaje automático, por favor no respondas a este email.
+            </div>
         </div>
+
     </div>
 </body>
+
 </html>

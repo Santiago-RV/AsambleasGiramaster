@@ -4,361 +4,495 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bienvenido a GIRAMASTER - Copropietario</title>
+  <title>Bienvenido a GIRAMASTER</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      line-height: 1.6;
-      color: #333333;
-      background-color: #f4f4f4;
+    * {
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
     }
 
-    .container {
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333333;
+      background-color: #f5f5f5;
+      padding: 20px 0;
+    }
+
+    .email-container {
       max-width: 600px;
-      margin: 20px auto;
+      margin: 0 auto;
       background-color: #ffffff;
-      border-radius: 12px;
+      border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
+    /* Header con Logo */
     .header {
-      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-      color: white;
-      padding: 40px 30px;
+      background-color: #ffffff;
+      padding: 30px 40px;
       text-align: center;
+      border-bottom: 3px solid #8BC53F;
     }
 
-    .header h1 {
-      margin: 0;
-      font-size: 28px;
-      font-weight: 600;
+    .logo {
+      max-width: 280px;
+      height: auto;
+      margin: 0 auto;
     }
 
+    /* Contenido Principal */
     .content {
-      padding: 40px 30px;
+      padding: 40px;
     }
 
     .greeting {
-      font-size: 18px;
-      color: #2c3e50;
-      margin-bottom: 20px;
-    }
-
-    .info-card {
-      background-color: #f8f9fa;
-      border-radius: 8px;
-      border-left: 4px solid #3498db;
-      padding: 25px;
-      margin-bottom: 30px;
-    }
-
-    .info-card h2 {
-      color: #3498db;
-      margin: 0 0 20px 0;
-      font-size: 22px;
-    }
-
-    .info-row {
-      padding: 8px 0;
-    }
-
-    .info-label {
+      font-size: 16px;
       color: #333333;
-      font-weight: bold;
-      font-size: 14px;
-    }
-
-    .info-value {
-      color: #555555;
-      font-size: 14px;
-      margin-left: 10px;
-    }
-
-    .credentials-card {
-      background-color: #e8f5e9;
-      border-radius: 8px;
-      padding: 25px;
       margin-bottom: 30px;
-      border-left: 4px solid #27ae60;
+      line-height: 1.7;
     }
 
-    .credentials-card h3 {
-      color: #27ae60;
-      margin: 0 0 20px 0;
-      font-size: 20px;
-    }
-
-    .credential-item {
-      background-color: white;
-      padding: 15px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      border: 1px solid #c8e6c9;
-    }
-
-    .credential-label {
-      color: #666666;
-      font-size: 12px;
-      text-transform: uppercase;
-      font-weight: 600;
-      margin-bottom: 5px;
-    }
-
-    .credential-value {
-      color: #2c3e50;
+    .greeting strong {
+      color: #1E3A8A;
       font-size: 18px;
-      font-weight: 600;
-      font-family: 'Courier New', monospace;
     }
 
-    /* NUEVO: Estilos para el botón de acceso directo */
-    .access-button-container {
-      text-align: center;
-      margin: 30px 0;
-      padding: 20px;
-      background-color: #f0f8ff;
+    /* Botón de Acceso Rápido */
+    .quick-access {
+      background-color: #F9FAFB;
+      border: 2px solid #E5E7EB;
       border-radius: 8px;
-      border: 2px dashed #3498db;
+      padding: 30px;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .quick-access-title {
+      color: #1E3A8A;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
     }
 
     .access-button {
       display: inline-block;
-      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-      color: white;
+      background-color: #8BC53F;
+      color: #ffffff;
       text-decoration: none;
-      padding: 16px 40px;
-      border-radius: 8px;
-      font-size: 18px;
+      padding: 14px 32px;
+      border-radius: 6px;
+      font-size: 16px;
       font-weight: 600;
-      box-shadow: 0 4px 6px rgba(52, 152, 219, 0.3);
-      transition: all 0.3s ease;
+      transition: background-color 0.3s ease;
     }
 
     .access-button:hover {
-      background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
-      box-shadow: 0 6px 8px rgba(52, 152, 219, 0.4);
-      transform: translateY(-2px);
+      background-color: #7AB32F;
     }
 
-    .access-text {
-      color: #555555;
-      font-size: 14px;
-      margin-top: 12px;
-    }
-
-    .token-info {
-      background-color: #fff3cd;
-      border-left: 4px solid #ffc107;
-      padding: 15px;
-      border-radius: 6px;
-      margin-top: 10px;
-    }
-
-    .token-info p {
-      margin: 5px 0;
-      color: #856404;
+    .quick-access-note {
+      color: #6B7280;
       font-size: 13px;
+      margin-top: 15px;
+      line-height: 1.5;
     }
 
-    .warning {
-      background-color: #fff3cd;
-      border-left: 4px solid #ffc107;
-      padding: 15px;
-      border-radius: 6px;
-      margin: 20px 0;
-    }
-
-    .warning p {
-      margin: 5px 0;
-      color: #856404;
+    .token-validity {
+      background-color: #FEF3C7;
+      border-left: 3px solid #F59E0B;
+      padding: 12px 15px;
+      border-radius: 4px;
+      margin-top: 15px;
       font-size: 13px;
+      color: #92400E;
     }
 
-    .features {
-      background-color: #e3f2fd;
+    /* Tarjetas de Información */
+    .info-section {
+      background-color: #F9FAFB;
       border-radius: 8px;
       padding: 25px;
-      margin: 20px 0;
+      margin-bottom: 20px;
     }
 
-    .features h3 {
-      color: #1976d2;
-      margin: 0 0 15px 0;
-      font-size: 18px;
+    .info-section-title {
+      color: #1E3A8A;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #E5E7EB;
     }
 
-    .feature-item {
+    .info-row {
+      display: flex;
       padding: 10px 0;
-      color: #424242;
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      flex: 0 0 140px;
+      color: #6B7280;
       font-size: 14px;
+      font-weight: 500;
     }
 
-    .footer {
-      background-color: #34495e;
-      color: white;
-      padding: 30px;
-      text-align: center;
+    .info-value {
+      flex: 1;
+      color: #111827;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Credenciales */
+    .credentials-section {
+      background: linear-gradient(135deg, #8BC53F 0%, #7AB32F 100%);
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 20px;
+      color: #ffffff;
+    }
+
+    .credentials-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .credential-box {
+      background-color: rgba(255, 255, 255, 0.95);
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+
+    .credential-box:last-child {
+      margin-bottom: 0;
+    }
+
+    .credential-label {
+      color: #6B7280;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .credential-value {
+      color: #1E3A8A;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+    }
+
+    /* Advertencia */
+    .warning-box {
+      background-color: #FEF3C7;
+      border-left: 3px solid #F59E0B;
+      border-radius: 6px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .warning-title {
+      color: #92400E;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .warning-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .warning-list li {
+      color: #92400E;
       font-size: 13px;
+      padding: 4px 0;
+      padding-left: 20px;
+      position: relative;
     }
 
-    .footer p {
+    .warning-list li:before {
+      content: "•";
+      position: absolute;
+      left: 5px;
+      font-weight: bold;
+    }
+
+    /* Características del Sistema */
+    .features-section {
+      background-color: #F9FAFB;
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+
+    .features-title {
+      color: #1E3A8A;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    .features-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features-list li {
+      color: #4B5563;
+      font-size: 14px;
+      padding: 8px 0;
+      padding-left: 25px;
+      position: relative;
+    }
+
+    .features-list li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #8BC53F;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    /* Acceso Manual */
+    .manual-access {
+      background-color: #F9FAFB;
+      border-radius: 6px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .manual-access-title {
+      color: #6B7280;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .manual-access p {
+      color: #6B7280;
+      font-size: 13px;
+      line-height: 1.6;
       margin: 5px 0;
     }
 
-    .footer a {
-      color: #3498db;
+    .manual-access a {
+      color: #6B4C9A;
       text-decoration: none;
+      font-weight: 600;
     }
 
+    .manual-access a:hover {
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    .footer {
+      background-color: #1E3A8A;
+      color: #ffffff;
+      padding: 30px 40px;
+      text-align: center;
+    }
+
+    .footer-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .footer-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-bottom: 15px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      opacity: 0.7;
+      line-height: 1.6;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Responsive */
     @media only screen and (max-width: 600px) {
-      .container {
-        margin: 0;
+      body {
+        padding: 0;
+      }
+
+      .email-container {
         border-radius: 0;
       }
 
-      .content {
-        padding: 20px 15px;
+      .header,
+      .content,
+      .footer {
+        padding: 25px 20px;
       }
 
-      .header {
-        padding: 30px 15px;
+      .logo {
+        max-width: 220px;
+      }
+
+      .info-row {
+        flex-direction: column;
+      }
+
+      .info-label {
+        flex: none;
+        margin-bottom: 4px;
       }
 
       .access-button {
-        padding: 14px 30px;
-        font-size: 16px;
+        padding: 12px 24px;
+        font-size: 15px;
       }
     }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <!-- Header -->
+  <div class="email-container">
+
+    <!-- Header con Logo -->
     <div class="header">
-      <h1>🏢 Bienvenido a GIRAMASTER</h1>
-      <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">
-        Sistema de Gestión de Asambleas
-      </p>
+      <img src="cid:logo" alt="GIRAMASTER" class="logo">
     </div>
 
-    <!-- Content -->
+    <!-- Contenido Principal -->
     <div class="content">
+
+      <!-- Saludo -->
       <div class="greeting">
         <p><strong>Estimado/a {{firstname}} {{lastname}},</strong></p>
         <p>
-          ¡Bienvenido/a al sistema GIRAMASTER! Su cuenta ha sido creada exitosamente.
-          A continuación encontrará sus credenciales de acceso al sistema.
+          Bienvenido/a a GIRAMASTER. Su cuenta ha sido creada exitosamente y ya puede acceder al sistema
+          de gestión de asambleas de su unidad residencial.
         </p>
       </div>
 
-      <!-- NUEVO: Botón de Acceso Directo (solo si hay token) -->
+      <!-- Botón de Acceso Rápido (si hay token) -->
       {% if auto_login_url %}
-      <div class="access-button-container">
-        <p style="color: #2c3e50; font-size: 16px; margin-bottom: 15px; font-weight: 600;">
-          ✨ Acceso Rápido al Sistema
+      <div class="quick-access">
+        <div class="quick-access-title">Acceso Rápido al Sistema</div>
+        <a href="{{auto_login_url}}" class="access-button">ACCEDER AHORA</a>
+        <p class="quick-access-note">
+          Haga clic en el botón para ingresar automáticamente.<br>
+          No necesita escribir sus credenciales.
         </p>
-        <a href="{{auto_login_url}}" class="access-button">
-          🚀 ACCEDER DIRECTAMENTE
-        </a>
-        <p class="access-text">
-          Haga clic en el botón para ingresar automáticamente al sistema.<br>
-          <strong>No necesita escribir sus credenciales.</strong>
-        </p>
-        <div class="token-info">
-          <p><strong>⏰ Este enlace es válido por 48 horas</strong></p>
-          <p>📱 Funciona solo una vez por seguridad</p>
+        <div class="token-validity">
+          <strong>Válido por 48 horas</strong> • Funciona solo una vez por seguridad
         </div>
       </div>
       {% endif %}
 
-      <!-- User Info Card -->
-      <div class="info-card">
-        <h2>👤 Información de su Cuenta</h2>
+      <!-- Información del Usuario -->
+      <div class="info-section">
+        <div class="info-section-title">Información de su Cuenta</div>
+
         <div class="info-row">
-          <span class="info-label">🏢 Unidad Residencial:</span>
+          <span class="info-label">Unidad Residencial</span>
           <span class="info-value">{{residential_unit_name}}</span>
         </div>
+
         <div class="info-row">
-          <span class="info-label">🏠 Apartamento:</span>
+          <span class="info-label">Apartamento</span>
           <span class="info-value">{{apartment_number}}</span>
         </div>
+
         <div class="info-row">
-          <span class="info-label">📧 Email:</span>
+          <span class="info-label">Email</span>
           <span class="info-value">{{user_email}}</span>
         </div>
+
         {% if phone %}
         <div class="info-row">
-          <span class="info-label">📱 Teléfono:</span>
+          <span class="info-label">Teléfono</span>
           <span class="info-value">{{phone}}</span>
         </div>
         {% endif %}
+
         <div class="info-row">
-          <span class="info-label">⚖️ Peso de Votación:</span>
+          <span class="info-label">Peso de Votación</span>
           <span class="info-value">{{voting_weight}}%</span>
         </div>
       </div>
 
-      <!-- Credentials Card -->
-      <div class="credentials-card">
-        <h3>🔐 Sus Credenciales de Acceso</h3>
+      <!-- Credenciales de Acceso -->
+      <div class="credentials-section">
+        <div class="credentials-title">Sus Credenciales de Acceso</div>
 
-        <div class="credential-item">
+        <div class="credential-box">
           <div class="credential-label">Usuario</div>
           <div class="credential-value">{{username}}</div>
         </div>
 
-        <div class="credential-item">
+        <div class="credential-box">
           <div class="credential-label">Contraseña Temporal</div>
           <div class="credential-value">{{password}}</div>
         </div>
       </div>
 
-      <!-- Warning -->
-      <div class="warning">
-        <p><strong>⚠️ Importante:</strong></p>
-        <p>• Esta contraseña es temporal y debe ser cambiada en su primer acceso.</p>
-        <p>• Por seguridad, no comparta sus credenciales con nadie.</p>
-        <p>• Guarde este correo en un lugar seguro.</p>
+      <!-- Advertencia de Seguridad -->
+      <div class="warning-box">
+        <div class="warning-title">Importante</div>
+        <ul class="warning-list">
+          <li>Esta contraseña es temporal y debe ser cambiada en su primer acceso</li>
+          <li>Por seguridad, no comparta sus credenciales con nadie</li>
+          <li>Guarde este correo en un lugar seguro</li>
+        </ul>
       </div>
 
-      <!-- Features -->
-      <div class="features">
-        <h3>🎯 ¿Qué puede hacer en el sistema?</h3>
-        <div class="feature-item">✓ Asistir a asambleas virtuales</div>
-        <div class="feature-item">✓ Participar en votaciones electrónicas</div>
-        <div class="feature-item">✓ Consultar actas y documentos</div>
-        <div class="feature-item">✓ Mantenerse informado sobre su comunidad</div>
+      <!-- Características del Sistema -->
+      <div class="features-section">
+        <div class="features-title">¿Qué puede hacer en el sistema?</div>
+        <ul class="features-list">
+          <li>Asistir a asambleas virtuales</li>
+          <li>Participar en votaciones electrónicas</li>
+          <li>Consultar actas y documentos</li>
+          <li>Mantenerse informado sobre su comunidad</li>
+        </ul>
       </div>
 
-      <!-- Manual Login Instructions -->
+      <!-- Acceso Manual (si hay token) -->
       {% if auto_login_url %}
-      <div style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
-        <h4 style="color: #555; margin: 0 0 10px 0; font-size: 14px;">
-          📝 Acceso Manual (si lo prefiere)
-        </h4>
-        <p style="color: #666; font-size: 13px; margin: 5px 0;">
-          También puede ingresar manualmente desde: 
-          <a href="https://tu-dominio.com/login" style="color: #3498db;">https://tu-dominio.com/login</a>
+      <div class="manual-access">
+        <div class="manual-access-title">Acceso Manual</div>
+        <p>
+          También puede ingresar desde:
+          <a href="https://tu-dominio.com/login">https://tu-dominio.com/login</a>
         </p>
-        <p style="color: #666; font-size: 13px; margin: 5px 0;">
-          Use las credenciales mostradas arriba.
-        </p>
+        <p>Use las credenciales mostradas arriba.</p>
       </div>
       {% endif %}
+
     </div>
 
     <!-- Footer -->
     <div class="footer">
-      <p><strong>GIRAMASTER</strong> - Sistema de Gestión de Asambleas</p>
-      <p>© {{residential_unit_name}}</p>
-      <p style="margin-top: 15px; font-size: 12px; opacity: 0.8;">
-        Si tiene problemas para acceder, contacte al administrador de su unidad residencial.
-      </p>
+      <div class="footer-title">GIRAMASTER</div>
+      <div class="footer-subtitle">Sistema de Gestión de Asambleas</div>
+      <div>{{residential_unit_name}}</div>
+      <div class="footer-note">
+        Si tiene problemas para acceder, contacte al administrador<br>
+        de su unidad residencial.
+      </div>
     </div>
+
   </div>
 </body>
 
