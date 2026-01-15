@@ -15,6 +15,8 @@ from app.schemas.residential_unit_schema import BulkToggleAccessRequest
 from app.core.exceptions import ServiceException, ResourceNotFoundException
 import logging
 
+from app.schemas.email_notification_schema import BulkSendCredentialsRequest
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -452,6 +454,117 @@ async def resend_coowner_credentials(
             message=f"Error al reenviar credenciales: {str(e)}",
             details={"original_error": str(e)}
         )
+
+@router.post(
+    "/send-bulk-credentials",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Enviar credenciales en masa a múltiples copropietarios",
+    description="Genera nuevas contraseñas temporales y las envía por correo a múltiples copropietarios seleccionados"
+)
+async def send_bulk_credentials(
+    request_data: BulkSendCredentialsRequest,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Envía credenciales en masa a múltiples copropietarios SELECCIONADOS.
+    Genera nuevas contraseñas temporales y las envía por correo.
+    
+    Body:
+        {
+            "resident_ids": [5, 8, 12]
+        }
+    """
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user or user.int_id_rol != 2:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo los administradores pueden enviar credenciales"
+            )
+        
+        residential_service = ResidentialUnitService(db)
+        admin_unit = await residential_service.get_admin_residential_unit(user.id)
+        
+        if not admin_unit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se encontró una unidad residencial asignada"
+            )
+        
+        if not request_data.resident_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe proporcionar al menos un ID de residente"
+            )
+        
+        # Procesar cada copropietario (usar resident_ids del schema)
+        successful = 0
+        failed = 0
+        errors = []
+        sent_to = []
+        
+        for user_id in request_data.resident_ids:  # ← Usar resident_ids aquí
+            try:
+                result = await residential_service.resend_resident_credentials(
+                    user_id=user_id,
+                    unit_id=admin_unit['id']
+                )
+                
+                successful += 1
+                sent_to.append({
+                    "user_id": result.get("user_id", user_id),
+                    "username": result.get("username", "Unknown"),
+                    "name": result.get("name", "Unknown"),
+                    "email": result.get("email", "Unknown"),
+                    "status": "sent"
+                })
+                
+            except Exception as e:
+                failed += 1
+                errors.append({
+                    "user_id": user_id,
+                    "error": str(e)
+                })
+                logger.error(f"Error al enviar credenciales a user_id={user_id}: {str(e)}")
+        
+        # Preparar mensaje de respuesta
+        if successful == len(request_data.resident_ids):
+            message = f"✅ Credenciales enviadas exitosamente a {successful} copropietarios"
+        elif successful > 0:
+            message = f"⚠️ Proceso completado: {successful} exitosos, {failed} fallidos"
+        else:
+            message = f"❌ No se pudo enviar credenciales a ningún copropietario"
+        
+        logger.info(
+            f"📧 Admin {current_user} envió credenciales masivas en unit_id={admin_unit['id']}: "
+            f"{successful} exitosos, {failed} fallidos"
+        )
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=message,
+            data={
+                "total_processed": len(request_data.resident_ids),
+                "successful": successful,
+                "failed": failed,
+                "errors": errors,
+                "sent_to": sent_to
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al enviar credenciales masivas: {str(e)}")
+        raise ServiceException(
+            message=f"Error al enviar credenciales masivas: {str(e)}",
+            details={"original_error": str(e)}
+        )
         
 @router.post(
     "/toggle-access-bulk",
@@ -588,4 +701,3 @@ async def toggle_coowners_access_bulk(
             message=f"Error al modificar acceso masivo: {str(e)}",
             details={"original_error": str(e)}
         )
-        
