@@ -1842,3 +1842,254 @@ class ResidentialUnitService:
                 message=f"Error al obtener unidad residencial: {str(e)}",
                 details={"user_id": user_id}
             )
+            
+    async def create_guest(self, unit_id: int, guest_data: dict) -> dict:
+        """
+        Crea un invitado (rol 4) para una unidad residencial.
+        
+        Los invitados:
+        - Solo tienen datos básicos (nombre, apellido, correo)
+        - NO tienen credenciales de acceso
+        - NO pueden votar
+        - Solo reciben correos con links de asambleas
+        
+        Args:
+            unit_id: ID de la unidad residencial
+            guest_data: Dict con firstname, lastname, email
+        
+        Returns:
+            dict: Datos del invitado creado
+        """
+        try:
+            # 1. Verificar que la unidad residencial existe
+            unit = await self.get_residential_unit_by_id(unit_id)
+            if not unit:
+                raise ResourceNotFoundException(
+                    message=f"Unidad residencial con ID {unit_id} no encontrada",
+                    resource_type="ResidentialUnit"
+                )
+            
+            # 2. Verificar si el email ya está registrado
+            email_check = await self.db.execute(
+                select(DataUserModel).where(DataUserModel.str_email == guest_data['email'])
+            )
+            existing_user = email_check.scalar_one_or_none()
+            
+            if existing_user:
+                raise ServiceException(
+                    message=f"El correo {guest_data['email']} ya está registrado en el sistema",
+                    error_code="EMAIL_ALREADY_EXISTS"
+                )
+            
+            # 3. Crear registro en tbl_data_users
+            data_user = DataUserModel(
+                str_firstname=guest_data['firstname'],
+                str_lastname=guest_data['lastname'],
+                str_email=guest_data['email'],
+                str_phone=None,  # Los invitados no tienen teléfono
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(data_user)
+            await self.db.flush()
+            
+            logger.info(f"DataUser creado para invitado: {guest_data['email']} (ID: {data_user.id})")
+            
+            # 4. Crear usuario con rol 4 (Invitado) SIN credenciales de acceso
+            user = UserModel(
+                int_data_user_id=data_user.id,
+                str_username=None,  # Los invitados NO tienen username
+                str_password_hash=None,  # Los invitados NO tienen contraseña
+                int_id_rol=4,  # 4: Invitado
+                bln_allow_entry=False,  # Los invitados NO tienen acceso
+                bln_is_external_delegate=False,
+                bln_user_temporary=False,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(user)
+            await self.db.flush()
+            
+            logger.info(
+                f"Usuario invitado creado: Email: {guest_data['email']} - "
+                f"Rol: 4 (Invitado) - Sin acceso a la aplicación"
+            )
+            
+            # 5. Crear relación en tbl_user_residential_units
+            user_unit = UserResidentialUnitModel(
+                int_user_id=user.id,
+                int_residential_unit_id=unit_id,
+                str_apartment_number="INVITADO",  # Identificador especial para invitados
+                bool_is_admin=False,
+                dec_default_voting_weight=0.0,  # Los invitados NO votan
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(user_unit)
+            
+            await self.db.commit()
+            
+            logger.info(
+                f"Invitado {guest_data['firstname']} {guest_data['lastname']} "
+                f"vinculado a unidad {unit_id} - Sin derecho a voto"
+            )
+            
+            # 6. Retornar datos del invitado creado
+            return {
+                "id": user.id,
+                "data_user_id": data_user.id,
+                "firstname": data_user.str_firstname,
+                "lastname": data_user.str_lastname,
+                "email": data_user.str_email,
+                "residential_unit_id": unit_id,
+                "residential_unit_name": unit.str_name,
+                "role": "Invitado",
+                "has_access": False,
+                "can_vote": False,
+                "created_at": user.created_at.isoformat() if user.created_at else None
+            }
+            
+        except (ServiceException, ResourceNotFoundException):
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al crear invitado: {e}")
+            raise ServiceException(
+                message=f"Error al crear invitado: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
+
+    async def get_guests_by_unit(self, unit_id: int) -> list:
+        """
+        Obtiene todos los invitados (rol 4) de una unidad residencial.
+        
+        Args:
+            unit_id: ID de la unidad residencial
+        
+        Returns:
+            list: Lista de invitados
+        """
+        try:
+            # Verificar que la unidad existe
+            unit = await self.get_residential_unit_by_id(unit_id)
+            if not unit:
+                raise ResourceNotFoundException(
+                    message=f"Unidad residencial con ID {unit_id} no encontrada",
+                    resource_type="ResidentialUnit"
+                )
+            
+            # Obtener invitados (rol 4) de la unidad
+            query = (
+                select(UserModel)
+                .options(selectinload(UserModel.data_user))
+                .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                .where(
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                    UserModel.int_id_rol == 4  # Solo invitados
+                )
+            )
+            
+            result = await self.db.execute(query)
+            guests = result.scalars().all()
+            
+            # Formatear respuesta
+            guests_list = []
+            for guest in guests:
+                if guest.data_user:
+                    guests_list.append({
+                        "id": guest.id,
+                        "data_user_id": guest.data_user.id,
+                        "firstname": guest.data_user.str_firstname,
+                        "lastname": guest.data_user.str_lastname,
+                        "email": guest.data_user.str_email,
+                        "role": "Invitado",
+                        "has_access": False,
+                        "can_vote": False,
+                        "created_at": guest.created_at.isoformat() if guest.created_at else None
+                    })
+            
+            logger.info(f"Se encontraron {len(guests_list)} invitados para la unidad {unit_id}")
+            return guests_list
+            
+        except ResourceNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"Error al obtener invitados: {e}")
+            raise ServiceException(
+                message=f"Error al obtener invitados: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
+
+    async def delete_guest(self, unit_id: int, guest_id: int) -> None:
+        """
+        Elimina un invitado de una unidad residencial.
+        
+        Elimina:
+        - El registro en tbl_user_residential_units
+        - El usuario en tbl_users
+        - Los datos en tbl_data_users
+        
+        Args:
+            unit_id: ID de la unidad residencial
+            guest_id: ID del usuario invitado
+        """
+        try:
+            # 1. Verificar que el usuario existe y es invitado (rol 4)
+            query = (
+                select(UserModel)
+                .options(selectinload(UserModel.data_user))
+                .where(UserModel.id == guest_id, UserModel.int_id_rol == 4)
+            )
+            result = await self.db.execute(query)
+            guest = result.scalar_one_or_none()
+            
+            if not guest:
+                raise ResourceNotFoundException(
+                    message=f"Invitado con ID {guest_id} no encontrado",
+                    resource_type="Guest"
+                )
+            
+            # 2. Verificar que el invitado pertenece a la unidad
+            unit_relation_query = select(UserResidentialUnitModel).where(
+                UserResidentialUnitModel.int_user_id == guest_id,
+                UserResidentialUnitModel.int_residential_unit_id == unit_id
+            )
+            unit_relation_result = await self.db.execute(unit_relation_query)
+            unit_relation = unit_relation_result.scalar_one_or_none()
+            
+            if not unit_relation:
+                raise ServiceException(
+                    message=f"El invitado no pertenece a la unidad residencial {unit_id}",
+                    error_code="GUEST_NOT_IN_UNIT"
+                )
+            
+            # 3. Eliminar en cascada
+            data_user_id = guest.int_data_user_id
+            
+            # Eliminar relación unidad-usuario
+            await self.db.delete(unit_relation)
+            
+            # Eliminar usuario
+            await self.db.delete(guest)
+            
+            # Eliminar datos del usuario
+            if data_user_id and guest.data_user:
+                await self.db.delete(guest.data_user)
+            
+            await self.db.commit()
+            
+            logger.info(f"Invitado {guest_id} eliminado de la unidad {unit_id}")
+            
+        except (ServiceException, ResourceNotFoundException):
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al eliminar invitado: {e}")
+            raise ServiceException(
+                message=f"Error al eliminar invitado: {str(e)}",
+                details={"original_error": str(e)}
+            )

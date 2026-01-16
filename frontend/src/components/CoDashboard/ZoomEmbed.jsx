@@ -11,7 +11,7 @@ import '../../styles/swal-custom.css';
 /**
  * Componente de Zoom usando SDK Web (pantalla completa) para Copropietarios
  * Permite unirse a reuniones como participante (role: 0) CON funcionalidad de votación
- */
+*/
 const ZoomEmbed = ({
 	meetingData,
 	onClose,
