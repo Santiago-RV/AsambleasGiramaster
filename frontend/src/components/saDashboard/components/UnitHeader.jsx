@@ -8,6 +8,7 @@ import {
 	Phone,
 	AlertCircle,
 	FileSpreadsheet,
+	UserPlus
 } from 'lucide-react';
 
 const UnitHeader = ({
@@ -18,6 +19,7 @@ const UnitHeader = ({
 	onOpenResidentModal,
 	onOpenExcelModal,
 	onOpenChangeAdminModal,
+	onOpenGuestModal
 }) => {
 	return (
 		<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -134,8 +136,12 @@ const UnitHeader = ({
 				</div>
 			</div>
 
-			{/* Botones de acción para residentes */}
+			{/* ======================================== */}
+			{/* Botones de acción para residentes       */}
+			{/* CORREGIDO: Eliminado botón duplicado    */}
+			{/* ======================================== */}
 			<div className="flex gap-3 pt-4 border-t border-gray-200">
+				{/* Botón: Agregar Residente */}
 				<button
 					onClick={onOpenResidentModal}
 					className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
@@ -143,6 +149,17 @@ const UnitHeader = ({
 					<Plus size={18} />
 					Agregar Residente
 				</button>
+				
+				{/* Botón: Agregar Invitado - NUEVO */}
+				<button
+					onClick={onOpenGuestModal}
+					className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
+				>
+					<UserPlus size={18} />
+					Agregar Invitado
+				</button>
+				
+				{/* Botón: Cargar desde Excel */}
 				<button
 					onClick={onOpenExcelModal}
 					className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
