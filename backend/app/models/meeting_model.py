@@ -14,7 +14,7 @@ class MeetingModel(Base):
     str_meeting_type = Column(String(50), index=True, nullable=False)
     dat_schedule_date = Column(DateTime, nullable=False)
     int_estimated_duration = Column(Integer, nullable=False, default=0)  # 0 = duración indefinida
-    int_organizer_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    int_organizer_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
     int_meeting_leader_id = Column(Integer, nullable=False)
     int_zoom_meeting_id = Column(BigInteger, nullable=True)  # Se completa al crear en Zoom
     str_zoom_join_url = Column(String(500), nullable=True)  # Se completa al crear en Zoom
@@ -30,8 +30,10 @@ class MeetingModel(Base):
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
-    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
 
     residential_unit = relationship("ResidentialUnitModel", back_populates="meetings")
     polls = relationship("PollModel", back_populates="meeting", cascade="all, delete-orphan")
+    invitations = relationship("MeetingInvitationModel", back_populates="meeting", cascade="all, delete-orphan")
+    attendances = relationship("MeetingAttendanceModel", back_populates="meeting", cascade="all, delete-orphan")

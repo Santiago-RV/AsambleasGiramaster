@@ -8,7 +8,7 @@ class MeetingInvitationModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    int_user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    int_user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     dec_voting_weight = Column(Numeric, nullable=False)
     str_apartment_number = Column(String(20), nullable=False)
     str_invitation_status = Column(String(50), index=True, nullable=False)
@@ -26,5 +26,8 @@ class MeetingInvitationModel(Base):
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
-    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
+
+    # Relationships
+    meeting = relationship("MeetingModel", back_populates="invitations")
