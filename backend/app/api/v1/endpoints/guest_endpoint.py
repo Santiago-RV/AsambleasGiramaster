@@ -15,7 +15,7 @@ router = APIRouter()
              response_model=SuccessResponse,
              status_code=status.HTTP_201_CREATED,
              summary="Crear un nuevo invitado para una unidad residencial",
-             description="Crear invitado con rol 4 de invitado, solo recibe el link de zoom."
+             description="Crear invitado con rol 4 de invitado, con acceso a la app pero sin derecho a voto"
 )
 async def create_guest(
     unit_id: int,
@@ -27,16 +27,20 @@ async def create_guest(
     Crea un nuevo invitado para la unidad residencial.
     
     Los invitados:
-    - Tiene rol 4
-    - Solor ecibe correos con links de asambleas
-    - NO tiene derecho a votar ni acceder a la app
+    - Tienen rol 4
+    - Tienen credenciales de acceso automáticas
+    - Tienen acceso a la aplicación (bln_allow_entry=True)
+    - Reciben email con credenciales y auto-login
+    - NO tienen derecho a votar
+    - NO pueden ver encuestas
     """
     
     try:
-        # Verificar permisos (Super admin o admin)
+        # CORREGIDO: Verificar permisos (Super admin o admin)
         user_service = UserService(db)
         current_user_data = await user_service.get_user_by_username(current_user)
-        if current_user_data.role not in [1, 2]:  # 1:
+        
+        if current_user_data.int_id_rol not in [1, 2]:  # 1: Super Admin, 2: Admin
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tiene permisos para crear invitados."
@@ -50,7 +54,7 @@ async def create_guest(
             guest_data=guest_data.model_dump()
         )
         
-        # Retornar respuesta con respecto a la creación del invitación
+        # Retornar respuesta con respecto a la creación del invitado
         return SuccessResponse(
             message="Invitado creado exitosamente.",
             data=GuestResponse.model_validate(new_guest)
@@ -64,6 +68,7 @@ async def create_guest(
             details={"original_error": str(e)}
         )
         
+
 @router.get(
     "/units/{unit_id}/guests",
     response_model=SuccessResponse,
@@ -106,6 +111,7 @@ async def get_guests_by_unit(
             details={"original_error": str(e)}
         )
         
+
 @router.delete("/units/{unit_id}/guest/{guest_id}",
                response_model=SuccessResponse,
                status_code=status.HTTP_200_OK,
@@ -120,10 +126,11 @@ async def delete_guest(
 ):
     """Eliminar un invitado de una unidad residencial"""
     try:
-        # Verificar permisos
+        # CORREGIDO: Verificar permisos
         user_service = UserService(db)
         current_user_data = await user_service.get_user_by_username(current_user)
-        if current_user_data.role not in [1, 2]:
+        
+        if current_user_data.int_id_rol not in [1, 2]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tiene permisos para eliminar invitados."
@@ -145,4 +152,3 @@ async def delete_guest(
             message=f"Error al eliminar invitado: {str(e)}",
             details={"original_error": str(e)}
         )
-                

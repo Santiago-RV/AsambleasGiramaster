@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bienvenido a GIRAMASTER - Invitado</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
+      padding: 20px;
+    }
+
+    .email-container {
+      max-width: 650px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+      color: #ffffff;
+      padding: 40px 30px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .header-subtitle {
+      font-size: 15px;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 40px 30px;
+    }
+
+    .greeting {
+      font-size: 16px;
+      color: #374151;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .intro-text {
+      font-size: 15px;
+      color: #6B7280;
+      line-height: 1.7;
+      margin-bottom: 25px;
+    }
+
+    /* Información de Rol de Invitado */
+    .role-info {
+      background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 25px;
+      color: #ffffff;
+    }
+
+    .role-info-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .role-info-text {
+      font-size: 14px;
+      line-height: 1.6;
+      opacity: 0.95;
+    }
+
+    /* Acceso Rápido */
+    .quick-access {
+      background-color: #EFF6FF;
+      border: 2px dashed #3B82F6;
+      border-radius: 8px;
+      padding: 25px;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .quick-access-title {
+      color: #1E40AF;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    .access-button {
+      display: inline-block;
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+      color: #ffffff;
+      padding: 14px 40px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+
+    .access-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .quick-access-note {
+      color: #6B7280;
+      font-size: 13px;
+      margin-top: 15px;
+      line-height: 1.5;
+    }
+
+    .token-validity {
+      background-color: #FEF3C7;
+      border-left: 3px solid #F59E0B;
+      padding: 12px 15px;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-size: 13px;
+      color: #92400E;
+    }
+
+    /* Credenciales */
+    .credentials-section {
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 20px;
+      color: #ffffff;
+    }
+
+    .credentials-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .credential-box {
+      background-color: rgba(255, 255, 255, 0.95);
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+
+    .credential-box:last-child {
+      margin-bottom: 0;
+    }
+
+    .credential-label {
+      color: #6B7280;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .credential-value {
+      color: #1E3A8A;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+    }
+
+    /* Limitaciones del Invitado */
+    .limitations-box {
+      background-color: #FEF2F2;
+      border-left: 3px solid #DC2626;
+      border-radius: 6px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .limitations-title {
+      color: #991B1B;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .limitations-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .limitations-list li {
+      color: #991B1B;
+      font-size: 13px;
+      padding: 6px 0;
+      padding-left: 25px;
+      position: relative;
+    }
+
+    .limitations-list li:before {
+      content: "✗";
+      position: absolute;
+      left: 5px;
+      font-weight: bold;
+      color: #DC2626;
+    }
+
+    /* Características del Sistema */
+    .features-section {
+      background-color: #F9FAFB;
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+
+    .features-title {
+      color: #1E3A8A;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    .features-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features-list li {
+      color: #4B5563;
+      font-size: 14px;
+      padding: 8px 0;
+      padding-left: 25px;
+      position: relative;
+    }
+
+    .features-list li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #3B82F6;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    /* Acceso Manual */
+    .manual-access {
+      background-color: #F9FAFB;
+      border-radius: 6px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .manual-access-title {
+      color: #6B7280;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .manual-access p {
+      color: #4B5563;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 5px 0;
+    }
+
+    .manual-access a {
+      color: #3B82F6;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    /* Footer */
+    .footer {
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+      color: #ffffff;
+      padding: 30px 40px;
+      text-align: center;
+    }
+
+    .footer-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .footer-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-bottom: 15px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      opacity: 0.7;
+      line-height: 1.6;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Responsive */
+    @media only screen and (max-width: 600px) {
+      body {
+        padding: 0;
+      }
+
+      .email-container {
+        border-radius: 0;
+      }
+
+      .header,
+      .content,
+      .footer {
+        padding: 25px 20px;
+      }
+
+      .credential-value {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="email-container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">GIRAMASTER</div>
+      <div class="header-subtitle">Sistema de Gestión de Asambleas</div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="content">
+
+      <!-- Saludo -->
+      <p class="greeting">
+        Hola <strong>{{firstname}} {{lastname}}</strong>,
+      </p>
+
+      <!-- Texto Introductorio -->
+      <p class="intro-text">
+        Te damos la bienvenida a <strong>GIRAMASTER</strong>. Has sido registrado como
+        <strong>Invitado</strong> de <strong>{{residential_unit_name}}</strong>.
+      </p>
+
+      <!-- Información del Rol -->
+      <div class="role-info">
+        <div class="role-info-title">🎫 Tu Rol como Invitado</div>
+        <div class="role-info-text">
+          Podrás acceder a la plataforma para asistir a las asambleas virtuales y estar informado 
+          sobre las actividades de la comunidad, aunque con algunas limitaciones respecto a los copropietarios.
+        </div>
+      </div>
+
+      <!-- Botón de Acceso Rápido (si hay token) -->
+      {% if auto_login_url %}
+      <div class="quick-access">
+        <div class="quick-access-title">🚀 Acceso Rápido al Sistema</div>
+        <a href="{{auto_login_url}}" class="access-button">ACCEDER AHORA</a>
+        <p class="quick-access-note">
+          Haga clic en el botón para ingresar automáticamente.<br>
+          No necesita escribir sus credenciales.
+        </p>
+        <div class="token-validity">
+          <strong>Válido por 48 horas</strong> • Funciona solo una vez por seguridad
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Credenciales de Acceso -->
+      <div class="credentials-section">
+        <div class="credentials-title">🔑 Sus Credenciales de Acceso</div>
+
+        <div class="credential-box">
+          <div class="credential-label">Usuario</div>
+          <div class="credential-value">{{username}}</div>
+        </div>
+
+        <div class="credential-box">
+          <div class="credential-label">Contraseña Temporal</div>
+          <div class="credential-value">{{password}}</div>
+        </div>
+
+        <div class="credential-box">
+          <div class="credential-label">Email</div>
+          <div class="credential-value">{{user_email}}</div>
+        </div>
+      </div>
+
+      <!-- LIMITACIONES DEL INVITADO -->
+      <div class="limitations-box">
+        <div class="limitations-title">
+          ⚠️ Limitaciones de su cuenta de Invitado
+        </div>
+        <ul class="limitations-list">
+          <li>No puede participar en votaciones ni encuestas</li>
+          <li>No tiene derecho a voto en las asambleas</li>
+          <li>No puede ver el módulo de encuestas activas</li>
+          <li>Solo puede observar y escuchar en las reuniones virtuales</li>
+        </ul>
+      </div>
+
+      <!-- Características del Sistema -->
+      <div class="features-section">
+        <div class="features-title">✅ ¿Qué puede hacer en el sistema?</div>
+        <ul class="features-list">
+          <li>Asistir a asambleas virtuales como observador</li>
+          <li>Consultar actas y documentos compartidos</li>
+          <li>Mantenerse informado sobre eventos de la comunidad</li>
+          <li>Recibir notificaciones de reuniones programadas</li>
+        </ul>
+      </div>
+
+      <!-- Acceso Manual (si hay token) -->
+      {% if auto_login_url %}
+      <div class="manual-access">
+        <div class="manual-access-title">🔐 Acceso Manual</div>
+        <p>
+          También puede ingresar desde:
+          <a href="https://tu-dominio.com/login">https://tu-dominio.com/login</a>
+        </p>
+        <p>Use las credenciales mostradas arriba.</p>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-title">GIRAMASTER</div>
+      <div class="footer-subtitle">Sistema de Gestión de Asambleas</div>
+      <div>{{residential_unit_name}}</div>
+      <div class="footer-note">
+        Si tiene problemas para acceder, contacte al administrador<br>
+        de su unidad residencial.
+      </div>
+    </div>
+
+  </div>
+</body>
+
+</html>

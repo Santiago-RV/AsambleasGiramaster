@@ -146,7 +146,7 @@ const UnitHeader = ({
 					onClick={onOpenResidentModal}
 					className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 				>
-					<Plus size={18} />
+					<UserPlus size={18} />
 					Agregar Residente
 				</button>
 				

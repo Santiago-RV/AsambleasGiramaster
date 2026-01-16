@@ -182,7 +182,7 @@ const ResidentsList = ({
 								) : (
 									<>
 										<Send size={16} />
-										<span className="hidden sm:inline">Enviar</span>
+										<span className="hidden sm:inline">Enviar Credenciales</span>
 									</>
 								)}
 							</button>

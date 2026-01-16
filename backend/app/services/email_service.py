@@ -448,6 +448,75 @@ class EmailService:
         except Exception as e:
             logger.error(f"❌ Error al enviar email de credenciales: {e}")
             return False
+        
+    async def send_guest_credentials_email(
+        self,
+        to_email: str,
+        firstname: str,
+        lastname: str,
+        username: str,
+        password: str,
+        residential_unit_name: str,
+        auto_login_token: Optional[str] = None
+    ) -> bool:
+        """
+        Envía email de bienvenida con credenciales para un invitado.
+        
+        Args:
+            to_email: Email del invitado
+            firstname: Nombre
+            lastname: Apellido
+            username: Usuario generado
+            password: Contraseña temporal
+            residential_unit_name: Nombre de la unidad residencial
+            auto_login_token: Token JWT para auto-login (opcional)
+        """
+        try:
+            # Cargar template
+            template_path = self.templates_dir / "welcome_guest.html"
+            
+            with open(template_path, 'r', encoding='utf-8') as file:
+                template_content = file.read()
+            
+            # Construir URL de auto-login
+            auto_login_url = None
+            if auto_login_token:
+                from app.core.config import settings
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
+                logger.info(f"🔗 URL de auto-login generada para invitado {to_email}")
+            
+            # Renderizar template
+            template = Template(template_content)
+            html_content = template.render(
+                firstname=firstname,
+                lastname=lastname,
+                username=username,
+                password=password,
+                residential_unit_name=residential_unit_name,
+                user_email=to_email,
+                auto_login_url=auto_login_url
+            )
+            
+            # Enviar email
+            subject = f"Invitación a GIRAMASTER - {residential_unit_name}"
+            
+            result = email_sender.send_email(
+                to_emails=[to_email],
+                subject=subject,
+                html_content=html_content
+            )
+            
+            if result:
+                logger.info(f"✅ Email de invitado enviado a {to_email}")
+                return True
+            else:
+                logger.warning(f"❌ No se pudo enviar email a {to_email}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error al enviar email de invitado: {e}")
+            return False
 
 
 # Instancia global del servicio de email

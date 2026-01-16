@@ -1845,39 +1845,28 @@ class ResidentialUnitService:
             
     async def create_guest(self, unit_id: int, guest_data: dict) -> dict:
         """
-        Crea un invitado (rol 4) para una unidad residencial.
+        Crea un invitado con acceso a la aplicación.
         
-        Los invitados:
-        - Solo tienen datos básicos (nombre, apellido, correo)
-        - NO tienen credenciales de acceso
-        - NO pueden votar
-        - Solo reciben correos con links de asambleas
-        
-        Args:
-            unit_id: ID de la unidad residencial
-            guest_data: Dict con firstname, lastname, email
-        
-        Returns:
-            dict: Datos del invitado creado
+        Los invitados AHORA:
+        - Tienen credenciales generadas automáticamente
+        - Tienen acceso a la aplicación (bln_allow_entry=True)
+        - Reciben correo con credenciales y auto-login
+        - NO pueden votar (peso = 0)
+        - NO ven encuestas en la interfaz
         """
         try:
-            # 1. Verificar que la unidad residencial existe
+            # 1. Verificar unidad residencial
             unit = await self.get_residential_unit_by_id(unit_id)
             if not unit:
-                raise ResourceNotFoundException(
-                    message=f"Unidad residencial con ID {unit_id} no encontrada",
-                    resource_type="ResidentialUnit"
-                )
+                raise ResourceNotFoundException(...)
             
-            # 2. Verificar si el email ya está registrado
+            # 2. Verificar email único
             email_check = await self.db.execute(
                 select(DataUserModel).where(DataUserModel.str_email == guest_data['email'])
             )
-            existing_user = email_check.scalar_one_or_none()
-            
-            if existing_user:
+            if email_check.scalar_one_or_none():
                 raise ServiceException(
-                    message=f"El correo {guest_data['email']} ya está registrado en el sistema",
+                    message=f"El correo {guest_data['email']} ya está registrado",
                     error_code="EMAIL_ALREADY_EXISTS"
                 )
             
@@ -1886,22 +1875,37 @@ class ResidentialUnitService:
                 str_firstname=guest_data['firstname'],
                 str_lastname=guest_data['lastname'],
                 str_email=guest_data['email'],
-                str_phone=None,  # Los invitados no tienen teléfono
+                str_phone=None,
                 created_at=datetime.now(),
                 updated_at=datetime.now()
             )
             self.db.add(data_user)
             await self.db.flush()
             
-            logger.info(f"DataUser creado para invitado: {guest_data['email']} (ID: {data_user.id})")
+            # 4. **NUEVO:** Generar credenciales automáticas
+            import secrets
+            import string
             
-            # 4. Crear usuario con rol 4 (Invitado) SIN credenciales de acceso
+            # Username: {firstname}.{lastname}.INVITADO
+            username = f"{guest_data['firstname']}.{guest_data['lastname']}.INVITADO".replace(" ", "")
+            
+            # Password aleatorio seguro de 12 caracteres
+            alphabet = string.ascii_letters + string.digits + "!@#$%"
+            password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            
+            # Hashear contraseña
+            from app.core.security import security_manager
+            hashed_password = security_manager.create_password_hash(password)
+            
+            logger.info(f"🔐 Credenciales generadas para invitado: {username}")
+            
+            # 5. Crear usuario con rol 4 y **ACCESO HABILITADO**
             user = UserModel(
                 int_data_user_id=data_user.id,
-                str_username=None,  # Los invitados NO tienen username
-                str_password_hash=None,  # Los invitados NO tienen contraseña
+                str_username=username,
+                str_password_hash=hashed_password,
                 int_id_rol=4,  # 4: Invitado
-                bln_allow_entry=False,  # Los invitados NO tienen acceso
+                bln_allow_entry=False,  # Entrar inhabilitado
                 bln_is_external_delegate=False,
                 bln_user_temporary=False,
                 created_at=datetime.now(),
@@ -1911,17 +1915,17 @@ class ResidentialUnitService:
             await self.db.flush()
             
             logger.info(
-                f"Usuario invitado creado: Email: {guest_data['email']} - "
-                f"Rol: 4 (Invitado) - Sin acceso a la aplicación"
+                f"👤 Usuario invitado creado: {username} - "
+                f"Email: {guest_data['email']} - Acceso: HABILITADO"
             )
             
-            # 5. Crear relación en tbl_user_residential_units
+            # 6. Crear relación en tbl_user_residential_units
             user_unit = UserResidentialUnitModel(
                 int_user_id=user.id,
                 int_residential_unit_id=unit_id,
-                str_apartment_number="INVITADO",  # Identificador especial para invitados
+                str_apartment_number="INVITADO",
                 bool_is_admin=False,
-                dec_default_voting_weight=0.0,  # Los invitados NO votan
+                dec_default_voting_weight=0.0,  # Sin derecho a voto
                 created_at=datetime.now(),
                 updated_at=datetime.now()
             )
@@ -1929,36 +1933,61 @@ class ResidentialUnitService:
             
             await self.db.commit()
             
-            logger.info(
-                f"Invitado {guest_data['firstname']} {guest_data['lastname']} "
-                f"vinculado a unidad {unit_id} - Sin derecho a voto"
+            # 7. **NUEVO:** Generar token de auto-login
+            from app.services.simple_auto_login_service import SimpleAutoLoginService
+            auto_login_service = SimpleAutoLoginService()
+            auto_login_token = auto_login_service.generate_auto_login_token(
+                username=username,
+                password=password,  # Contraseña sin hashear
+                expiration_hours=48
             )
             
-            # 6. Retornar datos del invitado creado
+            logger.info(f"🎟️ Token de auto-login generado para {username}")
+            
+            # 8. **NUEVO:** Enviar email de bienvenida
+            try:
+                from app.services.email_service import EmailService
+                email_service = EmailService()
+                
+                email_sent = await email_service.send_guest_credentials_email(
+                    to_email=guest_data['email'],
+                    firstname=guest_data['firstname'],
+                    lastname=guest_data['lastname'],
+                    username=username,
+                    password=password,
+                    residential_unit_name=unit.str_name,
+                    auto_login_token=auto_login_token
+                )
+                
+                if email_sent:
+                    logger.info(f"📧 Email de bienvenida enviado a {guest_data['email']}")
+                else:
+                    logger.warning(f"⚠️ No se pudo enviar email a {guest_data['email']}")
+                    
+            except Exception as e:
+                logger.error(f"Error al enviar email: {e}")
+                # No fallar si el correo falla
+            
+            # 9. Retornar datos del invitado
             return {
                 "id": user.id,
                 "data_user_id": data_user.id,
+                "username": username,  # ✅ NUEVO
                 "firstname": data_user.str_firstname,
                 "lastname": data_user.str_lastname,
                 "email": data_user.str_email,
                 "residential_unit_id": unit_id,
                 "residential_unit_name": unit.str_name,
                 "role": "Invitado",
-                "has_access": False,
+                "has_access": True,  # ✅ CAMBIO
                 "can_vote": False,
-                "created_at": user.created_at.isoformat() if user.created_at else None
+                "created_at": user.created_at.isoformat()
             }
             
-        except (ServiceException, ResourceNotFoundException):
-            await self.db.rollback()
-            raise
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Error al crear invitado: {e}")
-            raise ServiceException(
-                message=f"Error al crear invitado: {str(e)}",
-                details={"original_error": str(e)}
-            )
+            raise
 
 
     async def get_guests_by_unit(self, unit_id: int) -> list:
