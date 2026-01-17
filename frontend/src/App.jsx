@@ -18,17 +18,17 @@ function App() {
 				{/* ========================================== */}
 				{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
 				{/* ========================================== */}
-				
+
 				{/* Ruta pública - Login */}
 				<Route path="/login" element={<Login />} />
-				
+
 				{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
 				<Route path="/auto-login/:token" element={<AutoLogin />} />
 
 				{/* ========================================== */}
 				{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
 				{/* ========================================== */}
-				
+
 				<Route path="/" element={<ProtectedRoute />}>
 					{/* Ruta para Super Administrador */}
 					<Route
@@ -54,7 +54,7 @@ function App() {
 					<Route
 						path="copropietario"
 						element={
-							<RoleBasedRoute allowedRoles={['Usuario']}>
+							<RoleBasedRoute allowedRoles={['Usuario', 'Invitado']}>
 								<AppCopropietario />
 							</RoleBasedRoute>
 						}
