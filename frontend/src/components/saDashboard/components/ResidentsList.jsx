@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX } from 'lucide-react';
-
+import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 
 const ResidentsList = ({
@@ -287,24 +287,27 @@ const ResidentsList = ({
 
 											{/* Botón para enviar WhatsApp */}
 											<button
-												onClick={(e) => {
-													e.stopPropagation();
-													if (!resident?.phone) return;
-													const phone = resident.phone
-													? resident.phone
-													: `${resident.phone}`;
-													const url = `https://wa.me/${phone}`;
+											onClick={(e) => {
+												e.stopPropagation();
 
-													window.open(url, "_blank");
-												}}
-												className="p-2 hover:bg-green-100 rounded-lg transition-colors group"
-												title="Enviar WhatsApp"
+												if (!resident?.phone) {
+												Swal.fire({
+													icon: 'error',
+													title: 'Sin número de WhatsApp',
+													text: 'Este usuario no posee un número de WhatsApp registrado.',
+													confirmButtonText: 'Cerrar',
+													confirmButtonColor: '#25D366',
+												});
+												return;
+												}
+
+												const phone = resident.phone.replace(/\D/g, "");
+												window.open(`https://wa.me/${phone}`, "_blank");
+											}}
+											className="p-2 hover:bg-green-100 rounded-lg transition-colors"
+											title="Enviar WhatsApp"
 											>
-												<img
-												src="/Wpp.png"
-												alt="WhatsApp"
-												className="w-5 h-5"
-												/>
+											<img src="/Wpp.png" alt="WhatsApp" className="w-5 h-5" />
 											</button>
 
 											{/* Botón para enviar credenciales individual */}
