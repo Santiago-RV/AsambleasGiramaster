@@ -19,8 +19,8 @@ const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 	});
 
 	// DETECTAR SI ES INVITADO (ROL 4)
-	const userRole = userData?.role || 3; // Default: copropietario (3)
-	const isGuest = userRole === 4;
+	const userRole = userData?.role || "Usuario"; // Default: copropietario (3)
+	const isGuest = userRole === "Invitado";
 
 	// Obtener reuniones de la unidad residencial del copropietario
 	const {

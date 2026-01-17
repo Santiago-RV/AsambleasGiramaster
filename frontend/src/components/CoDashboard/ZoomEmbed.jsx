@@ -36,8 +36,8 @@ const ZoomEmbed = ({
 		staleTime: Infinity,
 	});
 	
-	const userRole = userData?.role || 3;
-	const isGuest = userRole === 4; // Detectar invitado
+	const userRole = userData?.role || "Usuario";
+	const isGuest = userRole === "Invitado"; // Detectar invitado
 
 	// Obtener encuestas activas de la reunión
 	const { data: pollsData, isLoading: isLoadingPolls, refetch: refetchPolls } = useQuery({
