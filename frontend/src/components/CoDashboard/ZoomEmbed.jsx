@@ -1,7 +1,8 @@
+// ZoomEmbed.jsx - VERSIÓN CORREGIDA COMPLETA
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
-import { X, Loader2, CheckCircle, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Loader2, CheckCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
@@ -21,9 +22,9 @@ const ZoomEmbed = ({
 	const [loadingMessage, setLoadingMessage] = useState('Iniciando reunión...');
 	const [error, setError] = useState(null);
 	const [isFullscreen, setIsFullscreen] = useState(startFullscreen);
-	const [showPollButton, setShowPollButton] = useState(false); // Se activa cuando hay encuesta
+	const [showPollButton, setShowPollButton] = useState(false);
 	const [showPollModal, setShowPollModal] = useState(false);
-	const [selectedOptions, setSelectedOptions] = useState([]); // Array para soportar múltiples opciones
+	const [selectedOptions, setSelectedOptions] = useState([]);
 	const [isSubmittingVote, setIsSubmittingVote] = useState(false);
 
 	// ✅ OBTENER ROL DEL USUARIO
@@ -37,7 +38,7 @@ const ZoomEmbed = ({
 	});
 	
 	const userRole = userData?.role || "Usuario";
-	const isGuest = userRole === "Invitado"; // Detectar invitado
+	const isGuest = userRole === "Invitado";
 
 	// Obtener encuestas activas de la reunión
 	const { data: pollsData, isLoading: isLoadingPolls, refetch: refetchPolls } = useQuery({
@@ -49,56 +50,23 @@ const ZoomEmbed = ({
 			console.log('📊 [ZoomEmbed] Encuestas obtenidas:', result);
 			return result;
 		},
-		enabled: !!meetingData?.id && !isGuest, // ✅ NO obtener encuestas si es invitado
-		refetchInterval: isGuest ? false : 5000, // ✅ NO refrescar si es invitado
+		enabled: !!meetingData?.id && !isGuest,
+		refetchInterval: isGuest ? false : 5000,
 	});
 
-	// Obtener la encuesta activa (estado "Activa" o "active")
+	// Obtener la encuesta activa
 	const activePoll = !isGuest ? pollsData?.data?.find(poll => {
 		const isActive = poll.str_status === 'Activa' || poll.str_status === 'active';
-		console.log('🔍 [ZoomEmbed] Evaluando encuesta:', {
-			id: poll.id,
-			title: poll.str_title,
-			status: poll.str_status,
-			statusType: typeof poll.str_status,
-			isActive
-		});
 		return isActive;
-	}) : null; // ✅ NULL si es invitado
+	}) : null;
 
-	// Log completo de la encuesta activa y sus opciones
-	useEffect(() => {
-		if (activePoll && !isGuest) {
-			console.log('📊 [ZoomEmbed] ENCUESTA ACTIVA COMPLETA:', {
-				id: activePoll.id,
-				title: activePoll.str_title,
-				type: activePoll.str_poll_type,
-				status: activePoll.str_status,
-				options: activePoll.options,
-				optionsLength: activePoll.options?.length,
-				fullPollData: activePoll
-			});
-		}
-	}, [activePoll, isGuest]);
-
-	// ✅ MODIFICAR: Mostrar botón solo si NO es invitado Y hay encuesta activa
+	// Mostrar botón cuando hay encuesta activa
 	useEffect(() => {
 		if (isGuest) {
-			// Los invitados NUNCA ven el botón de encuestas
 			setShowPollButton(false);
 			console.log('🚫 [ZoomEmbed] Usuario invitado: Botón de encuestas deshabilitado');
 			return;
 		}
-
-		// Lógica original para copropietarios
-		const polls = pollsData?.data || [];
-		console.log('🎯 [ZoomEmbed] Evaluando mostrar botón:', {
-			totalPolls: polls.length,
-			polls: polls.map(p => ({ id: p.id, title: p.str_title, status: p.str_status })),
-			activePoll: activePoll ? { id: activePoll.id, title: activePoll.str_title } : null,
-			showPollButton: !!activePoll,
-			isGuest
-		});
 		setShowPollButton(!!activePoll);
 	}, [activePoll, pollsData, isGuest]);
 
@@ -109,11 +77,9 @@ const ZoomEmbed = ({
 			return;
 		}
 
-		// Precargar recursos de Zoom SOLO cuando se va a usar
 		ZoomMtg.preLoadWasm();
 		ZoomMtg.prepareWebSDK();
 
-		// Mostrar el contenedor root de Zoom
 		const zmmtgRoot = document.getElementById('zmmtg-root');
 		if (zmmtgRoot) {
 			zmmtgRoot.style.display = 'block';
@@ -125,10 +91,7 @@ const ZoomEmbed = ({
 
 		return () => {
 			clearTimeout(timer);
-
 			console.log('🧹 Limpiando componente de Zoom...');
-
-			// Limpiar Zoom al desmontar
 			const zmmtgRoot = document.getElementById('zmmtg-root');
 			if (zmmtgRoot) {
 				zmmtgRoot.style.display = 'none';
@@ -156,7 +119,7 @@ const ZoomEmbed = ({
 				'/zoom/generate-signature',
 				{
 					meeting_number: meetingNumber,
-					role: 0, // 0 = participante (copropietario)
+					role: 0,
 				}
 			);
 
@@ -177,7 +140,6 @@ const ZoomEmbed = ({
 	};
 
 	const handleViewPoll = () => {
-		// ✅ Doble verificación: invitados no pueden abrir el modal
 		if (isGuest) {
 			console.log('🚫 [ZoomEmbed] Invitado intentó abrir encuesta - Acción bloqueada');
 			return;
@@ -193,13 +155,7 @@ const ZoomEmbed = ({
 		setSelectedOptions([]);
 	};
 
-	const toggleFullscreen = () => {
-		setIsFullscreen(!isFullscreen);
-	};
-
-	// Manejar selección de opciones (single o multiple)
 	const handleOptionToggle = (optionId) => {
-		// ✅ Bloquear si es invitado
 		if (isGuest) {
 			console.log('🚫 [ZoomEmbed] Invitado intentó votar - Acción bloqueada');
 			return;
@@ -208,10 +164,8 @@ const ZoomEmbed = ({
 		if (!activePoll) return;
 
 		if (activePoll.str_poll_type === 'single') {
-			// Para single choice, solo una opción
 			setSelectedOptions([optionId]);
 		} else if (activePoll.str_poll_type === 'multiple') {
-			// Para multiple choice, agregar/quitar de la lista
 			setSelectedOptions(prev => {
 				if (prev.includes(optionId)) {
 					return prev.filter(id => id !== optionId);
@@ -235,9 +189,7 @@ const ZoomEmbed = ({
 		}
 	};
 
-	// Enviar voto
 	const handleSubmitVote = async () => {
-		// ✅ Bloquear si es invitado
 		if (isGuest) {
 			await Swal.fire({
 				icon: 'error',
@@ -264,7 +216,6 @@ const ZoomEmbed = ({
 			return;
 		}
 
-		// Validación para multiple choice
 		if (activePoll.str_poll_type === 'multiple') {
 			const maxSelections = activePoll.int_max_selections || activePoll.options?.length;
 			if (selectedOptions.length > maxSelections) {
@@ -291,7 +242,6 @@ const ZoomEmbed = ({
 			});
 
 			const response = await PollService.submitVote(activePoll.id, selectedOptions);
-
 			console.log('✅ Voto registrado:', response);
 
 			handleClosePollModal();
@@ -313,9 +263,8 @@ const ZoomEmbed = ({
 					const popup = document.querySelector('.swal2-popup');
 					if (popup) {
 						popup.style.zIndex = '99999';
+						popup.style.borderTop = '4px solid #10b981';
 					}
-					popup.style.borderTop = '4px solid #10b981';
-					popup.style.zIndex = '99999';
 				}
 			});
 
@@ -340,9 +289,8 @@ const ZoomEmbed = ({
 					const popup = document.querySelector('.swal2-popup');
 					if (popup) {
 						popup.style.zIndex = '99999';
+						popup.style.borderTop = '4px solid #ef4444';
 					}
-					popup.style.borderTop = '4px solid #ef4444';
-					popup.style.zIndex = '99999';
 				}
 			});
 		} finally {
@@ -389,7 +337,6 @@ const ZoomEmbed = ({
 				? JSON.parse(localStorage.getItem('user')).email || ''
 				: '';
 
-			// ✅ Agregar indicador de invitado al nombre
 			const displayName = isGuest ? `${userName} (Invitado)` : userName;
 
 			ZoomMtg.i18n.load('es-ES');
@@ -422,55 +369,18 @@ const ZoomEmbed = ({
 						signature: signature,
 						sdkKey: sdkKey,
 						meetingNumber: meetingNumber,
-						userName: displayName, // ✅ Usar nombre con indicador de invitado
+						userName: displayName,
 						userEmail: userEmail,
 						passWord: password,
 						tk: '',
 						success: (joinSuccess) => {
 							console.log('✅ Unido a la reunión exitosamente:', joinSuccess);
-							setIsLoading(false);
-
-							let zoomLoadAttempts = 0;
-							const maxAttempts = 40;
-							const checkInterval = setInterval(() => {
-								zoomLoadAttempts++;
-								const zmmtgRoot = document.getElementById('zmmtg-root');
-
-								console.log(`🔍 Intento ${zoomLoadAttempts}: Buscando interfaz de Zoom...`);
-
-								if (zmmtgRoot && zmmtgRoot.children.length > 0) {
-									const waitingRoom = zmmtgRoot.querySelector('[class*="waiting"]') ||
-										zmmtgRoot.querySelector('[class*="join"]') ||
-										zmmtgRoot.querySelector('[class*="preview"]');
-
-									const meetingContent = zmmtgRoot.querySelector('[class*="meeting-client"]') ||
-										zmmtgRoot.querySelector('[class*="main-layout"]') ||
-										zmmtgRoot.querySelector('[class*="meeting-app"]');
-
-									const anyZoomContent = zmmtgRoot.querySelector('[class*="zm-"]') ||
-										zmmtgRoot.querySelector('iframe') ||
-										zmmtgRoot.querySelector('video');
-
-									console.log('🔍 Elementos encontrados:', {
-										waitingRoom: !!waitingRoom,
-										meetingContent: !!meetingContent,
-										anyZoomContent: !!anyZoomContent,
-										childrenCount: zmmtgRoot.children.length
-									});
-
-									if (meetingContent || anyZoomContent) {
-										console.log('✅ Interfaz de Zoom completamente cargada');
-										clearInterval(checkInterval);
-										setIsLoading(false);
-									}
-								}
-
-								if (zoomLoadAttempts >= maxAttempts) {
-									console.log('✅ Tiempo máximo alcanzado, asumiendo que Zoom está listo');
-									clearInterval(checkInterval);
-									setIsLoading(false);
-								}
-							}, 250);
+							
+							// ✅ SOLUCIÓN SIMPLE: Esperar 3 segundos y quitar el loading
+							setTimeout(() => {
+								console.log('✅ Quitando pantalla de carga después de 3 segundos');
+								setIsLoading(false);
+							}, 3000);
 						},
 						error: (joinError) => {
 							console.error('❌ Error al unirse:', joinError);
@@ -528,7 +438,17 @@ const ZoomEmbed = ({
 	// Loading overlay
 	if (isLoading) {
 		return (
-			<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 10000 }}>
+			<div 
+				className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900" 
+				style={{ 
+					position: 'fixed', 
+					top: 0, 
+					left: 0, 
+					width: '100%', 
+					height: '100%', 
+					zIndex: 99999
+				}}
+			>
 				<div className="text-center max-w-md mx-4">
 					<div className="mb-6">
 						<div className="w-20 h-20 mx-auto bg-blue-600 rounded-full flex items-center justify-center shadow-2xl">
@@ -570,48 +490,76 @@ const ZoomEmbed = ({
 		);
 	}
 
-	// Log para debugging
-	console.log('🔘 [ZoomEmbed] Estado del botón:', {
-		showPollButton,
-		activePoll: activePoll ? { id: activePoll.id, title: activePoll.str_title } : null,
-		hasActivePoll: !!activePoll,
-		isGuest
-	});
-
 	return (
 		<>
-			{/* ✅ SOLO MOSTRAR BOTÓN SI NO ES INVITADO */}
+			{/* ✅ BOTÓN CENTRADO EN EL MEDIO (CENTRO-CENTRO) */}
 			{!isGuest && showPollButton && !isLoading && ReactDOM.createPortal(
 				<button
 					onClick={handleViewPoll}
-					className="fixed bottom-8 right-8 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-8 py-4 rounded-2xl shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 flex items-center gap-3 font-bold text-lg animate-pulse z-[99999]"
+					className="fixed group"
 					style={{
-						zIndex: 99999,
-						boxShadow: '0 10px 40px rgba(147, 51, 234, 0.4)',
+						top: '50%',
+						left: '50%',
+						transform: 'translate(-50%, -50%)',
+						zIndex: 99999
 					}}
+					title="Ver encuesta activa"
 				>
-					<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-					</svg>
-					<span>📊 Encuesta Activa</span>
-					<span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full animate-ping"></span>
+					{/* Efecto de resplandor */}
+					<div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-3xl blur-2xl opacity-75 animate-pulse"></div>
+
+					{/* Botón principal - EXTRA GRANDE */}
+					<div className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white px-16 py-8 rounded-3xl shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 flex items-center gap-5 hover:scale-105 hover:-translate-y-2">
+						{/* Icono grande */}
+						<div className="relative">
+							<svg
+								className="w-14 h-14 animate-bounce"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2.5}
+									d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+								/>
+							</svg>
+							{/* Badge de alerta */}
+							<div className="absolute -top-4 -right-4 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-base font-bold animate-pulse shadow-lg">
+								!
+							</div>
+						</div>
+
+						{/* Texto grande */}
+						<div className="flex flex-col items-start">
+							<span className="font-black text-3xl leading-tight">📊 ENCUESTA ACTIVA</span>
+							<span className="text-lg text-purple-100 leading-tight mt-1 font-semibold">Click aquí para votar ahora</span>
+						</div>
+
+						{/* Indicador animado */}
+						<div className="relative ml-3">
+							<div className="w-6 h-6 bg-white rounded-full animate-ping absolute"></div>
+							<div className="w-6 h-6 bg-white rounded-full"></div>
+						</div>
+					</div>
 				</button>,
 				document.body
 			)}
 
-			{/* ✅ SOLO MOSTRAR MODAL SI NO ES INVITADO */}
+			{/* Modal de encuesta */}
 			{!isGuest && showPollModal && ReactDOM.createPortal(
 				<div
 					className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
-					style={{ zIndex: 99998 }}
+					style={{ zIndex: 100000 }}
 					onClick={handleClosePollModal}
 				>
 					<div
 						className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto animate-slideUp"
-						style={{ zIndex: 99999 }}
+						style={{ zIndex: 100001 }}
 						onClick={(e) => e.stopPropagation()}
 					>
-						{/* Header del modal */}
+						{/* Header */}
 						<div className="sticky top-0 bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-3xl flex items-center justify-between shadow-lg z-10">
 							<div className="flex items-center gap-3">
 								<div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -629,11 +577,10 @@ const ZoomEmbed = ({
 							</button>
 						</div>
 
-						{/* Contenido del modal */}
+						{/* Contenido */}
 						<div className="p-8">
 							{activePoll && (activePoll.str_poll_type === 'single' || activePoll.str_poll_type === 'multiple') ? (
 								<div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-									{/* Título de la encuesta */}
 									<div style={{ textAlign: 'center', paddingBottom: '16px', borderBottom: '2px solid #f3f4f6' }}>
 										<h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px' }}>
 											{activePoll.str_title}
@@ -645,22 +592,13 @@ const ZoomEmbed = ({
 										)}
 									</div>
 
-									{/* Opciones */}
 									<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 										<p style={{ fontWeight: '600', color: '#374151', margin: 0 }}>
 											{activePoll.str_poll_type === 'single'
 												? 'Selecciona una opción:'
 												: `Selecciona hasta ${activePoll.int_max_selections || 'todas las'} opciones:`}
 										</p>
-										{console.log('🎯 [ZoomEmbed] Renderizando opciones:', {
-											options: activePoll.options,
-											isArray: Array.isArray(activePoll.options),
-											length: activePoll.options?.length,
-											selectedOptions,
-											pollType: activePoll.str_poll_type
-										})}
 										{activePoll.options?.map((option) => {
-											console.log('🔘 [ZoomEmbed] Opción individual:', option);
 											const isSelected = selectedOptions.includes(option.id);
 											return (
 												<button
@@ -708,7 +646,6 @@ const ZoomEmbed = ({
 										)}
 									</div>
 
-									{/* Botones de acción */}
 									<div style={{ display: 'flex', gap: '12px', paddingTop: '16px', borderTop: '2px solid #f3f4f6' }}>
 										<button
 											onClick={handleClosePollModal}
@@ -782,30 +719,13 @@ const ZoomEmbed = ({
 							) : (
 								<div className="text-center py-12">
 									<div className="inline-flex p-4 bg-gray-100 rounded-full mb-4">
-										<svg
-											className="w-12 h-12 text-gray-400"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-											/>
+										<svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
 										</svg>
 									</div>
-									<h3 className="text-lg font-bold text-gray-800 mb-2">
-										No hay encuestas activas
-									</h3>
-									<p className="text-gray-600 mb-6">
-										No hay encuestas activas en este momento. El administrador puede crear encuestas desde el dashboard.
-									</p>
-									<button
-										onClick={handleClosePollModal}
-										className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold"
-									>
+									<h3 className="text-lg font-bold text-gray-800 mb-2">No hay encuestas activas</h3>
+									<p className="text-gray-600 mb-6">No hay encuestas activas en este momento.</p>
+									<button onClick={handleClosePollModal} className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold">
 										Cerrar
 									</button>
 								</div>

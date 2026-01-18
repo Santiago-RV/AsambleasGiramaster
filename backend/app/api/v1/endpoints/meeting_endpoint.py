@@ -310,4 +310,3 @@ async def send_meeting_invitations(
             message=f"Error al enviar invitaciones: {str(e)}",
             details={"original_error": str(e), "meeting_id": meeting_id}
         )
-

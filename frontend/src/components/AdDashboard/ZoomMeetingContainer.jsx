@@ -1,3 +1,4 @@
+// ZoomMeetingContainer.jsx
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
@@ -232,16 +233,16 @@ const ZoomMeetingContainer = ({
 								if (zmmtgRoot && zmmtgRoot.children.length > 0) {
 									// Buscar elementos específicos de la sala de espera o interfaz de Zoom
 									const waitingRoom = zmmtgRoot.querySelector('[class*="waiting"]') ||
-									                    zmmtgRoot.querySelector('[class*="join"]') ||
-									                    zmmtgRoot.querySelector('[class*="preview"]');
+										zmmtgRoot.querySelector('[class*="join"]') ||
+										zmmtgRoot.querySelector('[class*="preview"]');
 
 									const meetingContent = zmmtgRoot.querySelector('[class*="meeting-client"]') ||
-									                       zmmtgRoot.querySelector('[class*="main-layout"]') ||
-									                       zmmtgRoot.querySelector('[class*="meeting-app"]');
+										zmmtgRoot.querySelector('[class*="main-layout"]') ||
+										zmmtgRoot.querySelector('[class*="meeting-app"]');
 
 									const anyZoomContent = zmmtgRoot.querySelector('[class*="zm-"]') ||
-									                       zmmtgRoot.querySelector('iframe') ||
-									                       zmmtgRoot.querySelector('video');
+										zmmtgRoot.querySelector('iframe') ||
+										zmmtgRoot.querySelector('video');
 
 									console.log('🔍 Elementos encontrados:', {
 										waitingRoom: !!waitingRoom,
@@ -617,19 +618,19 @@ const ZoomMeetingContainer = ({
 			{showPollButton && ReactDOM.createPortal(
 				<button
 					onClick={handleViewPoll}
-					className="fixed bottom-40 right-8 group"
+					className="fixed bottom-8 left-1/2 transform -translate-x-1/2 group"
 					style={{ zIndex: 10001 }}
 					title="Ver encuesta activa"
 				>
-					{/* Efecto de resplandor animado */}
-					<div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-2xl blur-xl opacity-75 animate-pulse"></div>
+					{/* Efecto de resplandor animado más grande */}
+					<div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-3xl blur-2xl opacity-75 animate-pulse"></div>
 
-					{/* Contenedor del botón */}
-					<div className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white px-6 py-4 rounded-2xl shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 flex items-center gap-3 hover:scale-105 hover:-translate-y-1">
-						{/* Icono de encuesta */}
+					{/* Contenedor del botón - MÁS GRANDE */}
+					<div className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white px-12 py-6 rounded-3xl shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 flex items-center gap-4 hover:scale-105 hover:-translate-y-2">
+						{/* Icono de encuesta - MÁS GRANDE */}
 						<div className="relative">
 							<svg
-								className="w-7 h-7 animate-bounce"
+								className="w-10 h-10 animate-bounce"
 								fill="none"
 								viewBox="0 0 24 24"
 								stroke="currentColor"
@@ -641,22 +642,22 @@ const ZoomMeetingContainer = ({
 									d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
 								/>
 							</svg>
-							{/* Badge con número */}
-							<div className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+							{/* Badge con número - MÁS GRANDE */}
+							<div className="absolute -top-3 -right-3 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center text-sm font-bold animate-pulse shadow-lg">
 								!
 							</div>
 						</div>
 
-						{/* Texto */}
+						{/* Texto - MÁS GRANDE */}
 						<div className="flex flex-col items-start">
-							<span className="font-bold text-sm leading-tight">Encuesta Activa</span>
-							<span className="text-xs text-purple-100 leading-tight">Click para votar</span>
+							<span className="font-bold text-2xl leading-tight">📊 Encuesta Activa</span>
+							<span className="text-base text-purple-100 leading-tight mt-1">Click aquí para votar</span>
 						</div>
 
-						{/* Indicador pulsante */}
-						<div className="relative">
-							<div className="w-3 h-3 bg-white rounded-full animate-ping absolute"></div>
-							<div className="w-3 h-3 bg-white rounded-full"></div>
+						{/* Indicador pulsante - MÁS GRANDE */}
+						<div className="relative ml-2">
+							<div className="w-5 h-5 bg-white rounded-full animate-ping absolute"></div>
+							<div className="w-5 h-5 bg-white rounded-full"></div>
 						</div>
 					</div>
 				</button>,
@@ -756,8 +757,8 @@ const ZoomMeetingContainer = ({
 											fontWeight: '500'
 										}}>
 											{activePoll.str_poll_type === 'single' ? 'Opción única' :
-											 activePoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
-											 activePoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
+												activePoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
+													activePoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
 										</span>
 										{activePoll.bln_is_anonymous && (
 											<span style={{
