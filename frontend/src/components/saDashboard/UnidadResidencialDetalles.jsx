@@ -21,7 +21,10 @@ import ChangeAdminModal from './components/modals/ChangeAdminModal';
 import ExcelUploadModal from './components/modals/ExcelUploadModal';
 import CreateManualAdminModal from './components/modals/CreateManualAdminModal';
 
-const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
+// ========================================
+// CAMBIO: Agregada prop onOpenGuestModal
+// ========================================
+const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuestModal }) => {
 	const queryClient = useQueryClient();
 
 	// Estados locales
@@ -309,6 +312,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 	return (
 		<div className="space-y-6">
 			{/* Encabezado */}
+			{/* ======================================== */}
+			{/* CAMBIO: Agregada prop onOpenGuestModal  */}
+			{/* ======================================== */}
 			<UnitHeader
 				unitData={unitData}
 				currentAdmin={currentAdmin}
@@ -317,6 +323,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting }) => {
 				onOpenResidentModal={handleOpenResidentModal}
 				onOpenExcelModal={() => setIsExcelModalOpen(true)}
 				onOpenChangeAdminModal={() => setIsChangeAdminModalOpen(true)}
+				onOpenGuestModal={onOpenGuestModal}
 			/>
 
 			{/* Buscador */}

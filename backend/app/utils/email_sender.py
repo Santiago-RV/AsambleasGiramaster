@@ -28,7 +28,7 @@ class EmailSender:
         self.email_enabled = settings.EMAIL_ENABLED
         
         # Ruta del logo para embeber en los correos
-        self.logo_path = Path(__file__).parent.parent / "templates" / "static" / "img" / "LogoGiramaster.jpeg"
+        self.logo_path = Path(__file__).parent.parent / "templates" / "static" / "img" / "LogoGira.gif"
         
         # Verificar si el logo existe al inicializar
         if self.logo_path.exists():
@@ -55,7 +55,7 @@ class EmailSender:
                 img = MIMEImage(img_file.read())
                 # El Content-ID debe coincidir con src="cid:logo" en el HTML
                 img.add_header('Content-ID', '<logo>')
-                img.add_header('Content-Disposition', 'inline', filename='LogoGiramaster.jpeg')
+                img.add_header('Content-Disposition', 'inline', filename='LogoGira.gif')
                 message.attach(img)
             
             return True
