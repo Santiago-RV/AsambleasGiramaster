@@ -86,7 +86,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
   // Mutación para el envío masivo de credenciales
   const sendBulkCredentialsMutation = useMutation({
     mutationFn: async (residentIds) => {
-      return await CoownerService.sendBulkCredentials(residentialUnitId, residentIds);
+      return await CoownerService.sendBulkCredentials(residentIds);  // ← Quitar residentialUnitId
     },
     onSuccess: (response) => {
       const { successful, failed, total_processed } = response.data;
@@ -392,7 +392,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onResendCredentials={handleResendCredentials}
             onEditResident={onEditUser}
             onDeleteResident={handleDeleteResident}
-            onToggleAccess={handleToggleAccess}              
+            onToggleAccess={handleToggleAccess}
             onBulkToggleAccess={handleBulkToggleAccess}
             onSendBulkCredentials={(selectedResidents) => {
               if (selectedResidents.length === 0) {

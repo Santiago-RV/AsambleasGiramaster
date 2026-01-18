@@ -1,95 +1,308 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acceso Deshabilitado - GIRAMASTER</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f5f5f5;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Header con Logo */
+        .header {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            text-align: center;
+            border-bottom: 3px solid #EF4444;
+        }
+
+        .logo {
+            max-width: 280px;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        /* Contenido Principal */
+        .content {
+            padding: 40px;
+        }
+
+        .greeting {
+            font-size: 16px;
+            color: #333333;
+            margin-bottom: 20px;
+            line-height: 1.7;
+        }
+
+        .greeting strong {
+            color: #1E3A8A;
+            font-size: 18px;
+        }
+
+        .main-message {
+            color: #4B5563;
+            font-size: 15px;
+            line-height: 1.7;
+            margin-bottom: 30px;
+        }
+
+        .main-message strong {
+            color: #DC2626;
+        }
+
+        /* Alerta de Acceso Restringido */
+        .alert-box {
+            background-color: #FEE2E2;
+            border-left: 3px solid #EF4444;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .alert-title {
+            color: #991B1B;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .alert-text {
+            color: #7F1D1D;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Sección de Información */
+        .info-section {
+            background-color: #F9FAFB;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .info-title {
+            color: #1E3A8A;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .info-text {
+            color: #4B5563;
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 15px;
+        }
+
+        .info-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .info-list li {
+            color: #4B5563;
+            font-size: 14px;
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .info-list li:before {
+            content: "•";
+            position: absolute;
+            left: 8px;
+            color: #6B7280;
+            font-weight: bold;
+        }
+
+        /* Caja de Contacto */
+        .contact-box {
+            background-color: #EFF6FF;
+            border-left: 3px solid #6B4C9A;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .contact-title {
+            color: #6B4C9A;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .contact-text {
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Nota Final */
+        .final-note {
+            color: #6B7280;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #E5E7EB;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #1E3A8A;
+            color: #ffffff;
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .footer-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .footer-subtitle {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }
+
+        .footer-note {
+            font-size: 12px;
+            opacity: 0.7;
+            line-height: 1.6;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 0;
+            }
+
+            .email-container {
+                border-radius: 0;
+            }
+
+            .header,
+            .content,
+            .footer {
+                padding: 25px 20px;
+            }
+
+            .logo {
+                max-width: 220px;
+            }
+
+            .greeting strong {
+                font-size: 17px;
+            }
+
+            .alert-title,
+            .info-title {
+                font-size: 15px;
+            }
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
-        <tr>
-            <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                    
-                    <!-- Header -->
-                    <tr>
-                        <td style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 40px 30px; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">
-                                🔒 Acceso Deshabilitado
-                            </h1>
-                            <p style="color: #fadbd8; margin: 10px 0 0 0; font-size: 16px;">
-                                GIRAMASTER - Sistema de Gestión de Asambleas
-                            </p>
-                        </td>
-                    </tr>
 
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 30px;">
-                            <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                                Estimado(a) <strong>{{user_name}}</strong>,
-                            </p>
+<body>
+    <div class="email-container">
 
-                            <p style="color: #555555; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
-                                Le informamos que su acceso al sistema GIRAMASTER ha sido <strong style="color: #e74c3c;">deshabilitado temporalmente</strong>.
-                            </p>
+        <!-- Header con Logo -->
+        <div class="header">
+            <img src="cid:logo" alt="GIRAMASTER" class="logo">
+        </div>
 
-                            <!-- Info Card -->
-                            <div style="background-color: #fadbd8; border-radius: 8px; padding: 25px; margin-bottom: 30px; border-left: 4px solid #e74c3c;">
-                                <h3 style="color: #c0392b; margin: 0 0 15px 0; font-size: 20px;">
-                                    🔐 Acceso Restringido
-                                </h3>
-                                <p style="color: #555555; font-size: 15px; line-height: 1.6; margin: 0;">
-                                    No podrá iniciar sesión en GIRAMASTER hasta que su administrador reactive su acceso.
-                                </p>
-                            </div>
+        <!-- Contenido Principal -->
+        <div class="content">
 
-                            <!-- What to do -->
-                            <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
-                                <h3 style="color: #333333; margin: 0 0 15px 0; font-size: 18px;">
-                                    ❓ ¿Qué significa esto?
-                                </h3>
-                                <p style="color: #555555; font-size: 15px; line-height: 1.6; margin: 0 0 15px 0;">
-                                    La deshabilitación de su acceso puede deberse a:
-                                </p>
-                                <ul style="color: #555555; font-size: 15px; line-height: 1.8; margin: 0; padding-left: 20px;">
-                                    <li>Actualización de información de la unidad residencial</li>
-                                    <li>Revisión administrativa periódica</li>
-                                    <li>Solicitud de alguna de las partes involucradas</li>
-                                    <li>Otras razones administrativas</li>
-                                </ul>
-                            </div>
+            <!-- Saludo -->
+            <p class="greeting">
+                Estimado(a) <strong>{{user_name}}</strong>,
+            </p>
 
-                            <!-- Contact Info -->
-                            <div style="background-color: #d1ecf1; border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #17a2b8;">
-                                <h3 style="color: #0c5460; margin: 0 0 10px 0; font-size: 18px;">
-                                    📞 ¿Necesita más información?
-                                </h3>
-                                <p style="color: #0c5460; font-size: 15px; margin: 0; line-height: 1.6;">
-                                    Por favor, contacte a su administrador de la unidad residencial para obtener más detalles sobre esta acción.
-                                </p>
-                            </div>
+            <!-- Mensaje Principal -->
+            <p class="main-message">
+                Le informamos que su acceso al sistema GIRAMASTER ha sido
+                <strong>deshabilitado temporalmente</strong>.
+            </p>
 
-                            <p style="color: #555555; font-size: 15px; line-height: 1.6; margin: 20px 0 0 0;">
-                                Le notificaremos por correo cuando su acceso sea reactivado.
-                            </p>
-                        </td>
-                    </tr>
+            <!-- Alerta de Acceso Restringido -->
+            <div class="alert-box">
+                <div class="alert-title">Acceso Restringido</div>
+                <div class="alert-text">
+                    No podrá iniciar sesión en GIRAMASTER hasta que su administrador
+                    reactive su acceso.
+                </div>
+            </div>
 
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #dee2e6;">
-                            <p style="color: #6c757d; font-size: 13px; margin: 0; line-height: 1.5;">
-                                Este es un correo automático, por favor no responda a este mensaje.
-                            </p>
-                            <p style="color: #6c757d; font-size: 13px; margin: 10px 0 0 0;">
-                                © 2025 GIRAMASTER. Todos los derechos reservados.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
+            <!-- Información sobre la Deshabilitación -->
+            <div class="info-section">
+                <div class="info-title">¿Qué significa esto?</div>
+                <div class="info-text">
+                    La deshabilitación de su acceso puede deberse a:
+                </div>
+                <ul class="info-list">
+                    <li>Actualización de información de la unidad residencial</li>
+                    <li>Revisión administrativa periódica</li>
+                    <li>Solicitud de alguna de las partes involucradas</li>
+                    <li>Otras razones administrativas</li>
+                </ul>
+            </div>
+
+            <!-- Información de Contacto -->
+            <div class="contact-box">
+                <div class="contact-title">¿Necesita más información?</div>
+                <div class="contact-text">
+                    Por favor, contacte a su administrador de la unidad residencial
+                    para obtener más detalles sobre esta acción.
+                </div>
+            </div>
+
+            <!-- Nota Final -->
+            <div class="final-note">
+                Le notificaremos por correo cuando su acceso sea reactivado.
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-title">GIRAMASTER</div>
+            <div class="footer-subtitle">Sistema de Gestión de Asambleas Residenciales</div>
+            <div class="footer-note">
+                Este es un correo automático, por favor no responda a este mensaje.<br>
+                © 2025 GIRAMASTER. Todos los derechos reservados.
+            </div>
+        </div>
+
+    </div>
 </body>
+
 </html>
