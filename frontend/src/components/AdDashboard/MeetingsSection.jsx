@@ -135,7 +135,7 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-5">
+      <div className="bg-gradient-to-r from-green-600 to-indigo-600 px-6 py-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -143,14 +143,14 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Reuniones Virtuales</h2>
-              <p className="text-purple-100 text-sm">
+              <p className="text-green-100 text-sm">
                 {upcomingMeetings.length} próxima{upcomingMeetings.length !== 1 ? 's' : ''} · {pastMeetings.length} pasada{pastMeetings.length !== 1 ? 's' : ''}
               </p>
             </div>
           </div>
           <button
             onClick={onCreateMeeting}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white text-purple-600 rounded-xl hover:bg-purple-50 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-green-600 rounded-xl hover:bg-green-50 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
             <Plus size={20} />
             <span>Nueva Reunión</span>
@@ -165,7 +165,7 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
             onClick={() => setActiveTab('upcoming')}
             className={`flex-1 px-6 py-3 text-sm font-semibold transition-all relative ${
               activeTab === 'upcoming'
-                ? 'text-purple-600 bg-white'
+                ? 'text-green-600 bg-white'
                 : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
             }`}
           >
@@ -175,7 +175,7 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
               {upcomingMeetings.length > 0 && (
                 <span className={`px-2 py-0.5 rounded-full text-xs ${
                   activeTab === 'upcoming'
-                    ? 'bg-purple-100 text-purple-700'
+                    ? 'bg-green-100 text-green-700'
                     : 'bg-gray-200 text-gray-600'
                 }`}>
                   {upcomingMeetings.length}
@@ -183,14 +183,14 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
               )}
             </div>
             {activeTab === 'upcoming' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600"></div>
             )}
           </button>
           <button
             onClick={() => setActiveTab('past')}
             className={`flex-1 px-6 py-3 text-sm font-semibold transition-all relative ${
               activeTab === 'past'
-                ? 'text-purple-600 bg-white'
+                ? 'text-green-600 bg-white'
                 : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
             }`}
           >
@@ -200,7 +200,7 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
               {pastMeetings.length > 0 && (
                 <span className={`px-2 py-0.5 rounded-full text-xs ${
                   activeTab === 'past'
-                    ? 'bg-purple-100 text-purple-700'
+                    ? 'bg-green-100 text-green-700'
                     : 'bg-gray-200 text-gray-600'
                 }`}>
                   {pastMeetings.length}
@@ -208,7 +208,7 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
               )}
             </div>
             {activeTab === 'past' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600"></div>
             )}
           </button>
         </div>
@@ -246,14 +246,14 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
 
                   {/* Meeting info */}
                   <div className="pr-32">
-                    <h3 className="text-lg font-bold text-gray-800 mb-3 group-hover:text-purple-600 transition-colors">
+                    <h3 className="text-lg font-bold text-gray-800 mb-3 group-hover:text-green-600 transition-colors">
                       {meeting.titulo}
                     </h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <div className="p-1.5 bg-white rounded-lg">
-                          <Calendar size={16} className="text-purple-600" />
+                          <Calendar size={16} className="text-green-600" />
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 font-medium">Fecha</p>
@@ -367,8 +367,8 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
           </div>
         ) : (
           <div className="text-center py-16">
-            <div className="inline-flex p-6 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full mb-4">
-              <Calendar className="text-purple-600" size={48} />
+            <div className="inline-flex p-6 bg-gradient-to-br from-green-100 to-indigo-100 rounded-full mb-4">
+              <Calendar className="text-green-600" size={48} />
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
               {activeTab === 'upcoming'
@@ -383,7 +383,7 @@ const MeetingsSection = ({ meetings, isLoading, onCreateMeeting, onJoinMeeting }
             {activeTab === 'upcoming' && (
               <button
                 onClick={onCreateMeeting}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all font-semibold shadow-lg hover:shadow-xl"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-indigo-600 text-white rounded-xl hover:from-green-700 hover:to-indigo-700 transition-all font-semibold shadow-lg hover:shadow-xl"
               >
                 <Plus size={20} />
                 <span>Crear Primera Reunión</span>

@@ -21,7 +21,7 @@ export default function AssembliesTable({ assemblies = [], onEdit, onStart }) {
               <td className="p-3">{a.participants}</td>
               <td className="p-3">{a.state === "Programada" ? <span className="px-3 py-1 text-sm rounded bg-green-100 text-green-700">{a.state}</span> : <span className="px-3 py-1 text-sm rounded bg-gray-100 text-gray-700">{a.state}</span>}</td>
               <td className="p-3 flex gap-2">
-                <button onClick={() => onEdit(a)} className="px-3 py-1 bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white rounded">Editar</button>
+                <button onClick={() => onEdit(a)} className="px-3 py-1 bg-gradient-to-br from-[#059669] to-[#10b981] text-white rounded">Editar</button>
                 <button onClick={() => onStart(a)} className="px-3 py-1 bg-green-600 text-white rounded">Iniciar</button>
                 <button className="px-3 py-1 bg-gray-300 rounded">Ver Agenda</button>
               </td>

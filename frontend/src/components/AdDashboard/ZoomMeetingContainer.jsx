@@ -622,10 +622,10 @@ const ZoomMeetingContainer = ({
 					title="Ver encuesta activa"
 				>
 					{/* Efecto de resplandor animado */}
-					<div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-2xl blur-xl opacity-75 animate-pulse"></div>
+					<div className="absolute inset-0 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 rounded-2xl blur-xl opacity-75 animate-pulse"></div>
 
 					{/* Contenedor del botón */}
-					<div className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white px-6 py-4 rounded-2xl shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 flex items-center gap-3 hover:scale-105 hover:-translate-y-1">
+					<div className="relative bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl hover:shadow-green-500/50 transition-all duration-300 flex items-center gap-3 hover:scale-105 hover:-translate-y-1">
 						{/* Icono de encuesta */}
 						<div className="relative">
 							<svg
@@ -650,7 +650,7 @@ const ZoomMeetingContainer = ({
 						{/* Texto */}
 						<div className="flex flex-col items-start">
 							<span className="font-bold text-sm leading-tight">Encuesta Activa</span>
-							<span className="text-xs text-purple-100 leading-tight">Click para votar</span>
+							<span className="text-xs text-green-100 leading-tight">Click para votar</span>
 						</div>
 
 						{/* Indicador pulsante */}

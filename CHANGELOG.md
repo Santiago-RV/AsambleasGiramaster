@@ -9,6 +9,192 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-01-14
+
+- **Sistema mejorado de gestión de unidades residenciales en SuperAdmin**:
+  - **Objetivo**: Mejorar la interfaz de gestión de unidades con opciones de edición/eliminación y múltiples vistas
+  - **Menú desplegable no invasivo en tarjetas**:
+    - Botón con tres puntos verticales (MoreVertical) en cada tarjeta
+    - Dropdown elegante con opciones de "Editar" y "Eliminar"
+    - Hover azul para editar, hover rojo para eliminar
+    - Cierre automático al hacer clic fuera del menú
+    - Prevención de navegación al interactuar con el menú
+  - **Vista de listado (tabla) completa**:
+    - Tabla profesional con columnas: Unidad, Ubicación, Tipo, Unidades, Estado, Acciones
+    - Información condensada y organizada
+    - Menú de acciones (⋮) en cada fila
+    - Hover en filas para mejor UX
+    - Diseño responsive con padding generoso
+  - **Toggle entre vistas tarjetas/lista**:
+    - Control toggle elegante en el encabezado
+    - Botones para "Tarjetas" (LayoutGrid) y "Lista" (List)
+    - Resaltado visual del modo activo (azul con fondo blanco)
+    - Solo visible cuando hay unidades residenciales
+  - **Funcionalidad de edición implementada**:
+    - Modal reutilizado con título "Editar Unidad Residencial"
+    - Prellenado automático de todos los campos con datos actuales
+    - Incluye campos de empresa administradora
+    - Botón cambia a "Actualizar Unidad Residencial" con ícono de lápiz
+    - Reset completo de formulario al cerrar
+  - **Funcionalidad de eliminación con confirmación**:
+    - Diálogo SweetAlert2 con advertencia sobre eliminación en cascada
+    - Nombre de unidad resaltado en negrita
+    - Advertencia roja sobre datos asociados
+    - Botón de confirmación en rojo, cancelar en gris
+    - Mensaje de éxito con toast al completar
+  - **Archivos modificados**:
+    - `frontend/src/components/saDashboard/UnidadesResidencialesTab.jsx`:
+      - Línea 1: Agregado `useEffect` a imports de React
+      - Línea 7: Importados íconos: `MoreVertical, Edit2, Trash2, LayoutGrid, List`
+      - Líneas 11-15: Estados para edición, dropdown y vista (`isEditMode`, `editingUnit`, `openDropdownId`, `viewMode`)
+      - Líneas 161-170: Función `handleCloseModal` actualizada para limpiar estados
+      - Líneas 172-194: Función `handleEdit` para prellenar formulario y abrir modal
+      - Líneas 196-224: Función `handleDelete` con confirmación SweetAlert2
+      - Líneas 226-229: Función `toggleDropdown` para gestión del menú
+      - Líneas 231-243: `useEffect` para cerrar dropdown al hacer clic fuera
+      - Líneas 243-279: Toggle de vista agregado en el encabezado
+      - Líneas 348-435: Vista de tarjetas (grid) con menú desplegable
+      - Líneas 446-557: Vista de tabla (list) completa con todas las columnas
+      - Línea 564: Título del modal dinámico según modo (crear/editar)
+      - Líneas 1076-1077: Botón de guardar con texto e ícono dinámicos
+  - **Características técnicas**:
+    - Prevención de propagación de eventos (stopPropagation) en menús
+    - Estado de dropdown cerrado al ejecutar acciones
+    - Consistencia de diseño con colores azul (#3498db/#2980b9) del proyecto
+    - Transiciones suaves en todos los elementos interactivos
+    - Grid responsive: 1 columna en móvil, 2 en tablet, 3 en desktop
+  - **Beneficios**:
+    - ✅ Opciones de editar/eliminar accesibles pero no invasivas
+    - ✅ Dos formas de visualización según preferencia del usuario
+    - ✅ Experiencia consistente en ambas vistas (tarjetas y lista)
+    - ✅ Confirmación antes de eliminar para prevenir errores
+    - ✅ Modal reutilizado eficientemente para crear y editar
+    - ✅ Interfaz moderna con animaciones y feedback visual
+    - ✅ Código organizado y mantenible
+    - ✅ Lista para integración con backend (endpoints de update/delete)
+
+#### 2026-01-14 (anterior)
+
+- **Información de empresa administradora en unidades residenciales**:
+  - **Objetivo**: Capturar información de la empresa que administra cada unidad residencial
+  - **Archivos modificados en backend**:
+    - `backend/app/models/residential_unit_model.py`:
+      - Líneas 22-24: Agregados campos `str_management_company`, `str_contact_person`, `str_contact_phone`
+      - Campos opcionales (nullable=True) para flexibilidad
+    - `backend/app/schemas/residential_unit_schema.py`:
+      - Líneas 38-40: Agregados campos opcionales en `ResidentialUnitBase`
+      - Validación con Pydantic para los nuevos campos
+  - **Archivos modificados en frontend**:
+    - `frontend/src/components/saDashboard/UnidadesResidencialesTab.jsx`:
+      - Línea 7: Importado ícono `Briefcase` de lucide-react
+      - Líneas 146-148: Agregados campos al objeto `unitData` en `onSubmit`
+      - Líneas 532-602: Nueva sección "Empresa Administradora" en el formulario
+      - Incluye: Nombre de empresa, persona de contacto, teléfono
+  - **Migración de base de datos**:
+    - `backend/migrations/add_management_company_fields.sql`:
+      - Agrega 3 columnas a `tbl_residential_units`
+      - Crea índice en `str_management_company` para búsquedas
+  - **Campos agregados**:
+    - `str_management_company`: Nombre de la empresa administradora (VARCHAR 200, opcional)
+    - `str_contact_person`: Persona de contacto (VARCHAR 200, opcional)
+    - `str_contact_phone`: Teléfono de contacto (VARCHAR 50, opcional con validación de 10 dígitos)
+  - **Características del formulario**:
+    - Sección claramente identificada con ícono de Briefcase (maletín) en color teal
+    - Badge "Opcional" para indicar que los campos no son obligatorios
+    - Validación de formato de teléfono (10 dígitos sin espacios)
+    - Diseño responsive con grid de 2 columnas
+    - Campo de empresa ocupa 2 columnas para mayor visibilidad
+  - **Beneficios**:
+    - ✅ Trazabilidad de quién administra cada unidad residencial
+    - ✅ Información de contacto centralizada
+    - ✅ Campos opcionales para flexibilidad
+    - ✅ Validación de datos en frontend y backend
+    - ✅ Diseño UI/UX consistente con el resto del formulario
+
+- **Mejora de contraste en sidebar del administrador**:
+  - **Objetivo**: Mejorar la legibilidad y accesibilidad del sidebar con colores más oscuros
+  - **Archivos modificados**:
+    - `frontend/src/pages/AdDashboard.jsx`:
+      - Líneas 435-437: Cambio de gradiente del sidebar para mejor contraste
+      - `gradientFrom`: De `#059669` (green-600) a `#047857` (green-700)
+      - `gradientTo`: De `#10b981` (green-500) a `#065f46` (green-800)
+      - `accentColor`: De `#34d399` (green-400) a `#10b981` (green-500)
+  - **Mejoras de accesibilidad**:
+    - ✅ Mayor contraste entre el fondo del sidebar y el texto blanco
+    - ✅ Tonos verde oscuro (#047857 y #065f46) proporcionan mejor legibilidad
+    - ✅ Cumplimiento de estándares WCAG para contraste de color
+    - ✅ Mejor experiencia visual sin sacrificar la identidad de color verde
+
+- **Eliminación del Dashboard en la vista de administrador**:
+  - **Objetivo**: Simplificar la interfaz de administrador eliminando el dashboard redundante
+  - **Archivos modificados**:
+    - `frontend/src/pages/AdDashboard.jsx`:
+      - Línea 25: Estado inicial cambiado de `"dashboard"` a `"users"`
+      - Líneas 76-82: Eliminada opción `dashboard` del menú del sidebar
+      - Líneas 85-91: Eliminado título de sección `dashboard`
+      - Línea 397: Botón "Volver al Inicio" redirige a `users` en lugar de `dashboard`
+      - Línea 441: Eliminado renderizado condicional de `<DashboardPage />`
+      - Líneas 3, 6: Eliminadas importaciones de `LayoutDashboard` y `DashboardPage`
+  - **Archivos eliminados**:
+    - `frontend/src/components/AdDashboard/DashboardPage.jsx` (componente eliminado completamente)
+  - **Comportamiento nuevo**:
+    - La vista de administrador ahora inicia directamente en "Gestión de Copropietarios"
+    - El menú lateral ya no muestra la opción "Dashboard"
+    - El botón "Volver al Inicio" redirige a la sección de copropietarios
+  - **Beneficios**:
+    - ✅ Interfaz más limpia y directa
+    - ✅ Eliminación de información redundante o mock
+    - ✅ Acceso inmediato a la funcionalidad principal (gestión de copropietarios)
+    - ✅ Simplificación del código y reducción de componentes innecesarios
+
+- **Cambio de esquema de colores en vista administrativa de morado a verde**:
+  - **Objetivo**: Diferenciar visualmente el dashboard administrativo con colores verdes
+  - **Archivos modificados**:
+    - `frontend/src/pages/AdDashboard.jsx`:
+      - Líneas 438-440: Gradiente del layout de `#2c3e50/#764ba2` a `#059669/#10b981`
+      - Línea 372: Avatar de usuario de gradiente morado a verde
+      - Línea 301: Spinner de carga de `text-purple-500` a `text-green-500`
+    - `frontend/src/components/AdDashboard/StatCard.jsx`:
+      - Línea 3: Gradiente de tarjetas estadísticas de morado a verde
+    - `frontend/src/components/AdDashboard/DashboardPage.jsx`:
+      - Línea 41: Botón "Editar" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/UsersTable.jsx`:
+      - Línea 30: Botón "Editar" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/AssembliesTable.jsx`:
+      - Línea 24: Botón "Editar" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/ReportsPage.jsx`:
+      - Líneas 9, 14, 19: Botones "Ver Reporte" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/MeetingsSection.jsx`:
+      - Header y tabs: Cambio completo de `purple-*` a `green-*` (600, 700, 100, 50)
+      - Línea 138: Gradiente del header de `purple-600/indigo-600` a `green-600/indigo-600`
+    - `frontend/src/components/AdDashboard/LivePage.jsx`:
+      - Línea 57: Header de encuestas de gradiente morado a verde
+      - Línea 66: Loader de `text-purple-600` a `text-green-600`
+    - `frontend/src/components/AdDashboard/LiveMeetingCard.jsx`:
+      - Cambio completo de `purple-*` a `green-*` (400, 500, 600, 100, 200)
+      - Líneas 69, 74, 79-80, 92, 97, 105: Bordes, textos e iconos
+    - `frontend/src/components/AdDashboard/CreatePollView.jsx`:
+      - Cambio completo de `purple-*` a `green-*` (500, 600, 700, 800, 100, 200)
+      - Focus de inputs, checkboxes y botones
+    - `frontend/src/components/AdDashboard/MeetingPollsView.jsx`:
+      - Cambio completo de `purple-*` a `green-*` (400, 600, 700, 800, 100)
+      - Botones, loaders, badges y elementos interactivos
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx`:
+      - Línea 625: Efecto de resplandor de `purple-500/pink-500` a `green-500/emerald-500`
+      - Línea 628: Botón flotante de encuesta de `purple-600/pink-600` a `green-600/emerald-600`
+      - Sombras de `shadow-purple-500/50` a `shadow-green-500/50`
+  - **Paleta de colores verde implementada**:
+    - Verde principal: `#059669` (green-600)
+    - Verde secundario: `#10b981` (green-500)
+    - Verde claro: `#34d399` (green-400) como color de acento
+    - Tonos complementarios: `green-100`, `green-200`, `green-700`, `green-800`
+    - Combinación con `emerald-*` para gradientes especiales
+  - **Beneficios**:
+    - ✅ Identidad visual distintiva para administradores
+    - ✅ Mejor diferenciación entre roles (SuperAdmin morado, Admin verde)
+    - ✅ Coherencia visual en todos los componentes del dashboard
+    - ✅ Mantenimiento de accesibilidad y legibilidad con la nueva paleta
+
 #### 2025-12-26
 
 - **Dashboard de SuperAdmin con estadísticas en tiempo real**:

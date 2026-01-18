@@ -255,7 +255,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
         <div className="bg-white rounded-xl shadow-md p-6">
           <button
             onClick={() => setSelectedPoll(null)}
-            className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-semibold mb-4"
+            className="flex items-center gap-2 text-green-600 hover:text-green-700 font-semibold mb-4"
           >
             <ArrowLeft size={20} />
             Volver a encuestas
@@ -271,7 +271,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
               )}
               <div className="flex flex-wrap gap-2">
                 {getStatusBadge(selectedPoll.str_status)}
-                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                   {selectedPoll.str_poll_type === 'single' ? 'Opción única' :
                    selectedPoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
                    selectedPoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
@@ -313,7 +313,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
         {/* Estadísticas */}
         {isLoadingStats ? (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
+            <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Cargando estadísticas...</p>
           </div>
         ) : stats ? (
@@ -340,7 +340,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
 
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <CheckCircle className="text-purple-600" size={24} />
+                  <CheckCircle className="text-green-600" size={24} />
                   <h3 className="font-semibold text-gray-700">Quórum</h3>
                 </div>
                 <p className="text-3xl font-bold text-gray-800">
@@ -364,7 +364,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3">
                         <div
-                          className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                          className="bg-green-600 h-3 rounded-full transition-all duration-300"
                           style={{ width: `${option.percentage || 0}%` }}
                         ></div>
                       </div>
@@ -410,7 +410,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
       <div className="bg-white rounded-xl shadow-md p-6">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-semibold mb-4"
+          className="flex items-center gap-2 text-green-600 hover:text-green-700 font-semibold mb-4"
         >
           <ArrowLeft size={20} />
           Volver a reuniones
@@ -427,7 +427,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </div>
           <button
             onClick={() => setShowCreatePoll(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all font-semibold shadow-lg"
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
           >
             <Plus size={20} />
             Nueva Encuesta
@@ -438,7 +438,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
       {/* Lista de encuestas */}
       {isLoadingPolls ? (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
-          <Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Cargando encuestas...</p>
         </div>
       ) : polls.length > 0 ? (
@@ -447,11 +447,11 @@ export default function MeetingPollsView({ meeting, onBack }) {
             <div
               key={poll.id}
               onClick={() => setSelectedPoll(poll)}
-              className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-200 hover:border-purple-400 overflow-hidden group"
+              className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-200 hover:border-green-400 overflow-hidden group"
             >
               <div className="p-6">
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-bold text-gray-800 group-hover:text-purple-600 transition-colors flex-1">
+                  <h3 className="text-lg font-bold text-gray-800 group-hover:text-green-600 transition-colors flex-1">
                     {poll.str_title}
                   </h3>
                   {getStatusBadge(poll.str_status)}
@@ -464,7 +464,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
                 )}
 
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
                     {poll.str_poll_type === 'single' ? 'Opción única' :
                      poll.str_poll_type === 'multiple' ? 'Múltiple' :
                      poll.str_poll_type === 'text' ? 'Texto' : 'Numérica'}
@@ -499,7 +499,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </p>
           <button
             onClick={() => setShowCreatePoll(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all font-semibold shadow-lg"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
           >
             <Plus size={20} />
             Crear Primera Encuesta

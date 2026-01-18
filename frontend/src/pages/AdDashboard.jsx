@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { LayoutDashboard, Users, Calendar, Video, FileText, Settings, LogOut } from 'lucide-react';
+import { Users, Video, FileText, Settings, LogOut } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DashboardLayout from "../components/layout/DashboardLayout";
-import DashboardPage from "../components/AdDashboard/DashboardPage";
 import UsersPage from "../components/AdDashboard/UsersPage";
 import AssembliesPage from "../components/AdDashboard/AssembliesPage";
 import LivePage from "../components/AdDashboard/LivePage";
@@ -22,7 +21,7 @@ import { ResidentService } from "../services/api/ResidentService";
 import { MeetingService } from "../services/api/MeetingService";
 
 export default function AppAdmin() {
-  const [section, setSection] = useState("dashboard");
+  const [section, setSection] = useState("users");
   const [showUserForm, setShowUserForm] = useState(false);
   const [showAssemblyForm, setShowAssemblyForm] = useState(false);
   const [powerModalData, setPowerModalData] = useState(null);
@@ -74,7 +73,6 @@ export default function AppAdmin() {
 
   // Configuración del menú del sidebar
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'Gestión de Copropietarios', icon: Users },
     // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
@@ -84,7 +82,6 @@ export default function AppAdmin() {
 
   // Títulos para cada sección
   const sectionTitles = {
-    dashboard: "Dashboard",
     users: "Gestión de Copropietarios",
     // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
@@ -298,7 +295,7 @@ export default function AppAdmin() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
           <svg
-            className="animate-spin h-12 w-12 text-purple-500 mx-auto mb-4"
+            className="animate-spin h-12 w-12 text-green-500 mx-auto mb-4"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -369,7 +366,7 @@ export default function AppAdmin() {
 
         {/* Perfil de usuario */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#667eea] to-[#764ba2] flex items-center justify-center text-white font-bold shadow-md">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#059669] to-[#10b981] flex items-center justify-center text-white font-bold shadow-md">
             {user?.name
               ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
               : user?.role?.charAt(0).toUpperCase() || 'A'
@@ -397,7 +394,7 @@ export default function AppAdmin() {
           {/* Menú desplegable */}
           <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
             <button
-              onClick={() => setSection('dashboard')}
+              onClick={() => setSection('users')}
               className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors"
             >
               Volver al Inicio
@@ -435,13 +432,12 @@ export default function AppAdmin() {
       menuItems={menuItems}
       activeTab={section}
       onTabChange={setSection}
-      gradientFrom="#2c3e50"
-      gradientTo="#764ba2"
-      accentColor="#fbbf24"
+      gradientFrom="#047857"
+      gradientTo="#065f46"
+      accentColor="#10b981"
       header={headerContent}
     >
 
-      {section === "dashboard" && <DashboardPage />}
       {section === "users" && (
         <UsersPage
           residentialUnitId={residentialUnitId}
