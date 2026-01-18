@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // URL base del backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 // Instancia de Axios pública (sin token) - para login y register
 export const publicAxios = axios.create({

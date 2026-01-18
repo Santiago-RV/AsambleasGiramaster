@@ -5,226 +5,495 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bienvenido a GIRAMASTER</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333333;
+      background-color: #f5f5f5;
+      padding: 20px 0;
+    }
+
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Header con Logo */
+    .header {
+      background-color: #ffffff;
+      padding: 30px 40px;
+      text-align: center;
+      border-bottom: 3px solid #8BC53F;
+    }
+
+    .logo {
+      max-width: 280px;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    /* Contenido Principal */
+    .content {
+      padding: 40px;
+    }
+
+    .greeting {
+      font-size: 16px;
+      color: #333333;
+      margin-bottom: 30px;
+      line-height: 1.7;
+    }
+
+    .greeting strong {
+      color: #1E3A8A;
+      font-size: 18px;
+    }
+
+    /* Botón de Acceso Rápido */
+    .quick-access {
+      background-color: #F9FAFB;
+      border: 2px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 30px;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .quick-access-title {
+      color: #1E3A8A;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .access-button {
+      display: inline-block;
+      background-color: #8BC53F;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      transition: background-color 0.3s ease;
+    }
+
+    .access-button:hover {
+      background-color: #7AB32F;
+    }
+
+    .quick-access-note {
+      color: #6B7280;
+      font-size: 13px;
+      margin-top: 15px;
+      line-height: 1.5;
+    }
+
+    .token-validity {
+      background-color: #FEF3C7;
+      border-left: 3px solid #F59E0B;
+      padding: 12px 15px;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-size: 13px;
+      color: #92400E;
+    }
+
+    /* Tarjetas de Información */
+    .info-section {
+      background-color: #F9FAFB;
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+
+    .info-section-title {
+      color: #1E3A8A;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #E5E7EB;
+    }
+
+    .info-row {
+      display: flex;
+      padding: 10px 0;
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      flex: 0 0 140px;
+      color: #6B7280;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .info-value {
+      flex: 1;
+      color: #111827;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Credenciales */
+    .credentials-section {
+      background: linear-gradient(135deg, #8BC53F 0%, #7AB32F 100%);
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 20px;
+      color: #ffffff;
+    }
+
+    .credentials-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .credential-box {
+      background-color: rgba(255, 255, 255, 0.95);
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+
+    .credential-box:last-child {
+      margin-bottom: 0;
+    }
+
+    .credential-label {
+      color: #6B7280;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .credential-value {
+      color: #1E3A8A;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+    }
+
+    /* Advertencia */
+    .warning-box {
+      background-color: #FEF3C7;
+      border-left: 3px solid #F59E0B;
+      border-radius: 6px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .warning-title {
+      color: #92400E;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .warning-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .warning-list li {
+      color: #92400E;
+      font-size: 13px;
+      padding: 4px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .warning-list li:before {
+      content: "•";
+      position: absolute;
+      left: 5px;
+      font-weight: bold;
+    }
+
+    /* Características del Sistema */
+    .features-section {
+      background-color: #F9FAFB;
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+
+    .features-title {
+      color: #1E3A8A;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    .features-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features-list li {
+      color: #4B5563;
+      font-size: 14px;
+      padding: 8px 0;
+      padding-left: 25px;
+      position: relative;
+    }
+
+    .features-list li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #8BC53F;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    /* Acceso Manual */
+    .manual-access {
+      background-color: #F9FAFB;
+      border-radius: 6px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .manual-access-title {
+      color: #6B7280;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .manual-access p {
+      color: #6B7280;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 5px 0;
+    }
+
+    .manual-access a {
+      color: #6B4C9A;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .manual-access a:hover {
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    .footer {
+      background-color: #1E3A8A;
+      color: #ffffff;
+      padding: 30px 40px;
+      text-align: center;
+    }
+
+    .footer-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .footer-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-bottom: 15px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      opacity: 0.7;
+      line-height: 1.6;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Responsive */
+    @media only screen and (max-width: 600px) {
+      body {
+        padding: 0;
+      }
+
+      .email-container {
+        border-radius: 0;
+      }
+
+      .header,
+      .content,
+      .footer {
+        padding: 25px 20px;
+      }
+
+      .logo {
+        max-width: 220px;
+      }
+
+      .info-row {
+        flex-direction: column;
+      }
+
+      .info-label {
+        flex: none;
+        margin-bottom: 4px;
+      }
+
+      .access-button {
+        padding: 12px 24px;
+        font-size: 15px;
+      }
+    }
+  </style>
 </head>
 
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0"
-          style="background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+<body>
+  <div class="email-container">
 
-          <!-- Header -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); padding: 40px 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">
-                🏠 ¡Bienvenido a GIRAMASTER!
-              </h1>
-              <p style="color: #e8f4f8; margin: 10px 0 0 0; font-size: 16px;">
-                Sistema de Gestión de Asambleas y Copropietarios
-              </p>
-            </td>
-          </tr>
+    <!-- Header con Logo -->
+    <div class="header">
+      <img src="cid:logo" alt="GIRAMASTER" class="logo">
+    </div>
 
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px 30px;">
-              <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                Estimado(a) <strong>{{user_name}}</strong>,
-              </p>
+    <!-- Contenido Principal -->
+    <div class="content">
 
-              <p style="color: #555555; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
-                Se ha creado exitosamente su cuenta como copropietario de <strong>{{residential_unit_name}}</strong>. 
-                A continuación encontrará sus credenciales de acceso al sistema.
-              </p>
+      <!-- Saludo -->
+      <div class="greeting">
+        <p><strong>Estimado/a {{firstname}} {{lastname}},</strong></p>
+        <p>
+          Bienvenido/a a GIRAMASTER. Su cuenta ha sido creada exitosamente y ya puede acceder al sistema
+          de gestión de asambleas de su unidad residencial.
+        </p>
+      </div>
 
-              <!-- User Info Card -->
-              <table width="100%" cellpadding="0" cellspacing="0"
-                style="background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db; margin-bottom: 30px;">
-                <tr>
-                  <td style="padding: 25px;">
-                    <h2 style="color: #3498db; margin: 0 0 20px 0; font-size: 22px;">
-                      👤 Información de su Cuenta
-                    </h2>
+      <!-- Botón de Acceso Rápido (si hay token) -->
+      {% if auto_login_url %}
+      <div class="quick-access">
+        <div class="quick-access-title">Acceso Rápido al Sistema</div>
+        <a href="{{auto_login_url}}" class="access-button">ACCEDER AHORA</a>
+        <p class="quick-access-note">
+          Haga clic en el botón para ingresar automáticamente.<br>
+          No necesita escribir sus credenciales.
+        </p>
+        <div class="token-validity">
+          <strong>Válido por 48 horas</strong> • Funciona solo una vez por seguridad
+        </div>
+      </div>
+      {% endif %}
 
-                    <table width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="padding: 8px 0;">
-                          <strong style="color: #333333; font-size: 14px;">🏢 Unidad Residencial:</strong>
-                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{residential_unit_name}}</span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0;">
-                          <strong style="color: #333333; font-size: 14px;">🏠 Apartamento:</strong>
-                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{apartment_number}}</span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0;">
-                          <strong style="color: #333333; font-size: 14px;">📧 Email:</strong>
-                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{user_email}}</span>
-                        </td>
-                      </tr>
-                      {{#if phone}}
-                      <tr>
-                        <td style="padding: 8px 0;">
-                          <strong style="color: #333333; font-size: 14px;">📱 Teléfono:</strong>
-                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{phone}}</span>
-                        </td>
-                      </tr>
-                      {{/if}}
-                      <tr>
-                        <td style="padding: 8px 0;">
-                          <strong style="color: #333333; font-size: 14px;">⚖️ Peso de Votación:</strong>
-                          <span style="color: #555555; font-size: 14px; margin-left: 10px;">{{voting_weight}}%</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
+      <!-- Información del Usuario -->
+      <div class="info-section">
+        <div class="info-section-title">Información de su Cuenta</div>
 
-              <!-- Credentials Card -->
-              <div style="background-color: #e8f5e9; border-radius: 8px; padding: 25px; margin-bottom: 30px; border-left: 4px solid #27ae60;">
-                <h3 style="color: #27ae60; margin: 0 0 20px 0; font-size: 20px;">
-                  🔐 Sus Credenciales de Acceso
-                </h3>
+        <div class="info-row">
+          <span class="info-label">Unidad Residencial</span>
+          <span class="info-value">{{residential_unit_name}}</span>
+        </div>
 
-                <div style="background-color: #ffffff; border-radius: 6px; padding: 20px; margin-bottom: 15px;">
-                  <p style="color: #333333; font-size: 14px; margin: 0 0 8px 0;">
-                    <strong>Usuario:</strong>
-                  </p>
-                  <p style="color: #555555; font-size: 16px; margin: 0; font-family: monospace; background-color: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6;">
-                    {{username}}
-                  </p>
-                </div>
+        <div class="info-row">
+          <span class="info-label">Apartamento</span>
+          <span class="info-value">{{apartment_number}}</span>
+        </div>
 
-                <div style="background-color: #ffffff; border-radius: 6px; padding: 20px; margin-bottom: 15px;">
-                  <p style="color: #333333; font-size: 14px; margin: 0 0 8px 0;">
-                    <strong>Contraseña temporal:</strong>
-                  </p>
-                  <p style="color: #555555; font-size: 16px; margin: 0; font-family: monospace; background-color: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6;">
-                    {{password}}
-                  </p>
-                </div>
+        <div class="info-row">
+          <span class="info-label">Email</span>
+          <span class="info-value">{{user_email}}</span>
+        </div>
 
-                <div style="background-color: #fff3cd; border-radius: 6px; padding: 15px; border-left: 3px solid #ffc107;">
-                  <p style="color: #856404; font-size: 13px; margin: 0; line-height: 1.5;">
-                    <strong>Importante:</strong> Por seguridad, le recomendamos cambiar su contraseña después de iniciar sesión por primera vez.
-                  </p>
-                </div>
-              </div>
+        {% if phone %}
+        <div class="info-row">
+          <span class="info-label">Teléfono</span>
+          <span class="info-value">{{phone}}</span>
+        </div>
+        {% endif %}
 
-              <!-- Access Button -->
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="{{login_url}}"
-                  style="display: inline-block; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; box-shadow: 0 4px 6px rgba(52, 152, 219, 0.3); transition: all 0.3s;">
-                  🚀 Acceder al Sistema
-                </a>
-              </div>
+        <div class="info-row">
+          <span class="info-label">Peso de Votación</span>
+          <span class="info-value">{{voting_weight}}%</span>
+        </div>
+      </div>
 
-              <!-- Features Info -->
-              <div style="background-color: #f8f9fa; border-radius: 8px; padding: 25px; margin-top: 30px;">
-                <h3 style="color: #333333; margin: 0 0 20px 0; font-size: 18px; text-align: center;">
-                  ✨ ¿Qué puedes hacer en el sistema?
-                </h3>
+      <!-- Credenciales de Acceso -->
+      <div class="credentials-section">
+        <div class="credentials-title">Sus Credenciales de Acceso</div>
 
-                <table width="100%" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td style="padding: 10px; vertical-align: top; width: 50%;">
-                      <div style="display: flex; align-items: start;">
-                        <span style="font-size: 24px; margin-right: 10px;">📊</span>
-                        <div>
-                          <strong style="color: #333333; font-size: 14px; display: block; margin-bottom: 5px;">Participar en Encuestas</strong>
-                          <p style="color: #666666; font-size: 13px; margin: 0; line-height: 1.4;">
-                            Vota en las decisiones importantes de tu unidad residencial
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td style="padding: 10px; vertical-align: top; width: 50%;">
-                      <div style="display: flex; align-items: start;">
-                        <span style="font-size: 24px; margin-right: 10px;">🎥</span>
-                        <div>
-                          <strong style="color: #333333; font-size: 14px; display: block; margin-bottom: 5px;">Asistir a Asambleas</strong>
-                          <p style="color: #666666; font-size: 13px; margin: 0; line-height: 1.4;">
-                            Únete a reuniones virtuales directamente desde la plataforma
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px; vertical-align: top; width: 50%;">
-                      <div style="display: flex; align-items: start;">
-                        <span style="font-size: 24px; margin-right: 10px;">📋</span>
-                        <div>
-                          <strong style="color: #333333; font-size: 14px; display: block; margin-bottom: 5px;">Ver Resultados</strong>
-                          <p style="color: #666666; font-size: 13px; margin: 0; line-height: 1.4;">
-                            Consulta los resultados de encuestas y asambleas en tiempo real
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td style="padding: 10px; vertical-align: top; width: 50%;">
-                      <div style="display: flex; align-items: start;">
-                        <span style="font-size: 24px; margin-right: 10px;">🔔</span>
-                        <div>
-                          <strong style="color: #333333; font-size: 14px; display: block; margin-bottom: 5px;">Recibir Notificaciones</strong>
-                          <p style="color: #666666; font-size: 13px; margin: 0; line-height: 1.4;">
-                            Mantente informado sobre nuevas encuestas y reuniones
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                </table>
-              </div>
+        <div class="credential-box">
+          <div class="credential-label">Usuario</div>
+          <div class="credential-value">{{username}}</div>
+        </div>
 
-              <!-- Support Info -->
-              <div style="margin-top: 30px; padding: 20px; background-color: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196f3;">
-                <h3 style="color: #1976d2; margin: 0 0 15px 0; font-size: 16px;">
-                  💡 ¿Necesitas Ayuda?
-                </h3>
-                <p style="color: #555555; font-size: 14px; line-height: 1.6; margin: 0;">
-                  Si tienes problemas para acceder o preguntas sobre el sistema, contacta al administrador de tu unidad residencial.
-                </p>
-              </div>
+        <div class="credential-box">
+          <div class="credential-label">Contraseña Temporal</div>
+          <div class="credential-value">{{password}}</div>
+        </div>
+      </div>
 
-              <!-- Important Notice -->
-              <div style="margin-top: 30px; padding: 20px; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
-                <h3 style="color: #856404; margin: 0 0 15px 0; font-size: 16px;">
-                  Nota de Seguridad
-                </h3>
-                <p style="color: #856404; font-size: 13px; line-height: 1.6; margin: 0;">
-                  <strong>IMPORTANTE:</strong> Su cuenta ha sido creada con acceso <strong>DESHABILITADO</strong> por motivos de seguridad. 
-                  El Super Administrador debe habilitar su acceso antes de que pueda iniciar sesión. 
-                  Recibirá una notificación cuando su cuenta sea activada.
-                </p>
-              </div>
+      <!-- Advertencia de Seguridad -->
+      <div class="warning-box">
+        <div class="warning-title">Importante</div>
+        <ul class="warning-list">
+          <li>Esta contraseña es temporal y debe ser cambiada en su primer acceso</li>
+          <li>Por seguridad, no comparta sus credenciales con nadie</li>
+          <li>Guarde este correo en un lugar seguro</li>
+        </ul>
+      </div>
 
-            </td>
-          </tr>
+      <!-- Características del Sistema -->
+      <div class="features-section">
+        <div class="features-title">¿Qué puede hacer en el sistema?</div>
+        <ul class="features-list">
+          <li>Asistir a asambleas virtuales</li>
+          <li>Participar en votaciones electrónicas</li>
+          <li>Consultar actas y documentos</li>
+          <li>Mantenerse informado sobre su comunidad</li>
+        </ul>
+      </div>
 
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #dee2e6;">
-              <p style="color: #666666; font-size: 12px; margin: 0 0 10px 0;">
-                Este es un correo automático generado por el Sistema GIRAMASTER
-              </p>
-              <p style="color: #999999; font-size: 11px; margin: 0 0 5px 0;">
-                Por favor, no responda a este correo
-              </p>
-              <p style="color: #999999; font-size: 11px; margin: 0;">
-                © {{current_year}} GIRAMASTER - Sistema de Gestión de Asambleas
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+      <!-- Acceso Manual (si hay token) -->
+      {% if auto_login_url %}
+      <div class="manual-access">
+        <div class="manual-access-title">Acceso Manual</div>
+        <p>
+          También puede ingresar desde:
+          <a href="https://tu-dominio.com/login">https://tu-dominio.com/login</a>
+        </p>
+        <p>Use las credenciales mostradas arriba.</p>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-title">GIRAMASTER</div>
+      <div class="footer-subtitle">Sistema de Gestión de Asambleas</div>
+      <div>{{residential_unit_name}}</div>
+      <div class="footer-note">
+        Si tiene problemas para acceder, contacte al administrador<br>
+        de su unidad residencial.
+      </div>
+    </div>
+
+  </div>
 </body>
 
 </html>

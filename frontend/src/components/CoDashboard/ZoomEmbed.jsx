@@ -11,7 +11,7 @@ import '../../styles/swal-custom.css';
 /**
  * Componente de Zoom usando SDK Web (pantalla completa) para Copropietarios
  * Permite unirse a reuniones como participante (role: 0) CON funcionalidad de votación
- */
+*/
 const ZoomEmbed = ({
 	meetingData,
 	onClose,
@@ -26,6 +26,19 @@ const ZoomEmbed = ({
 	const [selectedOptions, setSelectedOptions] = useState([]); // Array para soportar múltiples opciones
 	const [isSubmittingVote, setIsSubmittingVote] = useState(false);
 
+	// ✅ OBTENER ROL DEL USUARIO
+	const { data: userData } = useQuery({
+		queryKey: ['user'],
+		queryFn: () => {
+			const user = localStorage.getItem('user');
+			return user ? JSON.parse(user) : null;
+		},
+		staleTime: Infinity,
+	});
+	
+	const userRole = userData?.role || "Usuario";
+	const isGuest = userRole === "Invitado"; // Detectar invitado
+
 	// Obtener encuestas activas de la reunión
 	const { data: pollsData, isLoading: isLoadingPolls, refetch: refetchPolls } = useQuery({
 		queryKey: ['meeting-polls', meetingData?.id],
@@ -36,12 +49,12 @@ const ZoomEmbed = ({
 			console.log('📊 [ZoomEmbed] Encuestas obtenidas:', result);
 			return result;
 		},
-		enabled: !!meetingData?.id,
-		refetchInterval: 5000, // Refrescar cada 5 segundos
+		enabled: !!meetingData?.id && !isGuest, // ✅ NO obtener encuestas si es invitado
+		refetchInterval: isGuest ? false : 5000, // ✅ NO refrescar si es invitado
 	});
 
 	// Obtener la encuesta activa (estado "Activa" o "active")
-	const activePoll = pollsData?.data?.find(poll => {
+	const activePoll = !isGuest ? pollsData?.data?.find(poll => {
 		const isActive = poll.str_status === 'Activa' || poll.str_status === 'active';
 		console.log('🔍 [ZoomEmbed] Evaluando encuesta:', {
 			id: poll.id,
@@ -51,11 +64,11 @@ const ZoomEmbed = ({
 			isActive
 		});
 		return isActive;
-	});
+	}) : null; // ✅ NULL si es invitado
 
 	// Log completo de la encuesta activa y sus opciones
 	useEffect(() => {
-		if (activePoll) {
+		if (activePoll && !isGuest) {
 			console.log('📊 [ZoomEmbed] ENCUESTA ACTIVA COMPLETA:', {
 				id: activePoll.id,
 				title: activePoll.str_title,
@@ -66,19 +79,28 @@ const ZoomEmbed = ({
 				fullPollData: activePoll
 			});
 		}
-	}, [activePoll]);
+	}, [activePoll, isGuest]);
 
-	// Mostrar botón cuando hay encuesta activa
+	// ✅ MODIFICAR: Mostrar botón solo si NO es invitado Y hay encuesta activa
 	useEffect(() => {
+		if (isGuest) {
+			// Los invitados NUNCA ven el botón de encuestas
+			setShowPollButton(false);
+			console.log('🚫 [ZoomEmbed] Usuario invitado: Botón de encuestas deshabilitado');
+			return;
+		}
+
+		// Lógica original para copropietarios
 		const polls = pollsData?.data || [];
 		console.log('🎯 [ZoomEmbed] Evaluando mostrar botón:', {
 			totalPolls: polls.length,
 			polls: polls.map(p => ({ id: p.id, title: p.str_title, status: p.str_status })),
 			activePoll: activePoll ? { id: activePoll.id, title: activePoll.str_title } : null,
-			showPollButton: !!activePoll
+			showPollButton: !!activePoll,
+			isGuest
 		});
 		setShowPollButton(!!activePoll);
-	}, [activePoll, pollsData]);
+	}, [activePoll, pollsData, isGuest]);
 
 	useEffect(() => {
 		if (!meetingData) {
@@ -155,6 +177,11 @@ const ZoomEmbed = ({
 	};
 
 	const handleViewPoll = () => {
+		// ✅ Doble verificación: invitados no pueden abrir el modal
+		if (isGuest) {
+			console.log('🚫 [ZoomEmbed] Invitado intentó abrir encuesta - Acción bloqueada');
+			return;
+		}
 		console.log('📊 Abriendo modal de encuesta activa');
 		setSelectedOptions([]);
 		setShowPollModal(true);
@@ -172,6 +199,12 @@ const ZoomEmbed = ({
 
 	// Manejar selección de opciones (single o multiple)
 	const handleOptionToggle = (optionId) => {
+		// ✅ Bloquear si es invitado
+		if (isGuest) {
+			console.log('🚫 [ZoomEmbed] Invitado intentó votar - Acción bloqueada');
+			return;
+		}
+
 		if (!activePoll) return;
 
 		if (activePoll.str_poll_type === 'single') {
@@ -204,6 +237,20 @@ const ZoomEmbed = ({
 
 	// Enviar voto
 	const handleSubmitVote = async () => {
+		// ✅ Bloquear si es invitado
+		if (isGuest) {
+			await Swal.fire({
+				icon: 'error',
+				title: 'Acción no permitida',
+				text: 'Los invitados no pueden votar en las encuestas',
+				confirmButtonColor: '#ef4444',
+				customClass: {
+					popup: 'swal-custom-zindex'
+				}
+			});
+			return;
+		}
+
 		if (!activePoll || selectedOptions.length === 0) {
 			await Swal.fire({
 				icon: 'warning',
@@ -335,12 +382,15 @@ const ZoomEmbed = ({
 			setLoadingMessage('Cargando sala de reunión...');
 
 			const userName = localStorage.getItem('user')
-				? JSON.parse(localStorage.getItem('user')).nombre || 'Copropietario'
-				: 'Copropietario';
+				? JSON.parse(localStorage.getItem('user')).name || 'Usuario'
+				: 'Usuario';
 
 			const userEmail = localStorage.getItem('user')
 				? JSON.parse(localStorage.getItem('user')).email || ''
 				: '';
+
+			// ✅ Agregar indicador de invitado al nombre
+			const displayName = isGuest ? `${userName} (Invitado)` : userName;
 
 			ZoomMtg.i18n.load('es-ES');
 			ZoomMtg.i18n.reload('es-ES');
@@ -372,7 +422,7 @@ const ZoomEmbed = ({
 						signature: signature,
 						sdkKey: sdkKey,
 						meetingNumber: meetingNumber,
-						userName: userName,
+						userName: displayName, // ✅ Usar nombre con indicador de invitado
 						userEmail: userEmail,
 						passWord: password,
 						tk: '',
@@ -524,13 +574,14 @@ const ZoomEmbed = ({
 	console.log('🔘 [ZoomEmbed] Estado del botón:', {
 		showPollButton,
 		activePoll: activePoll ? { id: activePoll.id, title: activePoll.str_title } : null,
-		showPollButton: !!activePoll
+		hasActivePoll: !!activePoll,
+		isGuest
 	});
 
 	return (
 		<>
-			{/* Botón flotante para ver encuestas - usando Portal */}
-			{showPollButton && !isLoading && ReactDOM.createPortal(
+			{/* ✅ SOLO MOSTRAR BOTÓN SI NO ES INVITADO */}
+			{!isGuest && showPollButton && !isLoading && ReactDOM.createPortal(
 				<button
 					onClick={handleViewPoll}
 					className="fixed bottom-8 right-8 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-8 py-4 rounded-2xl shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 flex items-center gap-3 font-bold text-lg animate-pulse z-[99999]"
@@ -548,8 +599,8 @@ const ZoomEmbed = ({
 				document.body
 			)}
 
-			{/* Modal de encuesta - usando Portal */}
-			{showPollModal && ReactDOM.createPortal(
+			{/* ✅ SOLO MOSTRAR MODAL SI NO ES INVITADO */}
+			{!isGuest && showPollModal && ReactDOM.createPortal(
 				<div
 					className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
 					style={{ zIndex: 99998 }}

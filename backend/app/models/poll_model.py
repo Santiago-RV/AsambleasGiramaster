@@ -7,7 +7,7 @@ class PollModel(Base):
     __tablename__ = "tbl_polls"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id"), nullable=False)
+    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     str_poll_code = Column(String(50), index=True, nullable=False)
     str_title = Column(String(200), index=True, nullable=False)
     str_description = Column(String(1000), nullable=True)
@@ -23,10 +23,10 @@ class PollModel(Base):
     str_status = Column(String(50), index=True, nullable=False, default='draft')
 
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now)
-    created_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
-    updated_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
 
     meeting = relationship("MeetingModel", back_populates="polls")
-    responses = relationship("PollResponseModel", back_populates="poll")
-    options = relationship("PollOptionModel", back_populates="poll")
+    responses = relationship("PollResponseModel", back_populates="poll", cascade="all, delete-orphan")
+    options = relationship("PollOptionModel", back_populates="poll", cascade="all, delete-orphan")

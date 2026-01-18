@@ -91,6 +91,62 @@ const CoownerService = {
 		);
 		return response.data;
 	},
+
+	/**
+	 * Envía credenciales en masa a múltiples copropietarios seleccionados
+	 * (genera nuevas contraseñas temporales y las envía por correo)
+	 * @param {number[]} coownerIds - Array de IDs de copropietarios
+	 */
+	sendBulkCredentials: async (coownerIds) => {
+		const response = await axiosInstance.post(
+			'/admin/coowners/send-bulk-credentials',
+			{
+				resident_ids: coownerIds  // ← Cambiar de user_ids a resident_ids
+			}
+		);
+		return response.data;
+	},
+
+	/**
+	 * Habilita o deshabilita el acceso de múltiples copropietarios SELECCIONADOS
+	 */
+	toggleCoownersAccessBulk: async (coownerIds, enabled) => {
+		const response = await axiosInstance.post(
+			'/admin/coowners/toggle-access-bulk',
+			{
+				user_ids: coownerIds,
+				enabled: enabled
+			}
+		);
+		return response.data;
+	},
+
+	/**
+	 * Elimina múltiples copropietarios seleccionados
+	 * @param {number[]} coownerIds - Array de IDs de copropietarios
+	 */
+	deleteCoownersBulk: async (coownerIds) => {
+		const response = await axiosInstance.delete(
+			'/admin/coowners/delete-bulk',
+			{
+				data: {
+					user_ids: coownerIds
+				}
+			}
+		);
+		return response.data;
+	},
+
+	/**
+	 * Helper: Toggle individual (decide si habilitar o deshabilitar)
+	 */
+	toggleCoownerAccess: async (coownerId, enable, sendEmail = false) => {
+		if (enable) {
+			return await CoownerService.enableCoowner(coownerId, sendEmail);
+		} else {
+			return await CoownerService.disableCoowner(coownerId, sendEmail);
+		}
+	},
 };
 
 export default CoownerService;

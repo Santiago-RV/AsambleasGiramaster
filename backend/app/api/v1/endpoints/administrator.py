@@ -15,7 +15,11 @@ from app.services.residential_unit_service import ResidentialUnitService
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
 
-from app.schemas.residential_unit_schema import ResidentialUnitResponse
+from app.schemas.residential_unit_schema import BulkToggleAccessRequest, ResidentialUnitResponse
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

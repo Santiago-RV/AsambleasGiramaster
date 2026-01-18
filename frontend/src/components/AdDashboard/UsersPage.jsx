@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Plus } from 'lucide-react';
+import { Upload, Plus, Shield, ShieldOff } from 'lucide-react';
 import Swal from 'sweetalert2';
 import ResidentsList from "../saDashboard/components/ResidentsList";
 import MeetingsSection from "./MeetingsSection";
 import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
+import CoownerService from "../../services/api/coownerService";
 
 export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onTransferPower }) {
   const queryClient = useQueryClient();
@@ -41,25 +42,25 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
   // Transformar las reuniones al formato esperado
   const meetings = meetingsData?.success && meetingsData?.data
     ? meetingsData.data.map(meeting => ({
-        id: meeting.id,
-        titulo: meeting.str_title || 'Sin título',
-        estado: meeting.str_status || 'Programada',
-        fecha: meeting.dat_schedule_date,
-        hora: meeting.dat_schedule_date
-          ? new Date(meeting.dat_schedule_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-          : 'No definida',
-        asistentes: meeting.int_total_invitated || 0,
-        fechaCompleta: new Date(meeting.dat_schedule_date),
-        // Usar los campos correctos de Zoom
-        meeting_url: meeting.str_zoom_join_url,  // Corregido: era str_meeting_url (no existe)
-        zoom_meeting_id: meeting.int_zoom_meeting_id,  // Corregido: era str_zoom_meeting_id (tipo incorrecto)
-        zoom_password: meeting.str_zoom_password,  // Contraseña de la reunión
-      }))
+      id: meeting.id,
+      titulo: meeting.str_title || 'Sin título',
+      estado: meeting.str_status || 'Programada',
+      fecha: meeting.dat_schedule_date,
+      hora: meeting.dat_schedule_date
+        ? new Date(meeting.dat_schedule_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        : 'No definida',
+      asistentes: meeting.int_total_invitated || 0,
+      fechaCompleta: new Date(meeting.dat_schedule_date),
+      // Usar los campos correctos de Zoom
+      meeting_url: meeting.str_zoom_join_url,  // Corregido: era str_meeting_url (no existe)
+      zoom_meeting_id: meeting.int_zoom_meeting_id,  // Corregido: era str_zoom_meeting_id (tipo incorrecto)
+      zoom_password: meeting.str_zoom_password,  // Contraseña de la reunión
+    }))
     : [];
 
   // Mutación para eliminar residente
   const deleteResidentMutation = useMutation({
-    mutationFn: ({ userId, unitId }) => ResidentService.deleteResident(unitId, userId),
+    mutationFn: ({ userId, unitId }) => CoownerService.deleteResident(unitId, userId),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
       Swal.fire({
@@ -85,7 +86,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
   // Mutación para el envío masivo de credenciales
   const sendBulkCredentialsMutation = useMutation({
     mutationFn: async (residentIds) => {
-      return await ResidentService.sendBulkCredentials(residentialUnitId, residentIds);
+      return await CoownerService.sendBulkCredentials(residentIds);  // ← Quitar residentialUnitId
     },
     onSuccess: (response) => {
       const { successful, failed, total_processed } = response.data;
@@ -104,9 +105,8 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
               </p>
               ${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
             </div>
-            ${
-              response.data.errors && response.data.errors.length > 0
-                ? `
+            ${response.data.errors && response.data.errors.length > 0
+            ? `
                 <div class="bg-red-50 p-3 rounded-lg max-h-32 overflow-y-auto">
                   <p class="font-semibold text-red-800 mb-2">Errores:</p>
                   <ul class="text-sm text-red-700 space-y-1">
@@ -114,8 +114,8 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
                   </ul>
                 </div>
               `
-                : ''
-            }
+            : ''
+          }
           </div>
         `,
         confirmButtonColor: '#27ae60',
@@ -127,6 +127,70 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
         icon: 'error',
         title: 'Error al Enviar Credenciales',
         text: error.response?.data?.message || error.message || 'Error al enviar credenciales masivamente',
+        confirmButtonColor: '#e74c3c',
+      });
+    },
+  });
+
+  // Mutación para toggle access individual
+  const toggleAccessMutation = useMutation({
+    mutationFn: async ({ userId, enabled }) => {
+      return await CoownerService.toggleCoownerAccess(userId, enabled, false);
+    },
+    onSuccess: (response, variables) => {
+      const action = variables.enabled ? 'habilitado' : 'deshabilitado';
+      queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Acceso Modificado!',
+        html: `<p class="text-sm">Acceso ${action} exitosamente</p>`,
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end',
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.message || 'No se pudo modificar el acceso',
+        confirmButtonColor: '#ef4444',
+      });
+    },
+  });
+
+  // Mutación para toggle access masivo
+  const toggleAccessBulkMutation = useMutation({
+    mutationFn: async ({ userIds, enabled }) => {
+      return await CoownerService.toggleCoownersAccessBulk(userIds, enabled);
+    },
+    onSuccess: (response) => {
+      const { successful, failed, already_in_state, total_processed } = response.data;
+      queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+
+      Swal.fire({
+        icon: successful === total_processed ? 'success' : 'warning',
+        title: 'Acceso Modificado',
+        html: `
+        <div class="text-left">
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <p class="text-sm text-blue-700"><strong>Exitosos:</strong> ${successful}</p>
+            ${already_in_state > 0 ? `<p class="text-sm text-gray-700"><strong>Sin cambios:</strong> ${already_in_state}</p>` : ''}
+            ${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
+          </div>
+        </div>
+      `,
+        confirmButtonColor: '#27ae60',
+        width: '500px',
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.message || 'Error al modificar acceso',
         confirmButtonColor: '#e74c3c',
       });
     },
@@ -218,6 +282,54 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     }
   };
 
+  // Función para toggle access individual
+  const handleToggleAccess = async (resident) => {
+    const newStatus = !resident.bln_allow_entry;
+    const action = newStatus ? 'habilitar' : 'deshabilitar';
+
+    const result = await Swal.fire({
+      title: `¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso?`,
+      html: `<p>${resident.firstname} ${resident.lastname} ${newStatus ? 'PODRÁ' : 'NO PODRÁ'} acceder al sistema.</p>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: newStatus ? '#27ae60' : '#e74c3c',
+      confirmButtonText: `Sí, ${action}`,
+      cancelButtonText: 'Cancelar',
+    });
+
+    if (result.isConfirmed) {
+      toggleAccessMutation.mutate({ userId: resident.id, enabled: newStatus });
+    }
+  };
+
+  // Función para toggle access masivo
+  const handleBulkToggleAccess = async (selectedResidents, enabled) => {
+    if (selectedResidents.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Sin selección',
+        text: 'Debes seleccionar al menos un usuario',
+        confirmButtonColor: '#3498db',
+      });
+      return;
+    }
+
+    const action = enabled ? 'habilitar' : 'deshabilitar';
+    const result = await Swal.fire({
+      title: `¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso?`,
+      text: `Se ${action}á el acceso de ${selectedResidents.length} usuario(s)`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: enabled ? '#27ae60' : '#e74c3c',
+      confirmButtonText: `Sí, ${action}`,
+      cancelButtonText: 'Cancelar',
+    });
+
+    if (result.isConfirmed) {
+      toggleAccessBulkMutation.mutate({ userIds: selectedResidents, enabled });
+    }
+  };
+
   // Mostrar error
   if (isError) {
     return (
@@ -280,6 +392,8 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onResendCredentials={handleResendCredentials}
             onEditResident={onEditUser}
             onDeleteResident={handleDeleteResident}
+            onToggleAccess={handleToggleAccess}
+            onBulkToggleAccess={handleBulkToggleAccess}
             onSendBulkCredentials={(selectedResidents) => {
               if (selectedResidents.length === 0) {
                 Swal.fire({

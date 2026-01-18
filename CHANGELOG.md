@@ -9,6 +9,186 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2025-12-26
+
+- **Dashboard de SuperAdmin con estadísticas en tiempo real**:
+  - **Nuevo servicio de dashboard** (`backend/app/services/dashboard_service.py`):
+    - `get_dashboard_statistics()`: Obtiene todas las estadísticas necesarias
+    - `_get_general_stats()`: Calcula estadísticas generales del sistema
+    - `_calculate_average_attendance()`: Promedio de asistencia de las últimas 10 reuniones
+    - `_get_recent_meetings()`: Últimas 5 reuniones completadas
+    - `_get_upcoming_meetings()`: Próximas 5 reuniones programadas
+  - **Schemas de dashboard** (`backend/app/schemas/dashboard_schema.py`):
+    - `DashboardStatsResponse`: Estadísticas generales
+    - `RecentMeetingSchema`: Reuniones completadas recientemente
+    - `UpcomingMeetingSchema`: Reuniones programadas próximamente
+    - `DashboardDataResponse`: Respuesta completa del dashboard
+  - **Endpoint de API** (`GET /api/v1/super-admin/dashboard/statistics`):
+    - Retorna estadísticas completas del sistema
+    - Solo accesible para usuarios SuperAdmin (rol 1)
+    - Incluye unidades residenciales, residentes, reuniones activas y asistencia promedio
+  - **Servicio de dashboard en frontend** (`frontend/src/services/api/DashboardService.js`):
+    - `getDashboardStatistics()`: Obtiene estadísticas del backend
+    - Helpers para formateo de fechas, números y colores
+  - **DashboardTab actualizado** (`frontend/src/components/saDashboard/DashboardTab.jsx`):
+    - Carga datos reales desde el backend
+    - Tarjetas de estadísticas con datos dinámicos
+    - Lista de reuniones recientes con información completa
+    - Lista de próximas reuniones programadas
+    - Loader durante carga inicial
+    - Manejo de errores con SweetAlert2
+  - **Beneficios**:
+    - ✅ Estadísticas en tiempo real del sistema
+    - ✅ Conteo de unidades residenciales activas
+    - ✅ Conteo de residentes totales (copropietarios)
+    - ✅ Reuniones activas (en curso o programadas para hoy)
+    - ✅ Cálculo de asistencia promedio basado en datos reales
+    - ✅ Historial de reuniones con porcentajes de asistencia
+    - ✅ Calendario de próximas reuniones
+    - ✅ Formato de fechas y números localizados a español
+
+- **Sistema completo de monitoreo de reuniones activas para SuperAdmin**:
+  - **Schemas de reuniones activas** (`backend/app/schemas/active_meeting_schema.py`):
+    - `ConnectedUserSchema`: Datos de usuarios conectados
+    - `PollSummarySchema`: Resumen de encuestas
+    - `AdministratorInfoSchema`: Información del administrador
+    - `ActiveMeetingCardSchema`: Datos para tarjeta de reunión (vista de lista)
+    - `ActiveMeetingDetailsSchema`: Detalles completos de reunión
+    - `ActiveMeetingsListResponse`: Respuesta con lista de reuniones
+  - **Servicio de reuniones activas** (`backend/app/services/active_meeting_service.py`):
+    - `get_active_meetings_list()`: Obtiene todas las reuniones "En Curso"
+    - `get_meeting_details()`: Obtiene detalles completos de una reunión específica
+    - `_count_connected_users()`: Cuenta usuarios conectados
+    - `_count_active_polls()`: Cuenta encuestas activas
+    - `_get_unit_administrator()`: Obtiene administrador de la unidad
+    - `_get_connected_users()`: Obtiene lista detallada de usuarios conectados
+    - `_get_meeting_polls()`: Obtiene encuestas con estadísticas
+  - **Endpoints de API**:
+    - `GET /api/v1/super-admin/active-meetings`: Lista de reuniones activas
+    - `GET /api/v1/super-admin/active-meetings/{meeting_id}`: Detalles completos de reunión
+    - Incluyen información de usuarios conectados, encuestas, administrador y unidad residencial
+  - **Servicio de reuniones activas en frontend** (`frontend/src/services/api/ActiveMeetingService.js`):
+    - `getActiveMeetings()`: Obtiene reuniones activas
+    - `getActiveMeetingDetails()`: Obtiene detalles de reunión
+    - `calculateMeetingDuration()`: Calcula duración desde inicio
+    - `calculateAttendancePercentage()`: Calcula % de asistencia
+    - Helpers para formateo y colores
+  - **Componente ActiveMeetingCard** (`frontend/src/components/saDashboard/components/ActiveMeetingCard.jsx`):
+    - Tarjeta visual para cada reunión activa
+    - Header con gradiente verde y animación pulsante
+    - Estadísticas de usuarios conectados y asistencia
+    - Duración de la reunión en tiempo real
+    - Número de encuestas activas
+    - Click para ver detalles completos
+  - **Componente ActiveMeetingDetailsModal** (`frontend/src/components/saDashboard/components/ActiveMeetingDetailsModal.jsx`):
+    - Modal fullscreen con todos los detalles de la reunión
+    - Header con estadísticas rápidas (duración, conectados, quórum, encuestas)
+    - Información completa de la reunión con fechas
+    - Card del administrador con datos de contacto
+    - Lista de encuestas con estado, votos y requisitos
+    - Lista de participantes conectados con:
+      - Avatar con iniciales
+      - Nombre completo y email
+      - Número de apartamento
+      - Tipo de asistencia (Titular/Delegado)
+      - Peso de voto
+      - Indicador de presencia (punto verde pulsante)
+    - Información de la unidad residencial
+    - Botón para unirse a Zoom (si disponible)
+  - **ReunionActivaTab mejorado** (`frontend/src/components/saDashboard/ReunionActivaTab.jsx`):
+    - Auto-refresh cada 30 segundos
+    - Loader durante carga inicial
+    - Banner con contador de reuniones y participantes
+    - Grid de tarjetas de reuniones activas
+    - Modal de detalles al hacer click
+    - Estado vacío elegante cuando no hay reuniones
+    - Botón de actualización manual
+    - Manejo de errores con SweetAlert2
+  - **Beneficios**:
+    - ✅ Monitoreo en tiempo real de reuniones en curso
+    - ✅ Visualización de usuarios conectados
+    - ✅ Lista de encuestas creadas para cada reunión
+    - ✅ Información del administrador de la unidad
+    - ✅ Estadísticas de asistencia y quórum
+    - ✅ Acceso directo a Zoom
+    - ✅ Actualización automática cada 30 segundos
+    - ✅ Interface moderna y responsive
+    - ✅ Detalles completos en modal interactivo
+
+#### 2025-12-23
+
+- **Dockerización completa del frontend**:
+  - **Dockerfile simplificado y optimizado**:
+    - Imagen base: Nginx Alpine (ultra-ligera ~15MB)
+    - Build local de la aplicación React + Vite
+    - Solo copia archivos compilados (`dist/`) a la imagen
+    - Enfoque pragmático: compilación en host, servido en Docker
+  - **Configuración de Nginx** ([nginx.conf](frontend/nginx.conf)):
+    - Servidor web en puerto 80 interno
+    - Compresión gzip habilitada para mejor rendimiento
+    - Configuración SPA (Single Page Application) con fallback a index.html
+    - Cache optimizado: archivos estáticos cacheados por 1 año
+    - index.html sin cache para actualizaciones inmediatas
+    - Logs de acceso y error configurados
+    - Preparado para proxy reverso a backend
+  - **Archivo `.dockerignore`**:
+    - Exclusión de node_modules, .env y archivos de desarrollo
+    - **NO** ignora `dist/` (necesario para Docker)
+    - Contexto de build mínimo
+  - **Archivo `.env.production`**:
+    - Variable `VITE_API_URL` configurada para el backend
+    - Listo para personalizar según el entorno de despliegue
+  - **Comandos Make para frontend**:
+    - `make docker-build`: Compila app localmente Y construye imagen Docker
+    - `make docker-run`: Ejecutar contenedor con logs visibles (puerto 3000)
+    - `make docker-run-detached`: Ejecutar en segundo plano (puerto 3000)
+    - `make docker-stop`: Detener y eliminar contenedor
+    - `make docker-logs`: Ver logs en tiempo real
+    - `make docker-clean`: Limpiar imágenes y caché
+    - Puerto configurable: `PORT=8080 make docker-run-detached`
+  - **Correcciones de código**:
+    - Corregida clave duplicada `showPollButton` en `ZoomEmbed.jsx`
+    - Componente `ZoomMeetingContainer` con export correcto
+  - **Frontend completamente funcional**:
+    - Aplicación React compilada y optimizada
+    - Servida por Nginx en puerto configurable (default: 3000)
+    - Healthcheck integrado con wget
+    - Imagen Docker de solo ~15MB
+    - Lista para producción y despliegue
+
+- **Dockerización completa del backend**:
+  - **Dockerfile optimizado**:
+    - Imagen base Python 3.11-slim para menor tamaño
+    - Variables de entorno optimizadas para producción (PYTHONUNBUFFERED, PIP_NO_CACHE_DIR)
+    - Usuario no-root (appuser) para mayor seguridad
+    - Healthcheck integrado para monitoreo automático de la aplicación
+    - Puerto 8000 expuesto para la API FastAPI
+    - Directorio de logs configurado con permisos adecuados
+    - Soporte para MySQL client y dependencias del sistema necesarias
+  - **Archivo `.dockerignore`**:
+    - Exclusión de archivos innecesarios (venv, __pycache__, logs, .env)
+    - Reducción del contexto de build para mayor velocidad
+    - Exclusión de directorios de test y documentación
+  - **Archivo `.env.production`**:
+    - Plantilla de configuración para producción
+    - Formato sin comillas para compatibilidad con Docker
+    - Variables para base de datos MySQL, SMTP, Zoom y Redis
+  - **Comandos Make mejorados**:
+    - `make docker-build`: Construir imagen Docker
+    - `make docker-run`: Ejecutar contenedor con logs en consola
+    - `make docker-run-detached`: Ejecutar contenedor en segundo plano
+    - `make docker-stop`: Detener y eliminar contenedor
+    - `make docker-logs`: Ver logs del contenedor en tiempo real
+    - `make docker-clean`: Limpiar imágenes y caché de Docker
+  - **Dependencias actualizadas**:
+    - Agregado `Jinja2==3.1.4` para renderizado de plantillas de email
+    - Todas las dependencias verificadas y funcionando en Docker
+  - **Backend completamente funcional**:
+    - Conexión exitosa a base de datos MySQL remota
+    - API FastAPI corriendo en puerto 8000
+    - Sistema de logs operativo
+    - Healthcheck validando disponibilidad
+
 #### 2025-12-22
 
 - **Corrección de validación de campo `int_max_concurrent_meetings`**:

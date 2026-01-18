@@ -13,7 +13,7 @@ NC = \033[0m # No Color
 .DEFAULT_GOAL := help
 
 # PHONY indica que no son archivos reales
-.PHONY: help install dev prod test clean docker-build docker-run migrate
+.PHONY: help install dev prod test clean docker-build docker-run docker-run-detached docker-stop docker-logs docker-clean migrate
 
 ## Ayuda
 help:
@@ -23,7 +23,12 @@ help:
 	@echo "  $(YELLOW)make test$(NC)       - Ejecutar tests"
 	@echo "  $(YELLOW)make migrate$(NC)    - Ejecutar migraciones"
 	@echo "  $(YELLOW)make clean$(NC)      - Limpiar archivos temporales"
-	@echo "  $(YELLOW)make docker-build$(NC) - Construir imagen Docker"
+	@echo "  $(YELLOW)make docker-build$(NC)   - Construir imagen Docker"
+	@echo "  $(YELLOW)make docker-run$(NC)    - Ejecutar contenedor Docker (consola)"
+	@echo "  $(YELLOW)make docker-run-detached$(NC) - Ejecutar contenedor en segundo plano"
+	@echo "  $(YELLOW)make docker-stop$(NC)   - Detener y eliminar contenedor"
+	@echo "  $(YELLOW)make docker-logs$(NC)   - Ver logs del contenedor"
+	@echo "  $(YELLOW)make docker-clean$(NC)  - Limpiar imágenes Docker"
 
 ## Instalación
 install:
@@ -75,11 +80,25 @@ format:
 ## Docker
 docker-build:
 	@echo "$(GREEN)🐳 Construyendo imagen Docker...$(NC)"
-	docker build -t $(PROJECT_NAME) .
+	docker build --no-cache -t $(PROJECT_NAME) .
 
 docker-run:
 	@echo "$(GREEN)🐳 Ejecutando contenedor Docker...$(NC)"
 	docker run -p 8000:8000 --env-file .env.production $(PROJECT_NAME)
+
+docker-run-detached:
+	@echo "$(GREEN)🐳 Ejecutando contenedor Docker en segundo plano...$(NC)"
+	docker run -d --name $(PROJECT_NAME) -p 8000:8000 --env-file .env.production $(PROJECT_NAME)
+	@echo "$(GREEN)✅ Contenedor iniciado. Ver logs: docker logs -f $(PROJECT_NAME)$(NC)"
+
+docker-stop:
+	@echo "$(YELLOW)⏹️  Deteniendo contenedor Docker...$(NC)"
+	docker stop $(PROJECT_NAME)
+	docker rm $(PROJECT_NAME)
+
+docker-logs:
+	@echo "$(GREEN)📋 Mostrando logs del contenedor...$(NC)"
+	docker logs -f $(PROJECT_NAME)
 
 docker-clean:
 	@echo "$(YELLOW)🧹 Limpiando imágenes Docker...$(NC)"

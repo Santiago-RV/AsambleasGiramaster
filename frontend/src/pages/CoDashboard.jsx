@@ -11,31 +11,86 @@ import { UserService } from '../services/api/UserService';
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');
   const [residentialUnitId, setResidentialUnitId] = useState(null);
+  const [userRole, setUserRole] = useState(3); // Default: copropietario
   const navigate = useNavigate();
+
+  // OBTENER ROL DEL USUARIO DESDE LOCALSTORAGE
+  useEffect(() => {
+    const userString = localStorage.getItem('user');
+    if (userString) {
+      try {
+        const userData = JSON.parse(userString);
+        console.log('[CoDashboard] Usuario detectado:', userData);
+        console.log('[CoDashboard] Rol del usuario:', userData.role);
+        
+        // Establecer el rol del usuario
+        const role = userData.role || "Usuario";
+        setUserRole(role);
+        
+        console.log('[CoDashboard] Rol establecido:', role);
+        console.log('[CoDashboard] Es invitado?:', role === "Invitado");
+      } catch (error) {
+        console.error(' [CoDashboard] Error al parsear usuario:', error);
+        setUserRole(3); // Default a copropietario en caso de error
+      }
+    } else {
+      console.warn('[CoDashboard] No se encontró usuario en localStorage');
+      setUserRole(3);
+    }
+  }, []);
+
+  // DETECTAR SI ES INVITADO (ROL 4)
+  const isGuest = userRole === "Invitado";
+
+  // Log del estado actual
+  useEffect(() => {
+    console.log('[CoDashboard] Estado actual:', {
+      userRole,
+      isGuest,
+      section
+    });
+  }, [userRole, isGuest, section]);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
     navigate('/login');
   };
 
-  // Configuración del menú
-  const menuItems = [
+  // CONFIGURACIÓN DEL MENÚ CON ROLES PERMITIDOS
+  const allMenuItems = [
     {
       id: 'meetings',
       label: 'Reuniones',
       icon: Video,
+      allowedRoles: ["Usuario", "Invitado"], // Copropietarios E Invitados
     },
     {
       id: 'voting',
       label: 'Encuestas',
       icon: FileText,
+      allowedRoles: ["Usuario"], //  Solo Copropietarios
     },
     {
       id: 'profile',
       label: 'Mi Perfil',
       icon: User,
+      allowedRoles: ["Usuario"], //  Solo Copropietarios
     },
   ];
+
+  // FILTRAR MENÚ SEGÚN ROL DEL USUARIO
+  const menuItems = allMenuItems.filter(item => {
+    const isAllowed = item.allowedRoles.includes(userRole);
+    console.log(`[CoDashboard] Menu item "${item.label}":`, {
+      allowedRoles: item.allowedRoles,
+      userRole,
+      isAllowed
+    });
+    return isAllowed;
+  });
+
+  console.log('[CoDashboard] Items del menú filtrados:', menuItems.map(i => i.label));
 
   // Obtener la unidad residencial del usuario actual
   const {
@@ -126,8 +181,8 @@ export default function AppCopropietario() {
   return (
     <DashboardLayout
       title="GIRAMASTER"
-      subtitle="Dashboard Copropietario"
-      menuItems={menuItems}
+      subtitle={isGuest ? "Dashboard Invitado" : "Dashboard Copropietario"}
+      menuItems={menuItems} // Menú filtrado según rol
       activeTab={section}
       onTabChange={setSection}
       gradientFrom="#2563eb"
@@ -135,11 +190,12 @@ export default function AppCopropietario() {
       accentColor="#ffffff"
       sidebarFooter={sidebarFooter}
     >
+      {/* Solo mostrar secciones permitidas para cada rol */}
       {section === 'meetings' && (
         <MeetingsPage residentialUnitId={residentialUnitId} />
       )}
-      {section === 'voting' && <VotingPage />}
-      {section === 'profile' && <ProfilePage />}
+      {section === 'voting' && !isGuest && <VotingPage />}
+      {section === 'profile' && !isGuest && <ProfilePage />}
     </DashboardLayout>
   );
 }

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './providers/AppProvider';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { RoleBasedRoute } from './components/Auth/RoleBasedRoute';
+import AutoLogin from './components/Auth/AutoLogin';
 import React from 'react';
 import Login from './pages/Login';
 import HomeSA from './pages/HomeSA';
@@ -14,10 +15,20 @@ function App() {
 	return (
 		<AppProvider>
 			<Routes>
+				{/* ========================================== */}
+				{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
+				{/* ========================================== */}
+
 				{/* Ruta pública - Login */}
 				<Route path="/login" element={<Login />} />
 
-				{/* Rutas protegidas por autenticación */}
+				{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
+				<Route path="/auto-login/:token" element={<AutoLogin />} />
+
+				{/* ========================================== */}
+				{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
+				{/* ========================================== */}
+
 				<Route path="/" element={<ProtectedRoute />}>
 					{/* Ruta para Super Administrador */}
 					<Route
@@ -39,11 +50,11 @@ function App() {
 						}
 					/>
 
-					{/* Ruta para Administrador */}
+					{/* Ruta para Copropietario/Usuario */}
 					<Route
 						path="copropietario"
 						element={
-							<RoleBasedRoute allowedRoles={['Usuario']}>
+							<RoleBasedRoute allowedRoles={['Usuario', 'Invitado']}>
 								<AppCopropietario />
 							</RoleBasedRoute>
 						}

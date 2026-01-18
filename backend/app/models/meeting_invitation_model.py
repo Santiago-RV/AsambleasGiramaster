@@ -7,8 +7,8 @@ class MeetingInvitationModel(Base):
     __tablename__ = "tbl_meeting_invitations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id"), nullable=False)
-    int_user_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
+    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    int_user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
     dec_voting_weight = Column(Numeric, nullable=False)
     str_apartment_number = Column(String(20), nullable=False)
     str_invitation_status = Column(String(50), index=True, nullable=False)
@@ -25,6 +25,6 @@ class MeetingInvitationModel(Base):
     dat_left_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now)
-    created_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
-    updated_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)

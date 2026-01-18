@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class UserSimplifiedSchema(BaseModel):
@@ -57,3 +57,10 @@ class ResidentialUnitResponse(ResidentialUnitBase):
   updated_at: datetime = Field(..., description="Fecha de actualización")
   creator: Optional[UserSimplifiedSchema] = Field(None, description="Usuario que creó la unidad residencial")
   updater: Optional[UserSimplifiedSchema] = Field(None, description="Usuario que actualizó la unidad residencial")
+  
+class BulkToggleAccessRequest(BaseModel):
+  """
+  Esquema para habilitar acceso a todos los copropietarios
+  """
+  user_ids: List[int] = Field(..., min_items=1)
+  enabled: bool

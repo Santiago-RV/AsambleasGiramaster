@@ -32,7 +32,9 @@ htmlcov/
 
 # backend
 .env
+.env.production
 .venv/
 venv/
 
 back_laravel/
+migrations/
