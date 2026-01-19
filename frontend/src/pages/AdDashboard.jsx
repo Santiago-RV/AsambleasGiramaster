@@ -20,6 +20,10 @@ import { ResidentialUnitService } from "../services/api/ResidentialUnitService";
 import { ResidentService } from "../services/api/ResidentService";
 import { MeetingService } from "../services/api/MeetingService";
 
+import GuestModal from '../components/saDashboard/components/modals/GuestModal';
+import { useGuestOperations } from '../components/saDashboard/hooks/useGuestOperations';
+import { GuestService } from '../services/api/GuestService';
+
 export default function AppAdmin() {
   const [section, setSection] = useState("users");
   const [showUserForm, setShowUserForm] = useState(false);
@@ -35,6 +39,18 @@ export default function AppAdmin() {
   const { logout } = useAuth();
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
+  const [showGuestModal, setShowGuestModal] = useState(false);
+
+  // Hook para operaciones de invitados
+  const { createGuestMutation } = useGuestOperations(residentialUnitId);
+
+  // Query para obtener invitados
+  const { data: guestsData, refetch: refetchGuests } = useQuery({
+    queryKey: ['guests', residentialUnitId],
+    queryFn: () => GuestService.getGuestsByUnit(residentialUnitId),
+    enabled: !!residentialUnitId,
+    retry: 1,
+  });
 
   // Obtener la unidad residencial del administrador
   const {
@@ -196,6 +212,48 @@ export default function AppAdmin() {
         }
       );
     }
+  };
+
+  // Handler para abrir modal de invitado
+  const handleOpenGuestModal = () => {
+    setShowGuestModal(true);
+  };
+
+  // Handler para cerrar modal de invitado
+  const handleCloseGuestModal = () => {
+    setShowGuestModal(false);
+  };
+
+  // Handler para crear invitado
+  const handleCreateGuest = (guestData, resetForm) => {
+    createGuestMutation.mutate(guestData, {
+      onSuccess: () => {
+        setShowGuestModal(false);
+        if (resetForm) resetForm();
+        refetchGuests(); // Recargar lista de invitados
+        // También refrescar la lista de residentes para que aparezca el invitado
+        queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+        Swal.fire({
+          icon: 'success',
+          title: '¡Invitado Creado!',
+          text: 'El invitado ha sido creado exitosamente y recibirá un correo con sus credenciales.',
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3000,
+          backdrop: false,
+        });
+      },
+      onError: (error) => {
+        console.error('Error al crear invitado:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error.response?.data?.detail || 'No se pudo crear el invitado',
+          confirmButtonColor: '#ef4444',
+        });
+      },
+    });
   };
 
   // Mutación para crear reunión
@@ -453,6 +511,7 @@ export default function AppAdmin() {
           onTransferPower={(fromLabel, onConfirm) =>
             openPowerModal(fromLabel, onConfirm)
           }
+          onCreateGuest={handleOpenGuestModal}
         />
       )}
       {section === "assemblies" && (
@@ -529,6 +588,14 @@ export default function AppAdmin() {
           }}
         />
       )}
+
+      {/* Modal para crear invitado */}
+      <GuestModal
+        isOpen={showGuestModal}
+        onClose={handleCloseGuestModal}
+        onSubmit={handleCreateGuest}
+        isSubmitting={createGuestMutation.isPending}
+      />
     </DashboardLayout>
   );
 }

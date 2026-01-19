@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Plus } from 'lucide-react';
+import { Upload, Plus, UserPlus } from 'lucide-react';
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
 import MeetingsList from "../common/MeetingsList";
@@ -8,7 +8,7 @@ import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
 
-export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onTransferPower }) {
+export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onTransferPower, onCreateGuest }) {
   const queryClient = useQueryClient();
 
   // Obtener los residentes de la unidad residencial
@@ -380,6 +380,14 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
           >
             <Plus size={18} />
             <span>Agregar Copropietario</span>
+          </button>
+          {/* ← AGREGAR ESTE BOTÓN NUEVO */}
+          <button
+            onClick={onCreateGuest}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:shadow-lg transition-all"
+          >
+            <UserPlus size={18} />
+            <span>Agregar Invitado</span>
           </button>
         </div>
       </div>

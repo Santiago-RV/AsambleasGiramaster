@@ -46,7 +46,7 @@ const CoownerService = {
 	 */
 	deleteResident: async (unitId, userId) => {
 		const response = await axiosInstance.delete(
-			`/residential-units/units/${unitId}/residents/${userId}`
+			`/residential/units/${unitId}/residents/${userId}`
 		);
 		return response.data;
 	},
