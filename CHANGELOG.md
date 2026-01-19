@@ -9,6 +9,36 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-01-19
+
+- **Corrección de sección de encuestas en vista de administrador**:
+  - **Problema**: Error 404 al cargar reuniones en la sección de encuestas, impidiendo crear encuestas para reuniones en curso o programadas
+  - **Causa raíz**: El endpoint `/meetings/residential-unit/{residentialUnitId}` no existía en el backend
+  - **Backend - Nuevo endpoint y servicio**:
+    - `backend/app/services/meeting_service.py`:
+      - Agregado método `get_meetings_by_residential_unit(residential_unit_id)` (líneas 70-89)
+      - Obtiene todas las reuniones de una unidad residencial ordenadas por fecha descendente
+    - `backend/app/api/v1/endpoints/meeting_endpoint.py`:
+      - Agregado endpoint `GET /meetings/residential-unit/{residential_unit_id}` (líneas 55-81)
+      - Retorna lista de reuniones filtradas por unidad residencial
+  - **Backend - Corrección de inconsistencia de estados**:
+    - `backend/app/services/meeting_service.py` (línea 330):
+      - Corregido estado de `"En curso"` a `"En Curso"` para consistencia con el resto del sistema
+  - **Frontend - Mejoras en detección de estado**:
+    - `frontend/src/services/api/PollService.js` (línea 314):
+      - Filtrado de reuniones ahora usa comparación case-insensitive (`toLowerCase()`)
+      - Mayor robustez ante variaciones de mayúsculas/minúsculas en estados
+    - `frontend/src/components/AdDashboard/LiveMeetingCard.jsx` (líneas 11-14):
+      - Detección de estado "En Curso" mejorada
+      - Ahora verifica tanto `dat_actual_start_time` como `str_status`
+  - **Lógica de filtrado para encuestas**:
+    - Reuniones con estado "En Curso" → siempre visibles
+    - Reuniones "Programadas" dentro de ±1 hora de la hora actual → visibles
+  - **Beneficios**:
+    - Administradores ahora pueden ver y gestionar encuestas de reuniones en curso
+    - Permite crear encuestas hasta 1 hora antes del inicio programado
+    - Mayor robustez en la detección de estados de reuniones
+
 #### 2026-01-18
 
 - **Unificación de componente ResidentsList para Admin y SuperAdmin**:

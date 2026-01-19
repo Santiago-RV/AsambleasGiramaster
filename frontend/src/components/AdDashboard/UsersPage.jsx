@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, Plus } from 'lucide-react';
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
-import MeetingsSection from "./MeetingsSection";
+import MeetingsList from "../common/MeetingsList";
 import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
@@ -444,11 +444,12 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
 
         {/* Columna derecha: Reuniones */}
         <div className="lg:col-span-1">
-          <MeetingsSection
+          <MeetingsList
             meetings={meetings}
             isLoading={isLoadingMeetings}
             onCreateMeeting={onCreateMeeting}
             onJoinMeeting={onJoinMeeting}
+            variant="admin"
           />
         </div>
       </div>

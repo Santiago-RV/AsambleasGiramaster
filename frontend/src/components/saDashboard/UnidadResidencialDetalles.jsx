@@ -11,7 +11,7 @@ import { useAdminOperations } from './hooks/useAdminOperations';
 // Componentes
 import UnitHeader from './components/UnitHeader';
 import ResidentsList from '../common/ResidentsList';
-import MeetingsList from './components/MeetingsList';
+import MeetingsList from '../common/MeetingsList';
 
 // Modales
 import MeetingModal from './components/modals/MeetingModal';

@@ -311,14 +311,16 @@ export class PollService {
       const ONE_HOUR_MS = 60 * 60 * 1000;
 
       const liveMeetings = response.data.data.filter((meeting) => {
+        const status = (meeting.str_status || '').toLowerCase();
+
         // Reuniones en curso siempre se muestran
-        if (meeting.str_status === 'En Curso') {
+        if (status === 'en curso') {
           console.log('🔍 [getLiveMeetings] Reunión en curso:', meeting.str_title);
           return true;
         }
 
         // Reuniones programadas: mostrar si están dentro de la próxima hora
-        if (meeting.str_status === 'Programada') {
+        if (status === 'programada') {
           const scheduleDate = new Date(meeting.dat_schedule_date);
           const timeDiff = scheduleDate.getTime() - now.getTime();
 

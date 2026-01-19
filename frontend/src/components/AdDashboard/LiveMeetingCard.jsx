@@ -8,8 +8,10 @@ export default function LiveMeetingCard({ meeting, onClick }) {
     const scheduleDate = new Date(meeting.dat_schedule_date);
     const ONE_HOUR_MS = 60 * 60 * 1000;
     const timeDifference = scheduleDate.getTime() - now.getTime();
+    const status = (meeting.str_status || '').toLowerCase();
 
-    if (meeting.dat_actual_start_time) {
+    // Verificar si está en curso por tiempo de inicio o por estado
+    if (meeting.dat_actual_start_time || status === 'en curso') {
       return (
         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 animate-pulse">
           <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>

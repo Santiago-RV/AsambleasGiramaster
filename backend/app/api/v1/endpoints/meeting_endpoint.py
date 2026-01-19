@@ -53,6 +53,35 @@ async def get_meetings(
 
 
 @router.get(
+    "/residential-unit/{residential_unit_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener reuniones por unidad residencial",
+    description="Obtiene todas las reuniones de una unidad residencial específica"
+)
+async def get_meetings_by_residential_unit(
+    residential_unit_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Obtiene todas las reuniones de una unidad residencial"""
+    try:
+        meeting_service = MeetingService(db)
+        meetings = await meeting_service.get_meetings_by_residential_unit(residential_unit_id)
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Reuniones obtenidas correctamente",
+            data=[MeetingResponse.from_orm(meeting).dict() for meeting in meetings]
+        )
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al obtener las reuniones: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
     "/{meeting_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,

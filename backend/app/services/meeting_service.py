@@ -51,13 +51,13 @@ class MeetingService:
                 ).where(MeetingModel.id == meeting_id)
             )
             meeting = result.scalar_one_or_none()
-            
+
             if not meeting:
                 raise ResourceNotFoundException(
                     message=f"Reunión con ID {meeting_id} no encontrada",
                     details={"meeting_id": meeting_id}
                 )
-            
+
             return meeting
         except ResourceNotFoundException:
             raise
@@ -65,6 +65,27 @@ class MeetingService:
             raise ServiceException(
                 message=f"Error al obtener la reunión: {str(e)}",
                 details={"original_error": str(e)}
+            )
+
+    async def get_meetings_by_residential_unit(self, residential_unit_id: int) -> List[MeetingModel]:
+        """
+        Obtiene todas las reuniones de una unidad residencial.
+        Retorna reuniones en curso y programadas (para encuestas).
+        """
+        try:
+            result = await self.db.execute(
+                select(MeetingModel).options(
+                    selectinload(MeetingModel.residential_unit)
+                ).where(
+                    MeetingModel.int_id_residential_unit == residential_unit_id
+                ).order_by(MeetingModel.dat_schedule_date.desc())
+            )
+            meetings = result.scalars().all()
+            return list(meetings)
+        except Exception as e:
+            raise ServiceException(
+                message=f"Error al obtener las reuniones de la unidad residencial: {str(e)}",
+                details={"original_error": str(e), "residential_unit_id": residential_unit_id}
             )
 
     async def create_meeting(
@@ -327,7 +348,7 @@ class MeetingService:
         try:
             meeting = await self.get_meeting_by_id(meeting_id)
             
-            meeting.str_status = "En curso"
+            meeting.str_status = "En Curso"
             meeting.dat_actual_start_time = datetime.now()
             meeting.updated_at = datetime.now()
             meeting.updated_by = user_id
