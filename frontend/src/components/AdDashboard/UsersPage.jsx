@@ -398,6 +398,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onBulkToggleAccess={handleBulkToggleAccess}
             showSearch={true}
             title="Copropietarios"
+            isSuperAdmin={false}
             onSendBulkCredentials={(selectedResidents) => {
               if (selectedResidents.length === 0) {
                 Swal.fire({

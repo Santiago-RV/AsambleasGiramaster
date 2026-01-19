@@ -6,6 +6,9 @@ import ResidentActionsMenu from './ResidentActionsMenu';
 /**
  * Componente reutilizable para mostrar lista de residentes
  * Usado tanto en Admin Dashboard como en Super Admin Dashboard
+ *
+ * @param {boolean} isSuperAdmin - Si es true, puede habilitar/deshabilitar acceso a todos los usuarios incluyendo administradores.
+ *                                 Si es false (Admin), solo puede habilitar/deshabilitar copropietarios (rol 3) e invitados (rol 4).
  */
 const ResidentsList = ({
 	residents,
@@ -19,6 +22,7 @@ const ResidentsList = ({
 	onBulkToggleAccess,
 	showSearch = false, // Nueva prop para mostrar/ocultar barra de búsqueda
 	title = "Residentes", // Título personalizable
+	isSuperAdmin = false, // Si es SuperAdmin puede gestionar acceso de todos
 }) => {
 	const [selectedResidents, setSelectedResidents] = useState([]);
 	const [selectAll, setSelectAll] = useState(false);
@@ -26,6 +30,20 @@ const ResidentsList = ({
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const [searchTerm, setSearchTerm] = useState('');
 	const menuButtonRefs = useRef({});
+
+	/**
+	 * Determina si se puede modificar el acceso de un residente
+	 * - SuperAdmin: puede modificar acceso de todos (incluyendo administradores)
+	 * - Admin: solo puede modificar acceso de copropietarios (rol 3) e invitados (rol 4)
+	 */
+	const canToggleAccess = (resident) => {
+		if (isSuperAdmin) {
+			return true; // SuperAdmin puede modificar todos
+		}
+		// Admin solo puede modificar copropietarios (3) e invitados (4)
+		const residentRole = resident.int_id_rol;
+		return residentRole === 3 || residentRole === 4;
+	};
 
 	// Filtrar residentes por búsqueda
 	const filteredResidents = residents?.filter((resident) => {
@@ -213,9 +231,25 @@ const ResidentsList = ({
 								)}
 							</button>
 
-							{/* Botón para habilitar acceso masivo */}
+							{/* Botón para habilitar acceso masivo - filtra solo residentes modificables */}
 							<button
-								onClick={() => onBulkToggleAccess(selectedResidents, true)}
+								onClick={() => {
+									// Filtrar solo los residentes que el usuario puede modificar
+									const modifiableResidents = selectedResidents.filter((id) => {
+										const resident = filteredResidents.find((r) => r.id === id);
+										return resident && canToggleAccess(resident);
+									});
+									if (modifiableResidents.length > 0) {
+										onBulkToggleAccess(modifiableResidents, true);
+									} else {
+										Swal.fire({
+											icon: 'warning',
+											title: 'Sin permisos',
+											text: 'No tienes permisos para modificar el acceso de los usuarios seleccionados.',
+											confirmButtonColor: '#3498db',
+										});
+									}
+								}}
 								className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 								title="Habilitar acceso"
 							>
@@ -223,9 +257,25 @@ const ResidentsList = ({
 								<span className="hidden sm:inline">Habilitar</span>
 							</button>
 
-							{/* Botón para deshabilitar acceso masivo */}
+							{/* Botón para deshabilitar acceso masivo - filtra solo residentes modificables */}
 							<button
-								onClick={() => onBulkToggleAccess(selectedResidents, false)}
+								onClick={() => {
+									// Filtrar solo los residentes que el usuario puede modificar
+									const modifiableResidents = selectedResidents.filter((id) => {
+										const resident = filteredResidents.find((r) => r.id === id);
+										return resident && canToggleAccess(resident);
+									});
+									if (modifiableResidents.length > 0) {
+										onBulkToggleAccess(modifiableResidents, false);
+									} else {
+										Swal.fire({
+											icon: 'warning',
+											title: 'Sin permisos',
+											text: 'No tienes permisos para modificar el acceso de los usuarios seleccionados.',
+											confirmButtonColor: '#3498db',
+										});
+									}
+								}}
 								className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 								title="Deshabilitar acceso"
 							>
@@ -381,22 +431,24 @@ const ResidentsList = ({
 												<Mail size={20} className="text-blue-600 group-hover:text-blue-700" />
 											</button>
 
-											{/* Botón de toggle access */}
-											<button
-												onClick={(e) => {
-													e.stopPropagation();
-													onToggleAccess(resident);
-												}}
-												className={`p-2 rounded-lg transition-colors group ${resident.bln_allow_entry ? 'hover:bg-red-100' : 'hover:bg-green-100'
-													}`}
-												title={resident.bln_allow_entry ? 'Deshabilitar acceso' : 'Habilitar acceso'}
-											>
-												{resident.bln_allow_entry ? (
-													<UserX size={20} className="text-red-600 group-hover:text-red-700" />
-												) : (
-													<UserCheck size={20} className="text-green-600 group-hover:text-green-700" />
-												)}
-											</button>
+											{/* Botón de toggle access - solo visible si puede modificar el acceso */}
+											{canToggleAccess(resident) && (
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														onToggleAccess(resident);
+													}}
+													className={`p-2 rounded-lg transition-colors group ${resident.bln_allow_entry ? 'hover:bg-red-100' : 'hover:bg-green-100'
+														}`}
+													title={resident.bln_allow_entry ? 'Deshabilitar acceso' : 'Habilitar acceso'}
+												>
+													{resident.bln_allow_entry ? (
+														<UserX size={20} className="text-red-600 group-hover:text-red-700" />
+													) : (
+														<UserCheck size={20} className="text-green-600 group-hover:text-green-700" />
+													)}
+												</button>
+											)}
 
 											{/* Botón del menú de 3 puntos */}
 											<button

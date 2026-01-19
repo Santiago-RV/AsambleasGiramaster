@@ -31,23 +31,40 @@ const ResidentModal = ({
         },
     });
 
-    // Cargar datos del residente cuando está en modo edición
+    // Resetear el formulario cuando cambia el modo o se abre/cierra el modal
     useEffect(() => {
-        if (mode === 'edit' && resident) {
-            setValue('firstname', resident.firstname || '');
-            setValue('lastname', resident.lastname || '');
-            setValue('username', resident.username || '');
-            setValue('email', resident.email || '');
-            setValue('phone', resident.phone || '');
-            setValue('apartment_number', resident.apartment_number || '');
-            setValue('voting_weight', resident.voting_weight || '');
-            setValue(
-                'is_active',
-                resident.is_active !== undefined ? resident.is_active : true
-            );
-            setValue('password', '');
+        if (isOpen) {
+            if (mode === 'edit' && resident) {
+                // Modo edición: cargar datos del residente
+                reset({
+                    firstname: resident.firstname || '',
+                    lastname: resident.lastname || '',
+                    username: resident.username || '',
+                    email: resident.email || '',
+                    phone: resident.phone || '',
+                    apartment_number: resident.apartment_number || '',
+                    voting_weight: resident.voting_weight || '',
+                    is_active: resident.is_active !== undefined
+                        ? resident.is_active
+                        : (resident.bln_allow_entry !== undefined ? resident.bln_allow_entry : true),
+                    password: '',
+                });
+            } else {
+                // Modo creación: valores por defecto
+                reset({
+                    firstname: '',
+                    lastname: '',
+                    username: '',
+                    email: '',
+                    phone: '',
+                    apartment_number: '',
+                    voting_weight: '',
+                    is_active: true,
+                    password: '',
+                });
+            }
         }
-    }, [mode, resident, setValue]);
+    }, [isOpen, mode, resident, reset]);
 
     const handleClose = () => {
         reset();
@@ -278,29 +295,28 @@ const ResidentModal = ({
                     </label>
                     <input
                         type="password"
-                        {...register(
-                            'password',
-                            mode === 'create'
-                                ? {
-                                    required: 'La contraseña es obligatoria',
-                                    minLength: {
-                                        value: 8,
-                                        message:
-                                            'La contraseña debe tener mínimo 8 caracteres',
-                                    },
+                        {...register('password', {
+                            validate: (value) => {
+                                // En modo edición, la contraseña es opcional
+                                if (mode === 'edit') {
+                                    if (!value || value.trim() === '') {
+                                        return true; // Válido si está vacío
+                                    }
+                                    if (value.length < 8) {
+                                        return 'La contraseña debe tener mínimo 8 caracteres';
+                                    }
+                                    return true;
                                 }
-                                : {
-                                    validate: (value) => {
-                                        if (!value || value.trim() === '') {
-                                            return true;
-                                        }
-                                        if (value.length < 8) {
-                                            return 'La contraseña debe tener mínimo 8 caracteres';
-                                        }
-                                        return true;
-                                    },
+                                // En modo crear, la contraseña es obligatoria
+                                if (!value || value.trim() === '') {
+                                    return 'La contraseña es obligatoria';
                                 }
-                        )}
+                                if (value.length < 8) {
+                                    return 'La contraseña debe tener mínimo 8 caracteres';
+                                }
+                                return true;
+                            },
+                        })}
                         placeholder={
                             mode === 'create'
                                 ? 'Contraseña inicial del copropietario'

@@ -327,6 +327,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 					onToggleAccess={handleToggleAccess}
 					onBulkToggleAccess={handleBulkToggleAccess}
 					showSearch={true}
+					isSuperAdmin={true}
 				/>
 
 				{/* Lista de Reuniones */}
