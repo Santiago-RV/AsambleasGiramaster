@@ -40,6 +40,18 @@ const CoownerService = {
 	},
 
 	/**
+	 * Elimina un residente/copropietario de la unidad residencial
+	 * @param {number} unitId - ID de la unidad residencial
+	 * @param {number} userId - ID del usuario a eliminar
+	 */
+	deleteResident: async (unitId, userId) => {
+		const response = await axiosInstance.delete(
+			`/residential-units/units/${unitId}/residents/${userId}`
+		);
+		return response.data;
+	},
+
+	/**
 	 * Habilita el acceso de un copropietario al sistema
 	 */
 	enableCoowner: async (coownerId, sendEmail = true) => {
