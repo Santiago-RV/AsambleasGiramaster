@@ -1,4 +1,5 @@
 import axiosInstance from "./axiosconfig";
+import * as XLSX from 'xlsx';
 
 /**
  * Servicio para manejar las operaciones de unidades residenciales
@@ -448,29 +449,24 @@ export class ResidentialUnitService {
       'lastname',
       'phone',
       'apartment_number',
-      'voting_weight',
-      'password'
+      'voting_weight'
     ];
 
     const exampleRows = [
-      ['juan.perez@example.com', 'Juan', 'Pérez', '+57 300 111 2222', '101', '0.25', 'Temporal123!'],
-      ['maria.garcia@example.com', 'María', 'García', '+57 300 222 3333', '102', '0.30', 'Temporal123!'],
+      ['juan.perez@example.com', 'Juan', 'Pérez', '+57 300 111 2222', '101', '0.25'],
+      ['maria.garcia@example.com', 'María', 'García', '+57 300 222 3333', '102', '0.30'],
     ];
 
-    const csvContent = [
-      headers.join(','),
-      ...exampleRows.map(row => row.join(','))
-    ].join('\n');
+    const worksheetData = [
+      headers,
+      ...exampleRows
+    ];
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
 
-    link.href = url;
-    link.download = 'plantilla_copropietarios.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Copropietarios');
+
+    XLSX.writeFile(workbook, 'plantilla_copropietarios.xlsx');
   }
 }
