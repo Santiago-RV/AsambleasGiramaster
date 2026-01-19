@@ -9,6 +9,40 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-01-18
+
+- **Unificación de componente ResidentsList para Admin y SuperAdmin**:
+  - **Objetivo**: Eliminar duplicación de código y mejorar mantenibilidad usando un solo componente compartido
+  - **Componentes creados en `frontend/src/components/common/`**:
+    - `ResidentsList.jsx`: Componente unificado con las siguientes características:
+      - Prop `showSearch` (boolean, default: false) para mostrar/ocultar barra de búsqueda integrada
+      - Prop `title` (string, default: "Residentes") para personalizar el título del componente
+      - Búsqueda integrada por nombre, usuario, email, teléfono y número de apartamento
+      - Indicador de estado visual (badge "Activo"/"Inactivo") basado en `bln_allow_entry`
+      - Reset automático de selección al cambiar término de búsqueda
+      - Soporte completo para acciones masivas (envío de credenciales, habilitar/deshabilitar acceso)
+    - `ResidentActionsMenu.jsx`: Menú de acciones (Ver, Editar, Eliminar) extraído a componente común
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/UsersPage.jsx`:
+      - Import cambiado de `"../saDashboard/components/ResidentsList"` a `"../common/ResidentsList"`
+      - Agregadas props `showSearch={true}` y `title="Copropietarios"`
+    - `frontend/src/components/saDashboard/UnidadResidencialDetalles.jsx`:
+      - Import cambiado de `'./components/ResidentsList'` a `'../common/ResidentsList'`
+      - Eliminado import de `SearchBar` (ahora integrado en ResidentsList)
+      - Eliminado estado `searchTerm` y lógica de filtrado (manejado internamente por ResidentsList)
+      - Agregada prop `showSearch={true}` a ResidentsList
+      - Cambiado `filteredResidents` a `residentsData` en props
+  - **Archivos eliminados**:
+    - `frontend/src/components/saDashboard/components/ResidentsList.jsx`
+    - `frontend/src/components/saDashboard/components/ResidentActionsMenu.jsx`
+    - `frontend/src/components/saDashboard/components/SearchBar.jsx`
+  - **Beneficios**:
+    - Código DRY: Un solo componente para ambos dashboards
+    - Barra de búsqueda ahora disponible en Admin Dashboard
+    - Mantenimiento simplificado: cambios en un solo lugar
+    - Consistencia visual entre vistas de Admin y SuperAdmin
+    - Mejor organización del código con componentes en carpeta `common`
+
 #### 2026-01-14
 
 - **Sistema mejorado de gestión de unidades residenciales en SuperAdmin**:

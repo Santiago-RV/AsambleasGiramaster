@@ -7,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
-import '../../styles/swal-custom.css';
 
 // NO precargar aquí para evitar que los estilos se carguen globalmente
 // ZoomMtg.preLoadWasm();
@@ -444,25 +443,16 @@ const ZoomMeetingContainer = ({
 			// Cerrar modal
 			handleClosePollModal();
 
-			// Mostrar mensaje de éxito con SweetAlert2
+			// Mostrar mensaje de éxito
 			Swal.fire({
 				icon: 'success',
 				title: '¡Voto Registrado!',
-				html: '<p style="color: #6b7280; margin: 0;">Tu voto ha sido registrado exitosamente</p>',
-				showConfirmButton: false,
-				timer: 3000,
+				text: 'Tu voto ha sido registrado exitosamente',
 				toast: true,
 				position: 'top-end',
-				background: '#ffffff',
-				customClass: {
-					popup: 'poll-success-toast',
-					title: 'poll-toast-title',
-					icon: 'poll-toast-icon'
-				},
-				didOpen: (toast) => {
-					toast.style.borderLeft = '4px solid #9333ea';
-					toast.style.boxShadow = '0 10px 15px -3px rgba(147, 51, 234, 0.3)';
-				}
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		} catch (error) {
 			console.error('❌ Error al votar:', error);

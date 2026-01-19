@@ -301,6 +301,7 @@ export class PollService {
 
   /**
    * Obtener reuniones en vivo para gestión de encuestas
+   * Incluye reuniones en curso y programadas para la próxima hora
    */
   static async getLiveMeetings(residentialUnitId) {
     const response = await axiosInstance.get(`/meetings/residential-unit/${residentialUnitId}`);
@@ -310,9 +311,24 @@ export class PollService {
       const ONE_HOUR_MS = 60 * 60 * 1000;
 
       const liveMeetings = response.data.data.filter((meeting) => {
-        const isValidStatus = meeting.str_status === 'Programada' || meeting.str_status === 'En Curso';
-        console.log('🔍 [getLiveMeetings] Reunión:', meeting.str_title, '- Status válido:', isValidStatus, '- Estado:', meeting.str_status);
-        return isValidStatus;
+        // Reuniones en curso siempre se muestran
+        if (meeting.str_status === 'En Curso') {
+          console.log('🔍 [getLiveMeetings] Reunión en curso:', meeting.str_title);
+          return true;
+        }
+
+        // Reuniones programadas: mostrar si están dentro de la próxima hora
+        if (meeting.str_status === 'Programada') {
+          const scheduleDate = new Date(meeting.dat_schedule_date);
+          const timeDiff = scheduleDate.getTime() - now.getTime();
+
+          // Mostrar si la reunión está programada para dentro de una hora o ya pasó la hora (pero aún está programada)
+          const isWithinOneHour = timeDiff <= ONE_HOUR_MS && timeDiff >= -ONE_HOUR_MS;
+          console.log('🔍 [getLiveMeetings] Reunión programada:', meeting.str_title, '- Fecha:', scheduleDate, '- Dentro de 1 hora:', isWithinOneHour);
+          return isWithinOneHour;
+        }
+
+        return false;
       });
 
       console.log('📊 [getLiveMeetings] Reuniones filtradas:', liveMeetings.length);

@@ -106,10 +106,11 @@ export default function AppAdmin() {
         icon: 'success',
         title: '¡Éxito!',
         text: response.message || 'Copropietario creado exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -131,10 +132,11 @@ export default function AppAdmin() {
         icon: 'success',
         title: '¡Éxito!',
         text: response.message || 'Copropietario actualizado exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -176,8 +178,9 @@ export default function AppAdmin() {
           text: 'No se detectaron cambios para guardar',
           toast: true,
           position: 'top-end',
-          timer: 2000,
           showConfirmButton: false,
+          timer: 3000,
+          backdrop: false,
         });
         return;
       }
@@ -206,10 +209,11 @@ export default function AppAdmin() {
         icon: 'success',
         title: '¡Reunión Creada!',
         text: response.message || 'La reunión de Zoom ha sido creada exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {

@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 
+/**
+ * Componente reutilizable para mostrar lista de residentes
+ * Usado tanto en Admin Dashboard como en Super Admin Dashboard
+ */
 const ResidentsList = ({
 	residents,
 	isLoading,
@@ -12,13 +16,30 @@ const ResidentsList = ({
 	onSendBulkCredentials,
 	isSendingBulk,
 	onToggleAccess,
-	onBulkToggleAccess
+	onBulkToggleAccess,
+	showSearch = false, // Nueva prop para mostrar/ocultar barra de búsqueda
+	title = "Residentes", // Título personalizable
 }) => {
 	const [selectedResidents, setSelectedResidents] = useState([]);
 	const [selectAll, setSelectAll] = useState(false);
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+	const [searchTerm, setSearchTerm] = useState('');
 	const menuButtonRefs = useRef({});
+
+	// Filtrar residentes por búsqueda
+	const filteredResidents = residents?.filter((resident) => {
+		if (!searchTerm) return true;
+		const search = searchTerm.toLowerCase();
+		return (
+			resident.firstname?.toLowerCase().includes(search) ||
+			resident.lastname?.toLowerCase().includes(search) ||
+			resident.username?.toLowerCase().includes(search) ||
+			resident.email?.toLowerCase().includes(search) ||
+			resident.apartment_number?.toLowerCase().includes(search) ||
+			resident.phone?.toLowerCase().includes(search)
+		);
+	}) || [];
 
 	// Actualizar posición del menú cuando cambia el scroll o el tamaño de la ventana
 	useEffect(() => {
@@ -29,7 +50,7 @@ const ResidentsList = ({
 			) {
 				const button = menuButtonRefs.current[selectedResidentMenu];
 				const rect = button.getBoundingClientRect();
-				const menuWidth = 192; // w-48 = 12rem = 192px
+				const menuWidth = 192;
 				const viewportWidth = window.innerWidth;
 				const viewportHeight = window.innerHeight;
 
@@ -81,11 +102,17 @@ const ResidentsList = ({
 		};
 	}, [selectedResidentMenu]);
 
+	// Resetear selección cuando cambian los residentes filtrados
+	useEffect(() => {
+		setSelectedResidents([]);
+		setSelectAll(false);
+	}, [searchTerm]);
+
 	const handleSelectAll = () => {
 		if (selectAll) {
 			setSelectedResidents([]);
 		} else {
-			setSelectedResidents(residents.map((r) => r.id));
+			setSelectedResidents(filteredResidents.map((r) => r.id));
 		}
 		setSelectAll(!selectAll);
 	};
@@ -96,14 +123,13 @@ const ResidentsList = ({
 				? prev.filter((id) => id !== residentId)
 				: [...prev, residentId];
 
-			setSelectAll(updated.length === residents.length);
+			setSelectAll(updated.length === filteredResidents.length);
 			return updated;
 		});
 	};
 
 	const handleSendBulkCredentials = () => {
 		onSendBulkCredentials(selectedResidents, () => {
-			// Callback para limpiar selección después del envío exitoso
 			setSelectedResidents([]);
 			setSelectAll(false);
 		});
@@ -155,7 +181,7 @@ const ResidentsList = ({
 				<div className="flex items-center justify-between mb-4">
 					<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
 						<UsersIcon size={24} />
-						Residentes ({residents?.length || 0})
+						{title} ({filteredResidents?.length || 0})
 					</h2>
 
 					{/* Botones de acción masiva */}
@@ -209,6 +235,23 @@ const ResidentsList = ({
 						</div>
 					)}
 				</div>
+
+				{/* Barra de búsqueda (opcional) */}
+				{showSearch && (
+					<div className="relative">
+						<Search
+							className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+							size={20}
+						/>
+						<input
+							type="text"
+							placeholder="Buscar por nombre, usuario, email, teléfono o apartamento..."
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+							className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent"
+						/>
+					</div>
+				)}
 			</div>
 
 			<div
@@ -238,7 +281,7 @@ const ResidentsList = ({
 							></path>
 						</svg>
 					</div>
-				) : residents && residents.length > 0 ? (
+				) : filteredResidents && filteredResidents.length > 0 ? (
 					<>
 						{/* Checkbox para seleccionar todos */}
 						<div className="px-4 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
@@ -250,14 +293,14 @@ const ResidentsList = ({
 									className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
 								/>
 								<span className="text-sm font-semibold text-gray-700">
-									Seleccionar todos ({residents.length})
+									Seleccionar todos ({filteredResidents.length})
 								</span>
 							</label>
 						</div>
 
 						{/* Lista de residentes */}
 						<div className="divide-y divide-gray-200">
-							{residents.map((resident) => (
+							{filteredResidents.map((resident) => (
 								<div
 									key={resident.id}
 									className="p-4 hover:bg-gray-50 transition-colors relative"
@@ -280,6 +323,22 @@ const ResidentsList = ({
 											<p className="text-sm text-gray-600 mt-1">
 												Apt. {resident.apartment_number}
 											</p>
+											{resident.email && (
+												<p className="text-xs text-gray-500 truncate">
+													{resident.email}
+												</p>
+											)}
+										</div>
+
+										{/* Indicador de estado */}
+										<div className="flex-shrink-0 mr-2">
+											<span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+												resident.bln_allow_entry
+													? 'bg-green-100 text-green-700'
+													: 'bg-red-100 text-red-700'
+											}`}>
+												{resident.bln_allow_entry ? 'Activo' : 'Inactivo'}
+											</span>
 										</div>
 
 										{/* Botones de acción */}
@@ -287,27 +346,27 @@ const ResidentsList = ({
 
 											{/* Botón para enviar WhatsApp */}
 											<button
-											onClick={(e) => {
-												e.stopPropagation();
+												onClick={(e) => {
+													e.stopPropagation();
 
-												if (!resident?.phone) {
-												Swal.fire({
-													icon: 'error',
-													title: 'Sin número de WhatsApp',
-													text: 'Este usuario no posee un número de WhatsApp registrado.',
-													confirmButtonText: 'Cerrar',
-													confirmButtonColor: '#25D366',
-												});
-												return;
-												}
+													if (!resident?.phone) {
+														Swal.fire({
+															icon: 'error',
+															title: 'Sin número de WhatsApp',
+															text: 'Este usuario no posee un número de WhatsApp registrado.',
+															confirmButtonText: 'Cerrar',
+															confirmButtonColor: '#25D366',
+														});
+														return;
+													}
 
-												const phone = resident.phone.replace(/\D/g, "");
-												window.open(`https://wa.me/${phone}`, "_blank");
-											}}
-											className="p-2 hover:bg-green-100 rounded-lg transition-colors"
-											title="Enviar WhatsApp"
+													const phone = resident.phone.replace(/\D/g, "");
+													window.open(`https://wa.me/${phone}`, "_blank");
+												}}
+												className="p-2 hover:bg-green-100 rounded-lg transition-colors"
+												title="Enviar WhatsApp"
 											>
-											<img src="/Wpp.png" alt="WhatsApp" className="w-5 h-5" />
+												<img src="/Wpp.png" alt="WhatsApp" className="w-5 h-5" />
 											</button>
 
 											{/* Botón para enviar credenciales individual */}
@@ -322,7 +381,7 @@ const ResidentsList = ({
 												<Mail size={20} className="text-blue-600 group-hover:text-blue-700" />
 											</button>
 
-											{/* Botón de toggle access - NUEVO */}
+											{/* Botón de toggle access */}
 											<button
 												onClick={(e) => {
 													e.stopPropagation();
@@ -360,7 +419,11 @@ const ResidentsList = ({
 				) : (
 					<div className="text-center py-12">
 						<UsersIcon className="mx-auto text-gray-400 mb-4" size={48} />
-						<p className="text-gray-600">No hay residentes registrados</p>
+						<p className="text-gray-600">
+							{searchTerm
+								? 'No se encontraron residentes con esa búsqueda'
+								: 'No hay residentes registrados'}
+						</p>
 					</div>
 				)}
 			</div>
@@ -368,7 +431,7 @@ const ResidentsList = ({
 			{/* Menú de acciones */}
 			{selectedResidentMenu && (
 				<ResidentActionsMenu
-					resident={residents.find((r) => r.id === selectedResidentMenu)}
+					resident={filteredResidents.find((r) => r.id === selectedResidentMenu)}
 					position={menuPosition}
 					onView={() => { }}
 					onEdit={onEditResident}

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Plus, Shield, ShieldOff } from 'lucide-react';
+import { Upload, Plus } from 'lucide-react';
 import Swal from 'sweetalert2';
-import ResidentsList from "../saDashboard/components/ResidentsList";
+import ResidentsList from "../common/ResidentsList";
 import MeetingsSection from "./MeetingsSection";
 import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
 import { ResidentService } from "../../services/api/ResidentService";
@@ -67,10 +67,11 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
         icon: 'success',
         title: '¡Eliminado!',
         text: response.message || 'El usuario ha sido eliminado exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -144,11 +145,12 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       Swal.fire({
         icon: 'success',
         title: '¡Acceso Modificado!',
-        html: `<p class="text-sm">Acceso ${action} exitosamente</p>`,
-        timer: 2000,
-        showConfirmButton: false,
+        text: `Acceso ${action} exitosamente`,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -394,6 +396,8 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onDeleteResident={handleDeleteResident}
             onToggleAccess={handleToggleAccess}
             onBulkToggleAccess={handleBulkToggleAccess}
+            showSearch={true}
+            title="Copropietarios"
             onSendBulkCredentials={(selectedResidents) => {
               if (selectedResidents.length === 0) {
                 Swal.fire({

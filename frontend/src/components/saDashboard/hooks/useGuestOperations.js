@@ -20,10 +20,11 @@ export const useGuestOperations = (unitId) => {
 				icon: 'success',
 				title: '¡Éxito!',
 				text: response.message || 'Invitado creado exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {
@@ -48,10 +49,11 @@ export const useGuestOperations = (unitId) => {
 				icon: 'success',
 				title: '¡Eliminado!',
 				text: response.message || 'Invitado eliminado exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {

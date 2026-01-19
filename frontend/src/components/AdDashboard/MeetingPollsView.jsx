@@ -41,10 +41,11 @@ export default function MeetingPollsView({ meeting, onBack }) {
         icon: 'success',
         title: 'Encuesta Iniciada',
         text: 'La encuesta está activa y disponible en la reunión',
-        showConfirmButton: false,
-        timer: 3000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -73,10 +74,11 @@ export default function MeetingPollsView({ meeting, onBack }) {
         icon: 'success',
         title: 'Encuesta Finalizada',
         text: 'La encuesta ha sido cerrada',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -105,10 +107,11 @@ export default function MeetingPollsView({ meeting, onBack }) {
         icon: 'success',
         title: 'Encuesta Creada',
         text: response.message || 'La encuesta ha sido creada exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
       setShowCreatePoll(false);
     },

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResidentialCode } from '../../hooks/useResidentialCode';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
-import { Building2, FileText, MapPin, Hash, Home, Users, Calendar, Map, Plus, UserCog, Mail, Phone, User, Briefcase, MoreVertical, Edit2, Trash2, LayoutGrid, List } from 'lucide-react';
+import { Building2, FileText, MapPin, Hash, Home, Users, Map, Plus, Phone, User, Briefcase, MoreVertical, Edit2, Trash2, LayoutGrid, List } from 'lucide-react';
 import Modal from '../common/Modal';
 
 const UnidadesResidencialesTab = ({ onViewDetails }) => {
@@ -84,13 +84,12 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			Swal.fire({
 				icon: 'success',
 				title: '¡Éxito!',
-				text:
-					response.message ||
-					'Unidad residencial creada exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
+				text: response.message || 'Unidad residencial creada exitosamente',
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {
@@ -214,10 +213,11 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 					icon: 'success',
 					title: 'Eliminada',
 					text: 'La unidad residencial ha sido eliminada exitosamente.',
-					showConfirmButton: false,
-					timer: 2000,
 					toast: true,
 					position: 'top-end',
+					showConfirmButton: false,
+					timer: 3000,
+					backdrop: false,
 				});
 			}
 		});

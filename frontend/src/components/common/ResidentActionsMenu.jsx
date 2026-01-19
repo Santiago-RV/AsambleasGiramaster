@@ -21,7 +21,7 @@ const ResidentActionsMenu = ({
 					<p><strong>Email:</strong> ${resident.email}</p>
 					${resident.phone ? `<p><strong>Teléfono:</strong> ${resident.phone}</p>` : ''}
 					<p><strong>Apartamento:</strong> ${resident.apartment_number}</p>
-					<p><strong>Estado:</strong> ${resident.is_active ? 'Activo' : 'Inactivo'}</p>
+					<p><strong>Estado:</strong> ${resident.bln_allow_entry ? 'Activo' : 'Inactivo'}</p>
 				</div>
 			`,
 			confirmButtonColor: '#3498db',
