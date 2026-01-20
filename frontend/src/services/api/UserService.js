@@ -18,4 +18,17 @@ export class UserService {
 		const response = await axiosInstance.get(`/user/${userId}/residential-unit`);
 		return response.data;
 	}
+
+	/**
+	 * Obtener datos completos del usuario actual
+	 */
+	static async getCurrentUserData() {
+		try {
+			const response = await axiosInstance.get('/user/me/complete-data');
+			return response.data;
+		} catch (error) {
+			console.error('Error al obtener datos del usuario:', error);
+			throw error;
+		}
+	}
 }

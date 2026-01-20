@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Video, FileText, User, LogOut } from 'lucide-react';
+import { Video, FileText, User, LogOut, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { useAuthContext } from '../providers/AuthProvider';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import ProfilePage from '../components/CoDashboard/ProfilePage';
 import VotingPage from '../components/CoDashboard/VotingPage';
@@ -11,8 +13,11 @@ import { UserService } from '../services/api/UserService';
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');
   const [residentialUnitId, setResidentialUnitId] = useState(null);
+  const [residentialUnitName, setResidentialUnitName] = useState('');
   const [userRole, setUserRole] = useState(3); // Default: copropietario
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const { user } = useAuthContext();
 
   // OBTENER ROL DEL USUARIO DESDE LOCALSTORAGE
   useEffect(() => {
@@ -30,7 +35,7 @@ export default function AppCopropietario() {
         console.log('[CoDashboard] Rol establecido:', role);
         console.log('[CoDashboard] Es invitado?:', role === "Invitado");
       } catch (error) {
-        console.error(' [CoDashboard] Error al parsear usuario:', error);
+        console.error('[CoDashboard] Error al parsear usuario:', error);
         setUserRole(3); // Default a copropietario en caso de error
       }
     } else {
@@ -42,20 +47,24 @@ export default function AppCopropietario() {
   // DETECTAR SI ES INVITADO (ROL 4)
   const isGuest = userRole === "Invitado";
 
-  // Log del estado actual
-  useEffect(() => {
-    console.log('[CoDashboard] Estado actual:', {
-      userRole,
-      isGuest,
-      section
-    });
-  }, [userRole, isGuest, section]);
+  // Obtener información de la unidad residencial
+  const {
+    data: residentialUnitData,
+    isLoading: isLoadingUnit,
+    isError: isErrorUnit,
+  } = useQuery({
+    queryKey: ['user-residential-unit'],
+    queryFn: UserService.getMyResidentialUnit,
+    retry: 1,
+  });
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
+  // Sincronizar datos de la unidad residencial
+  useEffect(() => {
+    if (residentialUnitData?.success && residentialUnitData?.data) {
+      setResidentialUnitId(residentialUnitData.data.residential_unit_id);
+      setResidentialUnitName(residentialUnitData.data.residential_unit_name || 'Mi Unidad');
+    }
+  }, [residentialUnitData]);
 
   // CONFIGURACIÓN DEL MENÚ CON ROLES PERMITIDOS
   const allMenuItems = [
@@ -80,42 +89,18 @@ export default function AppCopropietario() {
   ];
 
   // FILTRAR MENÚ SEGÚN ROL DEL USUARIO
-  const menuItems = allMenuItems.filter(item => {
-    const isAllowed = item.allowedRoles.includes(userRole);
-    console.log(`[CoDashboard] Menu item "${item.label}":`, {
-      allowedRoles: item.allowedRoles,
-      userRole,
-      isAllowed
-    });
-    return isAllowed;
-  });
+  const menuItems = allMenuItems.filter(item =>
+    item.allowedRoles.includes(userRole)
+  );
 
-  console.log('[CoDashboard] Items del menú filtrados:', menuItems.map(i => i.label));
+  // Títulos para cada sección
+  const sectionTitles = {
+    meetings: "Reuniones Virtuales",
+    voting: "Encuestas Activas",
+    profile: "Mi Perfil",
+  };
 
-  // Obtener la unidad residencial del usuario actual
-  const {
-    data: residentialUnitData,
-    isLoading: isLoadingUnit,
-    isError: isErrorUnit,
-  } = useQuery({
-    queryKey: ['my-residential-unit'],
-    queryFn: UserService.getMyResidentialUnit,
-    retry: 1,
-    onSuccess: (data) => {
-      if (data?.success && data?.data?.residential_unit_id) {
-        setResidentialUnitId(data.data.residential_unit_id);
-      }
-    },
-  });
-
-  // Sincronizar el residential unit id cuando llegue
-  useEffect(() => {
-    if (residentialUnitData?.success && residentialUnitData?.data?.residential_unit_id) {
-      setResidentialUnitId(residentialUnitData.data.residential_unit_id);
-    }
-  }, [residentialUnitData]);
-
-  // Manejo de loading y errores
+  // Mostrar loading mientras carga
   if (isLoadingUnit) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -146,6 +131,7 @@ export default function AppCopropietario() {
     );
   }
 
+  // Mostrar error si no se pudo cargar la unidad residencial
   if (isErrorUnit || !residentialUnitId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -167,15 +153,82 @@ export default function AppCopropietario() {
     );
   }
 
-  // Footer personalizado con botón de cerrar sesión
-  const sidebarFooter = (
-    <button
-      onClick={handleLogout}
-      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-white hover:bg-red-500 transition-all"
-    >
-      <LogOut size={20} />
-      <span>Cerrar Sesión</span>
-    </button>
+  // Header personalizado similar al de Admin
+  const headerContent = (
+    <div className="px-8 py-4 flex justify-between items-center">
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold text-gray-800">
+          {sectionTitles[section]}
+        </h1>
+        {isGuest && (
+          <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
+            Invitado
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-4">
+        {/* Botón de inicio */}
+        <button
+          onClick={() => setSection('meetings')}
+          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Inicio"
+        >
+          <Home size={20} />
+        </button>
+
+        {/* Separador */}
+        <div className="w-px h-8 bg-gray-300"></div>
+
+        {/* Perfil de usuario */}
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-full ${
+            isGuest 
+              ? 'bg-gradient-to-br from-purple-500 to-purple-600' 
+              : 'bg-gradient-to-br from-[#2563eb] to-[#1e40af]'
+          } flex items-center justify-center text-white font-bold shadow-md`}>
+            {user?.name
+              ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+              : isGuest ? 'IN' : 'CO'
+            }
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-gray-800">
+              {user?.name || (isGuest ? 'Invitado' : 'Copropietario')}
+            </span>
+            <span className="text-xs text-gray-500">
+              {residentialUnitName}
+            </span>
+          </div>
+        </div>
+
+        {/* Cerrar sesión */}
+        <div className="relative group">
+          <button
+            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Cerrar sesión"
+          >
+            <LogOut size={20} />
+          </button>
+
+          {/* Menú desplegable */}
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <button
+              onClick={() => setSection('meetings')}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors"
+            >
+              Volver al Inicio
+            </button>
+            <button
+              onClick={logout}
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg transition-colors"
+            >
+              Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   return (
@@ -188,9 +241,9 @@ export default function AppCopropietario() {
       gradientFrom="#2563eb"
       gradientTo="#1e40af"
       accentColor="#ffffff"
-      sidebarFooter={sidebarFooter}
+      header={headerContent}
     >
-      {/* Solo mostrar secciones permitidas para cada rol */}
+      {/* Contenido de las secciones */}
       {section === 'meetings' && (
         <MeetingsPage residentialUnitId={residentialUnitId} />
       )}
