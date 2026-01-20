@@ -94,12 +94,41 @@ const MeetingsPage = ({ residentialUnitId }) => {
     );
   }
 
-  // Separar reuniones por estado
-  const activeOrUpcoming = meetingsData.filter(
-    (m) => m.str_status !== 'Finalizada' && m.str_status !== 'Completada'
+  // CALCULAR ESTADO DINÁMICO PARA CADA REUNIÓN
+  const meetingsWithStatus = meetingsData.map((meeting) => {
+    const now = new Date();
+    const scheduledDate = new Date(meeting.dat_schedule_date);
+    const oneHourBefore = new Date(scheduledDate.getTime() - 60 * 60 * 1000);
+
+    const duration = meeting.int_estimated_duration > 0
+      ? meeting.int_estimated_duration
+      : 240;
+
+    const meetingEnd = new Date(scheduledDate.getTime() + duration * 60 * 1000);
+
+    let computedStatus;
+    if (now < oneHourBefore) {
+      computedStatus = 'Programada';
+    } else if (now < scheduledDate) {
+      computedStatus = 'Disponible';
+    } else if (now < meetingEnd) {
+      computedStatus = 'En Curso';
+    } else {
+      computedStatus = 'Finalizada';
+    }
+
+    return {
+      ...meeting,
+      computedStatus
+    };
+  });
+
+  // Separar reuniones por estado CALCULADO
+  const activeOrUpcoming = meetingsWithStatus.filter(
+    (m) => m.computedStatus !== 'Finalizada'
   );
-  const finished = meetingsData.filter(
-    (m) => m.str_status === 'Finalizada' || m.str_status === 'Completada'
+  const finished = meetingsWithStatus.filter(
+    (m) => m.computedStatus === 'Finalizada'
   );
 
   // ORDENAR REUNIONES ACTIVAS PARA QUE "EN CURSO" APAREZCA PRIMERO
@@ -110,8 +139,8 @@ const MeetingsPage = ({ residentialUnitId }) => {
       'Programada': 2
     };
     
-    const statusA = statusOrder[a.str_status] ?? 3;
-    const statusB = statusOrder[b.str_status] ?? 3;
+    const statusA = statusOrder[a.computedStatus] ?? 3;
+    const statusB = statusOrder[b.computedStatus] ?? 3;
     
     if (statusA !== statusB) {
       return statusA - statusB;
