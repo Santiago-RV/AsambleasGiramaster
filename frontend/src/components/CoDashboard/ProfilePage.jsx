@@ -1,3 +1,4 @@
+import { UserCircle } from "lucide-react";
 import ProfileCard from "./ProfileCard";
 import ProfileStats from "./ProfileStats";
 import HistoryTable from "./HistoryTable";
@@ -37,23 +38,26 @@ export default function ProfilePage() {
   ];
 
   return (
-    <section className="bg-white rounded-xl p-6 shadow-md">
-      <h1 className="text-2xl font-semibold text-[#2c5aa0] border-b-2 pb-2 mb-6">
-        Mi Perfil
-      </h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div className="space-y-6">
+      {/* Sección de información personal y estadísticas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ProfileCard user={user} />
         <ProfileStats stats={stats} />
       </div>
 
-      <h3 className="mt-8 mb-3 text-[#2c5aa0] text-lg font-semibold">
-         Historial de Asambleas
-      </h3>
+      {/* Historial de asambleas */}
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+        <div className="flex items-center gap-2 mb-4">
+          <UserCircle className="text-blue-600" size={24} />
+          <h3 className="text-xl font-bold text-gray-800">
+            Historial de Asambleas
+          </h3>
+        </div>
+        <HistoryTable data={history} />
+      </div>
 
-      <HistoryTable data={history} />
-
+      {/* Configuración de notificaciones */}
       <NotificationSettings />
-    </section>
+    </div>
   );
 }
