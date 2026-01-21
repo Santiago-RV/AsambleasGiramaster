@@ -39,7 +39,9 @@ export class MeetingService {
    * Crear una nueva reunión de Zoom
    */
   static async createMeeting(meetingData) {
-    const response = await axiosInstance.post('/meetings', meetingData);
+    const response = await axiosInstance.post('/meetings', meetingData, {
+      timeout: 35000 // 35 segundos para dar margen a la API de Zoom
+    });
     return response.data;
   }
 

@@ -1,18 +1,19 @@
-// ZoomEmbed.jsx - VERSIÓN CORREGIDA COMPLETA
+// ZoomEmbed.jsx - VERSIÓN CON BURBUJA INFORMATIVA
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
-import { X, Loader2, CheckCircle } from 'lucide-react';
+import { X, Loader2, CheckCircle, UserCircle, Building2, Hash } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
-import { MeetingService } from '../../services/api/MeetingService';
+import { UserService } from '../../services/api/UserService';
 import '../../styles/swal-custom.css';
 
 /**
  * Componente de Zoom usando SDK Web (pantalla completa) para Copropietarios
  * Permite unirse a reuniones como participante (role: 0) CON funcionalidad de votación
+ * Incluye burbuja informativa superior con datos del usuario
 */
 const ZoomEmbed = ({
 	meetingData,
@@ -40,6 +41,24 @@ const ZoomEmbed = ({
 	
 	const userRole = userData?.role || "Usuario";
 	const isGuest = userRole === "Invitado";
+
+	// ✅ OBTENER DATOS COMPLETOS DEL USUARIO (nombre, unidad, coeficiente)
+	const { data: userCompleteData } = useQuery({
+		queryKey: ['copropietario-data'],
+		queryFn: async () => {
+			const response = await UserService.getCurrentUserData();
+			return response.data;
+		},
+		retry: 1,
+		refetchOnWindowFocus: false
+	});
+
+	// Extraer información del usuario
+	const userName = userCompleteData?.firstname && userCompleteData?.lastname
+		? `${userCompleteData.firstname} ${userCompleteData.lastname}`.trim()
+		: userData?.name || 'Usuario';
+	const unitName = userCompleteData?.residential_unit?.str_name || 'Cargando...';
+	const userCoefficient = userCompleteData?.coefficient;
 
 	// Obtener encuestas activas de la reunión
 	const { data: pollsData, isLoading: isLoadingPolls, refetch: refetchPolls } = useQuery({
@@ -120,7 +139,7 @@ const ZoomEmbed = ({
 				'/zoom/generate-signature',
 				{
 					meeting_number: meetingNumber,
-					role: 0,
+					role: 0, // 0 = participante (copropietario)
 				}
 			);
 
@@ -137,19 +156,6 @@ const ZoomEmbed = ({
 
 	const handleMeetingEnd = async () => {
 		console.log('🔄 Cerrando componente de Zoom y volviendo al dashboard');
-
-		// Registrar hora de salida (si no es invitado)
-		if (!isGuest && meetingData?.id) {
-			try {
-				console.log('📝 Registrando salida del usuario...');
-				await MeetingService.registerLeave(meetingData.id);
-				console.log('✅ Salida registrada');
-			} catch (leaveError) {
-				// No bloquear el cierre si falla
-				console.error('⚠️ Error al registrar salida (no crítico):', leaveError);
-			}
-		}
-
 		onClose();
 	};
 
@@ -175,136 +181,97 @@ const ZoomEmbed = ({
 			return;
 		}
 
-		if (!activePoll) return;
+		setSelectedOptions((prev) => {
+			const isMultiple = activePoll?.bln_allow_multiple_selection;
 
-		if (activePoll.str_poll_type === 'single') {
-			setSelectedOptions([optionId]);
-		} else if (activePoll.str_poll_type === 'multiple') {
-			setSelectedOptions(prev => {
-				if (prev.includes(optionId)) {
-					return prev.filter(id => id !== optionId);
-				} else {
-					const maxSelections = activePoll.int_max_selections || activePoll.options?.length || 1;
-					if (prev.length >= maxSelections) {
-						Swal.fire({
-							icon: 'warning',
-							title: 'Límite alcanzado',
-							text: `Solo puedes seleccionar hasta ${maxSelections} opciones`,
-							confirmButtonColor: '#9333ea',
-							customClass: {
-								popup: 'swal-custom-zindex'
-							}
-						});
-						return prev;
-					}
-					return [...prev, optionId];
-				}
-			});
-		}
+			if (!isMultiple) {
+				return prev.includes(optionId) ? [] : [optionId];
+			} else {
+				return prev.includes(optionId)
+					? prev.filter(id => id !== optionId)
+					: [...prev, optionId];
+			}
+		});
 	};
 
 	const handleSubmitVote = async () => {
 		if (isGuest) {
-			await Swal.fire({
-				icon: 'error',
-				title: 'Acción no permitida',
-				text: 'Los invitados no pueden votar en las encuestas',
-				confirmButtonColor: '#ef4444',
-				customClass: {
-					popup: 'swal-custom-zindex'
-				}
-			});
-			return;
-		}
-
-		if (!activePoll || selectedOptions.length === 0) {
-			await Swal.fire({
+			console.log('🚫 [ZoomEmbed] Invitado intentó enviar voto - Acción bloqueada');
+			Swal.fire({
+				title: 'Acceso Restringido',
+				text: 'Los invitados no pueden participar en votaciones',
 				icon: 'warning',
-				title: 'Selección requerida',
-				text: 'Por favor selecciona al menos una opción antes de votar',
-				confirmButtonColor: '#9333ea',
+				confirmButtonText: 'Entendido',
 				customClass: {
-					popup: 'swal-custom-zindex'
+					popup: 'swal-wide',
+					title: 'swal-title',
+					confirmButton: 'swal-confirm-btn'
 				}
 			});
 			return;
 		}
 
-		if (activePoll.str_poll_type === 'multiple') {
-			const maxSelections = activePoll.int_max_selections || activePoll.options?.length;
-			if (selectedOptions.length > maxSelections) {
-				await Swal.fire({
-					icon: 'warning',
-					title: 'Demasiadas opciones',
-					text: `Solo puedes seleccionar hasta ${maxSelections} opciones`,
-					confirmButtonColor: '#9333ea',
-					customClass: {
-						popup: 'swal-custom-zindex'
-					}
-				});
-				return;
-			}
+		if (selectedOptions.length === 0) {
+			Swal.fire({
+				title: 'Selecciona una opción',
+				text: 'Debes seleccionar al menos una opción antes de votar',
+				icon: 'warning',
+				confirmButtonText: 'Entendido',
+				customClass: {
+					popup: 'swal-wide',
+					title: 'swal-title',
+					confirmButton: 'swal-confirm-btn'
+				}
+			});
+			return;
 		}
 
 		setIsSubmittingVote(true);
 
 		try {
-			console.log('📝 Enviando voto:', {
-				pollId: activePoll.id,
-				selectedOptions,
-				pollType: activePoll.str_poll_type
+			const result = await PollService.submitVote(activePoll.id, {
+				option_ids: selectedOptions
 			});
 
-			const response = await PollService.submitVote(activePoll.id, selectedOptions);
-			console.log('✅ Voto registrado:', response);
-
-			handleClosePollModal();
-
-			await Swal.fire({
-				icon: 'success',
-				title: '¡Voto registrado!',
-				text: 'Tu voto ha sido registrado correctamente',
-				timer: 2000,
-				showConfirmButton: false,
-				customClass: {
-					popup: 'swal-custom-zindex'
-				},
-				didOpen: () => {
-					const modal = document.querySelector('.swal2-container');
-					if (modal) {
-						modal.style.zIndex = '99999';
+			if (result.success) {
+				await Swal.fire({
+					title: '¡Voto Registrado!',
+					html: `
+						<div class="text-center">
+							<p class="text-lg mb-4">Tu voto ha sido registrado exitosamente</p>
+							<div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+								<p class="text-sm text-blue-800 font-semibold">
+									${activePoll.str_title}
+								</p>
+							</div>
+						</div>
+					`,
+					icon: 'success',
+					confirmButtonText: 'Cerrar',
+					customClass: {
+						popup: 'swal-wide',
+						title: 'swal-title',
+						confirmButton: 'swal-confirm-btn'
 					}
-					const popup = document.querySelector('.swal2-popup');
-					if (popup) {
-						popup.style.zIndex = '99999';
-						popup.style.borderTop = '4px solid #10b981';
-					}
-				}
-			});
+				});
 
-			refetchPolls();
-
+				handleClosePollModal();
+				refetchPolls();
+			}
 		} catch (error) {
 			console.error('❌ Error al enviar voto:', error);
-
-			await Swal.fire({
+			
+			const errorMessage = error.response?.data?.message || 'No se pudo registrar el voto';
+			
+			Swal.fire({
+				title: 'Error al Votar',
+				text: errorMessage,
 				icon: 'error',
-				title: 'Error al votar',
-				text: error.response?.data?.message || 'Hubo un error al registrar tu voto. Intenta nuevamente.',
-				confirmButtonColor: '#ef4444',
+				confirmButtonText: 'Entendido',
 				customClass: {
-					popup: 'swal-custom-zindex'
-				},
-				didOpen: () => {
-					const modal = document.querySelector('.swal2-container');
-					if (modal) {
-						modal.style.zIndex = '99999';
-					}
-					const popup = document.querySelector('.swal2-popup');
-					if (popup) {
-						popup.style.zIndex = '99999';
-						popup.style.borderTop = '4px solid #ef4444';
-					}
+					popup: 'swal-wide',
+					title: 'swal-title',
+					confirmButton: 'swal-confirm-btn'
 				}
 			});
 		} finally {
@@ -343,15 +310,11 @@ const ZoomEmbed = ({
 			console.log('🔵 Iniciando Zoom SDK Web...');
 			setLoadingMessage('Cargando sala de reunión...');
 
-			const userName = localStorage.getItem('user')
-				? JSON.parse(localStorage.getItem('user')).name || 'Usuario'
-				: 'Usuario';
+			const displayName = isGuest ? `${userName} (Invitado)` : userName;
 
 			const userEmail = localStorage.getItem('user')
 				? JSON.parse(localStorage.getItem('user')).email || ''
 				: '';
-
-			const displayName = isGuest ? `${userName} (Invitado)` : userName;
 
 			ZoomMtg.i18n.load('es-ES');
 			ZoomMtg.i18n.reload('es-ES');
@@ -387,22 +350,9 @@ const ZoomEmbed = ({
 						userEmail: userEmail,
 						passWord: password,
 						tk: '',
-						success: async (joinSuccess) => {
+						success: (joinSuccess) => {
 							console.log('✅ Unido a la reunión exitosamente:', joinSuccess);
-
-							// Registrar asistencia del usuario (si no es invitado)
-							if (!isGuest && meetingData?.id) {
-								try {
-									console.log('📝 Registrando asistencia del usuario...');
-									const attendanceResult = await MeetingService.registerAttendance(meetingData.id);
-									console.log('✅ Asistencia registrada:', attendanceResult);
-								} catch (attendanceError) {
-									// No bloquear el flujo si falla el registro de asistencia
-									console.error('⚠️ Error al registrar asistencia (no crítico):', attendanceError);
-								}
-							}
-
-							// ✅ SOLUCIÓN SIMPLE: Esperar 3 segundos y quitar el loading
+							
 							setTimeout(() => {
 								console.log('✅ Quitando pantalla de carga después de 3 segundos');
 								setIsLoading(false);
@@ -438,330 +388,438 @@ const ZoomEmbed = ({
 		}
 	};
 
-	// Error
-	if (error) {
-		return (
-			<div className="flex items-center justify-center min-h-screen bg-gray-900">
-				<div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
-					<div className="text-center">
-						<div className="text-red-500 text-5xl mb-4">⚠️</div>
-						<h3 className="text-xl font-bold text-gray-800 mb-2">
-							Error al cargar la reunión
-						</h3>
-						<p className="text-gray-600 mb-6">{error}</p>
-						<button
-							onClick={onClose}
-							className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-						>
-							Cerrar
-						</button>
-					</div>
-				</div>
-			</div>
-		);
-	}
-
-	// Loading overlay
-	if (isLoading) {
-		return (
-			<div 
-				className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900" 
-				style={{ 
-					position: 'fixed', 
-					top: 0, 
-					left: 0, 
-					width: '100%', 
-					height: '100%', 
-					zIndex: 99999
-				}}
-			>
-				<div className="text-center max-w-md mx-4">
-					<div className="mb-6">
-						<div className="w-20 h-20 mx-auto bg-blue-600 rounded-full flex items-center justify-center shadow-2xl">
-							<svg
-								className="w-12 h-12 text-white"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-								/>
-							</svg>
-						</div>
-					</div>
-
-					<Loader2 className="w-16 h-16 text-blue-400 animate-spin mx-auto mb-6" />
-
-					<p className="text-white text-2xl font-bold mb-3 animate-pulse">
-						{loadingMessage}
-					</p>
-
-					<p className="text-gray-300 text-base mb-6">
-						{meetingData?.str_title || 'Cargando reunión'}
-					</p>
-
-					<div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-						<div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 animate-pulse rounded-full" style={{ width: '70%' }}></div>
-					</div>
-
-					<p className="text-gray-400 text-xs mt-4">
-						Por favor espera mientras cargamos la sala de reunión
-					</p>
-				</div>
-			</div>
-		);
-	}
-
+	// ===== RENDER =====
 	return (
-		<>
-			{/* ✅ BOTÓN CENTRADO EN EL MEDIO (CENTRO-CENTRO) */}
-			{!isGuest && showPollButton && !isLoading && ReactDOM.createPortal(
-				<button
-					onClick={handleViewPoll}
-					className="fixed group"
+		<div className="relative w-full h-screen">
+			{/* Estilos para animaciones */}
+			<style>
+				{`
+					@keyframes pulse {
+						0%, 100% { opacity: 1; }
+						50% { opacity: 0.5; }
+					}
+					
+					@keyframes bounce {
+						0%, 100% {
+							transform: translateY(-25%);
+							animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+						}
+						50% {
+							transform: translateY(0);
+							animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+						}
+					}
+					
+					@keyframes ping {
+						75%, 100% {
+							transform: scale(2);
+							opacity: 0;
+						}
+					}
+				`}
+			</style>
+			{/* 🆕 BURBUJA INFORMATIVA SUPERIOR */}
+			{!isLoading && !error && ReactDOM.createPortal(
+				<div
 					style={{
-						top: '50%',
+						position: 'fixed',
+						top: '20px',
 						left: '50%',
-						transform: 'translate(-50%, -50%)',
-						zIndex: 99999
+						transform: 'translateX(-50%)',
+						zIndex: 9999,
+						pointerEvents: 'auto'
 					}}
-					title="Ver encuesta activa"
 				>
-					{/* Efecto de resplandor */}
-					<div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-3xl blur-2xl opacity-75 animate-pulse"></div>
-
-					{/* Botón principal - EXTRA GRANDE */}
-					<div className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white px-16 py-8 rounded-3xl shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 flex items-center gap-5 hover:scale-105 hover:-translate-y-2">
-						{/* Icono grande */}
-						<div className="relative">
-							<svg
-								className="w-14 h-14 animate-bounce"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2.5}
-									d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-								/>
-							</svg>
-							{/* Badge de alerta */}
-							<div className="absolute -top-4 -right-4 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-base font-bold animate-pulse shadow-lg">
-								!
+					<div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-2xl px-6 py-4 flex items-center gap-6 border-2 border-white/20">
+						{/* Avatar y Nombre */}
+						<div className="flex items-center gap-3">
+							<div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+								{userName.charAt(0).toUpperCase() || 'U'}
+							</div>
+							<div>
+								<div className="flex items-center gap-2">
+									<UserCircle size={16} className="text-blue-200" />
+									<span className="font-bold text-lg">{userName}</span>
+								</div>
+								<div className="text-xs text-blue-100">
+									{isGuest ? '👁️ Invitado (Solo observador)' : '✅ Copropietario'}
+								</div>
 							</div>
 						</div>
 
-						{/* Texto grande */}
-						<div className="flex flex-col items-start">
-							<span className="font-black text-3xl leading-tight">📊 ENCUESTA ACTIVA</span>
-							<span className="text-lg text-purple-100 leading-tight mt-1 font-semibold">Click aquí para votar ahora</span>
+						{/* Separador */}
+						<div className="h-12 w-px bg-white/30"></div>
+
+						{/* Unidad Residencial */}
+						<div className="flex items-center gap-2">
+							<Building2 size={20} className="text-blue-200" />
+							<div>
+								<p className="text-xs text-blue-100">Unidad Residencial</p>
+								<p className="font-bold">{unitName}</p>
+							</div>
 						</div>
 
-						{/* Indicador animado */}
-						<div className="relative ml-3">
-							<div className="w-6 h-6 bg-white rounded-full animate-ping absolute"></div>
-							<div className="w-6 h-6 bg-white rounded-full"></div>
+						{/* Separador */}
+						{!isGuest && userCoefficient && (
+							<>
+								<div className="h-12 w-px bg-white/30"></div>
+
+								{/* Coeficiente de Quorum */}
+								<div className="flex items-center gap-2">
+									<Hash size={20} className="text-blue-200" />
+									<div>
+										<p className="text-xs text-blue-100">Mi Quorum</p>
+										<p className="font-bold text-lg">{userCoefficient}%</p>
+									</div>
+								</div>
+							</>
+						)}
+					</div>
+				</div>,
+				document.body
+			)}
+
+			{/* Pantalla de carga */}
+			{isLoading && !error && (
+				<div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-50">
+					<div className="text-center space-y-6">
+						<Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto" />
+						<div className="space-y-2">
+							<p className="text-2xl font-semibold text-gray-800">{loadingMessage}</p>
+							<p className="text-gray-500">Por favor espera un momento...</p>
 						</div>
 					</div>
-				</button>,
+				</div>
+			)}
+
+			{/* Pantalla de error */}
+			{error && (
+				<div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-50 p-8">
+					<div className="text-center max-w-2xl space-y-4">
+						<div className="text-red-500 text-6xl mb-4">⚠️</div>
+						<h2 className="text-2xl font-bold text-gray-800">Error al conectar</h2>
+						<p className="text-gray-600">{error}</p>
+						<button
+							onClick={onClose}
+							className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+						>
+							Volver al Dashboard
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Botón de encuesta activa - CENTRADO CON COLORES DEL ADMIN */}
+			{!isLoading && !error && showPollButton && !isGuest && activePoll && ReactDOM.createPortal(
+				<div
+					style={{
+						position: 'fixed',
+						top: '50%',
+						left: '50%',
+						transform: 'translate(-50%, -50%)',
+						zIndex: 9999,
+						pointerEvents: 'auto'
+					}}
+				>
+					<button
+						onClick={handleViewPoll}
+						style={{
+							position: 'relative',
+							background: 'transparent',
+							border: 'none',
+							cursor: 'pointer',
+							padding: 0
+						}}
+					>
+						{/* Efecto de resplandor animado */}
+						<div
+							style={{
+								position: 'absolute',
+								inset: 0,
+								background: 'linear-gradient(to right, #10b981, #059669, #10b981)',
+								borderRadius: '1.5rem',
+								filter: 'blur(1.5rem)',
+								opacity: 0.75,
+								animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+							}}
+						/>
+
+						{/* Contenedor del botón */}
+						<div
+							style={{
+								position: 'relative',
+								background: 'linear-gradient(to right, #059669, #10b981, #059669)',
+								color: 'white',
+								padding: '1.5rem 2.5rem',
+								borderRadius: '1.5rem',
+								boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+								display: 'flex',
+								alignItems: 'center',
+								gap: '1.25rem',
+								transition: 'all 0.3s'
+							}}
+							onMouseEnter={(e) => {
+								e.currentTarget.style.transform = 'scale(1.1) translateY(-0.25rem)';
+								e.currentTarget.style.boxShadow = '0 25px 50px -12px rgba(16, 185, 129, 0.5)';
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.transform = 'scale(1)';
+								e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
+							}}
+						>
+							{/* Icono de encuesta */}
+							<div style={{ position: 'relative' }}>
+								<svg
+									style={{
+										width: '4rem',
+										height: '4rem',
+										animation: 'bounce 1s infinite'
+									}}
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									strokeWidth={2.5}
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+									/>
+								</svg>
+								{/* Badge */}
+								<div
+									style={{
+										position: 'absolute',
+										top: '-1rem',
+										right: '-1rem',
+										width: '2.25rem',
+										height: '2.25rem',
+										background: '#ef4444',
+										borderRadius: '9999px',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										fontSize: '1.125rem',
+										fontWeight: 'bold',
+										animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+										boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+									}}
+								>
+									!
+								</div>
+							</div>
+
+							{/* Texto */}
+							<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+								<span style={{ fontWeight: 'bold', fontSize: '1.5rem', lineHeight: 1.2 }}>
+									📊 Encuesta Activa
+								</span>
+								<span style={{ fontSize: '1rem', color: '#d1fae5', lineHeight: 1.2 }}>
+									Haz clic para votar ahora
+								</span>
+							</div>
+
+							{/* Indicador pulsante */}
+							<div style={{ position: 'relative', marginLeft: '0.75rem' }}>
+								<div
+									style={{
+										width: '1.75rem',
+										height: '1.75rem',
+										background: 'white',
+										borderRadius: '9999px',
+										position: 'absolute',
+										animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite'
+									}}
+								/>
+								<div
+									style={{
+										width: '1.75rem',
+										height: '1.75rem',
+										background: 'white',
+										borderRadius: '9999px'
+									}}
+								/>
+							</div>
+						</div>
+					</button>
+				</div>,
 				document.body
 			)}
 
 			{/* Modal de encuesta */}
-			{!isGuest && showPollModal && ReactDOM.createPortal(
+			{!isGuest && showPollModal && activePoll && ReactDOM.createPortal(
 				<div
-					className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
-					style={{ zIndex: 100000 }}
+					style={{
+						position: 'fixed',
+						top: 0,
+						left: 0,
+						right: 0,
+						bottom: 0,
+						backgroundColor: 'rgba(0, 0, 0, 0.75)',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						zIndex: 10000,
+						padding: '20px'
+					}}
 					onClick={handleClosePollModal}
 				>
 					<div
-						className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto animate-slideUp"
-						style={{ zIndex: 100001 }}
+						style={{
+							backgroundColor: 'white',
+							borderRadius: '16px',
+							padding: '32px',
+							maxWidth: '600px',
+							width: '100%',
+							maxHeight: '80vh',
+							overflow: 'auto',
+							position: 'relative'
+						}}
 						onClick={(e) => e.stopPropagation()}
 					>
-						{/* Header */}
-						<div className="sticky top-0 bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-3xl flex items-center justify-between shadow-lg z-10">
-							<div className="flex items-center gap-3">
-								<div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-									<svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-									</svg>
-								</div>
-								<h2 className="text-2xl font-bold">Encuesta Activa</h2>
-							</div>
-							<button
-								onClick={handleClosePollModal}
-								className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-							>
-								<X size={24} />
-							</button>
+						<button
+							onClick={handleClosePollModal}
+							style={{
+								position: 'absolute',
+								top: '16px',
+								right: '16px',
+								background: 'none',
+								border: 'none',
+								cursor: 'pointer',
+								padding: '8px'
+							}}
+						>
+							<X size={24} className="text-gray-500 hover:text-gray-700" />
+						</button>
+
+						<div style={{ marginBottom: '24px' }}>
+							<h2 style={{
+								fontSize: '1.5rem',
+								fontWeight: 'bold',
+								color: '#1f2937',
+								marginBottom: '8px'
+							}}>
+								{activePoll.str_title}
+							</h2>
+							{activePoll.str_description && (
+								<p style={{ color: '#6b7280', fontSize: '0.95rem' }}>
+									{activePoll.str_description}
+								</p>
+							)}
 						</div>
 
-						{/* Contenido */}
-						<div className="p-8">
-							{activePoll && (activePoll.str_poll_type === 'single' || activePoll.str_poll_type === 'multiple') ? (
-								<div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-									<div style={{ textAlign: 'center', paddingBottom: '16px', borderBottom: '2px solid #f3f4f6' }}>
-										<h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px' }}>
-											{activePoll.str_title}
-										</h3>
-										{activePoll.str_description && (
-											<p style={{ fontSize: '0.95rem', color: '#6b7280', lineHeight: '1.5' }}>
-												{activePoll.str_description}
-											</p>
-										)}
-									</div>
-
-									<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-										<p style={{ fontWeight: '600', color: '#374151', margin: 0 }}>
-											{activePoll.str_poll_type === 'single'
-												? 'Selecciona una opción:'
-												: `Selecciona hasta ${activePoll.int_max_selections || 'todas las'} opciones:`}
-										</p>
-										{activePoll.options?.map((option) => {
-											const isSelected = selectedOptions.includes(option.id);
-											return (
-												<button
-													key={option.id}
-													onClick={() => handleOptionToggle(option.id)}
-													style={{
-														width: '100%',
-														textAlign: 'left',
-														padding: '16px',
-														borderRadius: '12px',
-														border: `2px solid ${isSelected ? '#9333ea' : '#e5e7eb'}`,
-														backgroundColor: isSelected ? '#f3e8ff' : '#ffffff',
-														transition: 'all 0.2s',
-														cursor: 'pointer',
-														display: 'flex',
-														alignItems: 'center',
-														justifyContent: 'space-between'
-													}}
-													onMouseEnter={(e) => {
-														if (!isSelected) {
-															e.currentTarget.style.borderColor = '#c084fc';
-															e.currentTarget.style.backgroundColor = '#f9fafb';
-														}
-													}}
-													onMouseLeave={(e) => {
-														if (!isSelected) {
-															e.currentTarget.style.borderColor = '#e5e7eb';
-															e.currentTarget.style.backgroundColor = '#ffffff';
-														}
-													}}
-												>
-													<span style={{ fontWeight: '500', color: '#1f2937' }}>
-														{option.str_option_text}
-													</span>
-													{isSelected && (
-														<CheckCircle style={{ color: '#9333ea' }} size={24} />
-													)}
-												</button>
-											);
-										})}
-										{activePoll.str_poll_type === 'multiple' && selectedOptions.length > 0 && (
-											<p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0', textAlign: 'center' }}>
-												{selectedOptions.length} de {activePoll.int_max_selections || activePoll.options?.length} seleccionada(s)
-											</p>
-										)}
-									</div>
-
-									<div style={{ display: 'flex', gap: '12px', paddingTop: '16px', borderTop: '2px solid #f3f4f6' }}>
-										<button
-											onClick={handleClosePollModal}
-											style={{
-												flex: '1',
-												padding: '14px 24px',
-												borderRadius: '12px',
-												border: '2px solid #e5e7eb',
-												backgroundColor: '#ffffff',
-												color: '#4b5563',
-												fontWeight: '600',
-												cursor: 'pointer',
-												transition: 'all 0.2s'
-											}}
-											onMouseEnter={(e) => {
-												e.currentTarget.style.backgroundColor = '#f9fafb';
-												e.currentTarget.style.borderColor = '#d1d5db';
-											}}
-											onMouseLeave={(e) => {
-												e.currentTarget.style.backgroundColor = '#ffffff';
-												e.currentTarget.style.borderColor = '#e5e7eb';
-											}}
-										>
-											Cancelar
-										</button>
-										<button
-											onClick={handleSubmitVote}
-											disabled={selectedOptions.length === 0 || isSubmittingVote}
-											style={{
-												flex: '2',
-												padding: '14px 24px',
-												borderRadius: '12px',
-												border: 'none',
-												backgroundColor: selectedOptions.length === 0 || isSubmittingVote ? '#d1d5db' : '#9333ea',
-												color: '#ffffff',
-												fontWeight: '600',
-												cursor: selectedOptions.length === 0 || isSubmittingVote ? 'not-allowed' : 'pointer',
-												transition: 'all 0.2s',
-												display: 'flex',
-												alignItems: 'center',
-												justifyContent: 'center',
-												gap: '8px',
-												opacity: selectedOptions.length === 0 || isSubmittingVote ? 0.6 : 1
-											}}
-											onMouseEnter={(e) => {
-												if (selectedOptions.length > 0 && !isSubmittingVote) {
-													e.currentTarget.style.backgroundColor = '#7e22ce';
-													e.currentTarget.style.transform = 'translateY(-1px)';
-													e.currentTarget.style.boxShadow = '0 8px 20px rgba(147, 51, 234, 0.3)';
-												}
-											}}
-											onMouseLeave={(e) => {
-												if (selectedOptions.length > 0 && !isSubmittingVote) {
-													e.currentTarget.style.backgroundColor = '#9333ea';
-													e.currentTarget.style.transform = 'translateY(0)';
-													e.currentTarget.style.boxShadow = 'none';
-												}
-											}}
-										>
-											{isSubmittingVote ? (
-												<>
-													<Loader2 className="animate-spin" size={20} />
-													<span>Votando...</span>
-												</>
-											) : (
-												`Votar${selectedOptions.length > 1 ? ` (${selectedOptions.length})` : ''}`
+						<div style={{ marginBottom: '24px' }}>
+							{activePoll.options?.map((option) => (
+								<div
+									key={option.id}
+									onClick={() => handleOptionToggle(option.id)}
+									style={{
+										padding: '16px',
+										marginBottom: '12px',
+										border: selectedOptions.includes(option.id)
+											? '3px solid #3b82f6'
+											: '2px solid #e5e7eb',
+										borderRadius: '12px',
+										cursor: 'pointer',
+										backgroundColor: selectedOptions.includes(option.id)
+											? '#eff6ff'
+											: 'white',
+										transition: 'all 0.2s'
+									}}
+								>
+									<div style={{
+										display: 'flex',
+										alignItems: 'center',
+										gap: '12px'
+									}}>
+										<div style={{
+											width: '24px',
+											height: '24px',
+											borderRadius: activePoll.bln_allow_multiple_selection ? '4px' : '50%',
+											border: selectedOptions.includes(option.id)
+												? '2px solid #3b82f6'
+												: '2px solid #d1d5db',
+											backgroundColor: selectedOptions.includes(option.id)
+												? '#3b82f6'
+												: 'white',
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											flexShrink: 0
+										}}>
+											{selectedOptions.includes(option.id) && (
+												<CheckCircle size={16} className="text-white" />
 											)}
-										</button>
+										</div>
+										<span style={{
+											fontSize: '1rem',
+											color: '#374151',
+											fontWeight: selectedOptions.includes(option.id) ? '600' : '400'
+										}}>
+											{option.str_option_text}
+										</span>
 									</div>
 								</div>
-							) : (
-								<div className="text-center py-12">
-									<div className="inline-flex p-4 bg-gray-100 rounded-full mb-4">
-										<svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-										</svg>
-									</div>
-									<h3 className="text-lg font-bold text-gray-800 mb-2">No hay encuestas activas</h3>
-									<p className="text-gray-600 mb-6">No hay encuestas activas en este momento.</p>
-									<button onClick={handleClosePollModal} className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold">
-										Cerrar
-									</button>
-								</div>
-							)}
+							))}
+						</div>
+
+						<div style={{
+							display: 'flex',
+							gap: '12px',
+							justifyContent: 'flex-end'
+						}}>
+							<button
+								onClick={handleClosePollModal}
+								style={{
+									padding: '12px 24px',
+									borderRadius: '8px',
+									border: '1px solid #d1d5db',
+									backgroundColor: 'white',
+									color: '#374151',
+									fontSize: '1rem',
+									fontWeight: '500',
+									cursor: 'pointer'
+								}}
+							>
+								Cancelar
+							</button>
+							<button
+								onClick={handleSubmitVote}
+								disabled={isSubmittingVote || selectedOptions.length === 0}
+								style={{
+									padding: '12px 32px',
+									borderRadius: '8px',
+									border: 'none',
+									background: selectedOptions.length === 0
+										? '#e5e7eb'
+										: 'linear-gradient(to right, #3b82f6, #2563eb)',
+									color: 'white',
+									fontSize: '1rem',
+									fontWeight: '600',
+									cursor: selectedOptions.length === 0 ? 'not-allowed' : 'pointer',
+									display: 'flex',
+									alignItems: 'center',
+									gap: '8px'
+								}}
+							>
+								{isSubmittingVote ? (
+									<>
+										<Loader2 size={20} className="animate-spin" />
+										<span>Enviando...</span>
+									</>
+								) : (
+									<>
+										<CheckCircle size={20} />
+										<span>Confirmar Voto</span>
+									</>
+								)}
+							</button>
 						</div>
 					</div>
 				</div>,
 				document.body
 			)}
-		</>
+		</div>
 	);
 };
 

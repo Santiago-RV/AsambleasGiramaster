@@ -626,50 +626,50 @@ const ZoomMeetingContainer = ({
 
 	return (
 		<>
-			{/* Botón flotante renderizado directamente en body usando Portal */}
+			{/* Botón flotante CENTRADO y MÁS GRANDE - renderizado directamente en body usando Portal */}
 			{showPollButton && ReactDOM.createPortal(
 				<button
 					onClick={handleViewPoll}
-					className="fixed bottom-8 left-1/2 transform -translate-x-1/2 group"
+					className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 group"
 					style={{ zIndex: 10001 }}
 					title="Ver encuesta activa"
 				>
-					{/* Efecto de resplandor animado */}
-					<div className="absolute inset-0 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 rounded-2xl blur-xl opacity-75 animate-pulse"></div>
+					{/* Efecto de resplandor animado - MÁS INTENSO */}
+					<div className="absolute inset-0 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 rounded-3xl blur-2xl opacity-75 animate-pulse"></div>
 
-					{/* Contenedor del botón */}
-					<div className="relative bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl hover:shadow-green-500/50 transition-all duration-300 flex items-center gap-3 hover:scale-105 hover:-translate-y-1">
-						{/* Icono de encuesta */}
+					{/* Contenedor del botón - MÁS GRANDE */}
+					<div className="relative bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 text-white px-10 py-6 rounded-3xl shadow-2xl hover:shadow-green-500/50 transition-all duration-300 flex items-center gap-5 hover:scale-110 hover:-translate-y-1">
+						{/* Icono de encuesta - MÁS GRANDE */}
 						<div className="relative">
 							<svg
-								className="w-10 h-10 animate-bounce"
+								className="w-16 h-16 animate-bounce"
 								fill="none"
 								viewBox="0 0 24 24"
 								stroke="currentColor"
+								strokeWidth={2.5}
 							>
 								<path
 									strokeLinecap="round"
 									strokeLinejoin="round"
-									strokeWidth={2.5}
 									d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
 								/>
 							</svg>
 							{/* Badge con número - MÁS GRANDE */}
-							<div className="absolute -top-3 -right-3 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center text-sm font-bold animate-pulse shadow-lg">
+							<div className="absolute -top-4 -right-4 w-9 h-9 bg-red-500 rounded-full flex items-center justify-center text-lg font-bold animate-pulse shadow-lg">
 								!
 							</div>
 						</div>
 
 						{/* Texto - MÁS GRANDE */}
 						<div className="flex flex-col items-start">
-							<span className="font-bold text-sm leading-tight">Encuesta Activa</span>
-							<span className="text-xs text-green-100 leading-tight">Click para votar</span>
+							<span className="font-bold text-2xl leading-tight">📊 Encuesta Activa</span>
+							<span className="text-base text-green-100 leading-tight">Haz clic para votar ahora</span>
 						</div>
 
 						{/* Indicador pulsante - MÁS GRANDE */}
-						<div className="relative ml-2">
-							<div className="w-5 h-5 bg-white rounded-full animate-ping absolute"></div>
-							<div className="w-5 h-5 bg-white rounded-full"></div>
+						<div className="relative ml-3">
+							<div className="w-7 h-7 bg-white rounded-full animate-ping absolute"></div>
+							<div className="w-7 h-7 bg-white rounded-full"></div>
 						</div>
 					</div>
 				</button>,
