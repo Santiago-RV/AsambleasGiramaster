@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
+import { MeetingService } from '../../services/api/MeetingService';
 
 // NO precargar aquí para evitar que los estilos se carguen globalmente
 // ZoomMtg.preLoadWasm();
@@ -188,9 +189,21 @@ const ZoomMeetingContainer = ({
 						userEmail: '',
 						tk: '',
 						zak: '',
-						success: (success) => {
+						success: async (success) => {
 							console.log('✅ Conectado a la reunión como anfitrión', success);
 							setLoadingMessage('Cargando interfaz de Zoom...');
+
+							// Registrar asistencia del administrador
+							if (meetingData?.id) {
+								try {
+									console.log('📝 Registrando asistencia del administrador...');
+									const attendanceResult = await MeetingService.registerAttendance(meetingData.id);
+									console.log('✅ Asistencia registrada:', attendanceResult);
+								} catch (attendanceError) {
+									// No bloquear el flujo si falla el registro de asistencia
+									console.error('⚠️ Error al registrar asistencia (no crítico):', attendanceError);
+								}
+							}
 
 							// Configurar listeners para detectar cuando se sale de la reunión
 							console.log('🎧 Configurando listeners de eventos de Zoom...');
@@ -352,6 +365,15 @@ const ZoomMeetingContainer = ({
 		// Primero cerrar el componente y volver al dashboard
 		console.log('🔄 Cerrando componente de Zoom y volviendo al dashboard');
 		onClose();
+
+		// Registrar hora de salida del administrador
+		try {
+			console.log('📝 Registrando salida del administrador...');
+			await MeetingService.registerLeave(meetingData.id);
+			console.log('✅ Salida registrada');
+		} catch (leaveError) {
+			console.error('⚠️ Error al registrar salida (no crítico):', leaveError);
+		}
 
 		// Luego registrar la hora de finalización en segundo plano
 		// Esto evita que cualquier error (incluyendo 401) afecte la navegación

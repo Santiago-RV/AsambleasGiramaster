@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
+import { MeetingService } from '../../services/api/MeetingService';
 import '../../styles/swal-custom.css';
 
 /**
@@ -136,6 +137,19 @@ const ZoomEmbed = ({
 
 	const handleMeetingEnd = async () => {
 		console.log('🔄 Cerrando componente de Zoom y volviendo al dashboard');
+
+		// Registrar hora de salida (si no es invitado)
+		if (!isGuest && meetingData?.id) {
+			try {
+				console.log('📝 Registrando salida del usuario...');
+				await MeetingService.registerLeave(meetingData.id);
+				console.log('✅ Salida registrada');
+			} catch (leaveError) {
+				// No bloquear el cierre si falla
+				console.error('⚠️ Error al registrar salida (no crítico):', leaveError);
+			}
+		}
+
 		onClose();
 	};
 
@@ -373,9 +387,21 @@ const ZoomEmbed = ({
 						userEmail: userEmail,
 						passWord: password,
 						tk: '',
-						success: (joinSuccess) => {
+						success: async (joinSuccess) => {
 							console.log('✅ Unido a la reunión exitosamente:', joinSuccess);
-							
+
+							// Registrar asistencia del usuario (si no es invitado)
+							if (!isGuest && meetingData?.id) {
+								try {
+									console.log('📝 Registrando asistencia del usuario...');
+									const attendanceResult = await MeetingService.registerAttendance(meetingData.id);
+									console.log('✅ Asistencia registrada:', attendanceResult);
+								} catch (attendanceError) {
+									// No bloquear el flujo si falla el registro de asistencia
+									console.error('⚠️ Error al registrar asistencia (no crítico):', attendanceError);
+								}
+							}
+
 							// ✅ SOLUCIÓN SIMPLE: Esperar 3 segundos y quitar el loading
 							setTimeout(() => {
 								console.log('✅ Quitando pantalla de carga después de 3 segundos');

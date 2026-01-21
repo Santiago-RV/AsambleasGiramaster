@@ -213,7 +213,7 @@ const MeetingsList = ({
 				</div>
 
 				{/* Content */}
-				<div className="p-6 max-h-[600px] overflow-y-auto">
+				<div className="p-6 max-h-[520px] overflow-y-auto">
 					{displayMeetings && displayMeetings.length > 0 ? (
 						<div className="grid gap-4">
 							{displayMeetings.map((meeting) => {

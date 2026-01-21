@@ -11,6 +11,143 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 #### 2026-01-19
 
+- **Corrección del sistema de votación con peso de voto en encuestas**:
+  - **Problema**: Las respuestas de encuestas no registraban correctamente el peso de votación de cada usuario
+  - **Solución en `backend/app/services/pool_service.py`**:
+    - **`_get_user_voting_weight()`** - Mejorada la obtención del peso de votación:
+      - Prioridad 1: Busca en invitaciones de la reunión (`MeetingInvitationModel.dec_voting_weight`)
+      - Prioridad 2: Busca el peso por defecto del usuario en la unidad residencial (`UserResidentialUnitModel.dec_default_voting_weight`)
+      - Fallback: Si no encuentra en ningún lado, usa peso por defecto de 1.0 (evita errores)
+      - Agregado logging detallado para debugging
+    - **`get_poll_statistics()`** - Mejoradas las estadísticas de encuestas:
+      - Agregado `total_weight_voted`: suma del peso de todos los votos emitidos
+      - Agregado `total_weight_invited`: suma del peso de todos los invitados
+      - Agregado `weight_participation_percentage`: porcentaje de participación basado en peso
+      - El quórum ahora se calcula basándose en el peso de votación (no solo cantidad de personas)
+  - **Flujo de votación**:
+    1. Usuario vota → se obtiene su peso de votación (de invitación o de unidad residencial)
+    2. Se guarda en `PollResponseModel.dec_voting_weight`
+    3. Se actualiza `PollOptionModel.dec_weight_total` sumando el peso
+    4. Al calcular porcentajes, se usa el peso total de cada opción dividido entre el peso total votado
+
+- **Unificación del componente MeetingsList para Admin y SuperAdmin**:
+  - **Objetivo**: Eliminar duplicación de código, agregar separación de reuniones próximas/historial para SuperAdmin
+  - **Componente creado en `frontend/src/components/common/MeetingsList.jsx`**:
+    - Prop `variant`: `'admin'` (diseño completo con gradient) o `'compact'` (diseño simple para SuperAdmin)
+    - Tabs para "Próximas" e "Historial" en ambas variantes
+    - Filtrado automático de reuniones por fecha y estado
+    - Soporte para `onJoinMeeting` y `onStartMeeting` (compatibilidad con ambos dashboards)
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/UsersPage.jsx`: Usa `MeetingsList` con `variant="admin"`
+    - `frontend/src/components/saDashboard/UnidadResidencialDetalles.jsx`: Usa `MeetingsList` (variante `compact` por defecto)
+  - **Archivos eliminados**:
+    - `frontend/src/components/AdDashboard/MeetingsSection.jsx`
+    - `frontend/src/components/saDashboard/components/MeetingsList.jsx`
+
+- **Control de acceso diferenciado para habilitar/deshabilitar usuarios**:
+  - **Requisito**: SuperAdmin puede habilitar/deshabilitar acceso de todos (incluyendo administradores), Admin solo puede hacerlo para copropietarios e invitados
+  - **Backend - `backend/app/services/user_service.py`**:
+    - Agregado parámetro `is_super_admin: bool = False` a `enable_coowner_access()` y `disable_coowner_access()`
+    - La verificación de rol de administrador solo se aplica si `is_super_admin=False`
+  - **Backend - `backend/app/api/v1/endpoints/super_admin.py`**:
+    - Endpoints de toggle access individual y masivo ahora pasan `is_super_admin=True`
+  - **Backend - `backend/app/services/residential_unit_service.py`**:
+    - Agregados campos `bln_allow_entry` e `int_id_rol` a la respuesta de `get_residents_by_residential_unit`
+  - **Frontend - `frontend/src/components/common/ResidentsList.jsx`**:
+    - Agregada prop `isSuperAdmin` (default: `false`)
+    - Función `canToggleAccess(resident)` controla visibilidad del botón individual
+    - Acciones masivas filtran residentes según permisos del usuario
+  - **Frontend - Configuración de props**:
+    - `UsersPage.jsx`: `isSuperAdmin={false}` (Admin no puede modificar administradores)
+    - `UnidadResidencialDetalles.jsx`: `isSuperAdmin={true}` (SuperAdmin puede modificar todos)
+
+- **Corrección del formulario de edición de copropietario (contraseña opcional)**:
+  - **Problema**: El formulario mostraba "La contraseña es obligatoria" en modo edición cuando debería ser opcional
+  - **Causa**: `react-hook-form` cacheaba la validación y no se actualizaba al cambiar el modo
+  - **Solución en `frontend/src/components/saDashboard/components/modals/ResidentModal.jsx`**:
+    - Cambiado `useEffect` para usar `reset()` con los datos del residente cuando cambia `isOpen` o `mode`
+    - Cambiada validación del campo `password` a una función `validate` que evalúa el `mode` en tiempo de ejecución
+    - En modo edición: contraseña es opcional (si está vacía, se mantiene la actual en BD)
+    - En modo creación: contraseña es obligatoria con mínimo 8 caracteres
+  - **Backend ya manejaba correctamente**: Solo actualiza contraseña si se proporciona y no está vacía
+
+#### 2026-01-19 (previo)
+
+- **Corrección de visualización de asistentes en lista de reuniones**:
+  - **Problema**: En la vista de SuperAdmin no se mostraba el número de asistentes de las reuniones, y en Admin mostraba un valor incorrecto (1 en lugar de 3 copropietarios)
+  - **Causa raíz**: El hook `useResidentialUnitData.js` usaba el campo `int_total_confirmed` (siempre 0 hasta que confirmen asistencia) en lugar de `int_total_invitated` (número real de invitados)
+  - **Solución**:
+    - `frontend/src/components/saDashboard/hooks/useResidentialUnitData.js` (línea 69):
+      - Cambiado `asistentes: reunion.int_total_confirmed || 0` a `asistentes: reunion.int_total_invitated || 0`
+  - **Beneficios**:
+    - Ahora se muestra correctamente el número de copropietarios invitados a cada reunión
+    - Consistencia entre las vistas de Admin y SuperAdmin
+
+- **Ajuste de altura del componente MeetingsList**:
+  - **Solicitud**: Hacer que el componente de reuniones tenga la misma altura que el componente de residentes
+  - **Solución**:
+    - `frontend/src/components/common/MeetingsList.jsx` (línea 216):
+      - Variante admin: Cambiado `max-h-[600px]` a `max-h-[520px]` para que el componente completo coincida con los ~700px de ResidentsList
+  - **Beneficios**:
+    - Interfaz más consistente y balanceada visualmente en ambas vistas
+
+- **Sistema de invitaciones y registro de asistencia a reuniones**:
+  - **Backend - Creación automática de invitaciones al crear reunión**:
+    - `backend/app/services/meeting_service.py`:
+      - Al crear una reunión, se crean automáticamente registros en `tbl_meeting_invitations` para cada copropietario activo de la unidad residencial
+      - Cada invitación incluye: `int_user_id`, `dec_voting_weight`, `str_apartment_number`, `str_invitation_status='pending'`, `str_response_status='no_response'`
+      - Imports agregados: `MeetingInvitationModel`, `UserResidentialUnitModel`, `UserModel`
+  - **Backend - Nuevos endpoints para registro de asistencia**:
+    - `POST /meetings/{meeting_id}/register-attendance`:
+      - Registra la hora de entrada (`dat_joined_at`) cuando un usuario se une a la reunión
+      - Actualiza `bln_actually_attended=True` y `str_response_status='attended'`
+      - Solo registra una vez por usuario (idempotente)
+    - `POST /meetings/{meeting_id}/register-leave`:
+      - Registra la hora de salida (`dat_left_at`) cuando un usuario abandona la reunión
+  - **Backend - Nuevos métodos en `meeting_service.py`**:
+    - `register_attendance(meeting_id, user_id)` - Registra entrada del usuario
+    - `register_leave(meeting_id, user_id)` - Registra salida del usuario
+  - **Frontend - Integración con componentes de Zoom**:
+    - `frontend/src/services/api/MeetingService.js`:
+      - Agregado `registerAttendance(meetingId)` - Llama al endpoint de registro de asistencia
+      - Agregado `registerLeave(meetingId)` - Llama al endpoint de registro de salida
+    - `frontend/src/components/CoDashboard/ZoomEmbed.jsx`:
+      - Al unirse exitosamente a Zoom, registra automáticamente la asistencia del copropietario
+      - Al salir de la reunión, registra la hora de salida
+      - Los invitados (role="Invitado") no registran asistencia
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx`:
+      - Al unirse exitosamente a Zoom, registra la asistencia del administrador
+      - Al finalizar la reunión, registra la hora de salida antes de marcar la reunión como completada
+  - **Flujo completo de registro de asistencia**:
+    1. Al crear reunión → Se crean invitaciones para todos los copropietarios activos
+    2. Usuario se une a Zoom → Se registra `dat_joined_at` y `bln_actually_attended=true`
+    3. Usuario sale de Zoom → Se registra `dat_left_at`
+  - **Beneficios**:
+    - Registro completo de quién fue invitado vs quién asistió realmente
+    - Trazabilidad de horas de entrada y salida de cada participante
+    - Base para cálculo de quórum y reportes de asistencia
+
+- **Mejora en el ciclo de vida de reuniones (inicio/finalización)**:
+  - **Problema**: Cada vez que un usuario se unía a la reunión, se sobrescribía la hora de inicio y el estado
+  - **Backend - Corrección en `meeting_service.py`**:
+    - **`start_meeting()`** (líneas 346-377):
+      - Ahora solo cambia estado a "En Curso" si la reunión está en estado "Programada"
+      - Si ya está "En Curso", retorna la reunión sin modificar
+      - Evita sobrescribir `dat_actual_start_time` en llamadas subsecuentes
+    - **`end_meeting()`** (líneas 379-410):
+      - Ahora solo cambia estado a "Completada" si la reunión está "En Curso"
+      - Si ya está "Completada", retorna la reunión sin modificar
+      - Evita sobrescribir `dat_actual_end_time` en llamadas subsecuentes
+  - **Flujo corregido**:
+    - Primera llamada a `/meetings/{id}/start` → Cambia a "En Curso" y registra hora
+    - Llamadas subsiguientes → Sin cambios, retorna estado actual
+    - Primera llamada a `/meetings/{id}/end` → Cambia a "Completada" y registra hora
+    - Llamadas subsiguientes → Sin cambios, retorna estado actual
+  - **Beneficios**:
+    - Múltiples usuarios pueden unirse sin afectar la hora de inicio real
+    - El estado de la reunión es consistente para todos los participantes
+    - Mejor trazabilidad de cuándo realmente inició y terminó la reunión
+
 - **Corrección de sección de encuestas en vista de administrador**:
   - **Problema**: Error 404 al cargar reuniones en la sección de encuestas, impidiendo crear encuestas para reuniones en curso o programadas
   - **Causa raíz**: El endpoint `/meetings/residential-unit/{residentialUnitId}` no existía en el backend

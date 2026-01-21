@@ -88,4 +88,26 @@ export class MeetingService {
     );
     return response.data;
   }
+
+  /**
+   * Registrar asistencia a una reunión
+   * Se llama cuando un usuario entra a la reunión
+   */
+  static async registerAttendance(meetingId) {
+    const response = await axiosInstance.post(
+      `/meetings/${meetingId}/register-attendance`
+    );
+    return response.data;
+  }
+
+  /**
+   * Registrar salida de una reunión
+   * Se llama cuando un usuario sale de la reunión
+   */
+  static async registerLeave(meetingId) {
+    const response = await axiosInstance.post(
+      `/meetings/${meetingId}/register-leave`
+    );
+    return response.data;
+  }
 }
