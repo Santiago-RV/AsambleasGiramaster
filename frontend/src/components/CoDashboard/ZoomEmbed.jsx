@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
 import { X, Loader2, CheckCircle, UserCircle, Building2, Hash } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
@@ -28,6 +28,9 @@ const ZoomEmbed = ({
 	const [showPollModal, setShowPollModal] = useState(false);
 	const [selectedOptions, setSelectedOptions] = useState([]);
 	const [isSubmittingVote, setIsSubmittingVote] = useState(false);
+
+	// ✅ Hook para invalidar queries
+	const queryClient = useQueryClient();
 
 	// ✅ OBTENER ROL DEL USUARIO
 	const { data: userData } = useQuery({
@@ -77,7 +80,16 @@ const ZoomEmbed = ({
 	// Obtener la encuesta activa
 	const activePoll = !isGuest ? pollsData?.data?.find(poll => {
 		const isActive = poll.str_status === 'Activa' || poll.str_status === 'active';
-		return isActive;
+		const hasNotVoted = !poll.has_voted; // ✅ Verificar que NO haya votado
+		console.log('🔍 [ZoomEmbed] Evaluando encuesta:', {
+			id: poll.id,
+			title: poll.str_title,
+			status: poll.str_status,
+			has_voted: poll.has_voted,
+			isActive,
+			hasNotVoted
+		});
+		return isActive && hasNotVoted; // ✅ Solo mostrar si está activa Y no ha votado
 	}) : null;
 
 	// Mostrar botón cuando hay encuesta activa
@@ -229,11 +241,16 @@ const ZoomEmbed = ({
 		setIsSubmittingVote(true);
 
 		try {
-			const result = await PollService.submitVote(activePoll.id, {
-				option_ids: selectedOptions
-			});
+			const result = await PollService.submitVote(activePoll.id, selectedOptions);
 
 			if (result.success) {
+				// ✅ Invalidar TODAS las queries relacionadas con polls
+				await Promise.all([
+					refetchPolls(), // Refrescar en Zoom
+					queryClient.invalidateQueries({ queryKey: ['all-polls'] }), // Refrescar en VotingPage
+					queryClient.invalidateQueries({ queryKey: ['meeting-polls'] }) // Cualquier otra query de polls
+				]);
+
 				await Swal.fire({
 					title: '¡Voto Registrado!',
 					html: `
@@ -256,7 +273,6 @@ const ZoomEmbed = ({
 				});
 
 				handleClosePollModal();
-				refetchPolls();
 			}
 		} catch (error) {
 			console.error('❌ Error al enviar voto:', error);

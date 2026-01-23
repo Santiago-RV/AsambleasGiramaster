@@ -67,7 +67,7 @@ export default function VotingPage() {
     if (!dateString) return false;
     const today = new Date();
     const date = new Date(dateString);
-    
+
     return (
       date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
@@ -79,7 +79,8 @@ export default function VotingPage() {
   const activePolls = allPollsData?.polls?.filter(poll => {
     const isActive = poll.str_status === 'active' || poll.str_status === 'Activa';
     const isFromToday = isToday(poll.dat_started_at);
-    return isActive && isFromToday;
+    const hasNotVoted = !poll.has_voted; // ✅ Solo mostrar si NO ha votado
+    return isActive && isFromToday && hasNotVoted;
   }) || [];
 
   const closedPolls = allPollsData?.polls?.filter(poll => {
@@ -93,16 +94,23 @@ export default function VotingPage() {
     mutationFn: async ({ pollId, voteData }) => {
       return await PollService.vote(pollId, voteData);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       // Agregar al set de encuestas votadas
       setVotedPolls(prev => new Set([...prev, variables.pollId]));
-      
+
       // Limpiar selecciones
       setSelectedOptions(prev => {
         const newSelections = { ...prev };
         delete newSelections[variables.pollId];
         return newSelections;
       });
+
+      // ✅ Invalidar TODAS las queries relacionadas con polls
+      await Promise.all([
+        refetchPolls(),
+        queryClient.invalidateQueries({ queryKey: ['all-polls'] }),
+        queryClient.invalidateQueries({ queryKey: ['meeting-polls'] })
+      ]);
 
       Swal.fire({
         icon: 'success',
@@ -111,10 +119,6 @@ export default function VotingPage() {
         timer: 2000,
         showConfirmButton: false,
       });
-
-      // Refrescar encuestas
-      refetchPolls();
-      queryClient.invalidateQueries({ queryKey: ['all-polls'] });
     },
     onError: (error) => {
       console.error('Error al votar:', error);
@@ -138,16 +142,16 @@ export default function VotingPage() {
         // Para multiple choice
         if (currentSelections.includes(optionId)) {
           // Quitar opción
-          return { 
-            ...prev, 
-            [pollId]: currentSelections.filter(id => id !== optionId) 
+          return {
+            ...prev,
+            [pollId]: currentSelections.filter(id => id !== optionId)
           };
         } else {
           // Agregar opción (verificar límite)
           if (currentSelections.length < (maxSelections || 999)) {
-            return { 
-              ...prev, 
-              [pollId]: [...currentSelections, optionId] 
+            return {
+              ...prev,
+              [pollId]: [...currentSelections, optionId]
             };
           }
           return prev;
@@ -159,7 +163,7 @@ export default function VotingPage() {
 
   const handleVote = async (poll) => {
     const selections = selectedOptions[poll.id] || [];
-    
+
     if (selections.length === 0) {
       Swal.fire({
         icon: 'warning',
@@ -228,7 +232,7 @@ export default function VotingPage() {
             Sistema de Votaciones - Encuestas de Hoy
           </h3>
           <p className="text-sm text-blue-700">
-            Aquí aparecerán las encuestas activas del día de hoy. 
+            Aquí aparecerán las encuestas activas del día de hoy.
             Tu voto se registrará de forma segura y ponderada según tu coeficiente de propiedad.
           </p>
         </div>
@@ -241,18 +245,18 @@ export default function VotingPage() {
             <FileText className="text-green-600" size={24} />
             Encuestas Activas de Hoy ({activePolls.length})
           </h2>
-          
+
           {activePolls.map((poll) => {
-            const hasVoted = votedPolls.has(poll.id);
+            const hasVoted = poll.has_voted || votedPolls.has(poll.id); // ✅ Verificar backend Y local
             const currentSelections = selectedOptions[poll.id] || [];
             const isVoting = voteMutation.isPending;
 
             return (
-              <div 
+              <div
                 key={poll.id}
                 className={`bg-white rounded-xl shadow-md border-2 overflow-hidden transition-all ${
-                  hasVoted 
-                    ? 'border-green-300 bg-green-50/30' 
+                  hasVoted
+                    ? 'border-green-300 bg-green-50/30'
                     : 'border-blue-200 hover:shadow-lg'
                 }`}
               >
@@ -277,7 +281,7 @@ export default function VotingPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-4 mt-4 text-sm text-blue-100">
                     <div className="flex items-center gap-1">
                       <Clock size={16} />
@@ -332,8 +336,8 @@ export default function VotingPage() {
                             <button
                               key={option.id}
                               onClick={() => handleOptionToggle(
-                                poll.id, 
-                                option.id, 
+                                poll.id,
+                                option.id,
                                 poll.str_poll_type,
                                 poll.int_max_selections
                               )}
@@ -412,10 +416,10 @@ export default function VotingPage() {
             <FileText className="text-gray-600" size={24} />
             Encuestas Cerradas Hoy ({closedPolls.length})
           </h2>
-          
+
           <div className="space-y-3">
             {closedPolls.map((poll) => (
-              <div 
+              <div
                 key={poll.id}
                 className="bg-gray-50 rounded-lg border border-gray-300 p-4"
               >
