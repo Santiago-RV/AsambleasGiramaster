@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Info, Loader2, CheckCircle, Clock, AlertCircle, Calendar, Users } from "lucide-react";
+import { FileText, Info, Loader2, CheckCircle, Clock, AlertCircle, Calendar, Users, History, Award } from "lucide-react";
 import Swal from 'sweetalert2';
 import { PollService } from '../../services/api/PollService';
 import { UserService } from '../../services/api/UserService';
@@ -10,6 +10,7 @@ export default function VotingPage() {
   const queryClient = useQueryClient();
   const [selectedOptions, setSelectedOptions] = useState({});
   const [votedPolls, setVotedPolls] = useState(new Set());
+  const [showHistory, setShowHistory] = useState(false); // Toggle para mostrar historial
 
   // Obtener datos del usuario y su unidad residencial
   const { data: userData } = useQuery({
@@ -87,6 +88,11 @@ export default function VotingPage() {
     const isClosed = poll.str_status === 'closed' || poll.str_status === 'Cerrada';
     const isFromToday = isToday(poll.dat_ended_at);
     return isClosed && isFromToday;
+  }) || [];
+
+  // ✅ NUEVO: Filtrar encuestas votadas (historial completo, no solo de hoy)
+  const votedPollsHistory = allPollsData?.polls?.filter(poll => {
+    return poll.has_voted === true;
   }) || [];
 
   // Mutación para votar
@@ -227,7 +233,7 @@ export default function VotingPage() {
       {/* Banner informativo */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
-        <div>
+        <div className="flex-1">
           <h3 className="font-semibold text-blue-900 mb-1">
             Sistema de Votaciones - Encuestas de Hoy
           </h3>
@@ -236,7 +242,132 @@ export default function VotingPage() {
             Tu voto se registrará de forma segura y ponderada según tu coeficiente de propiedad.
           </p>
         </div>
+        
+        {/* ✅ NUEVO: Botón para ver historial */}
+        {votedPollsHistory.length > 0 && (
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+              showHistory
+                ? 'bg-purple-600 text-white'
+                : 'bg-white text-purple-600 border-2 border-purple-600 hover:bg-purple-50'
+            }`}
+          >
+            <History size={20} />
+            {showHistory ? 'Ocultar' : 'Ver'} Historial ({votedPollsHistory.length})
+          </button>
+        )}
       </div>
+
+      {/* ✅ NUEVO: Sección de Historial de Votaciones */}
+      {showHistory && votedPollsHistory.length > 0 && (
+        <div className="space-y-4 bg-purple-50 border-2 border-purple-200 rounded-xl p-6">
+          <h2 className="text-2xl font-bold text-purple-900 flex items-center gap-3">
+            <Award className="text-purple-600" size={28} />
+            Mis Votaciones ({votedPollsHistory.length})
+          </h2>
+          <p className="text-sm text-purple-700 mb-4">
+            Historial completo de todas las encuestas en las que has participado
+          </p>
+
+          <div className="space-y-3">
+            {votedPollsHistory.map((poll) => {
+              const isPollClosed = poll.str_status === 'closed' || poll.str_status === 'Cerrada';
+              const isPollActive = poll.str_status === 'active' || poll.str_status === 'Activa';
+              const userVotes = poll.user_votes || []; // ✅ Opciones votadas
+
+              return (
+                <div
+                  key={poll.id}
+                  className="bg-white rounded-lg border-2 border-purple-200 p-5 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <CheckCircle className="text-green-600 flex-shrink-0" size={24} />
+                        <h4 className="font-bold text-gray-900 text-lg">
+                          {poll.str_title}
+                        </h4>
+                      </div>
+                      
+                      {poll.str_description && (
+                        <p className="text-gray-600 text-sm mb-3 ml-9">
+                          {poll.str_description}
+                        </p>
+                      )}
+
+                      {/* ✅ NUEVO: Mostrar opciones votadas */}
+                      {userVotes.length > 0 && (
+                        <div className="ml-9 mb-3 bg-green-50 border border-green-200 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-green-800 mb-2 uppercase">
+                            {userVotes.length > 1 ? 'Tus votos:' : 'Tu voto:'}
+                          </p>
+                          <div className="space-y-2">
+                            {userVotes.map((vote, index) => (
+                              <div key={index} className="flex items-start gap-2">
+                                <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={16} />
+                                <span className="text-sm font-medium text-gray-800">
+                                  {vote.option_text}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {poll.bln_is_anonymous && (
+                        <div className="ml-9 mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-xs text-blue-700 flex items-center gap-2">
+                            <Info size={14} />
+                            Encuesta anónima - No se puede mostrar tu voto específico
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-3 ml-9 text-sm">
+                        <div className="flex items-center gap-1 text-gray-600">
+                          <Clock size={16} />
+                          <span>Iniciada: {formatDate(poll.dat_started_at)}</span>
+                        </div>
+                        
+                        {poll.dat_ended_at && (
+                          <div className="flex items-center gap-1 text-gray-600">
+                            <Calendar size={16} />
+                            <span>Finalizada: {formatDate(poll.dat_ended_at)}</span>
+                          </div>
+                        )}
+
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          isPollActive
+                            ? 'bg-green-100 text-green-700'
+                            : isPollClosed
+                            ? 'bg-gray-200 text-gray-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {isPollActive ? '✓ Activa' : isPollClosed ? '■ Cerrada' : 'Borrador'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="bg-green-500 text-white px-4 py-2 rounded-full flex items-center gap-2">
+                        <CheckCircle size={18} />
+                        <span className="font-bold text-sm">VOTADO</span>
+                      </div>
+                      
+                      {poll.options && (
+                        <span className="text-xs text-gray-500">
+                          {poll.options.length} opciones
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Encuestas Activas */}
       {activePolls.length > 0 ? (
@@ -247,7 +378,7 @@ export default function VotingPage() {
           </h2>
 
           {activePolls.map((poll) => {
-            const hasVoted = poll.has_voted || votedPolls.has(poll.id); // ✅ Verificar backend Y local
+            const hasVoted = poll.has_voted || votedPolls.has(poll.id);
             const currentSelections = selectedOptions[poll.id] || [];
             const isVoting = voteMutation.isPending;
 

@@ -16,6 +16,10 @@ from app.core.exceptions import (
     ServiceException
 )
 
+from sqlalchemy import select, and_
+from app.models.poll_response_model import PollResponseModel
+from app.models.poll_option_model import PollOptionModel
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -252,14 +256,14 @@ async def get_poll_by_code(
     "/meeting/{meeting_id}/polls",
     response_model=SuccessResponse,
     summary="Listar encuestas de reunión",
-    description="Obtiene todas las encuestas de una reunión con indicador de si el usuario ya votó"
+    description="Obtiene todas las encuestas de una reunión con indicador de si el usuario ya votó y qué opciones seleccionó"
 )
 async def get_meeting_polls(
     meeting_id: int,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista todas las encuestas de una reunión con estado de voto del usuario"""
+    """Lista todas las encuestas de una reunión con estado de voto del usuario y opciones votadas"""
     try:
         poll_service = PollService(db)
         user_service = UserService(db)
@@ -275,11 +279,38 @@ async def get_meeting_polls(
         # Obtener encuestas
         polls = await poll_service.get_polls_by_meeting(meeting_id)
 
-        # Preparar respuesta con has_voted
+        # Preparar respuesta con has_voted y user_votes
         polls_data = []
         for poll in polls:
             # Verificar si el usuario ya votó en esta encuesta
-            has_voted = await poll_service._user_has_voted(poll.id, user.id) if not poll.bln_is_anonymous else False
+            has_voted = await poll_service.user_has_voted(poll.id, user.id) if not poll.bln_is_anonymous else False
+            
+            # ✅ NUEVO: Obtener las opciones votadas por el usuario
+            user_voted_options = []
+            if has_voted and not poll.bln_is_anonymous:
+                # Buscar los votos del usuario en esta encuesta
+                from app.models.poll_response_model import PollResponseModel
+                from app.models.poll_option_model import PollOptionModel
+                
+                vote_query = (
+                    select(PollResponseModel, PollOptionModel)
+                    .join(PollOptionModel, PollResponseModel.int_option_id == PollOptionModel.id)
+                    .where(and_(
+                        PollResponseModel.int_poll_id == poll.id,
+                        PollResponseModel.int_user_id == user.id,
+                        PollResponseModel.bln_is_abstention == False
+                    ))
+                )
+                
+                vote_result = await db.execute(vote_query)
+                votes = vote_result.all()
+                
+                for vote_response, vote_option in votes:
+                    user_voted_options.append({
+                        "option_id": vote_option.id,
+                        "option_text": vote_option.str_option_text,
+                        "voted_at": vote_response.dat_response_at
+                    })
             
             polls_data.append({
                 "id": poll.id,
@@ -297,7 +328,8 @@ async def get_meeting_polls(
                 "int_duration_minutes": poll.int_duration_minutes,
                 "dat_started_at": poll.dat_started_at,
                 "dat_ended_at": poll.dat_ended_at,
-                "has_voted": has_voted,  # ✅ NUEVO CAMPO
+                "has_voted": has_voted,
+                "user_votes": user_voted_options,  # ✅ NUEVO CAMPO: Opciones votadas
                 "options": [
                     {
                         "id": opt.id,

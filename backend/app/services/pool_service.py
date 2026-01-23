@@ -318,6 +318,19 @@ class PollService:
             ))
         )
         return result.scalar_one_or_none() is not None
+    
+    async def user_has_voted(self, poll_id: int, user_id: int) -> bool:
+        """
+        Verifica si un usuario ya votó en una encuesta (método público)
+        
+        Args:
+            poll_id: ID de la encuesta
+            user_id: ID del usuario
+            
+        Returns:
+            bool: True si ya votó, False si no
+        """
+        return await self._user_has_voted(poll_id, user_id)
 
     async def _validate_response(self, poll: PollModel, response_data: PollResponseCreate):
         """Valida la respuesta según el tipo de encuesta"""
