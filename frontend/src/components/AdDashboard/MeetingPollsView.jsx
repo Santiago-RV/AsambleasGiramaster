@@ -206,22 +206,29 @@ export default function MeetingPollsView({ meeting, onBack }) {
   };
 
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Activa':
+    // Normalizar el estado (manejar tanto inglés como español del backend)
+    const normalizedStatus = status?.toLowerCase();
+
+    switch (normalizedStatus) {
+      case 'active':
+      case 'activa':
         return (
           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
             <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
             Activa
           </span>
         );
-      case 'Borrador':
+      case 'draft':
+      case 'borrador':
         return (
           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
             <Clock size={14} className="mr-1" />
             Borrador
           </span>
         );
-      case 'Finalizada':
+      case 'closed':
+      case 'finalizada':
+      case 'cerrada':
         return (
           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
             <CheckCircle size={14} className="mr-1" />
@@ -289,24 +296,32 @@ export default function MeetingPollsView({ meeting, onBack }) {
 
             {/* Botones de acción */}
             <div className="flex gap-2">
-              {selectedPoll.str_status === 'Borrador' && (
+              {(selectedPoll.str_status?.toLowerCase() === 'draft' || selectedPoll.str_status === 'Borrador') && (
                 <button
                   onClick={() => handleStartPoll(selectedPoll)}
                   disabled={startPollMutation.isPending}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold"
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
-                  <Play size={18} />
-                  Iniciar
+                  {startPollMutation.isPending ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Play size={18} />
+                  )}
+                  {startPollMutation.isPending ? 'Iniciando...' : 'Iniciar Encuesta'}
                 </button>
               )}
-              {selectedPoll.str_status === 'Activa' && (
+              {(selectedPoll.str_status?.toLowerCase() === 'active' || selectedPoll.str_status === 'Activa') && (
                 <button
                   onClick={() => handleEndPoll(selectedPoll)}
                   disabled={endPollMutation.isPending}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
-                  <Square size={18} />
-                  Finalizar
+                  {endPollMutation.isPending ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Square size={18} />
+                  )}
+                  {endPollMutation.isPending ? 'Finalizando...' : 'Finalizar Encuesta'}
                 </button>
               )}
             </div>
