@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Plus, Trash2, Save, Play } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Play, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function CreatePollView({ meeting, onBack, onPollCreated }) {
@@ -19,6 +19,8 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
     { str_option_text: '', int_option_order: 1 },
     { str_option_text: '', int_option_order: 2 },
   ]);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -79,7 +81,13 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
   };
 
   const handleSubmit = async (startImmediately = false) => {
-    console.log('📝 [CreatePollView] handleSubmit llamado:', { startImmediately });
+    console.log('📝 [CreatePollView] handleSubmit llamado:', { startImmediately, isSubmitting });
+
+    // Evitar múltiples envíos simultáneos
+    if (isSubmitting) {
+      console.warn('⚠️ [CreatePollView] Ya hay una encuesta en proceso de creación');
+      return;
+    }
 
     if (!validateForm()) {
       console.warn('⚠️ [CreatePollView] Validación fallida');
@@ -109,8 +117,16 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
     });
 
     if (onPollCreated) {
-      console.log('🚀 [CreatePollView] Llamando a onPollCreated...');
-      onPollCreated(pollData, startImmediately);
+      try {
+        setIsSubmitting(true);
+        console.log('🚀 [CreatePollView] Llamando a onPollCreated...');
+        await onPollCreated(pollData, startImmediately);
+        console.log('✅ [CreatePollView] onPollCreated completado exitosamente');
+      } catch (error) {
+        console.error('❌ [CreatePollView] Error en onPollCreated:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
       console.error('❌ [CreatePollView] onPollCreated no está definido');
     }
@@ -328,18 +344,38 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
               <button
                 type="button"
                 onClick={() => handleSubmit(false)}
-                className="flex-1 flex items-center justify-center gap-2 bg-gray-600 text-white font-semibold py-3 rounded-lg hover:bg-gray-700 transition-colors shadow-md"
+                disabled={isSubmitting}
+                className="flex-1 flex items-center justify-center gap-2 bg-gray-600 text-white font-semibold py-3 rounded-lg hover:bg-gray-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-600"
               >
-                <Save size={20} />
-                Guardar como Borrador
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save size={20} />
+                    Guardar como Borrador
+                  </>
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => handleSubmit(true)}
-                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
+                disabled={isSubmitting}
+                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-600 disabled:hover:to-green-700"
               >
-                <Play size={20} />
-                Crear e Iniciar
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <Play size={20} />
+                    Crear e Iniciar
+                  </>
+                )}
               </button>
             </div>
           </div>
