@@ -19,7 +19,7 @@ class MeetingInvitationModel(Base):
     int_delivery_attemps = Column(Integer, nullable=False)
     str_last_delivery_error = Column(String(500), nullable=True)
     bln_will_attend = Column(Boolean, default=False)
-    int_delegated_id = Column(Integer, nullable=True)
+    int_delegated_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
     bln_actually_attended = Column(Boolean, default=False)
     dat_joined_at = Column(DateTime, nullable=True)
     dat_left_at = Column(DateTime, nullable=True)

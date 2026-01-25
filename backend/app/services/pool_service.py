@@ -429,16 +429,28 @@ class PollService:
                 return 1.0
 
         # PRIORIDAD 1: Buscar en la lista de invitados de la reunión
+        # IMPORTANTE: También verificar si el usuario delegó su voto
         invitation_result = await self.db.execute(
-            select(MeetingInvitationModel.dec_voting_weight)
+            select(
+                MeetingInvitationModel.dec_voting_weight,
+                MeetingInvitationModel.int_delegated_id
+            )
             .where(and_(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
                 MeetingInvitationModel.int_user_id == user_id
             ))
         )
-        invitation_weight = invitation_result.scalar_one_or_none()
+        invitation_data = invitation_result.one_or_none()
 
-        if invitation_weight is not None:
+        if invitation_data is not None:
+            invitation_weight, delegated_id = invitation_data
+
+            # Si el usuario delegó su poder, no puede votar (peso = 0)
+            if delegated_id is not None:
+                logger.info(f"   🚫 Usuario delegó su poder a user_id={delegated_id}, peso=0")
+                return 0.0
+
+            # Retorna peso normal (puede incluir poderes recibidos de otros)
             weight = float(invitation_weight)
             logger.info(f"   Peso encontrado en invitación: {weight}")
             return weight
