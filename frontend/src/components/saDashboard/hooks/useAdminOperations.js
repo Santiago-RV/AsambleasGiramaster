@@ -16,13 +16,12 @@ export const useAdminOperations = (unitId) => {
 			Swal.fire({
 				icon: 'success',
 				title: '¡Administrador Cambiado!',
-				text:
-					response.message ||
-					'El administrador ha sido actualizado exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
+				text: response.message || 'El administrador ha sido actualizado exitosamente',
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {

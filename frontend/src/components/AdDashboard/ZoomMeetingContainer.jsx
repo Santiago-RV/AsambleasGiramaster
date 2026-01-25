@@ -1,3 +1,4 @@
+// ZoomMeetingContainer.jsx
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
@@ -6,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
-import '../../styles/swal-custom.css';
+import { MeetingService } from '../../services/api/MeetingService';
 
 // NO precargar aquí para evitar que los estilos se carguen globalmente
 // ZoomMtg.preLoadWasm();
@@ -188,9 +189,21 @@ const ZoomMeetingContainer = ({
 						userEmail: '',
 						tk: '',
 						zak: '',
-						success: (success) => {
+						success: async (success) => {
 							console.log('✅ Conectado a la reunión como anfitrión', success);
 							setLoadingMessage('Cargando interfaz de Zoom...');
+
+							// Registrar asistencia del administrador
+							if (meetingData?.id) {
+								try {
+									console.log('📝 Registrando asistencia del administrador...');
+									const attendanceResult = await MeetingService.registerAttendance(meetingData.id);
+									console.log('✅ Asistencia registrada:', attendanceResult);
+								} catch (attendanceError) {
+									// No bloquear el flujo si falla el registro de asistencia
+									console.error('⚠️ Error al registrar asistencia (no crítico):', attendanceError);
+								}
+							}
 
 							// Configurar listeners para detectar cuando se sale de la reunión
 							console.log('🎧 Configurando listeners de eventos de Zoom...');
@@ -232,16 +245,16 @@ const ZoomMeetingContainer = ({
 								if (zmmtgRoot && zmmtgRoot.children.length > 0) {
 									// Buscar elementos específicos de la sala de espera o interfaz de Zoom
 									const waitingRoom = zmmtgRoot.querySelector('[class*="waiting"]') ||
-									                    zmmtgRoot.querySelector('[class*="join"]') ||
-									                    zmmtgRoot.querySelector('[class*="preview"]');
+										zmmtgRoot.querySelector('[class*="join"]') ||
+										zmmtgRoot.querySelector('[class*="preview"]');
 
 									const meetingContent = zmmtgRoot.querySelector('[class*="meeting-client"]') ||
-									                       zmmtgRoot.querySelector('[class*="main-layout"]') ||
-									                       zmmtgRoot.querySelector('[class*="meeting-app"]');
+										zmmtgRoot.querySelector('[class*="main-layout"]') ||
+										zmmtgRoot.querySelector('[class*="meeting-app"]');
 
 									const anyZoomContent = zmmtgRoot.querySelector('[class*="zm-"]') ||
-									                       zmmtgRoot.querySelector('iframe') ||
-									                       zmmtgRoot.querySelector('video');
+										zmmtgRoot.querySelector('iframe') ||
+										zmmtgRoot.querySelector('video');
 
 									console.log('🔍 Elementos encontrados:', {
 										waitingRoom: !!waitingRoom,
@@ -353,6 +366,15 @@ const ZoomMeetingContainer = ({
 		console.log('🔄 Cerrando componente de Zoom y volviendo al dashboard');
 		onClose();
 
+		// Registrar hora de salida del administrador
+		try {
+			console.log('📝 Registrando salida del administrador...');
+			await MeetingService.registerLeave(meetingData.id);
+			console.log('✅ Salida registrada');
+		} catch (leaveError) {
+			console.error('⚠️ Error al registrar salida (no crítico):', leaveError);
+		}
+
 		// Luego registrar la hora de finalización en segundo plano
 		// Esto evita que cualquier error (incluyendo 401) afecte la navegación
 		try {
@@ -443,25 +465,16 @@ const ZoomMeetingContainer = ({
 			// Cerrar modal
 			handleClosePollModal();
 
-			// Mostrar mensaje de éxito con SweetAlert2
+			// Mostrar mensaje de éxito
 			Swal.fire({
 				icon: 'success',
 				title: '¡Voto Registrado!',
-				html: '<p style="color: #6b7280; margin: 0;">Tu voto ha sido registrado exitosamente</p>',
-				showConfirmButton: false,
-				timer: 3000,
+				text: 'Tu voto ha sido registrado exitosamente',
 				toast: true,
 				position: 'top-end',
-				background: '#ffffff',
-				customClass: {
-					popup: 'poll-success-toast',
-					title: 'poll-toast-title',
-					icon: 'poll-toast-icon'
-				},
-				didOpen: (toast) => {
-					toast.style.borderLeft = '4px solid #9333ea';
-					toast.style.boxShadow = '0 10px 15px -3px rgba(147, 51, 234, 0.3)';
-				}
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		} catch (error) {
 			console.error('❌ Error al votar:', error);
@@ -613,50 +626,50 @@ const ZoomMeetingContainer = ({
 
 	return (
 		<>
-			{/* Botón flotante renderizado directamente en body usando Portal */}
+			{/* Botón flotante CENTRADO y MÁS GRANDE - renderizado directamente en body usando Portal */}
 			{showPollButton && ReactDOM.createPortal(
 				<button
 					onClick={handleViewPoll}
-					className="fixed bottom-40 right-8 group"
+					className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 group"
 					style={{ zIndex: 10001 }}
 					title="Ver encuesta activa"
 				>
-					{/* Efecto de resplandor animado */}
-					<div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-2xl blur-xl opacity-75 animate-pulse"></div>
+					{/* Efecto de resplandor animado - MÁS INTENSO */}
+					<div className="absolute inset-0 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 rounded-3xl blur-2xl opacity-75 animate-pulse"></div>
 
-					{/* Contenedor del botón */}
-					<div className="relative bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white px-6 py-4 rounded-2xl shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 flex items-center gap-3 hover:scale-105 hover:-translate-y-1">
-						{/* Icono de encuesta */}
+					{/* Contenedor del botón - MÁS GRANDE */}
+					<div className="relative bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 text-white px-10 py-6 rounded-3xl shadow-2xl hover:shadow-green-500/50 transition-all duration-300 flex items-center gap-5 hover:scale-110 hover:-translate-y-1">
+						{/* Icono de encuesta - MÁS GRANDE */}
 						<div className="relative">
 							<svg
-								className="w-7 h-7 animate-bounce"
+								className="w-16 h-16 animate-bounce"
 								fill="none"
 								viewBox="0 0 24 24"
 								stroke="currentColor"
+								strokeWidth={2.5}
 							>
 								<path
 									strokeLinecap="round"
 									strokeLinejoin="round"
-									strokeWidth={2.5}
 									d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
 								/>
 							</svg>
-							{/* Badge con número */}
-							<div className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+							{/* Badge con número - MÁS GRANDE */}
+							<div className="absolute -top-4 -right-4 w-9 h-9 bg-red-500 rounded-full flex items-center justify-center text-lg font-bold animate-pulse shadow-lg">
 								!
 							</div>
 						</div>
 
-						{/* Texto */}
+						{/* Texto - MÁS GRANDE */}
 						<div className="flex flex-col items-start">
-							<span className="font-bold text-sm leading-tight">Encuesta Activa</span>
-							<span className="text-xs text-purple-100 leading-tight">Click para votar</span>
+							<span className="font-bold text-2xl leading-tight">📊 Encuesta Activa</span>
+							<span className="text-base text-green-100 leading-tight">Haz clic para votar ahora</span>
 						</div>
 
-						{/* Indicador pulsante */}
-						<div className="relative">
-							<div className="w-3 h-3 bg-white rounded-full animate-ping absolute"></div>
-							<div className="w-3 h-3 bg-white rounded-full"></div>
+						{/* Indicador pulsante - MÁS GRANDE */}
+						<div className="relative ml-3">
+							<div className="w-7 h-7 bg-white rounded-full animate-ping absolute"></div>
+							<div className="w-7 h-7 bg-white rounded-full"></div>
 						</div>
 					</div>
 				</button>,
@@ -756,8 +769,8 @@ const ZoomMeetingContainer = ({
 											fontWeight: '500'
 										}}>
 											{activePoll.str_poll_type === 'single' ? 'Opción única' :
-											 activePoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
-											 activePoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
+												activePoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
+													activePoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
 										</span>
 										{activePoll.bln_is_anonymous && (
 											<span style={{

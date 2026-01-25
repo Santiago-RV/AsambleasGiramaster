@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Clock, Users, Video, MapPin } from 'lucide-react';
+import { Calendar, Clock, Users, Video, MapPin, Loader2, Play, CalendarX } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ZoomMeetingContainer from './ZoomEmbed';
@@ -72,7 +72,7 @@ export default function MeetingCard({ meeting }) {
 			// Registrar la hora de inicio en la base de datos
 			console.log('📝 Registrando hora de inicio de la reunión...');
 			await MeetingService.startMeeting(meeting.id);
-			console.log('✅ Hora de inicio registrada exitosamente');
+			console.log('Hora de inicio registrada exitosamente');
 
 			// Mostrar el contenedor de Zoom
 			setShowZoom(true);
@@ -100,8 +100,9 @@ export default function MeetingCard({ meeting }) {
 							<h3 className="text-lg font-bold text-gray-800">
 								{meeting.str_title}
 							</h3>
-							<span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
-								🔴 En vivo
+							<span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
+								<Play size={12} className="fill-green-800" />
+								En vivo
 							</span>
 						</div>
 						<button
@@ -123,85 +124,98 @@ export default function MeetingCard({ meeting }) {
 		);
 	}
 
-	// Card normal (cuando NO está mostrando Zoom)
+	// Card normal (cuando NO está mostrando Zoom) - ALTURA COMPLETA
 	return (
-		<div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-gray-200">
-			{/* Header con estado */}
-			<div className="flex items-start justify-between mb-4">
-				<div className="flex-1">
-					<h3 className="text-xl font-bold text-gray-800 mb-2">
-						{meeting.str_title}
-					</h3>
-					<span
-						className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-							status.color === 'blue'
-								? 'bg-blue-100 text-blue-800'
-								: status.color === 'green'
-								? 'bg-green-100 text-green-800'
-								: status.color === 'red'
-								? 'bg-red-100 text-red-800'
-								: 'bg-gray-100 text-gray-800'
-						} ${status.pulsing ? 'animate-pulse' : ''}`}
-					>
-						{status.text}
-					</span>
-				</div>
-				<Video className="w-8 h-8 text-blue-600" />
-			</div>
-
-			{/* Descripción */}
-			{meeting.str_description && (
-				<p className="text-gray-600 mb-4 line-clamp-2">
-					{meeting.str_description}
-				</p>
-			)}
-
-			{/* Información de la reunión */}
-			<div className="space-y-3 mb-4">
-				<div className="flex items-center text-gray-700">
-					<Calendar className="w-5 h-5 mr-3 text-gray-400" />
-					<span>{formattedDate}</span>
-				</div>
-
-				<div className="flex items-center text-gray-700">
-					<Clock className="w-5 h-5 mr-3 text-gray-400" />
-					<span>
-						{formattedTime} ({formatDuration(meeting.int_estimated_duration)})
-					</span>
-				</div>
-
-				<div className="flex items-center text-gray-700">
-					<MapPin className="w-5 h-5 mr-3 text-gray-400" />
-					<span className="capitalize">{meeting.str_meeting_type}</span>
-				</div>
-
-				{meeting.int_zoom_meeting_id && (
-					<div className="flex items-center text-gray-700">
-						<Users className="w-5 h-5 mr-3 text-gray-400" />
-						<span className="text-sm">
-							ID Zoom: {meeting.int_zoom_meeting_id}
+		<div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 flex flex-col">
+			{/* SIN min-h ya que las cards van una debajo de otra */}
+			<div className="p-6 flex-1 flex flex-col">
+				{/* Header con estado */}
+				<div className="flex items-start justify-between mb-4">
+					<div className="flex-1">
+						<h3 className="text-xl font-bold text-gray-800 mb-2">
+							{meeting.str_title}
+						</h3>
+						<span
+							className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+								status.color === 'blue'
+									? 'bg-blue-100 text-blue-800'
+									: status.color === 'green'
+									? 'bg-green-100 text-green-800'
+									: status.color === 'red'
+									? 'bg-red-100 text-red-800'
+									: 'bg-gray-100 text-gray-800'
+							} ${status.pulsing ? 'animate-pulse' : ''}`}
+						>
+							{status.text}
 						</span>
 					</div>
-				)}
-			</div>
+					<Video className="w-8 h-8 text-blue-600" />
+				</div>
 
-			{/* Botón para unirse */}
-			<button
-				onClick={handleJoinMeeting}
-				disabled={!status.canJoin || isJoining}
-				className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
-					status.canJoin && !isJoining
-						? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
-						: 'bg-gray-300 text-gray-500 cursor-not-allowed'
-				}`}
-			>
-				{isJoining
-					? '⏳ Ingresando...'
-					: status.canJoin
-						? '🎥 Unirse a la Reunión'
-						: '📅 Reunión No Disponible'
-				}
-			</button>
+				{/* Descripción */}
+				{meeting.str_description && (
+					<p className="text-gray-600 mb-4 line-clamp-2">
+						{meeting.str_description}
+					</p>
+				)}
+
+				{/* Información de la reunión - ICONOS DE LUCIDE-REACT */}
+				<div className="space-y-3 mb-4 flex-1">
+					<div className="flex items-center text-gray-700">
+						<Calendar className="w-5 h-5 mr-3 text-gray-400" />
+						<span>{formattedDate}</span>
+					</div>
+
+					<div className="flex items-center text-gray-700">
+						<Clock className="w-5 h-5 mr-3 text-gray-400" />
+						<span>
+							{formattedTime} ({formatDuration(meeting.int_estimated_duration)})
+						</span>
+					</div>
+
+					<div className="flex items-center text-gray-700">
+						<MapPin className="w-5 h-5 mr-3 text-gray-400" />
+						<span className="capitalize">{meeting.str_meeting_type}</span>
+					</div>
+
+					{meeting.int_zoom_meeting_id && (
+						<div className="flex items-center text-gray-700">
+							<Users className="w-5 h-5 mr-3 text-gray-400" />
+							<span className="text-sm">
+								ID Zoom: {meeting.int_zoom_meeting_id}
+							</span>
+						</div>
+					)}
+				</div>
+
+				{/* Botón para unirse - ICONOS DE LUCIDE-REACT */}
+				<button
+					onClick={handleJoinMeeting}
+					disabled={!status.canJoin || isJoining}
+					className={`w-full py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+						status.canJoin && !isJoining
+							? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
+							: 'bg-gray-300 text-gray-500 cursor-not-allowed'
+					}`}
+				>
+					{isJoining ? (
+						<>
+							<Loader2 size={18} className="animate-spin" />
+							Ingresando...
+						</>
+					) : status.canJoin ? (
+						<>
+							<Video size={18} />
+							Unirse a la Reunión
+						</>
+					) : (
+						<>
+							<CalendarX size={18} />
+							Reunión No Disponible
+						</>
+					)}
+				</button>
+			</div>
 		</div>
 	);
 }

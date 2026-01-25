@@ -9,6 +9,393 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-01-19
+
+- **Corrección del sistema de votación con peso de voto en encuestas**:
+  - **Problema**: Las respuestas de encuestas no registraban correctamente el peso de votación de cada usuario
+  - **Solución en `backend/app/services/pool_service.py`**:
+    - **`_get_user_voting_weight()`** - Mejorada la obtención del peso de votación:
+      - Prioridad 1: Busca en invitaciones de la reunión (`MeetingInvitationModel.dec_voting_weight`)
+      - Prioridad 2: Busca el peso por defecto del usuario en la unidad residencial (`UserResidentialUnitModel.dec_default_voting_weight`)
+      - Fallback: Si no encuentra en ningún lado, usa peso por defecto de 1.0 (evita errores)
+      - Agregado logging detallado para debugging
+    - **`get_poll_statistics()`** - Mejoradas las estadísticas de encuestas:
+      - Agregado `total_weight_voted`: suma del peso de todos los votos emitidos
+      - Agregado `total_weight_invited`: suma del peso de todos los invitados
+      - Agregado `weight_participation_percentage`: porcentaje de participación basado en peso
+      - El quórum ahora se calcula basándose en el peso de votación (no solo cantidad de personas)
+  - **Flujo de votación**:
+    1. Usuario vota → se obtiene su peso de votación (de invitación o de unidad residencial)
+    2. Se guarda en `PollResponseModel.dec_voting_weight`
+    3. Se actualiza `PollOptionModel.dec_weight_total` sumando el peso
+    4. Al calcular porcentajes, se usa el peso total de cada opción dividido entre el peso total votado
+
+- **Unificación del componente MeetingsList para Admin y SuperAdmin**:
+  - **Objetivo**: Eliminar duplicación de código, agregar separación de reuniones próximas/historial para SuperAdmin
+  - **Componente creado en `frontend/src/components/common/MeetingsList.jsx`**:
+    - Prop `variant`: `'admin'` (diseño completo con gradient) o `'compact'` (diseño simple para SuperAdmin)
+    - Tabs para "Próximas" e "Historial" en ambas variantes
+    - Filtrado automático de reuniones por fecha y estado
+    - Soporte para `onJoinMeeting` y `onStartMeeting` (compatibilidad con ambos dashboards)
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/UsersPage.jsx`: Usa `MeetingsList` con `variant="admin"`
+    - `frontend/src/components/saDashboard/UnidadResidencialDetalles.jsx`: Usa `MeetingsList` (variante `compact` por defecto)
+  - **Archivos eliminados**:
+    - `frontend/src/components/AdDashboard/MeetingsSection.jsx`
+    - `frontend/src/components/saDashboard/components/MeetingsList.jsx`
+
+- **Control de acceso diferenciado para habilitar/deshabilitar usuarios**:
+  - **Requisito**: SuperAdmin puede habilitar/deshabilitar acceso de todos (incluyendo administradores), Admin solo puede hacerlo para copropietarios e invitados
+  - **Backend - `backend/app/services/user_service.py`**:
+    - Agregado parámetro `is_super_admin: bool = False` a `enable_coowner_access()` y `disable_coowner_access()`
+    - La verificación de rol de administrador solo se aplica si `is_super_admin=False`
+  - **Backend - `backend/app/api/v1/endpoints/super_admin.py`**:
+    - Endpoints de toggle access individual y masivo ahora pasan `is_super_admin=True`
+  - **Backend - `backend/app/services/residential_unit_service.py`**:
+    - Agregados campos `bln_allow_entry` e `int_id_rol` a la respuesta de `get_residents_by_residential_unit`
+  - **Frontend - `frontend/src/components/common/ResidentsList.jsx`**:
+    - Agregada prop `isSuperAdmin` (default: `false`)
+    - Función `canToggleAccess(resident)` controla visibilidad del botón individual
+    - Acciones masivas filtran residentes según permisos del usuario
+  - **Frontend - Configuración de props**:
+    - `UsersPage.jsx`: `isSuperAdmin={false}` (Admin no puede modificar administradores)
+    - `UnidadResidencialDetalles.jsx`: `isSuperAdmin={true}` (SuperAdmin puede modificar todos)
+
+- **Corrección del formulario de edición de copropietario (contraseña opcional)**:
+  - **Problema**: El formulario mostraba "La contraseña es obligatoria" en modo edición cuando debería ser opcional
+  - **Causa**: `react-hook-form` cacheaba la validación y no se actualizaba al cambiar el modo
+  - **Solución en `frontend/src/components/saDashboard/components/modals/ResidentModal.jsx`**:
+    - Cambiado `useEffect` para usar `reset()` con los datos del residente cuando cambia `isOpen` o `mode`
+    - Cambiada validación del campo `password` a una función `validate` que evalúa el `mode` en tiempo de ejecución
+    - En modo edición: contraseña es opcional (si está vacía, se mantiene la actual en BD)
+    - En modo creación: contraseña es obligatoria con mínimo 8 caracteres
+  - **Backend ya manejaba correctamente**: Solo actualiza contraseña si se proporciona y no está vacía
+
+#### 2026-01-19 (previo)
+
+- **Corrección de visualización de asistentes en lista de reuniones**:
+  - **Problema**: En la vista de SuperAdmin no se mostraba el número de asistentes de las reuniones, y en Admin mostraba un valor incorrecto (1 en lugar de 3 copropietarios)
+  - **Causa raíz**: El hook `useResidentialUnitData.js` usaba el campo `int_total_confirmed` (siempre 0 hasta que confirmen asistencia) en lugar de `int_total_invitated` (número real de invitados)
+  - **Solución**:
+    - `frontend/src/components/saDashboard/hooks/useResidentialUnitData.js` (línea 69):
+      - Cambiado `asistentes: reunion.int_total_confirmed || 0` a `asistentes: reunion.int_total_invitated || 0`
+  - **Beneficios**:
+    - Ahora se muestra correctamente el número de copropietarios invitados a cada reunión
+    - Consistencia entre las vistas de Admin y SuperAdmin
+
+- **Ajuste de altura del componente MeetingsList**:
+  - **Solicitud**: Hacer que el componente de reuniones tenga la misma altura que el componente de residentes
+  - **Solución**:
+    - `frontend/src/components/common/MeetingsList.jsx` (línea 216):
+      - Variante admin: Cambiado `max-h-[600px]` a `max-h-[520px]` para que el componente completo coincida con los ~700px de ResidentsList
+  - **Beneficios**:
+    - Interfaz más consistente y balanceada visualmente en ambas vistas
+
+- **Sistema de invitaciones y registro de asistencia a reuniones**:
+  - **Backend - Creación automática de invitaciones al crear reunión**:
+    - `backend/app/services/meeting_service.py`:
+      - Al crear una reunión, se crean automáticamente registros en `tbl_meeting_invitations` para cada copropietario activo de la unidad residencial
+      - Cada invitación incluye: `int_user_id`, `dec_voting_weight`, `str_apartment_number`, `str_invitation_status='pending'`, `str_response_status='no_response'`
+      - Imports agregados: `MeetingInvitationModel`, `UserResidentialUnitModel`, `UserModel`
+  - **Backend - Nuevos endpoints para registro de asistencia**:
+    - `POST /meetings/{meeting_id}/register-attendance`:
+      - Registra la hora de entrada (`dat_joined_at`) cuando un usuario se une a la reunión
+      - Actualiza `bln_actually_attended=True` y `str_response_status='attended'`
+      - Solo registra una vez por usuario (idempotente)
+    - `POST /meetings/{meeting_id}/register-leave`:
+      - Registra la hora de salida (`dat_left_at`) cuando un usuario abandona la reunión
+  - **Backend - Nuevos métodos en `meeting_service.py`**:
+    - `register_attendance(meeting_id, user_id)` - Registra entrada del usuario
+    - `register_leave(meeting_id, user_id)` - Registra salida del usuario
+  - **Frontend - Integración con componentes de Zoom**:
+    - `frontend/src/services/api/MeetingService.js`:
+      - Agregado `registerAttendance(meetingId)` - Llama al endpoint de registro de asistencia
+      - Agregado `registerLeave(meetingId)` - Llama al endpoint de registro de salida
+    - `frontend/src/components/CoDashboard/ZoomEmbed.jsx`:
+      - Al unirse exitosamente a Zoom, registra automáticamente la asistencia del copropietario
+      - Al salir de la reunión, registra la hora de salida
+      - Los invitados (role="Invitado") no registran asistencia
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx`:
+      - Al unirse exitosamente a Zoom, registra la asistencia del administrador
+      - Al finalizar la reunión, registra la hora de salida antes de marcar la reunión como completada
+  - **Flujo completo de registro de asistencia**:
+    1. Al crear reunión → Se crean invitaciones para todos los copropietarios activos
+    2. Usuario se une a Zoom → Se registra `dat_joined_at` y `bln_actually_attended=true`
+    3. Usuario sale de Zoom → Se registra `dat_left_at`
+  - **Beneficios**:
+    - Registro completo de quién fue invitado vs quién asistió realmente
+    - Trazabilidad de horas de entrada y salida de cada participante
+    - Base para cálculo de quórum y reportes de asistencia
+
+- **Mejora en el ciclo de vida de reuniones (inicio/finalización)**:
+  - **Problema**: Cada vez que un usuario se unía a la reunión, se sobrescribía la hora de inicio y el estado
+  - **Backend - Corrección en `meeting_service.py`**:
+    - **`start_meeting()`** (líneas 346-377):
+      - Ahora solo cambia estado a "En Curso" si la reunión está en estado "Programada"
+      - Si ya está "En Curso", retorna la reunión sin modificar
+      - Evita sobrescribir `dat_actual_start_time` en llamadas subsecuentes
+    - **`end_meeting()`** (líneas 379-410):
+      - Ahora solo cambia estado a "Completada" si la reunión está "En Curso"
+      - Si ya está "Completada", retorna la reunión sin modificar
+      - Evita sobrescribir `dat_actual_end_time` en llamadas subsecuentes
+  - **Flujo corregido**:
+    - Primera llamada a `/meetings/{id}/start` → Cambia a "En Curso" y registra hora
+    - Llamadas subsiguientes → Sin cambios, retorna estado actual
+    - Primera llamada a `/meetings/{id}/end` → Cambia a "Completada" y registra hora
+    - Llamadas subsiguientes → Sin cambios, retorna estado actual
+  - **Beneficios**:
+    - Múltiples usuarios pueden unirse sin afectar la hora de inicio real
+    - El estado de la reunión es consistente para todos los participantes
+    - Mejor trazabilidad de cuándo realmente inició y terminó la reunión
+
+- **Corrección de sección de encuestas en vista de administrador**:
+  - **Problema**: Error 404 al cargar reuniones en la sección de encuestas, impidiendo crear encuestas para reuniones en curso o programadas
+  - **Causa raíz**: El endpoint `/meetings/residential-unit/{residentialUnitId}` no existía en el backend
+  - **Backend - Nuevo endpoint y servicio**:
+    - `backend/app/services/meeting_service.py`:
+      - Agregado método `get_meetings_by_residential_unit(residential_unit_id)` (líneas 70-89)
+      - Obtiene todas las reuniones de una unidad residencial ordenadas por fecha descendente
+    - `backend/app/api/v1/endpoints/meeting_endpoint.py`:
+      - Agregado endpoint `GET /meetings/residential-unit/{residential_unit_id}` (líneas 55-81)
+      - Retorna lista de reuniones filtradas por unidad residencial
+  - **Backend - Corrección de inconsistencia de estados**:
+    - `backend/app/services/meeting_service.py` (línea 330):
+      - Corregido estado de `"En curso"` a `"En Curso"` para consistencia con el resto del sistema
+  - **Frontend - Mejoras en detección de estado**:
+    - `frontend/src/services/api/PollService.js` (línea 314):
+      - Filtrado de reuniones ahora usa comparación case-insensitive (`toLowerCase()`)
+      - Mayor robustez ante variaciones de mayúsculas/minúsculas en estados
+    - `frontend/src/components/AdDashboard/LiveMeetingCard.jsx` (líneas 11-14):
+      - Detección de estado "En Curso" mejorada
+      - Ahora verifica tanto `dat_actual_start_time` como `str_status`
+  - **Lógica de filtrado para encuestas**:
+    - Reuniones con estado "En Curso" → siempre visibles
+    - Reuniones "Programadas" dentro de ±1 hora de la hora actual → visibles
+  - **Beneficios**:
+    - Administradores ahora pueden ver y gestionar encuestas de reuniones en curso
+    - Permite crear encuestas hasta 1 hora antes del inicio programado
+    - Mayor robustez en la detección de estados de reuniones
+
+#### 2026-01-18
+
+- **Unificación de componente ResidentsList para Admin y SuperAdmin**:
+  - **Objetivo**: Eliminar duplicación de código y mejorar mantenibilidad usando un solo componente compartido
+  - **Componentes creados en `frontend/src/components/common/`**:
+    - `ResidentsList.jsx`: Componente unificado con las siguientes características:
+      - Prop `showSearch` (boolean, default: false) para mostrar/ocultar barra de búsqueda integrada
+      - Prop `title` (string, default: "Residentes") para personalizar el título del componente
+      - Búsqueda integrada por nombre, usuario, email, teléfono y número de apartamento
+      - Indicador de estado visual (badge "Activo"/"Inactivo") basado en `bln_allow_entry`
+      - Reset automático de selección al cambiar término de búsqueda
+      - Soporte completo para acciones masivas (envío de credenciales, habilitar/deshabilitar acceso)
+    - `ResidentActionsMenu.jsx`: Menú de acciones (Ver, Editar, Eliminar) extraído a componente común
+  - **Archivos modificados**:
+    - `frontend/src/components/AdDashboard/UsersPage.jsx`:
+      - Import cambiado de `"../saDashboard/components/ResidentsList"` a `"../common/ResidentsList"`
+      - Agregadas props `showSearch={true}` y `title="Copropietarios"`
+    - `frontend/src/components/saDashboard/UnidadResidencialDetalles.jsx`:
+      - Import cambiado de `'./components/ResidentsList'` a `'../common/ResidentsList'`
+      - Eliminado import de `SearchBar` (ahora integrado en ResidentsList)
+      - Eliminado estado `searchTerm` y lógica de filtrado (manejado internamente por ResidentsList)
+      - Agregada prop `showSearch={true}` a ResidentsList
+      - Cambiado `filteredResidents` a `residentsData` en props
+  - **Archivos eliminados**:
+    - `frontend/src/components/saDashboard/components/ResidentsList.jsx`
+    - `frontend/src/components/saDashboard/components/ResidentActionsMenu.jsx`
+    - `frontend/src/components/saDashboard/components/SearchBar.jsx`
+  - **Beneficios**:
+    - Código DRY: Un solo componente para ambos dashboards
+    - Barra de búsqueda ahora disponible en Admin Dashboard
+    - Mantenimiento simplificado: cambios en un solo lugar
+    - Consistencia visual entre vistas de Admin y SuperAdmin
+    - Mejor organización del código con componentes en carpeta `common`
+
+#### 2026-01-14
+
+- **Sistema mejorado de gestión de unidades residenciales en SuperAdmin**:
+  - **Objetivo**: Mejorar la interfaz de gestión de unidades con opciones de edición/eliminación y múltiples vistas
+  - **Menú desplegable no invasivo en tarjetas**:
+    - Botón con tres puntos verticales (MoreVertical) en cada tarjeta
+    - Dropdown elegante con opciones de "Editar" y "Eliminar"
+    - Hover azul para editar, hover rojo para eliminar
+    - Cierre automático al hacer clic fuera del menú
+    - Prevención de navegación al interactuar con el menú
+  - **Vista de listado (tabla) completa**:
+    - Tabla profesional con columnas: Unidad, Ubicación, Tipo, Unidades, Estado, Acciones
+    - Información condensada y organizada
+    - Menú de acciones (⋮) en cada fila
+    - Hover en filas para mejor UX
+    - Diseño responsive con padding generoso
+  - **Toggle entre vistas tarjetas/lista**:
+    - Control toggle elegante en el encabezado
+    - Botones para "Tarjetas" (LayoutGrid) y "Lista" (List)
+    - Resaltado visual del modo activo (azul con fondo blanco)
+    - Solo visible cuando hay unidades residenciales
+  - **Funcionalidad de edición implementada**:
+    - Modal reutilizado con título "Editar Unidad Residencial"
+    - Prellenado automático de todos los campos con datos actuales
+    - Incluye campos de empresa administradora
+    - Botón cambia a "Actualizar Unidad Residencial" con ícono de lápiz
+    - Reset completo de formulario al cerrar
+  - **Funcionalidad de eliminación con confirmación**:
+    - Diálogo SweetAlert2 con advertencia sobre eliminación en cascada
+    - Nombre de unidad resaltado en negrita
+    - Advertencia roja sobre datos asociados
+    - Botón de confirmación en rojo, cancelar en gris
+    - Mensaje de éxito con toast al completar
+  - **Archivos modificados**:
+    - `frontend/src/components/saDashboard/UnidadesResidencialesTab.jsx`:
+      - Línea 1: Agregado `useEffect` a imports de React
+      - Línea 7: Importados íconos: `MoreVertical, Edit2, Trash2, LayoutGrid, List`
+      - Líneas 11-15: Estados para edición, dropdown y vista (`isEditMode`, `editingUnit`, `openDropdownId`, `viewMode`)
+      - Líneas 161-170: Función `handleCloseModal` actualizada para limpiar estados
+      - Líneas 172-194: Función `handleEdit` para prellenar formulario y abrir modal
+      - Líneas 196-224: Función `handleDelete` con confirmación SweetAlert2
+      - Líneas 226-229: Función `toggleDropdown` para gestión del menú
+      - Líneas 231-243: `useEffect` para cerrar dropdown al hacer clic fuera
+      - Líneas 243-279: Toggle de vista agregado en el encabezado
+      - Líneas 348-435: Vista de tarjetas (grid) con menú desplegable
+      - Líneas 446-557: Vista de tabla (list) completa con todas las columnas
+      - Línea 564: Título del modal dinámico según modo (crear/editar)
+      - Líneas 1076-1077: Botón de guardar con texto e ícono dinámicos
+  - **Características técnicas**:
+    - Prevención de propagación de eventos (stopPropagation) en menús
+    - Estado de dropdown cerrado al ejecutar acciones
+    - Consistencia de diseño con colores azul (#3498db/#2980b9) del proyecto
+    - Transiciones suaves en todos los elementos interactivos
+    - Grid responsive: 1 columna en móvil, 2 en tablet, 3 en desktop
+  - **Beneficios**:
+    - ✅ Opciones de editar/eliminar accesibles pero no invasivas
+    - ✅ Dos formas de visualización según preferencia del usuario
+    - ✅ Experiencia consistente en ambas vistas (tarjetas y lista)
+    - ✅ Confirmación antes de eliminar para prevenir errores
+    - ✅ Modal reutilizado eficientemente para crear y editar
+    - ✅ Interfaz moderna con animaciones y feedback visual
+    - ✅ Código organizado y mantenible
+    - ✅ Lista para integración con backend (endpoints de update/delete)
+
+#### 2026-01-14 (anterior)
+
+- **Información de empresa administradora en unidades residenciales**:
+  - **Objetivo**: Capturar información de la empresa que administra cada unidad residencial
+  - **Archivos modificados en backend**:
+    - `backend/app/models/residential_unit_model.py`:
+      - Líneas 22-24: Agregados campos `str_management_company`, `str_contact_person`, `str_contact_phone`
+      - Campos opcionales (nullable=True) para flexibilidad
+    - `backend/app/schemas/residential_unit_schema.py`:
+      - Líneas 38-40: Agregados campos opcionales en `ResidentialUnitBase`
+      - Validación con Pydantic para los nuevos campos
+  - **Archivos modificados en frontend**:
+    - `frontend/src/components/saDashboard/UnidadesResidencialesTab.jsx`:
+      - Línea 7: Importado ícono `Briefcase` de lucide-react
+      - Líneas 146-148: Agregados campos al objeto `unitData` en `onSubmit`
+      - Líneas 532-602: Nueva sección "Empresa Administradora" en el formulario
+      - Incluye: Nombre de empresa, persona de contacto, teléfono
+  - **Migración de base de datos**:
+    - `backend/migrations/add_management_company_fields.sql`:
+      - Agrega 3 columnas a `tbl_residential_units`
+      - Crea índice en `str_management_company` para búsquedas
+  - **Campos agregados**:
+    - `str_management_company`: Nombre de la empresa administradora (VARCHAR 200, opcional)
+    - `str_contact_person`: Persona de contacto (VARCHAR 200, opcional)
+    - `str_contact_phone`: Teléfono de contacto (VARCHAR 50, opcional con validación de 10 dígitos)
+  - **Características del formulario**:
+    - Sección claramente identificada con ícono de Briefcase (maletín) en color teal
+    - Badge "Opcional" para indicar que los campos no son obligatorios
+    - Validación de formato de teléfono (10 dígitos sin espacios)
+    - Diseño responsive con grid de 2 columnas
+    - Campo de empresa ocupa 2 columnas para mayor visibilidad
+  - **Beneficios**:
+    - ✅ Trazabilidad de quién administra cada unidad residencial
+    - ✅ Información de contacto centralizada
+    - ✅ Campos opcionales para flexibilidad
+    - ✅ Validación de datos en frontend y backend
+    - ✅ Diseño UI/UX consistente con el resto del formulario
+
+- **Mejora de contraste en sidebar del administrador**:
+  - **Objetivo**: Mejorar la legibilidad y accesibilidad del sidebar con colores más oscuros
+  - **Archivos modificados**:
+    - `frontend/src/pages/AdDashboard.jsx`:
+      - Líneas 435-437: Cambio de gradiente del sidebar para mejor contraste
+      - `gradientFrom`: De `#059669` (green-600) a `#047857` (green-700)
+      - `gradientTo`: De `#10b981` (green-500) a `#065f46` (green-800)
+      - `accentColor`: De `#34d399` (green-400) a `#10b981` (green-500)
+  - **Mejoras de accesibilidad**:
+    - ✅ Mayor contraste entre el fondo del sidebar y el texto blanco
+    - ✅ Tonos verde oscuro (#047857 y #065f46) proporcionan mejor legibilidad
+    - ✅ Cumplimiento de estándares WCAG para contraste de color
+    - ✅ Mejor experiencia visual sin sacrificar la identidad de color verde
+
+- **Eliminación del Dashboard en la vista de administrador**:
+  - **Objetivo**: Simplificar la interfaz de administrador eliminando el dashboard redundante
+  - **Archivos modificados**:
+    - `frontend/src/pages/AdDashboard.jsx`:
+      - Línea 25: Estado inicial cambiado de `"dashboard"` a `"users"`
+      - Líneas 76-82: Eliminada opción `dashboard` del menú del sidebar
+      - Líneas 85-91: Eliminado título de sección `dashboard`
+      - Línea 397: Botón "Volver al Inicio" redirige a `users` en lugar de `dashboard`
+      - Línea 441: Eliminado renderizado condicional de `<DashboardPage />`
+      - Líneas 3, 6: Eliminadas importaciones de `LayoutDashboard` y `DashboardPage`
+  - **Archivos eliminados**:
+    - `frontend/src/components/AdDashboard/DashboardPage.jsx` (componente eliminado completamente)
+  - **Comportamiento nuevo**:
+    - La vista de administrador ahora inicia directamente en "Gestión de Copropietarios"
+    - El menú lateral ya no muestra la opción "Dashboard"
+    - El botón "Volver al Inicio" redirige a la sección de copropietarios
+  - **Beneficios**:
+    - ✅ Interfaz más limpia y directa
+    - ✅ Eliminación de información redundante o mock
+    - ✅ Acceso inmediato a la funcionalidad principal (gestión de copropietarios)
+    - ✅ Simplificación del código y reducción de componentes innecesarios
+
+- **Cambio de esquema de colores en vista administrativa de morado a verde**:
+  - **Objetivo**: Diferenciar visualmente el dashboard administrativo con colores verdes
+  - **Archivos modificados**:
+    - `frontend/src/pages/AdDashboard.jsx`:
+      - Líneas 438-440: Gradiente del layout de `#2c3e50/#764ba2` a `#059669/#10b981`
+      - Línea 372: Avatar de usuario de gradiente morado a verde
+      - Línea 301: Spinner de carga de `text-purple-500` a `text-green-500`
+    - `frontend/src/components/AdDashboard/StatCard.jsx`:
+      - Línea 3: Gradiente de tarjetas estadísticas de morado a verde
+    - `frontend/src/components/AdDashboard/DashboardPage.jsx`:
+      - Línea 41: Botón "Editar" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/UsersTable.jsx`:
+      - Línea 30: Botón "Editar" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/AssembliesTable.jsx`:
+      - Línea 24: Botón "Editar" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/ReportsPage.jsx`:
+      - Líneas 9, 14, 19: Botones "Ver Reporte" de gradiente morado a verde
+    - `frontend/src/components/AdDashboard/MeetingsSection.jsx`:
+      - Header y tabs: Cambio completo de `purple-*` a `green-*` (600, 700, 100, 50)
+      - Línea 138: Gradiente del header de `purple-600/indigo-600` a `green-600/indigo-600`
+    - `frontend/src/components/AdDashboard/LivePage.jsx`:
+      - Línea 57: Header de encuestas de gradiente morado a verde
+      - Línea 66: Loader de `text-purple-600` a `text-green-600`
+    - `frontend/src/components/AdDashboard/LiveMeetingCard.jsx`:
+      - Cambio completo de `purple-*` a `green-*` (400, 500, 600, 100, 200)
+      - Líneas 69, 74, 79-80, 92, 97, 105: Bordes, textos e iconos
+    - `frontend/src/components/AdDashboard/CreatePollView.jsx`:
+      - Cambio completo de `purple-*` a `green-*` (500, 600, 700, 800, 100, 200)
+      - Focus de inputs, checkboxes y botones
+    - `frontend/src/components/AdDashboard/MeetingPollsView.jsx`:
+      - Cambio completo de `purple-*` a `green-*` (400, 600, 700, 800, 100)
+      - Botones, loaders, badges y elementos interactivos
+    - `frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx`:
+      - Línea 625: Efecto de resplandor de `purple-500/pink-500` a `green-500/emerald-500`
+      - Línea 628: Botón flotante de encuesta de `purple-600/pink-600` a `green-600/emerald-600`
+      - Sombras de `shadow-purple-500/50` a `shadow-green-500/50`
+  - **Paleta de colores verde implementada**:
+    - Verde principal: `#059669` (green-600)
+    - Verde secundario: `#10b981` (green-500)
+    - Verde claro: `#34d399` (green-400) como color de acento
+    - Tonos complementarios: `green-100`, `green-200`, `green-700`, `green-800`
+    - Combinación con `emerald-*` para gradientes especiales
+  - **Beneficios**:
+    - ✅ Identidad visual distintiva para administradores
+    - ✅ Mejor diferenciación entre roles (SuperAdmin morado, Admin verde)
+    - ✅ Coherencia visual en todos los componentes del dashboard
+    - ✅ Mantenimiento de accesibilidad y legibilidad con la nueva paleta
+
 #### 2025-12-26
 
 - **Dashboard de SuperAdmin con estadísticas en tiempo real**:

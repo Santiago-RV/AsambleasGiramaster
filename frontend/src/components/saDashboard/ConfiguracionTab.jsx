@@ -55,10 +55,11 @@ const ConfiguracionTab = ({ onBack }) => {
 					icon: 'success',
 					title: '¡Éxito!',
 					text: 'Configuración de Zoom actualizada exitosamente',
-					showConfirmButton: false,
-					timer: 2000,
 					toast: true,
 					position: 'top-end',
+					showConfirmButton: false,
+					timer: 3000,
+					backdrop: false,
 				});
 			} else {
 				// Crear nueva configuración
@@ -72,10 +73,11 @@ const ConfiguracionTab = ({ onBack }) => {
 					icon: 'success',
 					title: '¡Éxito!',
 					text: 'Configuración de Zoom creada exitosamente',
-					showConfirmButton: false,
-					timer: 2000,
 					toast: true,
 					position: 'top-end',
+					showConfirmButton: false,
+					timer: 3000,
+					backdrop: false,
 				});
 			}
 			
@@ -107,10 +109,11 @@ const ConfiguracionTab = ({ onBack }) => {
 				icon: 'success',
 				title: '¡Éxito!',
 				text: 'Configuración de Zoom eliminada exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		} catch (error) {
 			Swal.fire({

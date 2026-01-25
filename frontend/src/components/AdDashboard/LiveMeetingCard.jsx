@@ -8,8 +8,10 @@ export default function LiveMeetingCard({ meeting, onClick }) {
     const scheduleDate = new Date(meeting.dat_schedule_date);
     const ONE_HOUR_MS = 60 * 60 * 1000;
     const timeDifference = scheduleDate.getTime() - now.getTime();
+    const status = (meeting.str_status || '').toLowerCase();
 
-    if (meeting.dat_actual_start_time) {
+    // Verificar si está en curso por tiempo de inicio o por estado
+    if (meeting.dat_actual_start_time || status === 'en curso') {
       return (
         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 animate-pulse">
           <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
@@ -66,18 +68,18 @@ export default function LiveMeetingCard({ meeting, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-200 hover:border-purple-400 overflow-hidden group"
+      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-200 hover:border-green-400 overflow-hidden group"
     >
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-purple-600 transition-colors">
+            <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600 transition-colors">
               {meeting.str_title}
             </h3>
             {getStatusBadge()}
           </div>
-          <div className="p-3 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-            <Video className="text-purple-600" size={24} />
+          <div className="p-3 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+            <Video className="text-green-600" size={24} />
           </div>
         </div>
 
@@ -89,12 +91,12 @@ export default function LiveMeetingCard({ meeting, onClick }) {
 
         <div className="space-y-2">
           <div className="flex items-center text-sm text-gray-600">
-            <Calendar size={16} className="mr-2 text-purple-500" />
+            <Calendar size={16} className="mr-2 text-green-500" />
             <span>{formatDate(meeting.dat_schedule_date)}</span>
           </div>
 
           <div className="flex items-center text-sm text-gray-600">
-            <Clock size={16} className="mr-2 text-purple-500" />
+            <Clock size={16} className="mr-2 text-green-500" />
             <span>{formatTime(meeting.dat_schedule_date)}</span>
             {meeting.int_estimated_duration > 0 && (
               <span className="ml-1">({meeting.int_estimated_duration} min)</span>
@@ -102,7 +104,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
           </div>
 
           <div className="flex items-center text-sm text-gray-600">
-            <Users size={16} className="mr-2 text-purple-500" />
+            <Users size={16} className="mr-2 text-green-500" />
             <span>
               {meeting.int_total_confirmed || 0} confirmados de {meeting.int_total_invitated || 0}
             </span>

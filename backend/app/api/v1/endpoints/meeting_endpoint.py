@@ -53,6 +53,35 @@ async def get_meetings(
 
 
 @router.get(
+    "/residential-unit/{residential_unit_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener reuniones por unidad residencial",
+    description="Obtiene todas las reuniones de una unidad residencial específica"
+)
+async def get_meetings_by_residential_unit(
+    residential_unit_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Obtiene todas las reuniones de una unidad residencial"""
+    try:
+        meeting_service = MeetingService(db)
+        meetings = await meeting_service.get_meetings_by_residential_unit(residential_unit_id)
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Reuniones obtenidas correctamente",
+            data=[MeetingResponse.from_orm(meeting).dict() for meeting in meetings]
+        )
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al obtener las reuniones: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
     "/{meeting_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
@@ -263,6 +292,76 @@ async def end_meeting(
 
 
 @router.post(
+    "/{meeting_id}/register-attendance",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Registrar asistencia a reunión",
+    description="Registra la hora de entrada de un usuario a una reunión"
+)
+async def register_attendance(
+    meeting_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Registra la asistencia de un usuario cuando entra a una reunión.
+    Actualiza dat_joined_at y bln_actually_attended en tbl_meeting_invitations.
+    """
+    try:
+        meeting_service = MeetingService(db)
+        user_id = current_user.get("user_id")
+
+        result = await meeting_service.register_attendance(meeting_id, user_id)
+
+        return SuccessResponse(
+            success=result.get("success", False),
+            status_code=status.HTTP_200_OK,
+            message=result.get("message", ""),
+            data=result
+        )
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al registrar asistencia: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.post(
+    "/{meeting_id}/register-leave",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Registrar salida de reunión",
+    description="Registra la hora de salida de un usuario de una reunión"
+)
+async def register_leave(
+    meeting_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Registra la hora de salida de un usuario de una reunión.
+    Actualiza dat_left_at en tbl_meeting_invitations.
+    """
+    try:
+        meeting_service = MeetingService(db)
+        user_id = current_user.get("user_id")
+
+        result = await meeting_service.register_leave(meeting_id, user_id)
+
+        return SuccessResponse(
+            success=result.get("success", False),
+            status_code=status.HTTP_200_OK,
+            message=result.get("message", ""),
+            data=result
+        )
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al registrar salida: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.post(
     "/{meeting_id}/send-invitations",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
@@ -310,4 +409,3 @@ async def send_meeting_invitations(
             message=f"Error al enviar invitaciones: {str(e)}",
             details={"original_error": str(e), "meeting_id": meeting_id}
         )
-

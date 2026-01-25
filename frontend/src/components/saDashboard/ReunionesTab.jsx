@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MeetingService } from '../../services/api/MeetingService';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
-import { Calendar, Clock, Users, MapPin, Plus, PlayCircle } from 'lucide-react';
+import { Calendar, Clock, Users, MapPin, Plus, PlayCircle, ChevronRight, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import Modal from '../common/Modal';
 
 const ReunionesTab = ({ onStartMeeting }) => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' o 'past'
 	const queryClient = useQueryClient();
 
 	const {
@@ -117,6 +118,7 @@ const ReunionesTab = ({ onStartMeeting }) => {
 				fecha:
 					reunion.dat_schedule_date?.split('T')[0] ||
 					fechaObj.toISOString().split('T')[0],
+				fechaCompleta: fechaObj, // Para comparaciones
 				hora: fechaObj.toLocaleTimeString('es-ES', {
 					hour: '2-digit',
 					minute: '2-digit',
@@ -131,6 +133,35 @@ const ReunionesTab = ({ onStartMeeting }) => {
 				duracion: reunion.int_estimated_duration,
 			};
 		}) || [];
+
+	// Filtrar y ordenar reuniones por pestaña
+	const { upcomingMeetings, pastMeetings } = useMemo(() => {
+		const now = new Date();
+		const upcoming = [];
+		const past = [];
+
+		reuniones.forEach(meeting => {
+			const meetingDate = new Date(meeting.fechaCompleta);
+
+			// Si está en curso o es una reunión futura
+			if (meetingDate >= now || meeting.estado?.toLowerCase() === 'en curso' || meeting.estado?.toLowerCase() === 'activa') {
+				upcoming.push(meeting);
+			} else {
+				past.push(meeting);
+			}
+		});
+
+		// Ordenar próximas reuniones: más cercanas primero
+		upcoming.sort((a, b) => new Date(a.fechaCompleta) - new Date(b.fechaCompleta));
+
+		// Ordenar reuniones pasadas: más recientes primero
+		past.sort((a, b) => new Date(b.fechaCompleta) - new Date(a.fechaCompleta));
+
+		return { upcomingMeetings: upcoming, pastMeetings: past };
+	}, [reuniones]);
+
+	// Reuniones a mostrar según la pestaña activa
+	const displayMeetings = activeTab === 'upcoming' ? upcomingMeetings : pastMeetings;
 
 	// Función para iniciar una reunión
 	const handleStartMeeting = (reunion) => {
@@ -216,7 +247,7 @@ const ReunionesTab = ({ onStartMeeting }) => {
 	}
 
 	return (
-		<div className="space-y-8">
+		<div className="space-y-6">
 			{/* Encabezado */}
 			<div className="flex justify-between items-center">
 				<div>
@@ -224,7 +255,7 @@ const ReunionesTab = ({ onStartMeeting }) => {
 						Reuniones
 					</h1>
 					<p className="text-gray-600 mt-2">
-						Gestión de asambleas y reuniones virtuales
+						{upcomingMeetings.length} próxima{upcomingMeetings.length !== 1 ? 's' : ''} · {pastMeetings.length} pasada{pastMeetings.length !== 1 ? 's' : ''}
 					</p>
 				</div>
 				<div className="flex gap-3">
@@ -245,14 +276,72 @@ const ReunionesTab = ({ onStartMeeting }) => {
 				</div>
 			</div>
 
-			{/* Tarjeta de reunión activa - Solo mostrar si hay una reunión en curso */}
-			{reuniones.some(
+			{/* Pestañas */}
+			<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+				<div className="border-b border-gray-200 bg-gray-50">
+					<div className="flex">
+						<button
+							onClick={() => setActiveTab('upcoming')}
+							className={`flex-1 px-6 py-3 text-sm font-semibold transition-all relative ${
+								activeTab === 'upcoming'
+									? 'text-blue-600 bg-white'
+									: 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+							}`}
+						>
+							<div className="flex items-center justify-center gap-2">
+								<ChevronRight size={16} />
+								<span>Próximas</span>
+								{upcomingMeetings.length > 0 && (
+									<span className={`px-2 py-0.5 rounded-full text-xs ${
+										activeTab === 'upcoming'
+											? 'bg-blue-100 text-blue-700'
+											: 'bg-gray-200 text-gray-600'
+									}`}>
+										{upcomingMeetings.length}
+									</span>
+								)}
+							</div>
+							{activeTab === 'upcoming' && (
+								<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+							)}
+						</button>
+						<button
+							onClick={() => setActiveTab('past')}
+							className={`flex-1 px-6 py-3 text-sm font-semibold transition-all relative ${
+								activeTab === 'past'
+									? 'text-blue-600 bg-white'
+									: 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+							}`}
+						>
+							<div className="flex items-center justify-center gap-2">
+								<Clock size={16} />
+								<span>Historial</span>
+								{pastMeetings.length > 0 && (
+									<span className={`px-2 py-0.5 rounded-full text-xs ${
+										activeTab === 'past'
+											? 'bg-blue-100 text-blue-700'
+											: 'bg-gray-200 text-gray-600'
+									}`}>
+										{pastMeetings.length}
+									</span>
+								)}
+							</div>
+							{activeTab === 'past' && (
+								<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+							)}
+						</button>
+					</div>
+				</div>
+			</div>
+
+			{/* Tarjeta de reunión activa - Solo mostrar si hay una reunión en curso y en pestaña de próximas */}
+			{activeTab === 'upcoming' && upcomingMeetings.some(
 				(r) =>
 					r.estado?.toLowerCase() === 'en curso' ||
 					r.estado?.toLowerCase() === 'activa'
 			) && (
 				<div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-					{reuniones
+					{upcomingMeetings
 						.filter(
 							(r) =>
 								r.estado?.toLowerCase() === 'en curso' ||
@@ -317,28 +406,34 @@ const ReunionesTab = ({ onStartMeeting }) => {
 
 			{/* Listado de reuniones */}
 			<div className="grid grid-cols-1 gap-6">
-				{reuniones.length === 0 ? (
+				{displayMeetings.length === 0 ? (
 					<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
 						<Calendar
 							size={64}
 							className="mx-auto text-gray-300 mb-4"
 						/>
 						<h3 className="text-xl font-bold text-gray-600 mb-2">
-							No hay reuniones programadas
+							{activeTab === 'upcoming'
+								? 'No hay reuniones programadas'
+								: 'No hay reuniones en el historial'}
 						</h3>
 						<p className="text-gray-500 mb-6">
-							Comienza creando una nueva reunión de Zoom
+							{activeTab === 'upcoming'
+								? 'Comienza creando una nueva reunión de Zoom'
+								: 'Las reuniones finalizadas o pasadas aparecerán aquí'}
 						</p>
-						<button
-							onClick={() => setIsModalOpen(true)}
-							className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
-						>
-							<Plus size={20} />
-							Nueva Reunión
-						</button>
+						{activeTab === 'upcoming' && (
+							<button
+								onClick={() => setIsModalOpen(true)}
+								className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+							>
+								<Plus size={20} />
+								Nueva Reunión
+							</button>
+						)}
 					</div>
 				) : (
-					reuniones.map((reunion) => (
+					displayMeetings.map((reunion) => (
 						<div
 							key={reunion.id}
 							className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all"
@@ -401,31 +496,56 @@ const ReunionesTab = ({ onStartMeeting }) => {
 									</div>
 								</div>
 
-								<div className="flex gap-2">
-									{(reunion.estado?.toLowerCase() ===
-										'en curso' ||
-										reunion.estado?.toLowerCase() ===
-											'activa' ||
-										reunion.estado?.toLowerCase() ===
-											'programada') && (
-										<button
-											onClick={() =>
-												handleStartMeeting(reunion)
-											}
-											className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
-										>
-											{reunion.estado?.toLowerCase() ===
-												'en curso' ||
+								{/* Botones según pestaña */}
+								{activeTab === 'upcoming' ? (
+									<div className="flex gap-2">
+										{(reunion.estado?.toLowerCase() ===
+											'en curso' ||
 											reunion.estado?.toLowerCase() ===
-												'activa'
-												? 'Unirse'
-												: 'Iniciar'}
+												'activa' ||
+											reunion.estado?.toLowerCase() ===
+												'programada') && (
+											<button
+												onClick={() =>
+													handleStartMeeting(reunion)
+												}
+												className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
+											>
+												{reunion.estado?.toLowerCase() ===
+													'en curso' ||
+												reunion.estado?.toLowerCase() ===
+													'activa'
+													? 'Unirse'
+													: 'Iniciar'}
+											</button>
+										)}
+										<button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-sm">
+											Ver detalles
 										</button>
-									)}
-									<button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-sm">
-										Ver detalles
-									</button>
-								</div>
+									</div>
+								) : (
+									<div className="flex gap-2 items-center text-sm text-gray-600">
+										{reunion.estado?.toLowerCase() === 'cancelada' ? (
+											<span className="flex items-center gap-1 text-red-600">
+												<XCircle size={16} />
+												Reunión cancelada
+											</span>
+										) : reunion.estado?.toLowerCase() === 'completada' || reunion.estado?.toLowerCase() === 'finalizada' ? (
+											<span className="flex items-center gap-1 text-green-600">
+												<CheckCircle size={16} />
+												Reunión finalizada
+											</span>
+										) : (
+											<span className="flex items-center gap-1 text-gray-500">
+												<AlertCircle size={16} />
+												Reunión pasada
+											</span>
+										)}
+										<button className="ml-auto px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-sm">
+											Ver detalles
+										</button>
+									</div>
+								)}
 							</div>
 						</div>
 					))

@@ -1,14 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Plus, Shield, ShieldOff } from 'lucide-react';
+import { Upload, Plus, UserPlus } from 'lucide-react';
 import Swal from 'sweetalert2';
-import ResidentsList from "../saDashboard/components/ResidentsList";
-import MeetingsSection from "./MeetingsSection";
+import ResidentsList from "../common/ResidentsList";
+import MeetingsList from "../common/MeetingsList";
 import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
 
-export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onTransferPower }) {
+export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onTransferPower, onCreateGuest }) {
   const queryClient = useQueryClient();
 
   // Obtener los residentes de la unidad residencial
@@ -67,10 +67,11 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
         icon: 'success',
         title: '¡Eliminado!',
         text: response.message || 'El usuario ha sido eliminado exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -144,11 +145,12 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       Swal.fire({
         icon: 'success',
         title: '¡Acceso Modificado!',
-        html: `<p class="text-sm">Acceso ${action} exitosamente</p>`,
-        timer: 2000,
-        showConfirmButton: false,
+        text: `Acceso ${action} exitosamente`,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -379,6 +381,14 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             <Plus size={18} />
             <span>Agregar Copropietario</span>
           </button>
+          {/* ← AGREGAR ESTE BOTÓN NUEVO */}
+          <button
+            onClick={onCreateGuest}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:shadow-lg transition-all"
+          >
+            <UserPlus size={18} />
+            <span>Agregar Invitado</span>
+          </button>
         </div>
       </div>
 
@@ -394,6 +404,9 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onDeleteResident={handleDeleteResident}
             onToggleAccess={handleToggleAccess}
             onBulkToggleAccess={handleBulkToggleAccess}
+            showSearch={true}
+            title="Copropietarios"
+            isSuperAdmin={false}
             onSendBulkCredentials={(selectedResidents) => {
               if (selectedResidents.length === 0) {
                 Swal.fire({
@@ -439,11 +452,12 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
 
         {/* Columna derecha: Reuniones */}
         <div className="lg:col-span-1">
-          <MeetingsSection
+          <MeetingsList
             meetings={meetings}
             isLoading={isLoadingMeetings}
             onCreateMeeting={onCreateMeeting}
             onJoinMeeting={onJoinMeeting}
+            variant="admin"
           />
         </div>
       </div>

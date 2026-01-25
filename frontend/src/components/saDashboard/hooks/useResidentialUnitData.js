@@ -66,7 +66,7 @@ export const useResidentialUnitData = (unitId) => {
 							hour: '2-digit',
 							minute: '2-digit',
 						}),
-						asistentes: reunion.int_total_confirmed || 0,
+						asistentes: reunion.int_total_invitated || 0,
 						estado: reunion.str_status || 'Programada',
 						fechaCompleta: fechaObj,
 						tipo: reunion.str_meeting_type,

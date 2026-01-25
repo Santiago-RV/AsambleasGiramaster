@@ -18,10 +18,15 @@ class ResidentialUnitModel(Base):
     bln_is_active = Column(Boolean, default=True)
     int_max_concurrent_meetings = Column(Integer, nullable=True)
 
+    # Información de la empresa administradora
+    str_management_company = Column(String(200), nullable=True)
+    str_contact_person = Column(String(200), nullable=True)
+    str_contact_phone = Column(String(50), nullable=True)
+
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
-    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
 
     # Relationships
     meetings = relationship("MeetingModel", back_populates="residential_unit", cascade="all, delete-orphan")

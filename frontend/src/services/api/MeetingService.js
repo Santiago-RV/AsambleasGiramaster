@@ -39,7 +39,9 @@ export class MeetingService {
    * Crear una nueva reunión de Zoom
    */
   static async createMeeting(meetingData) {
-    const response = await axiosInstance.post('/meetings', meetingData);
+    const response = await axiosInstance.post('/meetings', meetingData, {
+      timeout: 35000 // 35 segundos para dar margen a la API de Zoom
+    });
     return response.data;
   }
 
@@ -85,6 +87,28 @@ export class MeetingService {
     const response = await axiosInstance.post(
       `/meetings/${meetingId}/send-invitations`,
       { user_ids: userIds }
+    );
+    return response.data;
+  }
+
+  /**
+   * Registrar asistencia a una reunión
+   * Se llama cuando un usuario entra a la reunión
+   */
+  static async registerAttendance(meetingId) {
+    const response = await axiosInstance.post(
+      `/meetings/${meetingId}/register-attendance`
+    );
+    return response.data;
+  }
+
+  /**
+   * Registrar salida de una reunión
+   * Se llama cuando un usuario sale de la reunión
+   */
+  static async registerLeave(meetingId) {
+    const response = await axiosInstance.post(
+      `/meetings/${meetingId}/register-leave`
     );
     return response.data;
   }

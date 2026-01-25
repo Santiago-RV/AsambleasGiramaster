@@ -34,6 +34,11 @@ class ResidentialUnitBase(BaseModel):
   bln_is_active: bool = Field(default=True, description="Estado de la unidad residencial")
   int_max_concurrent_meetings: Optional[int] = Field(None, description="Máximo de reuniones concurrentes")
 
+  # Información de la empresa administradora
+  str_management_company: Optional[str] = Field(None, description="Nombre de la empresa administradora")
+  str_contact_person: Optional[str] = Field(None, description="Persona de contacto")
+  str_contact_phone: Optional[str] = Field(None, description="Teléfono de contacto")
+
   model_config = ConfigDict(from_attributes=True)
 
 class ResidentialUnitCreate(ResidentialUnitBase):

@@ -233,6 +233,8 @@ class ResidentialUnitService:
                     "is_external_delegate": user.bln_is_external_delegate,
                     "user_temporary": user.bln_user_temporary,
                     "is_active": user.bln_allow_entry,  # ← CAMBIO: usar bln_allow_entry
+                    "bln_allow_entry": user.bln_allow_entry,
+                    "int_id_rol": user.int_id_rol,  # 1: SuperAdmin, 2: Admin, 3: Copropietario, 4: Invitado
                     "created_at": user.created_at,
                 })
             

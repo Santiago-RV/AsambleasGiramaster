@@ -7,7 +7,7 @@ class AuditLogModel(Base):
     __tablename__ = "tbl_audit_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    int_user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    int_user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
     str_action = Column(String(100), index=True, nullable=False)
     str_ip_address = Column(String(50), index=True, nullable=False)
     str_user_agent = Column(String(50), index=True, nullable=False)
@@ -17,7 +17,7 @@ class AuditLogModel(Base):
     json_old_data = Column(JSON, nullable=False)
     json_new_data = Column(JSON, nullable=False)
     str_changes_summary = Column(String(1000), nullable=False)
-    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id", ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
     str_severity = Column(String(50), index=True, nullable=False)
     json_tags = Column(JSON, nullable=False)
 

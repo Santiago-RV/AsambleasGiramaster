@@ -10,9 +10,8 @@ import { useAdminOperations } from './hooks/useAdminOperations';
 
 // Componentes
 import UnitHeader from './components/UnitHeader';
-import SearchBar from './components/SearchBar';
-import ResidentsList from './components/ResidentsList';
-import MeetingsList from './components/MeetingsList';
+import ResidentsList from '../common/ResidentsList';
+import MeetingsList from '../common/MeetingsList';
 
 // Modales
 import MeetingModal from './components/modals/MeetingModal';
@@ -28,7 +27,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 	const queryClient = useQueryClient();
 
 	// Estados locales
-	const [searchTerm, setSearchTerm] = useState('');
 	const [currentAdmin, setCurrentAdmin] = useState(null);
 	const [selectedResident, setSelectedResident] = useState(null);
 	const [residentModalMode, setResidentModalMode] = useState('create');
@@ -80,18 +78,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 			setCurrentAdmin(administratorData);
 		}
 	}, [administratorData]);
-
-	// Filtrar residentes por búsqueda
-	const filteredResidents = residentsData?.filter((resident) => {
-		const search = searchTerm.toLowerCase();
-		return (
-			resident.firstname?.toLowerCase().includes(search) ||
-			resident.lastname?.toLowerCase().includes(search) ||
-			resident.username?.toLowerCase().includes(search) ||
-			resident.email?.toLowerCase().includes(search) ||
-			resident.apartment_number?.toLowerCase().includes(search)
-		);
-	});
 
 	// Handlers para modales
 	const handleOpenResidentModal = () => {
@@ -191,8 +177,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 					text: 'No se detectaron cambios para guardar',
 					toast: true,
 					position: 'top-end',
-					timer: 2000,
 					showConfirmButton: false,
+					timer: 3000,
+					backdrop: false,
 				});
 				return;
 			}
@@ -326,14 +313,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 				onOpenGuestModal={onOpenGuestModal}
 			/>
 
-			{/* Buscador */}
-			<SearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-
 			{/* Grid de listas */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				{/* Lista de Residentes */}
 				<ResidentsList
-					residents={filteredResidents}
+					residents={residentsData}
 					isLoading={isLoadingResidents}
 					onResendCredentials={handleResendCredentials}
 					onEditResident={handleEditResident}
@@ -342,6 +326,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 					isSendingBulk={sendBulkCredentialsMutation.isPending}
 					onToggleAccess={handleToggleAccess}
 					onBulkToggleAccess={handleBulkToggleAccess}
+					showSearch={true}
+					isSuperAdmin={true}
 				/>
 
 				{/* Lista de Reuniones */}
@@ -381,7 +367,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 				isOpen={isChangeAdminModalOpen}
 				onClose={() => setIsChangeAdminModalOpen(false)}
 				currentAdmin={currentAdmin}
-				residents={filteredResidents}
+				residents={residentsData}
 				isLoadingResidents={isLoadingResidents}
 				onChangeAdmin={handleChangeAdmin}
 				isChanging={changeAdminMutation.isPending}
