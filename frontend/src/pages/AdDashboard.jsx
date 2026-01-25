@@ -354,6 +354,65 @@ export default function AppAdmin() {
     setShowZoomMeeting(null);
   };
 
+  // Mutación para finalizar reunión
+  const endMeetingMutation = useMutation({
+    mutationFn: async (meetingId) => {
+      return await MeetingService.endMeeting(meetingId);
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+      Swal.fire({
+        icon: 'success',
+        title: 'Reunión Finalizada',
+        text: response.message || 'La reunión ha sido finalizada exitosamente',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.message || error.message || 'Error al finalizar la reunión',
+      });
+    },
+  });
+
+  // Handler para finalizar una reunión
+  const handleEndMeeting = async (meeting) => {
+    const result = await Swal.fire({
+      title: '¿Finalizar Reunión?',
+      html: `
+        <div class="text-left">
+          <p class="mb-3">¿Estás seguro de que deseas finalizar esta reunión?</p>
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <p class="font-semibold text-blue-800">${meeting.titulo}</p>
+            <p class="text-sm text-blue-700 mt-1">
+              <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+            </p>
+          </div>
+          <p class="text-xs text-gray-600 mt-3">
+            ⚠️ Esta acción marcará la reunión como finalizada y no podrá deshacerse.
+          </p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, Finalizar',
+      cancelButtonText: 'Cancelar',
+      width: '500px',
+    });
+
+    if (result.isConfirmed) {
+      endMeetingMutation.mutate(meeting.id);
+    }
+  };
+
   // Mostrar loading mientras carga la unidad residencial
   if (isLoadingUnit || isLoadingDetails) {
     return (
@@ -511,6 +570,7 @@ export default function AppAdmin() {
           onUploadExcel={() => setShowExcelModal(true)}
           onCreateMeeting={handleCreateMeeting}
           onJoinMeeting={handleJoinMeeting}
+          onEndMeeting={handleEndMeeting}
           onTransferPower={(fromLabel, onConfirm) =>
             openPowerModal(fromLabel, onConfirm)
           }

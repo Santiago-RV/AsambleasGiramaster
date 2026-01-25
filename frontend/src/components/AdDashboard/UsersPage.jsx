@@ -8,7 +8,7 @@ import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
 
-export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onTransferPower, onCreateGuest }) {
+export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onEndMeeting, onTransferPower, onCreateGuest }) {
   const queryClient = useQueryClient();
 
   // Obtener los residentes de la unidad residencial
@@ -457,6 +457,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             isLoading={isLoadingMeetings}
             onCreateMeeting={onCreateMeeting}
             onJoinMeeting={onJoinMeeting}
+            onEndMeeting={onEndMeeting}
             variant="admin"
           />
         </div>
