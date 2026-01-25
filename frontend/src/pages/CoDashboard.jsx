@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Video, FileText, User, LogOut, Building2, Hash, UserCircle } from 'lucide-react';
+import { Video, FileText, User, LogOut, Building2, Hash, UserCircle, HandCoins } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import ProfilePage from '../components/CoDashboard/ProfilePage';
 import VotingPage from '../components/CoDashboard/VotingPage';
 import MeetingsPage from '../components/CoDashboard/MeetingsPage';
+import PowersViewPage from '../components/CoDashboard/PowersViewPage';
 import { UserService } from '../services/api/UserService';
 
 export default function AppCopropietario() {
@@ -109,6 +110,12 @@ export default function AppCopropietario() {
       allowedRoles: ["Usuario"],
     },
     {
+      id: 'powers',
+      label: 'Poderes',
+      icon: HandCoins,
+      allowedRoles: ["Usuario"],
+    },
+    {
       id: 'profile',
       label: 'Mi Perfil',
       icon: User,
@@ -131,6 +138,7 @@ export default function AppCopropietario() {
   const titles = {
     meetings: 'Mis Reuniones',
     voting: 'Votaciones y Encuestas',
+    powers: 'Mis Poderes de Votación',
     profile: 'Mi Perfil'
   };
 
@@ -290,6 +298,7 @@ export default function AppCopropietario() {
           <MeetingsPage residentialUnitId={residentialUnitId} />
         )}
         {section === 'voting' && !isGuest && <VotingPage />}
+        {section === 'powers' && !isGuest && <PowersViewPage />}
         {section === 'profile' && !isGuest && <ProfilePage />}
       </div>
     </DashboardLayout>

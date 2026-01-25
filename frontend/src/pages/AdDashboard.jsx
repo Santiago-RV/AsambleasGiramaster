@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Video, FileText, Settings, LogOut } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
+import { Users, Video, FileText, Settings, LogOut, HandCoins } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DashboardLayout from "../components/layout/DashboardLayout";
 import UsersPage from "../components/AdDashboard/UsersPage";
@@ -8,6 +8,7 @@ import AssembliesPage from "../components/AdDashboard/AssembliesPage";
 import LivePage from "../components/AdDashboard/LivePage";
 import ReportsPage from "../components/AdDashboard/ReportsPage";
 import SettingsPage from "../components/AdDashboard/SettingsPage";
+import PowersManagementPage from "../components/AdDashboard/PowersManagementPage";
 import PowerModal from "../components/AdDashboard/PowerModal";
 import ResidentModal from "../components/saDashboard/components/modals/ResidentModal";
 import ExcelUploadModal from "../components/saDashboard/components/modals/ExcelUploadModal";
@@ -92,6 +93,7 @@ export default function AppAdmin() {
     { id: 'users', label: 'Gestión de Copropietarios', icon: Users },
     // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
+    { id: 'powers', label: 'Poderes', icon: HandCoins },
     { id: 'reports', label: 'Reportes', icon: FileText },
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
@@ -101,6 +103,7 @@ export default function AppAdmin() {
     users: "Gestión de Copropietarios",
     // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
+    powers: "Gestión de Poderes",
     reports: "Reportes",
     settings: "Configuración",
   };
@@ -520,6 +523,7 @@ export default function AppAdmin() {
         />
       )}
       {section === "live" && <LivePage />}
+      {section === "powers" && <PowersManagementPage />}
       {section === "reports" && <ReportsPage />}
       {section === "settings" && <SettingsPage />}
 

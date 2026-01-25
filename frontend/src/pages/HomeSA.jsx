@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Bell, Settings, LogOut, LayoutDashboard, Building2, Calendar, FileText } from 'lucide-react';
+import { Bell, Settings, LogOut, LayoutDashboard, Building2, Calendar, FileText, HandCoins } from 'lucide-react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import DashboardTab from '../components/saDashboard/DashboardTab';
 import UnidadesResidencialesTab from '../components/saDashboard/UnidadesResidencialesTab';
 import ReunionActivaTab from '../components/saDashboard/ReunionActivaTab';
 import InformesTab from '../components/saDashboard/InformesTab';
 import ConfiguracionTab from '../components/saDashboard/ConfiguracionTab';
+import PowersManagementPage from '../components/saDashboard/PowersManagementPage';
 import ZoomMeetingContainer from '../components/AdDashboard/ZoomMeetingContainer';
 import UnidadResidencialDetalles from '../components/saDashboard/UnidadResidencialDetalles';
 import GuestModal from '../components/saDashboard/components/modals/GuestModal';
@@ -60,6 +61,11 @@ const HomeSA = () => {
 			id: 'reuniones',
 			label: 'Reuniones Activas',
 			icon: Calendar,
+		},
+		{
+			id: 'powers',
+			label: 'Poderes',
+			icon: HandCoins,
 		},
 		{
 			id: 'informes',
@@ -164,6 +170,8 @@ const HomeSA = () => {
 				);
 			case 'reuniones':
 				return <ReunionActivaTab />;
+			case 'powers':
+				return <PowersManagementPage />;
 			case 'informes':
 				return <InformesTab />;
 			case 'configuracion':
