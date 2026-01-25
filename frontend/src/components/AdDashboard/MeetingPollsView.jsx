@@ -33,6 +33,16 @@ export default function MeetingPollsView({ meeting, onBack }) {
     },
     onSuccess: (response) => {
       console.log('✅ [MeetingPollsView] Encuesta iniciada exitosamente:', response);
+
+      // Actualizar el estado local de la encuesta seleccionada inmediatamente
+      if (selectedPoll) {
+        setSelectedPoll({
+          ...selectedPoll,
+          str_status: 'active', // Actualizar a estado activo
+          dat_started_at: new Date().toISOString()
+        });
+      }
+
       // Invalidar TODAS las queries de encuestas para actualizar en todos lados
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
       queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
@@ -66,6 +76,16 @@ export default function MeetingPollsView({ meeting, onBack }) {
     },
     onSuccess: (response) => {
       console.log('✅ [MeetingPollsView] Encuesta finalizada exitosamente:', response);
+
+      // Actualizar el estado local de la encuesta seleccionada inmediatamente
+      if (selectedPoll) {
+        setSelectedPoll({
+          ...selectedPoll,
+          str_status: 'closed', // Actualizar a estado cerrado
+          dat_ended_at: new Date().toISOString()
+        });
+      }
+
       // Invalidar TODAS las queries de encuestas
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
       queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
