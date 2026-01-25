@@ -276,8 +276,39 @@ async def get_meeting_polls(
                 detail="Usuario no autenticado"
             )
         
-        # Obtener encuestas
-        polls = await poll_service.get_polls_by_meeting(meeting_id)
+        # ============================================================================
+        # ✅ MODIFICACIÓN PRINCIPAL: Obtener todas las encuestas y filtrar por rol
+        # ============================================================================
+        all_polls = await poll_service.get_polls_by_meeting(meeting_id)
+        
+        # 🔒 FILTRO DE SEGURIDAD: Ocultar encuestas 'draft' a copropietarios e invitados
+        # Roles del sistema:
+        #   1 = Super Admin    → Ve TODAS las encuestas (incluyendo draft)
+        #   2 = Administrador  → Ve TODAS las encuestas (incluyendo draft)
+        #   3 = Copropietario  → NO ve encuestas en estado 'draft'
+        #   4 = Invitado       → NO ve encuestas en estado 'draft'
+        
+        if user.int_id_rol in [3, 4]:  # Copropietario o Invitado
+            # Filtrar: NO mostrar encuestas en estado 'draft'
+            polls = [poll for poll in all_polls if poll.str_status != 'draft']
+            
+            # Log informativo para debugging
+            logger.info(
+                f"👥 Copropietario/Invitado '{current_user}' (rol={user.int_id_rol}) - "
+                f"Filtrando encuestas draft. Total: {len(all_polls)} -> Visibles: {len(polls)}"
+            )
+        else:  # Super Admin (rol 1) o Administrador (rol 2)
+            # Mostrar TODAS las encuestas sin filtrar
+            polls = all_polls
+            
+            # Log informativo para debugging
+            logger.info(
+                f"👨‍💼 Admin '{current_user}' (rol={user.int_id_rol}) - "
+                f"Mostrando todas las encuestas (incluyendo draft). Total: {len(polls)}"
+            )
+        # ============================================================================
+        # FIN DE LA MODIFICACIÓN
+        # ============================================================================
 
         # Preparar respuesta con has_voted y user_votes
         polls_data = []
@@ -285,7 +316,7 @@ async def get_meeting_polls(
             # Verificar si el usuario ya votó en esta encuesta
             has_voted = await poll_service.user_has_voted(poll.id, user.id) if not poll.bln_is_anonymous else False
             
-            # ✅ NUEVO: Obtener las opciones votadas por el usuario
+            # ✅ Obtener las opciones votadas por el usuario
             user_voted_options = []
             if has_voted and not poll.bln_is_anonymous:
                 # Buscar los votos del usuario en esta encuesta
@@ -329,7 +360,7 @@ async def get_meeting_polls(
                 "dat_started_at": poll.dat_started_at,
                 "dat_ended_at": poll.dat_ended_at,
                 "has_voted": has_voted,
-                "user_votes": user_voted_options,  # ✅ NUEVO CAMPO: Opciones votadas
+                "user_votes": user_voted_options,
                 "options": [
                     {
                         "id": opt.id,
