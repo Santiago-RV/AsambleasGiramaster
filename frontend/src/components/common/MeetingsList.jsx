@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle } from 'lucide-react';
+import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle, StopCircle } from 'lucide-react';
 
 /**
  * Componente unificado para mostrar lista de reuniones
@@ -13,6 +13,7 @@ const MeetingsList = ({
 	onCreateMeeting,
 	onJoinMeeting,
 	onStartMeeting, // Alias para compatibilidad con SuperAdmin
+	onEndMeeting, // Handler para finalizar reunión
 	variant = 'compact', // 'admin' o 'compact'
 }) => {
 	const [activeTab, setActiveTab] = useState('upcoming');

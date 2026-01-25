@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from datetime import datetime
 from typing import List, Dict, Optional
 import pandas as pd
@@ -214,10 +215,13 @@ class MeetingInvitationService:
             raise
 
     async def get_invitations_by_meeting(self, meeting_id: int) -> List[MeetingInvitationModel]:
-        """Obtiene todas las invitaciones de una reunión"""
+        """Obtiene todas las invitaciones de una reunión con datos del usuario"""
         result = await self.db.execute(
-            select(MeetingInvitationModel).where(
-                MeetingInvitationModel.int_meeting_id == meeting_id
+            select(MeetingInvitationModel)
+            .where(MeetingInvitationModel.int_meeting_id == meeting_id)
+            .options(
+                selectinload(MeetingInvitationModel.user).selectinload(UserModel.data_user),
+                selectinload(MeetingInvitationModel.delegated_user).selectinload(UserModel.data_user)
             )
         )
         return result.scalars().all()

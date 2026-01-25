@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tantml:react-query';
+import { useQuery } from '@tanstack/react-query';
 import { HandCoins, Loader2, AlertCircle, UserMinus, UserPlus, Info, CheckCircle } from 'lucide-react';
 import { DelegationService } from '../../services/api/DelegationService';
 import { MeetingService } from '../../services/api/MeetingService';

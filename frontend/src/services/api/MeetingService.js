@@ -112,4 +112,15 @@ export class MeetingService {
     );
     return response.data;
   }
+
+  /**
+   * Obtener invitaciones de una reunión
+   * Retorna la lista de todos los invitados con su información
+   */
+  static async getMeetingInvitations(meetingId) {
+    const response = await axiosInstance.get(
+      `/meeting-invitations/meeting/${meetingId}`
+    );
+    return response.data;
+  }
 }

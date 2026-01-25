@@ -31,3 +31,5 @@ class MeetingInvitationModel(Base):
 
     # Relationships
     meeting = relationship("MeetingModel", back_populates="invitations")
+    user = relationship("UserModel", foreign_keys=[int_user_id], back_populates="meeting_invitations")
+    delegated_user = relationship("UserModel", foreign_keys=[int_delegated_id])

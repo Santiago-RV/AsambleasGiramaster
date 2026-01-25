@@ -45,8 +45,26 @@ class MeetingInvitationResponse(MeetingInvitationBase):
     created_by: int
     updated_by: int
 
+    # Datos del usuario (para el frontend)
+    str_firstname: Optional[str] = None
+    str_lastname: Optional[str] = None
+    str_email: Optional[str] = None
+
     class Config:
         from_attributes = True
+
+    @classmethod
+    def from_orm(cls, obj):
+        """Personaliza la creación desde ORM para incluir datos del usuario"""
+        data = super().from_orm(obj)
+
+        # Si tiene relación con usuario y data_user, agregar los datos
+        if hasattr(obj, 'user') and obj.user and hasattr(obj.user, 'data_user') and obj.user.data_user:
+            data.str_firstname = obj.user.data_user.str_firstname
+            data.str_lastname = obj.user.data_user.str_lastname
+            data.str_email = obj.user.data_user.str_email
+
+        return data
 
 class ExcelUserRow(BaseModel):
     """Schema para validar cada fila del Excel"""

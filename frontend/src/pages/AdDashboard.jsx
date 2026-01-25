@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Video, FileText, Settings, LogOut, HandCoins } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DashboardLayout from "../components/layout/DashboardLayout";
