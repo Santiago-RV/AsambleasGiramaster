@@ -1,57 +1,47 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, UserMinus, UserPlus, AlertCircle } from 'lucide-react';
+import { UserMinus, UserPlus, AlertCircle, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import Modal from './Modal';
+import { MeetingService } from '../../services/api/MeetingService'; // CAMBIO AQUÍ
 import { DelegationService } from '../../services/api/DelegationService';
-import { MeetingService } from '../../services/api/MeetingService';
 
-const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
+export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
   const [selectedDelegators, setSelectedDelegators] = useState([]);
   const [selectedDelegate, setSelectedDelegate] = useState(null);
   const queryClient = useQueryClient();
 
-  // Query: obtener invitaciones de la reunión
-  const { data: invitationsResponse, isLoading } = useQuery({
+  // Obtener invitaciones con quorum base
+  const { data: invitationsData, isLoading } = useQuery({
     queryKey: ['meeting-invitations', meetingId],
-    queryFn: async () => {
-      const response = await MeetingService.getMeetingInvitations(meetingId);
-      return response;
-    },
-    enabled: !!meetingId && isOpen,
-    retry: 1
+    queryFn: () => MeetingService.getMeetingInvitations(meetingId), // USAR ESTE MÉTODO
+    enabled: isOpen && !!meetingId,
   });
 
-  const invitations = useMemo(() => {
-    if (!invitationsResponse?.success || !invitationsResponse?.data) {
-      return [];
-    }
-    return invitationsResponse.data;
-  }, [invitationsResponse]);
+  const invitations = invitationsData?.data || [];
 
-  // Filtrar cedentes disponibles (no han delegado previamente)
+  // Filtrar: disponibles para ceder (no han delegado y no son delegados seleccionados)
   const availableDelegators = useMemo(() => {
-    return invitations.filter(inv => !inv.int_delegated_id);
-  }, [invitations]);
+    return invitations.filter(inv => 
+      !inv.int_delegated_id && 
+      inv.int_user_id !== selectedDelegate?.int_user_id
+    );
+  }, [invitations, selectedDelegate]);
 
-  // Filtrar delegados disponibles (no están en la lista de cedentes seleccionados y no han delegado)
+  // Filtrar: disponibles para recibir (no han delegado y no están en la lista de cedentes)
   const availableDelegates = useMemo(() => {
-    if (selectedDelegators.length === 0) {
-      return [];
-    }
+    if (selectedDelegators.length === 0) return [];
+    
     const delegatorIds = selectedDelegators.map(d => d.int_user_id);
-    return invitations.filter(inv =>
-      !delegatorIds.includes(inv.int_user_id) &&
-      !inv.int_delegated_id  // No puede recibir si ya delegó
+    return invitations.filter(inv => 
+      !inv.int_delegated_id && 
+      !delegatorIds.includes(inv.int_user_id)
     );
   }, [invitations, selectedDelegators]);
 
-  // Calcular peso total a ceder
+  // Calcular peso total a ceder (suma de quorum base)
   const totalWeightToDelegate = useMemo(() => {
-    return selectedDelegators.reduce((sum, delegator) => {
-      const weight = parseFloat(delegator.dec_voting_weight || 0);
-      return sum + weight;
-    }, 0);
+    return selectedDelegators.reduce((sum, d) => sum + (d.dec_quorum_base || 0), 0);
   }, [selectedDelegators]);
 
   // Mutación para crear delegación
@@ -62,7 +52,7 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
         icon: 'success',
         title: 'Delegación Exitosa',
         html: `
-          <p class="text-gray-700">Se cedieron <strong>${totalWeightToDelegate.toFixed(2)}</strong> votos exitosamente.</p>
+          <p class="text-gray-700">Se cedieron <strong>${totalWeightToDelegate.toFixed(2)}</strong> quorum exitosamente.</p>
           <p class="mt-2 text-sm text-gray-600">
             ${selectedDelegators.length} copropietario(s) delegaron su poder a
             ${selectedDelegate?.str_firstname} ${selectedDelegate?.str_lastname}
@@ -71,23 +61,15 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
         confirmButtonColor: '#10b981'
       });
 
-      // Invalidar queries
       queryClient.invalidateQueries(['meeting-invitations', meetingId]);
       queryClient.invalidateQueries(['delegations', meetingId]);
-      queryClient.invalidateQueries(['meeting-delegations']);
 
-      // Reset y cerrar
       handleReset();
       if (onSuccess) onSuccess();
       onClose();
     },
     onError: (error) => {
-      console.error('Error al crear delegación:', error);
-
-      const errorMessage = error.response?.data?.message ||
-                          error.response?.data?.detail ||
-                          'Hubo un error al crear la delegación';
-
+      const errorMessage = error.response?.data?.message || 'Hubo un error al crear la delegación';
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -108,7 +90,6 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
       }
     });
 
-    // Si el delegado estaba seleccionado y ahora lo agregamos como cedente, deseleccionarlo
     if (selectedDelegate?.int_user_id === invitation.int_user_id) {
       setSelectedDelegate(null);
     }
@@ -134,7 +115,6 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
       return;
     }
 
-    // Confirmación
     const result = await Swal.fire({
       icon: 'question',
       title: '¿Confirmar Delegación?',
@@ -143,15 +123,15 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
           <p class="text-gray-700"><strong>Cedentes:</strong></p>
           <ul class="list-disc pl-5 text-sm text-gray-600">
             ${selectedDelegators.map(d =>
-              `<li>${d.str_firstname} ${d.str_lastname} (${parseFloat(d.dec_voting_weight).toFixed(2)} votos)</li>`
+              `<li>${d.str_firstname} ${d.str_lastname} - Apto: ${d.str_apartment_number} (${parseFloat(d.dec_quorum_base).toFixed(2)} quorum)</li>`
             ).join('')}
           </ul>
           <p class="mt-3 text-gray-700"><strong>Receptor:</strong></p>
           <p class="text-sm text-gray-600 pl-5">
-            ${selectedDelegate.str_firstname} ${selectedDelegate.str_lastname}
+            ${selectedDelegate.str_firstname} ${selectedDelegate.str_lastname} - Apto: ${selectedDelegate.str_apartment_number}
           </p>
           <p class="mt-3 text-lg font-bold text-green-600">
-            Peso total a ceder: ${totalWeightToDelegate.toFixed(2)} votos
+            Peso total a ceder: ${totalWeightToDelegate.toFixed(2)} quorum
           </p>
         </div>
       `,
@@ -209,23 +189,23 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
 
             <div className="p-4 max-h-96 overflow-y-auto">
               {isLoading ? (
-                <div className="text-center py-8 text-gray-500">
-                  Cargando copropietarios...
-                </div>
-              ) : availableDelegators.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No hay copropietarios disponibles para ceder poder
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="animate-spin text-blue-600" size={32} />
                 </div>
               ) : (
                 <div className="space-y-2">
                   {availableDelegators.map(invitation => {
-                    const isSelected = selectedDelegators.find(d => d.int_user_id === invitation.int_user_id);
+                    const isSelected = selectedDelegators.some(d => d.int_user_id === invitation.int_user_id);
+                    const isDisabled = selectedDelegate?.int_user_id === invitation.int_user_id;
+                    const quorumBase = parseFloat(invitation.dec_quorum_base || 0);
 
                     return (
                       <label
                         key={invitation.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                          isSelected
+                          isDisabled
+                            ? 'bg-gray-100 border-gray-200 opacity-50 cursor-not-allowed'
+                            : isSelected
                             ? 'bg-red-50 border-red-300 shadow-sm'
                             : 'bg-white border-gray-200 hover:border-red-200 hover:bg-red-25'
                         }`}
@@ -233,19 +213,21 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
                         <input
                           type="checkbox"
                           checked={!!isSelected}
-                          onChange={() => handleDelegatorToggle(invitation)}
-                          className="w-5 h-5 text-red-600 focus:ring-red-500"
+                          onChange={() => !isDisabled && handleDelegatorToggle(invitation)}
+                          disabled={isDisabled}
+                          className="w-5 h-5 text-red-600 focus:ring-red-500 disabled:cursor-not-allowed"
                         />
                         <div className="flex-1">
                           <p className="font-medium text-gray-800">
                             {invitation.str_firstname} {invitation.str_lastname}
                           </p>
+                          {/* SOLO QUORUM BASE - NO VOTACIONES */}
                           <div className="flex items-center justify-between mt-1">
                             <p className="text-xs text-gray-500">
                               Apto: {invitation.str_apartment_number}
                             </p>
                             <p className="text-sm font-semibold text-red-600">
-                              {parseFloat(invitation.dec_voting_weight).toFixed(2)} votos
+                              {quorumBase.toFixed(2)} quorum
                             </p>
                           </div>
                         </div>
@@ -261,7 +243,7 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
               <div className="p-4 bg-red-50 border-t border-gray-200">
                 <p className="text-sm text-gray-600">Peso total a ceder:</p>
                 <p className="text-2xl font-bold text-red-600">
-                  {totalWeightToDelegate.toFixed(2)} votos
+                  {totalWeightToDelegate.toFixed(2)} quorum
                 </p>
               </div>
             )}
@@ -294,8 +276,8 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
                 <div className="space-y-2">
                   {availableDelegates.map(invitation => {
                     const isSelected = selectedDelegate?.int_user_id === invitation.int_user_id;
-                    const currentWeight = parseFloat(invitation.dec_voting_weight);
-                    const newWeight = currentWeight + totalWeightToDelegate;
+                    const currentQuorum = parseFloat(invitation.dec_quorum_base || 0);
+                    const newQuorum = currentQuorum + totalWeightToDelegate;
 
                     return (
                       <label
@@ -317,20 +299,21 @@ const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
                           <p className="font-medium text-gray-800">
                             {invitation.str_firstname} {invitation.str_lastname}
                           </p>
+                          {/* SOLO QUORUM BASE - NO VOTACIONES */}
                           <div className="mt-1 text-xs space-y-1">
                             <p className="text-gray-500">
                               Apto: {invitation.str_apartment_number}
                             </p>
                             <div className="flex items-center justify-between">
-                              <span className="text-gray-600">Peso actual:</span>
+                              <span className="text-gray-600">Quorum actual:</span>
                               <span className="font-semibold text-gray-700">
-                                {currentWeight.toFixed(2)}
+                                {currentQuorum.toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                              <span className="text-green-600 font-semibold">Nuevo peso:</span>
+                              <span className="text-green-600 font-semibold">Nuevo quorum:</span>
                               <span className="font-bold text-green-600">
-                                {newWeight.toFixed(2)} votos
+                                {newQuorum.toFixed(2)} quorum
                               </span>
                             </div>
                           </div>

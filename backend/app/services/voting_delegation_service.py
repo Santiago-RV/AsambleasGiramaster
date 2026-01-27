@@ -163,15 +163,23 @@ class VotingDelegationService:
         # 1. Verificar permisos de admin
         meeting = await self._verify_admin_permissions(meeting_id, admin_user_id)
 
-        # 2. Verificar que la reunión esté activa
-        if meeting.str_status != "En vivo":
-            raise ValidationException(
-                message="Solo se pueden gestionar poderes en reuniones activas (estado 'En vivo')",
-                error_code="MEETING_NOT_ACTIVE"
-            )
+        # 2. MODIFICADO: Permitir delegaciones en cualquier momento
+        # Ya no validamos que la reunión esté "En vivo"
+        # Comentamos o eliminamos esta validación:
+        
+        # if meeting.str_status != "En vivo":
+        #     raise ValidationException(
+        #         message="Solo se pueden gestionar poderes en reuniones activas (estado 'En vivo')",
+        #         error_code="MEETING_NOT_ACTIVE"
+        #     )
+        
+        logger.info(f"✅ Delegación permitida en reunión con estado: {meeting.str_status}")
 
-        # 3. Verificar que NO haya encuestas activas
-        await self._verify_no_active_polls(meeting_id)
+        # 3. Verificar que NO haya encuestas activas (SOLO si la reunión está En vivo)
+        if meeting.str_status == "En vivo":
+            await self._verify_no_active_polls(meeting_id)
+        else:
+            logger.info(f"⏭️ Reunión no está en vivo, omitiendo validación de encuestas activas")
 
         # 4. Validar que todos los usuarios estén invitados
         logger.info(f"📋 Validando invitaciones...")
@@ -287,7 +295,11 @@ class VotingDelegationService:
 
         # 1. Verificar permisos
         meeting = await self._verify_admin_permissions(meeting_id, admin_user_id)
-
+        
+        # NOTA: Ya no verificamos el estado de la reunión aquí
+        # La revocación se permite en cualquier momento
+        logger.info(f"✅ Revocación permitida en reunión con estado: {meeting.str_status}")
+        
         # 2. Obtener invitación del delegador
         delegator_invitation = await self._get_invitation(meeting_id, delegator_id)
         if not delegator_invitation:

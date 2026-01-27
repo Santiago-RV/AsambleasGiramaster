@@ -197,6 +197,36 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 		}
 	};
 
+	const handleEndMeeting = async (meeting) => {
+		const result = await Swal.fire({
+			title: '¿Finalizar Reunión?',
+			html: `
+      <div class="text-left">
+        <p class="mb-3">¿Estás seguro de que deseas finalizar esta reunión?</p>
+        <div class="bg-blue-50 p-3 rounded-lg">
+          <p class="font-semibold text-blue-800">${meeting.titulo}</p>
+          <p class="text-sm text-blue-700 mt-1">
+            <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+          </p>
+        </div>
+        <p class="text-xs text-gray-600 mt-3">
+          ⚠️ Esta acción marcará la reunión como finalizada.
+        </p>
+      </div>
+    `,
+			icon: 'warning',
+			showCancelButton: true,
+			confirmButtonColor: '#dc2626',
+			cancelButtonColor: '#6b7280',
+			confirmButtonText: 'Sí, Finalizar',
+			cancelButtonText: 'Cancelar'
+		});
+
+		if (result.isConfirmed) {
+			endMeetingMutation.mutate(meeting.id);
+		}
+	};
+
 	const handleChangeAdmin = (newAdminUserId) => {
 		changeAdminMutation.mutate(newAdminUserId, {
 			onSuccess: (response) => {
@@ -336,6 +366,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 					isLoading={isLoadingMeetings}
 					onCreateMeeting={() => setIsMeetingModalOpen(true)}
 					onStartMeeting={onStartMeeting}
+					onEndMeeting={handleEndMeeting}
 				/>
 			</div>
 
