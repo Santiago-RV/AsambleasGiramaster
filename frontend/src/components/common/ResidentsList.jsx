@@ -170,23 +170,51 @@ const ResidentsList = ({
 				},
 			});
 
-			// Llamar a la API para generar el token de auto-login
-			const response = await fetch('/api/v1/residents/generate-auto-login', {
+			// Llamar a la API para generar el token de auto-login (endpoint simple)
+			const token = localStorage.getItem('access_token');
+			
+			if (!token) {
+				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
+			}
+			
+			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+			const endpoint = `${apiUrl}/residents/generate-qr-simple`;
+			
+			console.log('🔄 Making request to:', endpoint);
+			console.log('🔄 Request data:', { userId: resident.id });
+			console.log('🔄 Auth token:', token.substring(0, 20) + '...');
+			
+			const response = await fetch(endpoint, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+					'Authorization': `Bearer ${token}`
 				},
 				body: JSON.stringify({
 					userId: resident.id
 				})
 			});
+			
+			console.log('🔄 Response status:', response.status);
+			console.log('🔄 Response headers:', Object.fromEntries(response.headers.entries()));
 
 			if (response.ok) {
 				const data = await response.json();
+				console.log('✅ Response from backend:', data);
+				
+				if (!data.success) {
+					throw new Error(data.message || 'Error en la respuesta del servidor');
+				}
+				
+				if (!data.data || !data.data.auto_login_token) {
+					throw new Error('Respuesta inválida: falta token de acceso');
+				}
+				
 				const token = data.data.auto_login_token;
 				const frontendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
 				const url = `${frontendUrl}/auto-login/${token}`;
+				
+				console.log('✅ QR URL generated:', url);
 				
 				setAutoLoginUrl(url);
 				setSelectedResidentForQR(resident);
@@ -194,14 +222,42 @@ const ResidentsList = ({
 				
 				Swal.close();
 			} else {
-				throw new Error('No se pudo generar el enlace de acceso');
+				const errorData = await response.json().catch(() => ({}));
+				console.error('❌ Backend error response:', errorData);
+				throw new Error(errorData.message || `Error HTTP ${response.status}: ${response.statusText}`);
 			}
 		} catch (error) {
-			console.error('Error generating QR:', error);
+			console.error('❌ Error generating QR:', error);
+			console.error('❌ Error details:', {
+				message: error.message,
+				stack: error.stack,
+				resident: resident
+			});
+			
+			// Mostrar error más detallado
+			let errorMessage = 'No se pudo generar el código QR de acceso';
+			
+			if (error.message) {
+				if (error.message.includes('403')) {
+					errorMessage = 'No tienes permisos para generar códigos QR';
+				} else if (error.message.includes('404')) {
+					errorMessage = 'Usuario no encontrado';
+				} else if (error.message.includes('500')) {
+					errorMessage = 'Error interno del servidor. Revisa la consola para más detalles.';
+				} else {
+					errorMessage = `Error: ${error.message}`;
+				}
+			}
+			
 			Swal.fire({
 				icon: 'error',
-				title: 'Error',
-				text: 'No se pudo generar el código QR de acceso',
+				title: 'Error al generar QR',
+				html: `
+					<p>${errorMessage}</p>
+					<p style="font-size: 12px; color: #666; margin-top: 10px;">
+						Abre la consola del navegador (F12) para ver más detalles del error.
+					</p>
+				`,
 				confirmButtonColor: '#e74c3c'
 			});
 		}

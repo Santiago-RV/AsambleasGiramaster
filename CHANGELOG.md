@@ -9,6 +9,151 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-01-26 - Sistema Completo de Generación de Códigos QR
+
+- **📱 Implementación de Sistema de Códigos QR para Auto-Login**:
+  - **Objetivo**: Facilitar el acceso de residentes mediante códigos QR que permiten login automático sin recordar contraseñas
+  
+  - **Nuevo Servicio QR con Personalización** (`backend/app/services/qr_service.py`):
+    - Clase `QRCodeService` para generación local de códigos QR
+    - Generación de QR con librería `qrcode` y `Pillow` (sin dependencias externas)
+    - **Personalización avanzada**:
+      - Logo corporativo incrustado en el centro del QR
+      - Información del usuario (nombre, apartamento, unidad)
+      - Fecha de generación
+      - Tamaño configurable (default: 400x400px)
+      - Alta corrección de errores (ERROR_CORRECT_H)
+    - Métodos principales:
+      - `generate_qr_with_user_info()`: QR personalizado con datos del usuario
+      - `generate_user_qr_data()`: Genera token JWT + URL + QR en base64
+      - `generate_bulk_qr_codes()`: Generación masiva para múltiples usuarios
+    - QRs guardados automáticamente en `/backend/app/static/qr_codes/`
+    - Formato: Base64 para fácil integración en frontend y emails
+
+  - **Endpoint Simple de QR** (`/api/v1/residents/generate-qr-simple`):
+    - **POST** endpoint sin dependencias de email (más robusto)
+    - Genera contraseña temporal segura automáticamente con `secrets.token_urlsafe(12)`
+    - Actualiza hash de contraseña en BD del residente target
+    - Crea token JWT con username + password temporal (48 horas validez)
+    - Retorna: `auto_login_token`, `auto_login_url`, `expires_in_hours`
+    - **Permisos**: Solo SuperAdmin (rol 1) y Admin (rol 2)
+    - **Flujo**:
+      1. Valida permisos del usuario logueado
+      2. Busca residente en BD con todos sus datos
+      3. Genera contraseña temporal aleatoria
+      4. Actualiza hash en `tbl_users`
+      5. Crea JWT con credenciales temporales
+      6. Retorna URL de auto-login
+    - **Logging detallado**:
+      - Registra residente target
+      - Registra admin que generó el QR
+      - Registra errores con traceback completo
+
+  - **Endpoint Mejorado de QR** (`/api/v1/residents/enhanced-qr`):
+    - **POST** endpoint con QR personalizado y branding
+    - Incluye logo, información del usuario y fecha
+    - Opciones configurables:
+      - `include_personal_info`: Agregar datos del usuario
+      - `qr_size`: Tamaño del QR (default: 400px)
+      - `expiration_hours`: Horas de validez (default: 48)
+    - Retorna QR en base64 listo para mostrar en frontend
+
+  - **Endpoint de Generación Masiva** (`/api/v1/residents/bulk-qr`):
+    - **POST** endpoint para generar QRs de múltiples usuarios
+    - Recibe lista de `user_ids`
+    - Retorna estadísticas: `total_generated`, `total_failed`
+    - Ideal para generar QRs de toda una unidad residencial
+
+  - **Corrección del Email Service** (`backend/app/services/email_service.py:175`):
+    - **Problema**: Error en parámetro `to_email` vs `to_emails`
+    - **Solución**: Cambiado a `email_sender.send_email(to_emails=[to_email], ...)`
+    - Método `send_qr_access_email()` mejorado:
+      - Soporte para QR mejorado con parámetro `use_enhanced_qr`
+      - Genera QR localmente si está habilitado
+      - Fallback a servicio externo si falla
+      - QR incrustado como base64 en el email HTML
+
+  - **Frontend Actualizado** (`frontend/src/components/common/ResidentsList.jsx`):
+    - Botón "Generar QR" en cada residente
+    - Llamada al endpoint `/api/v1/residents/generate-qr-simple`
+    - **Manejo de errores mejorado**:
+      - Logs detallados en consola del navegador
+      - Mensajes de error específicos según código HTTP
+      - Validación de estructura de respuesta
+      - Detección de problemas de autenticación
+    - Modal QR con opciones para:
+      - Compartir por WhatsApp
+      - Enviar por email
+      - Imprimir
+      - Descargar
+
+  - **Integración con Auto-Login** (`/auth/auto-login/{token}`):
+    - Endpoint existente reutilizado
+    - Decodifica JWT y extrae username + password
+    - Verifica contraseña temporal contra hash en BD
+    - Genera token de sesión normal
+    - Usuario queda autenticado automáticamente
+
+  - **Estructura del Token JWT**:
+    ```json
+    {
+      "sub": "username_del_residente",
+      "pwd": "contraseña_temporal_en_texto_plano",
+      "exp": 1738403667,
+      "iat": 1738317267,
+      "type": "auto_login"
+    }
+    ```
+
+  - **Seguridad Implementada**:
+    - ✅ Contraseñas temporales aleatorias (12 caracteres seguros)
+    - ✅ Hashes actualizados en BD con bcrypt
+    - ✅ JWT firmado con SECRET_KEY del servidor
+    - ✅ Expiración automática de 48 horas
+    - ✅ Solo admins pueden generar QRs
+    - ✅ Auditoría completa en logs
+    - ✅ Contraseña en texto plano solo en JWT temporal
+
+  - **Archivos Creados**:
+    - `backend/app/services/qr_service.py`: Servicio de generación de QR
+    - `backend/app/api/v1/endpoints/simple_qr_endpoint.py`: Endpoint simple
+    - `backend/app/api/v1/endpoints/enhanced_qr_endpoint.py`: Endpoint mejorado
+    - `backend/app/static/qr_codes/`: Directorio para QRs generados
+
+  - **Archivos Modificados**:
+    - `backend/app/api/v1/api.py`: Registro de nuevos endpoints
+    - `backend/app/services/email_service.py`: Corrección de email sender
+    - `frontend/src/components/common/ResidentsList.jsx`: UI de generación QR
+    - `backend/requirements.txt`: Ya incluía `qrcode==8.0` y `Pillow==11.1.0`
+
+  - **Beneficios del Sistema**:
+    - ✅ **Acceso sin contraseña**: Residentes escanean QR para ingresar
+    - ✅ **Onboarding simplificado**: No necesitan recordar credenciales
+    - ✅ **Seguro**: Contraseñas temporales únicas por QR
+    - ✅ **Trazable**: Logs de quién generó cada QR
+    - ✅ **Personalizable**: QRs con branding corporativo
+    - ✅ **Escalable**: Generación masiva soportada
+    - ✅ **Sin dependencias externas**: QR generado localmente
+    - ✅ **Múltiples formatos**: Base64, PNG, imprimible
+    - ✅ **Auto-expirable**: Tokens válidos por 48 horas
+
+  - **Flujo Completo de Uso**:
+    1. Admin hace clic en "Generar QR" para un residente
+    2. Backend genera contraseña temporal y actualiza BD
+    3. Backend crea JWT con username + password temporal
+    4. Backend retorna URL de auto-login al frontend
+    5. Frontend muestra QR con la URL
+    6. Residente escanea QR con su teléfono
+    7. Navegador abre URL de auto-login
+    8. Backend decodifica JWT, extrae credenciales
+    9. Backend verifica password temporal contra hash
+    10. Backend genera token de sesión normal
+    11. Residente queda autenticado sin ingresar password
+
+  - **Documentación Creada**:
+    - `VALIDACION_QR.md`: Resultados de pruebas de endpoints
+    - `CORRECCION_QR.md`: Explicación detallada del problema y solución
+
 #### 2026-01-26
 
 - **🔒 Mejoras Críticas de Seguridad - Plan de Acción Inmediato Completado**:

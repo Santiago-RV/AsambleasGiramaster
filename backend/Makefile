@@ -1,6 +1,6 @@
 # Variables
-PYTHON = python
-PIP = pip
+PYTHON = .venv/bin/python
+PIP = .venv/bin/pip
 PROJECT_NAME = giramaster-backend
 
 # Colores para output 

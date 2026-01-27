@@ -14,6 +14,8 @@ from app.api.v1.endpoints import admin_coowners
 from app.auth.auth import get_current_user
 from app.api.v1.endpoints import guest_endpoint 
 from app.api.v1.endpoints import qr_endpoint 
+from app.api.v1.endpoints import enhanced_qr_endpoint
+from app.api.v1.endpoints import simple_qr_endpoint
 
 api_router = APIRouter()
 
@@ -99,5 +101,19 @@ api_router.include_router(
     qr_endpoint.router,
     prefix="/residents",
     tags=["QR Codes"],
+    dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
+    enhanced_qr_endpoint.router,
+    prefix="/residents",
+    tags=["Enhanced QR Codes"],
+    dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
+    simple_qr_endpoint.router,
+    prefix="/residents",
+    tags=["Simple QR Codes"],
     dependencies=[Depends(get_current_user)]
 )

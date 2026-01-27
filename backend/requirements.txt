@@ -3,6 +3,7 @@ annotated-types==0.7.0
 anyio==4.10.0
 argon2-cffi==25.1.0
 argon2-cffi-bindings==25.1.0
+bleach==6.1.0
 certifi==2025.10.5
 cffi==2.0.0
 charset-normalizer==3.4.4
@@ -17,10 +18,12 @@ greenlet==3.2.4
 h11==0.16.0
 idna==3.10
 Jinja2==3.1.4
+MarkupSafe==3.0.2
 numpy==2.3.4
 openpyxl==3.1.5
 pandas==2.3.3
 passlib==1.7.4
+pillow==11.1.0
 pyasn1==0.6.1
 pycparser==2.23
 pydantic==2.11.9
@@ -28,13 +31,12 @@ pydantic-settings==2.10.1
 pydantic_core==2.33.2
 PyJWT==2.8.0
 PyMySQL==1.1.2
-bleach==6.1.0
-markupsafe==3.0.2
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-jose==3.3.0
 python-multipart==0.0.20
 pytz==2025.2
+qrcode==8.0
 requests==2.31.0
 rsa==4.9.1
 six==1.17.0
@@ -46,5 +48,4 @@ typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.5.0
 uvicorn==0.35.0
-qrcode==8.0
-Pillow==11.1.0
+webencodings==0.5.1

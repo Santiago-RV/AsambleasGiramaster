@@ -16,6 +16,7 @@ from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.residential_unit_model import ResidentialUnitModel
 from app.utils.email_sender import email_sender
 from app.services.email_notification_service import EmailNotificationService
+from app.services.qr_service import qr_service
 from jinja2 import Template
         
 logger = logging.getLogger(__name__)
@@ -34,7 +35,8 @@ class EmailService:
         apartment_number: str,
         username: str,
         auto_login_url: str,
-        auto_login_token: str
+        auto_login_token: str,
+        use_enhanced_qr: bool = True
     ):
         """
         Envía un correo electrónico con el código QR de acceso.
@@ -46,10 +48,48 @@ class EmailService:
             username: Nombre de usuario
             auto_login_url: URL de auto-login
             auto_login_token: Token JWT para auto-login
+            use_enhanced_qr: Si usar el servicio QR mejorado (default: True)
         """
         try:
+            # Generar QR mejorado si está habilitado
+            qr_image_url = None
+            if use_enhanced_qr:
+                try:
+                    # Información del usuario para el QR
+                    user_info = {
+                        'name': resident_name,
+                        'apartment': apartment_number,
+                        'residential_unit': 'Asambleas Giramaster',
+                        'email': to_email,
+                        'role': 'Resident'
+                    }
+                    
+                    # Generar QR con el servicio mejorado
+                    qr_data = qr_service.generate_user_qr_data(
+                        user_id=0,  # No tenemos user_id aquí, pero es para el QR
+                        username=username,
+                        password="",  # No necesitamos password para el QR visual
+                        user_info=user_info,
+                        expiration_hours=48
+                    )
+                    
+                    # Usar el QR generado localmente en base64
+                    qr_image_url = qr_data['qr_base64']
+                    logger.info(f"✅ QR mejorado generado para el correo a {to_email}")
+                    
+                except Exception as qr_error:
+                    logger.warning(f"No se pudo generar QR mejorado, usando fallback: {qr_error}")
+                    qr_image_url = None
+            
             # Asunto del correo
             subject = "Tu Código de Acceso Directo - Asambleas Giramaster"
+            
+            # Determinar qué imagen QR usar
+            if qr_image_url:
+                qr_img_tag = f'<img src="{qr_image_url}" alt="Código QR de Acceso" style="max-width: 100%; height: auto;" />'
+            else:
+                # Fallback al servicio externo
+                qr_img_tag = f'<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={auto_login_url}" alt="Código QR de Acceso" />'
             
             # HTML del correo con el QR incrustado
             html_content = f"""
@@ -108,7 +148,7 @@ class EmailService:
                     <div style="text-align: center; margin: 30px 0;">
                         <p style="margin-bottom: 10px;"><strong>Escanea este código QR:</strong></p>
                         <div style="background: white; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={auto_login_url}" alt="Código QR de Acceso" />
+                            {qr_img_tag}
                         </div>
                     </div>
                     
@@ -132,8 +172,8 @@ class EmailService:
             """
             
             # Enviar el correo
-            await email_sender.send_email(
-                to_email=to_email,
+            email_sender.send_email(
+                to_emails=[to_email],
                 subject=subject,
                 html_content=html_content
             )
