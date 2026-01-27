@@ -36,7 +36,7 @@ class EmailService:
         username: str,
         auto_login_url: str,
         auto_login_token: str,
-        use_enhanced_qr: bool = True
+        qr_base64: Optional[str] = None
     ):
         """
         Envía un correo electrónico con el código QR de acceso.
@@ -46,40 +46,13 @@ class EmailService:
             resident_name: Nombre completo del residente
             apartment_number: Número de apartamento
             username: Nombre de usuario
-            auto_login_url: URL de auto-login
+            auto_login_url: URL de auto-login (debe apuntar al frontend)
             auto_login_token: Token JWT para auto-login
-            use_enhanced_qr: Si usar el servicio QR mejorado (default: True)
+            qr_base64: QR en base64 ya generado (opcional)
         """
         try:
-            # Generar QR mejorado si está habilitado
-            qr_image_url = None
-            if use_enhanced_qr:
-                try:
-                    # Información del usuario para el QR
-                    user_info = {
-                        'name': resident_name,
-                        'apartment': apartment_number,
-                        'residential_unit': 'Asambleas Giramaster',
-                        'email': to_email,
-                        'role': 'Resident'
-                    }
-                    
-                    # Generar QR con el servicio mejorado
-                    qr_data = qr_service.generate_user_qr_data(
-                        user_id=0,  # No tenemos user_id aquí, pero es para el QR
-                        username=username,
-                        password="",  # No necesitamos password para el QR visual
-                        user_info=user_info,
-                        expiration_hours=48
-                    )
-                    
-                    # Usar el QR generado localmente en base64
-                    qr_image_url = qr_data['qr_base64']
-                    logger.info(f"✅ QR mejorado generado para el correo a {to_email}")
-                    
-                except Exception as qr_error:
-                    logger.warning(f"No se pudo generar QR mejorado, usando fallback: {qr_error}")
-                    qr_image_url = None
+            # Usar el QR que viene del endpoint (ya generado correctamente)
+            qr_image_url = qr_base64
             
             # Asunto del correo
             subject = "Tu Código de Acceso Directo - Asambleas Giramaster"

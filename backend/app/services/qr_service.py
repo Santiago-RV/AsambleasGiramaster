@@ -221,8 +221,8 @@ class QRCodeService:
                 expiration_hours=expiration_hours
             )
             
-            # Construir URL
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'https://asambleas.giramaster.com')
+            # Construir URL (mismo fallback que email_service para consistencia)
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
             auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
             
             # Generar QR con información del usuario

@@ -38,3 +38,5 @@ venv/
 
 back_laravel/
 migrations/
+
+qr_codes/

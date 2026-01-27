@@ -9,7 +9,220 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
-#### 2026-01-26 - Sistema Completo de Generación de Códigos QR
+#### 2026-01-26 - FIX CRÍTICO FINAL: Frontend Construía URL de QR Incorrectamente
+
+- **🔧 Problema Real Encontrado: Frontend Ignoraba URL del Backend**:
+  - **Ubicación del problema**: `frontend/src/components/common/ResidentsList.jsx` línea 364
+  - **Impacto**: QR generado con URL `http://localhost:8001/v1/auto-login/...` en lugar de `http://localhost:5173/auto-login/...`
+  
+  - **Causa raíz**:
+    ```javascript
+    // CÓDIGO PROBLEMÁTICO (línea 364)
+    const frontendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
+    // VITE_API_URL = "http://localhost:8001/api/v1"
+    // .replace('/api', '') = "http://localhost:8001/v1"  ❌
+    const url = `${frontendUrl}/auto-login/${token}`;
+    // Resultado: "http://localhost:8001/v1/auto-login/..."  ❌
+    ```
+  
+  - **El backend estaba correcto**:
+    - Backend generaba URL correcta: `http://localhost:5173/auto-login/...`
+    - Backend retornaba en response: `data.auto_login_url` (correcta)
+    - Frontend **ignoraba** esta URL y construía la suya propia (incorrecta)
+  
+  - **Solución implementada**:
+    ```javascript
+    // SOLUCIÓN (línea 364-365)
+    const frontendUrl = window.location.origin;  // ✅ "http://localhost:5173"
+    const url = `${frontendUrl}/auto-login/${token}`;
+    // Resultado: "http://localhost:5173/auto-login/..."  ✅
+    
+    console.log('✅ Frontend URL:', frontendUrl);
+    ```
+  
+  - **Archivo modificado**:
+    - `frontend/src/components/common/ResidentsList.jsx` (líneas 364-368)
+  
+  - **Beneficios**:
+    - ✅ QR apunta al frontend correctamente
+    - ✅ Funciona en desarrollo (`localhost:5173`)
+    - ✅ Funciona en producción (`asambleas.giramaster.com`)
+    - ✅ No depende de variables de entorno
+    - ✅ Simple y confiable
+  
+  - **Mejora futura recomendada**:
+    - Usar directamente `data.data.auto_login_url` del backend
+    - Eliminar construcción de URL en frontend
+    - Backend es la fuente única de verdad para URLs
+  
+  - **Documentación agregada**:
+    - `FIX_FRONTEND_QR_URL.md`: Análisis completo del problema y solución
+
+#### 2026-01-26 - FIX CRÍTICO: Email Service Generaba QR Duplicado con URL Incorrecta
+
+- **🔧 Corrección de Generación Duplicada de QR en Email Service**:
+  - **Problema detectado**: `send_qr_access_email` generaba un SEGUNDO QR con parámetros incorrectos
+  - **Impacto**: URLs de QR apuntaban a backend (`localhost:8001/v1/auto-login/...`) en lugar del frontend
+  
+  - **Causa raíz**:
+    - `email_service.py` línea 68-74 generaba QR con:
+      - `user_id=0` ❌ ID incorrecto
+      - `password=""` ❌ Contraseña vacía
+      - Esto sobrescribía el QR correcto generado en el endpoint
+  
+  - **Solución implementada**:
+    - **Archivo:** `backend/app/services/email_service.py`
+    - **Cambio 1:** Firma de función (línea 31-40):
+      ```python
+      # ANTES
+      async def send_qr_access_email(..., use_enhanced_qr: bool = True):
+      
+      # DESPUÉS
+      async def send_qr_access_email(..., qr_base64: Optional[str] = None):
+      ```
+    
+    - **Cambio 2:** Eliminada generación duplicada de QR (líneas 54-82):
+      ```python
+      # ANTES (❌ ELIMINADO)
+      if use_enhanced_qr:
+          qr_data = qr_service.generate_user_qr_data(
+              user_id=0,  # ❌ Incorrecto
+              username=username,
+              password="",  # ❌ Vacío
+              ...
+          )
+      
+      # DESPUÉS
+      qr_image_url = qr_base64  # ✅ Usar QR ya generado
+      ```
+    
+    - **Cambio 3:** Endpoint actualizado para pasar QR base64:
+      ```python
+      # backend/app/api/v1/endpoints/qr_endpoints.py línea 383-390
+      email_sent = await email_service.send_qr_access_email(
+          ...,
+          qr_base64=qr_data['qr_base64']  # ✅ Pasar QR ya generado
+      )
+      ```
+  
+  - **Flujo corregido**:
+    1. ✅ Endpoint genera QR con contraseña temporal y URL correcta
+    2. ✅ Endpoint pasa `qr_base64` al email service
+    3. ✅ Email service usa el QR recibido (NO genera uno nuevo)
+    4. ✅ Email se envía con QR correcto que apunta al frontend
+  
+  - **Archivos modificados**:
+    - `backend/app/services/email_service.py` (líneas 31-53)
+    - `backend/app/api/v1/endpoints/qr_endpoints.py` (línea 390)
+  
+  - **Validación**:
+    - ✅ QR generado apunta a: `http://localhost:5173/auto-login/...`
+    - ✅ No más URLs con: `http://localhost:8001/v1/auto-login/...`
+    - ✅ Un solo QR generado por petición (no duplicados)
+    - ✅ Contraseña temporal correcta en JWT
+
+#### 2026-01-26 - Unificación de Endpoints de Códigos QR
+
+- **🔄 Consolidación de Archivos de Endpoints de QR**:
+  - **Objetivo**: Eliminar duplicación y mejorar mantenibilidad del código de QR
+  
+  - **Archivos eliminados** (3 archivos, 748 líneas):
+    - ❌ `backend/app/api/v1/endpoints/qr_endpoint.py` (247 líneas)
+    - ❌ `backend/app/api/v1/endpoints/simple_qr_endpoint.py` (133 líneas)
+    - ❌ `backend/app/api/v1/endpoints/enhanced_qr_endpoint.py` (368 líneas)
+  
+  - **Archivo creado** (1 archivo, 553 líneas):
+    - ✅ `backend/app/api/v1/endpoints/qr_endpoints.py` (archivo unificado)
+      - 4 endpoints activos (solo los usados por frontend)
+      - 7 schemas (BaseModel) bien definidos
+      - 4 funciones auxiliares reutilizables
+      - Documentación completa con docstrings
+      - Logging estandarizado con emojis
+      - Manejo de errores consistente
+  
+  - **Funciones auxiliares agregadas**:
+    - `_get_user_complete_data()`: Obtiene usuario con joins necesarios
+    - `_check_admin_permissions()`: Valida permisos de admin
+    - `_generate_temporary_password()`: Genera contraseña temporal segura
+    - `_update_user_password()`: Actualiza hash en BD con commit
+  
+  - **Endpoints finales**:
+    1. `POST /residents/generate-qr-simple` - Usado por modal de QR individual
+    2. `POST /residents/send-enhanced-qr-email` - Usado por envío masivo de QRs
+    3. `POST /residents/enhanced-qr` - Generación de QR con imagen personalizada
+    4. `POST /residents/bulk-qr` - Generación masiva de QRs
+  
+  - **Archivo modificado**:
+    - `backend/app/api/v1/api.py`:
+      - Eliminadas 3 importaciones de endpoints separados
+      - Agregada 1 importación del archivo unificado
+      - Eliminados 3 registros de routers
+      - Agregado 1 registro de router unificado
+  
+  - **Mejoras logradas**:
+    - Archivos: 3 → 1 (-66%)
+    - Líneas totales: 748 → 553 (-26%)
+    - Código duplicado: ~200 líneas → 0 líneas (-100%)
+    - Funciones auxiliares: 0 → 4 (+∞)
+    - Endpoints: 6 → 4 (-33%, eliminados los no usados)
+  
+  - **Beneficios**:
+    - ✅ Un solo archivo para modificar funcionalidad de QR
+    - ✅ Código reutilizable vía funciones auxiliares
+    - ✅ Logging estandarizado con emojis
+    - ✅ Menos bugs (lógica centralizada)
+    - ✅ Mantenimiento simple
+    - ✅ Frontend 100% compatible (sin cambios necesarios)
+  
+  - **Documentación creada**:
+    - `UNIFICACION_QR_ENDPOINTS.md`: Documento completo de la unificación (9,000+ palabras)
+
+#### 2026-01-26 - FIX: URL de Auto-Login en QR - Apuntar al Frontend
+
+- **🔧 Corrección de URLs de Auto-Login Inconsistentes**:
+  - **Problema detectado**: URLs generadas por el sistema de QR apuntaban al backend en lugar del frontend
+  - **Impacto**: Usuarios veían JSON en lugar de ser redirigidos al dashboard
+  
+  - **URLs incorrectas (ANTES)**:
+    - QR generado: `http://localhost:8001/v1/auto-login/eyJ...` ❌ Backend
+    - Email credenciales: `http://localhost:5173/auto-login/eyJ...` ✅ Frontend (correcto)
+  
+  - **URLs corregidas (DESPUÉS)**:
+    - QR generado: `http://localhost:5173/auto-login/eyJ...` ✅ Frontend
+    - Email credenciales: `http://localhost:5173/auto-login/eyJ...` ✅ Frontend
+    - **Todas las URLs son consistentes ahora**
+  
+  - **Archivos modificados**:
+    - `backend/app/services/qr_service.py` (línea 225):
+      - Cambio de fallback: `https://asambleas.giramaster.com` → `http://localhost:5173`
+    
+    - `backend/app/api/v1/endpoints/simple_qr_endpoint.py` (línea 106):
+      - Cambio de fallback: `https://asambleas.giramaster.com` → `http://localhost:5173`
+    
+    - `backend/app/api/v1/endpoints/qr_endpoint.py` (líneas 14, 224-225):
+      - Agregada importación: `from app.core.config import settings`
+      - Cambio de URL hardcoded a `getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')`
+  
+  - **Causa raíz**: Fallbacks diferentes para `FRONTEND_URL`
+    - `email_service.py` usaba: `http://localhost:5173` ✅
+    - Servicios de QR usaban: `https://asambleas.giramaster.com` ❌ (producción)
+  
+  - **Solución**: Estandarizar fallback a `http://localhost:5173` en todos los servicios
+  
+  - **Beneficios**:
+    - ✅ Desarrollo local funcional sin configurar `FRONTEND_URL`
+    - ✅ Consistencia entre emails y QRs
+    - ✅ Producción sigue funcionando con variable de entorno
+    - ✅ Mejor experiencia de usuario
+  
+  - **Configuración recomendada**:
+    - **Desarrollo:** No es necesario definir `FRONTEND_URL` (usa fallback `localhost:5173`)
+    - **Producción:** Obligatorio definir `FRONTEND_URL=https://asambleas.giramaster.com` en `.env`
+  
+  - **Documentación agregada**:
+    - `FIX_URL_QR_FRONTEND.md`: Explicación completa del problema y solución
+
+#### 2026-01-26 - Sistema Completo de Generación de Códigos QR (CONTINUACIÓN)
 
 - **📱 Implementación de Sistema de Códigos QR para Auto-Login**:
   - **Objetivo**: Facilitar el acceso de residentes mediante códigos QR que permiten login automático sin recordar contraseñas
@@ -153,6 +366,68 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   - **Documentación Creada**:
     - `VALIDACION_QR.md`: Resultados de pruebas de endpoints
     - `CORRECCION_QR.md`: Explicación detallada del problema y solución
+
+#### 2026-01-26 - FIX: Endpoint send-enhanced-qr-email - Generación de Contraseña Temporal
+
+- **🔐 Corrección Crítica de Seguridad en Endpoint de Envío de QR**:
+  - **Problema detectado**: El endpoint `/api/v1/residents/send-enhanced-qr-email` **no generaba contraseña temporal nueva**
+  - **Riesgo**: Reutilizaba contraseña existente, sin actualizar hash en BD, permitiendo que QRs antiguos siguieran funcionando
+  
+  - **Cambios implementados en `enhanced_qr_endpoint.py`**:
+    - **Importaciones agregadas** (líneas 18-22):
+      - `from app.core.security import security_manager`
+      - `import secrets, string`
+      - `from datetime import datetime`
+    
+    - **Nueva clase BaseModel** (líneas 49-51):
+      ```python
+      class SendQREmailRequest(BaseModel):
+          userId: int
+          recipient_email: Optional[EmailStr] = None
+      ```
+      - **Razón**: Frontend envía `userId` en body JSON, no como query parameter
+    
+    - **Generación de contraseña temporal** (líneas 292-310):
+      ```python
+      alphabet = string.ascii_letters + string.digits + "!@#$%"
+      temporary_password = ''.join(secrets.choice(alphabet) for i in range(12))
+      
+      hashed_password = security_manager.create_password_hash(temporary_password)
+      target_user.str_password_hash = hashed_password
+      target_user.updated_at = datetime.now()
+      await db.commit()
+      ```
+      - **Patrón**: Ahora sigue el mismo flujo que `resend_resident_credentials`
+      - **Seguridad**: Cada QR invalida todos los QRs anteriores automáticamente
+    
+    - **JWT con contraseña temporal** (líneas 326-332):
+      ```python
+      qr_data = qr_service.generate_user_qr_data(
+          username=target_user.str_username,
+          password=temporary_password,  # ✅ Contraseña temporal en texto plano
+          expiration_hours=48
+      )
+      ```
+  
+  - **Mejoras de seguridad**:
+    - ✅ Contraseña temporal única por cada QR generado
+    - ✅ Hash actualizado en BD inmediatamente
+    - ✅ QRs anteriores se invalidan automáticamente
+    - ✅ Consistencia con `resend_resident_credentials`
+    - ✅ Sin cambios requeridos en frontend
+  
+  - **Flujo actualizado**:
+    1. Admin solicita envío de QR
+    2. Backend genera contraseña temporal (12 caracteres seguros)
+    3. Backend actualiza hash en `tbl_users` y hace commit
+    4. Backend crea JWT con username + contraseña temporal
+    5. Backend genera QR personalizado con URL de auto-login
+    6. Backend envía email con QR
+    7. Usuario escanea QR → auto-login con contraseña temporal
+    8. ✅ Contraseñas anteriores quedan invalidadas
+  
+  - **Documentación agregada**:
+    - `FIX_SEND_ENHANCED_QR_EMAIL.md`: Explicación completa del problema y solución
 
 #### 2026-01-26
 

@@ -33,6 +33,7 @@ const ResidentsList = ({
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedResidentForQR, setSelectedResidentForQR] = useState(null);
 	const [autoLoginUrl, setAutoLoginUrl] = useState('');
+	const [isSendingQRs, setIsSendingQRs] = useState(false);
 	const menuButtonRefs = useRef({});
 
 	/**
@@ -157,6 +158,155 @@ const ResidentsList = ({
 		});
 	};
 
+	const handleSendBulkQRs = async () => {
+		if (selectedResidents.length === 0) {
+			Swal.fire({
+				icon: 'warning',
+				title: 'Sin selección',
+				text: 'Por favor, selecciona al menos un residente para enviar QRs.',
+				confirmButtonColor: '#3498db',
+			});
+			return;
+		}
+
+		// Confirmar acción
+		const result = await Swal.fire({
+			title: '¿Enviar códigos QR?',
+			html: `Se generarán y enviarán códigos QR por correo a <strong>${selectedResidents.length}</strong> residente(s) seleccionado(s).`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonColor: '#9333ea',
+			cancelButtonColor: '#6b7280',
+			confirmButtonText: 'Sí, enviar QRs',
+			cancelButtonText: 'Cancelar'
+		});
+
+		if (!result.isConfirmed) return;
+
+		setIsSendingQRs(true);
+
+		try {
+			const token = localStorage.getItem('access_token');
+			
+			if (!token) {
+				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
+			}
+
+			// Obtener información de los residentes seleccionados
+			const selectedResidentsData = selectedResidents.map(id => {
+				return filteredResidents.find(r => r.id === id);
+			}).filter(Boolean);
+
+			console.log('🔄 Enviando QRs a:', selectedResidentsData.length, 'residentes');
+
+			let successCount = 0;
+			let errorCount = 0;
+			const errors = [];
+
+			// Mostrar progreso
+			Swal.fire({
+				title: 'Generando códigos QR...',
+				html: `Procesando 0 de ${selectedResidents.length}`,
+				allowOutsideClick: false,
+				allowEscapeKey: false,
+				didOpen: () => {
+					Swal.showLoading();
+				},
+			});
+
+			// Enviar QR a cada residente
+			for (let i = 0; i < selectedResidentsData.length; i++) {
+				const resident = selectedResidentsData[i];
+				
+				try {
+					const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+					const endpoint = `${apiUrl}/residents/send-enhanced-qr-email`;
+
+					const response = await fetch(endpoint, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': `Bearer ${token}`
+						},
+						body: JSON.stringify({
+							userId: resident.id
+						})
+					});
+
+					if (response.ok) {
+						successCount++;
+						console.log(`✅ QR enviado a: ${resident.firstname} ${resident.lastname}`);
+					} else {
+						const errorData = await response.json().catch(() => ({}));
+						errorCount++;
+						errors.push(`${resident.firstname} ${resident.lastname}: ${errorData.message || 'Error desconocido'}`);
+						console.error(`❌ Error enviando QR a ${resident.firstname}:`, errorData);
+					}
+				} catch (error) {
+					errorCount++;
+					errors.push(`${resident.firstname} ${resident.lastname}: ${error.message}`);
+					console.error(`❌ Error enviando QR a ${resident.firstname}:`, error);
+				}
+
+				// Actualizar progreso
+				Swal.update({
+					html: `Procesando ${i + 1} de ${selectedResidents.length}`
+				});
+			}
+
+			// Mostrar resultado
+			if (errorCount === 0) {
+				await Swal.fire({
+					icon: 'success',
+					title: '¡QRs enviados exitosamente!',
+					html: `Se enviaron <strong>${successCount}</strong> código(s) QR por correo electrónico.`,
+					confirmButtonColor: '#27ae60'
+				});
+			} else if (successCount > 0) {
+				await Swal.fire({
+					icon: 'warning',
+					title: 'Envío parcialmente exitoso',
+					html: `
+						<p>✅ Enviados: <strong>${successCount}</strong></p>
+						<p>❌ Errores: <strong>${errorCount}</strong></p>
+						<div style="margin-top: 10px; max-height: 150px; overflow-y: auto; text-align: left; font-size: 12px;">
+							${errors.map(err => `<p>• ${err}</p>`).join('')}
+						</div>
+					`,
+					confirmButtonColor: '#f39c12'
+				});
+			} else {
+				await Swal.fire({
+					icon: 'error',
+					title: 'Error al enviar QRs',
+					html: `
+						<p>No se pudieron enviar los códigos QR.</p>
+						<div style="margin-top: 10px; max-height: 150px; overflow-y: auto; text-align: left; font-size: 12px;">
+							${errors.map(err => `<p>• ${err}</p>`).join('')}
+						</div>
+					`,
+					confirmButtonColor: '#e74c3c'
+				});
+			}
+
+			// Limpiar selección si todos se enviaron exitosamente
+			if (errorCount === 0) {
+				setSelectedResidents([]);
+			}
+
+		} catch (error) {
+			console.error('❌ Error en envío masivo de QRs:', error);
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: 'Ocurrió un error al enviar los códigos QR. Revisa la consola para más detalles.',
+				confirmButtonColor: '#e74c3c'
+			});
+		} finally {
+			setIsSendingQRs(false);
+		}
+	};
+
 	const handleGenerateQR = async (resident) => {
 		try {
 			// Mostrar loading
@@ -211,10 +361,12 @@ const ResidentsList = ({
 				}
 				
 				const token = data.data.auto_login_token;
-				const frontendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
+				// ✅ Usar window.location.origin para obtener la URL del frontend
+				const frontendUrl = window.location.origin;
 				const url = `${frontendUrl}/auto-login/${token}`;
 				
 				console.log('✅ QR URL generated:', url);
+				console.log('✅ Frontend URL:', frontendUrl);
 				
 				setAutoLoginUrl(url);
 				setSelectedResidentForQR(resident);
@@ -337,6 +489,29 @@ const ResidentsList = ({
 									<>
 										<Send size={16} />
 										<span className="hidden sm:inline">Enviar Credenciales</span>
+									</>
+								)}
+							</button>
+
+							{/* Botón de envío masivo de QRs */}
+							<button
+								onClick={handleSendBulkQRs}
+								disabled={isSendingQRs}
+								className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50"
+								title="Generar y enviar códigos QR por correo"
+							>
+								{isSendingQRs ? (
+									<>
+										<svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+											<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+										</svg>
+										<span className="hidden sm:inline">Enviando...</span>
+									</>
+								) : (
+									<>
+										<QrCode size={16} />
+										<span className="hidden sm:inline">Enviar QRs</span>
 									</>
 								)}
 							</button>
