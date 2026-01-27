@@ -1,0 +1,511 @@
+"""
+Endpoints unificados para generación y envío de códigos QR.
+
+Este archivo consolida toda la funcionalidad de QR en un solo lugar:
+- Generación de QR simple (para modal del frontend)
+- Generación de QR mejorado con personalización
+- Envío de QR por email
+- Generación masiva de QRs
+
+Autor: Claude Code
+Fecha: 2026-01-26
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List, Dict
+from datetime import datetime
+import logging
+import secrets
+import string
+
+from app.core.database import get_db
+from app.auth.auth import get_current_user_obj
+from app.models.user_model import UserModel
+from app.models.data_user_model import DataUserModel
+from app.models.user_residential_unit_model import UserResidentialUnitModel
+from app.models.residential_unit_model import ResidentialUnitModel
+from app.schemas.responses_schema import SuccessResponse
+from app.services.simple_auto_login_service import simple_auto_login_service
+from app.services.qr_service import qr_service
+from app.services.email_service import email_service
+from app.core.config import settings
+from app.core.security import security_manager
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+# ============================================
+# SCHEMAS / MODELOS DE REQUEST/RESPONSE
+# ============================================
+
+class SimpleQRRequest(BaseModel):
+    """Request para generar QR simple (usado por modal del frontend)"""
+    userId: int
+
+
+class SimpleQRResponse(BaseModel):
+    """Response de QR simple con token y URL"""
+    auto_login_token: str
+    auto_login_url: str
+    expires_in_hours: int
+
+
+class EnhancedQRRequest(BaseModel):
+    """Request para generar QR mejorado con personalización"""
+    userId: int
+    include_personal_info: bool = True
+    qr_size: int = 400
+    expiration_hours: int = 48
+
+
+class EnhancedQRResponse(BaseModel):
+    """Response de QR mejorado con imagen base64"""
+    qr_base64: str
+    auto_login_token: str
+    auto_login_url: str
+    qr_filename: str
+    expires_in_hours: int
+    user_info: Dict
+
+
+class SendQREmailRequest(BaseModel):
+    """Request para enviar QR por email"""
+    userId: int
+    recipient_email: Optional[EmailStr] = None
+
+
+class BulkQRRequest(BaseModel):
+    """Request para generar QRs en masa"""
+    user_ids: List[int]
+    qr_size: int = 400
+    expiration_hours: int = 48
+
+
+class BulkQRResponse(BaseModel):
+    """Response de generación masiva de QRs"""
+    generated_qrs: List[Dict]
+    total_generated: int
+    total_failed: int
+
+
+# ============================================
+# FUNCIONES AUXILIARES
+# ============================================
+
+async def _get_user_complete_data(db: AsyncSession, user_id: int):
+    """
+    Obtiene información completa del usuario con todos los joins necesarios.
+    
+    Args:
+        db: Sesión de base de datos
+        user_id: ID del usuario
+    
+    Returns:
+        Tupla con (UserModel, DataUserModel, UserResidentialUnitModel, ResidentialUnitModel)
+    
+    Raises:
+        HTTPException: Si el usuario no existe
+    """
+    result = await db.execute(
+        select(UserModel, DataUserModel, UserResidentialUnitModel, ResidentialUnitModel)
+        .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+        .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+        .join(ResidentialUnitModel, UserResidentialUnitModel.int_residential_unit_id == ResidentialUnitModel.id)
+        .where(UserModel.id == user_id)
+    )
+    user_data = result.first()
+    
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Usuario con ID {user_id} no encontrado"
+        )
+    
+    return user_data
+
+
+def _check_admin_permissions(current_user: UserModel):
+    """
+    Verifica que el usuario actual tenga permisos de admin.
+    
+    Args:
+        current_user: Usuario autenticado
+    
+    Raises:
+        HTTPException: Si no tiene permisos
+    """
+    if current_user.int_id_rol not in [1, 2]:  # 1=Super Admin, 2=Admin
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para gestionar códigos QR. Solo administradores."
+        )
+
+
+def _generate_temporary_password() -> str:
+    """
+    Genera una contraseña temporal segura.
+    
+    Returns:
+        Contraseña temporal de 12 caracteres
+    """
+    alphabet = string.ascii_letters + string.digits + "!@#$%"
+    return ''.join(secrets.choice(alphabet) for _ in range(12))
+
+
+async def _update_user_password(db: AsyncSession, user: UserModel, password: str):
+    """
+    Actualiza la contraseña de un usuario en la base de datos.
+    
+    Args:
+        db: Sesión de base de datos
+        user: Usuario a actualizar
+        password: Nueva contraseña en texto plano
+    """
+    hashed_password = security_manager.create_password_hash(password)
+    user.str_password_hash = hashed_password
+    user.updated_at = datetime.now()
+    await db.commit()
+
+
+# ============================================
+# ENDPOINTS
+# ============================================
+
+@router.post(
+    "/generate-qr-simple",
+    summary="Genera QR simple para mostrar en modal",
+    description="Genera un QR con contraseña temporal para acceso directo. Usado por el botón individual de QR.",
+    response_model=SuccessResponse[SimpleQRResponse]
+)
+async def generate_qr_simple(
+    request: SimpleQRRequest,
+    current_user: UserModel = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint principal usado por el frontend para generar QR individual.
+    
+    - Genera contraseña temporal única
+    - Actualiza hash en BD
+    - Crea JWT con contraseña temporal
+    - Retorna URL de auto-login
+    
+    **Frontend:** Botón de QR morado en ResidentsList.jsx
+    """
+    try:
+        _check_admin_permissions(current_user)
+        
+        # Obtener datos completos del usuario
+        target_user, target_data_user, user_residential_unit, residential_unit = \
+            await _get_user_complete_data(db, request.userId)
+        
+        # Generar contraseña temporal
+        temp_password = _generate_temporary_password()
+        logger.info(f"🔐 Contraseña temporal generada para {target_user.str_username}")
+        
+        # Actualizar hash en BD
+        await _update_user_password(db, target_user, temp_password)
+        logger.info(f"✅ Hash actualizado en BD para user_id={request.userId}")
+        
+        # Generar token JWT con contraseña temporal
+        auto_login_token = simple_auto_login_service.generate_auto_login_token(
+            username=target_user.str_username,
+            password=temp_password,
+            expiration_hours=48
+        )
+        
+        # Construir URL del frontend
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+        auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
+        
+        logger.info(
+            f"✅ QR simple generado para {target_data_user.str_firstname} {target_data_user.str_lastname} "
+            f"por admin {current_user.str_username}"
+        )
+        
+        return SuccessResponse[SimpleQRResponse](
+            data=SimpleQRResponse(
+                auto_login_token=auto_login_token,
+                auto_login_url=auto_login_url,
+                expires_in_hours=48
+            ),
+            message="Código QR generado exitosamente"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al generar QR simple: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar código QR: {str(e)}"
+        )
+
+
+@router.post(
+    "/enhanced-qr",
+    summary="Genera QR mejorado con imagen personalizada",
+    description="Genera un QR con logo, información del usuario y personalización avanzada",
+    response_model=SuccessResponse[EnhancedQRResponse]
+)
+async def generate_enhanced_qr(
+    request: EnhancedQRRequest,
+    current_user: UserModel = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Genera QR personalizado con imagen base64.
+    
+    - Incluye logo corporativo
+    - Información del usuario (nombre, apartamento, etc.)
+    - QR guardado como PNG en disco
+    - Retorna imagen en base64 para mostrar
+    
+    **Uso:** Ideal para impresión o envío por email
+    """
+    try:
+        _check_admin_permissions(current_user)
+        
+        # Obtener datos completos del usuario
+        target_user, target_data_user, user_residential_unit, residential_unit = \
+            await _get_user_complete_data(db, request.userId)
+        
+        # Generar contraseña temporal
+        temp_password = _generate_temporary_password()
+        
+        # Actualizar hash en BD
+        await _update_user_password(db, target_user, temp_password)
+        
+        # Preparar información del usuario
+        user_info = {
+            'name': f"{target_data_user.str_firstname} {target_data_user.str_lastname}".strip(),
+            'apartment': user_residential_unit.str_apartment_number,
+            'residential_unit': residential_unit.str_name,
+            'email': target_data_user.str_email,
+            'role': 'Admin' if target_user.int_id_rol in [1, 2] else 'Resident',
+            'user_id': target_user.id
+        } if request.include_personal_info else {}
+        
+        # Generar QR mejorado con imagen
+        qr_data = qr_service.generate_user_qr_data(
+            user_id=target_user.id,
+            username=target_user.str_username,
+            password=temp_password,
+            user_info=user_info,
+            expiration_hours=request.expiration_hours
+        )
+        
+        logger.info(f"🎯 QR mejorado generado para {user_info.get('name', 'Unknown')}")
+        
+        return SuccessResponse[EnhancedQRResponse](
+            data=EnhancedQRResponse(
+                qr_base64=qr_data['qr_base64'],
+                auto_login_token=qr_data['auto_login_token'],
+                auto_login_url=qr_data['auto_login_url'],
+                qr_filename=qr_data['qr_filename'],
+                expires_in_hours=qr_data['expires_in_hours'],
+                user_info=user_info
+            ),
+            message="Código QR mejorado generado exitosamente"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al generar QR mejorado: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar QR mejorado: {str(e)}"
+        )
+
+
+@router.post(
+    "/send-enhanced-qr-email",
+    summary="Envía QR personalizado por correo electrónico",
+    description="Genera QR con contraseña temporal y lo envía por email",
+    response_model=SuccessResponse[Dict]
+)
+async def send_enhanced_qr_email(
+    request: SendQREmailRequest,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    current_user: UserModel = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint principal usado por el frontend para envío masivo de QRs.
+    
+    - Genera contraseña temporal única
+    - Actualiza hash en BD
+    - Genera QR personalizado con logo
+    - Envía email con QR incrustado
+    - Invalida QRs anteriores automáticamente
+    
+    **Frontend:** Botón "Enviar QRs" morado en ResidentsList.jsx
+    """
+    try:
+        _check_admin_permissions(current_user)
+        
+        # Obtener datos completos del usuario
+        target_user, target_data_user, user_residential_unit, residential_unit = \
+            await _get_user_complete_data(db, request.userId)
+        
+        # Generar contraseña temporal
+        temp_password = _generate_temporary_password()
+        logger.info(f"🔐 Contraseña temporal generada para {target_data_user.str_email}")
+        
+        # Actualizar hash en BD
+        await _update_user_password(db, target_user, temp_password)
+        logger.info(f"✅ Hash actualizado en BD para user_id={request.userId}")
+        
+        # Preparar información del usuario
+        user_info = {
+            'name': f"{target_data_user.str_firstname} {target_data_user.str_lastname}".strip(),
+            'apartment': user_residential_unit.str_apartment_number,
+            'residential_unit': residential_unit.str_name,
+            'email': target_data_user.str_email,
+            'role': 'Admin' if target_user.int_id_rol in [1, 2] else 'Resident'
+        }
+        
+        # Generar QR con contraseña temporal
+        qr_data = qr_service.generate_user_qr_data(
+            user_id=target_user.id,
+            username=target_user.str_username,
+            password=temp_password,
+            user_info=user_info,
+            expiration_hours=48
+        )
+        
+        # Enviar correo con QR (pasar el QR base64 ya generado)
+        email_sent = await email_service.send_qr_access_email(
+            to_email=request.recipient_email or target_data_user.str_email,
+            resident_name=user_info['name'],
+            apartment_number=user_info['apartment'],
+            username=target_user.str_username,
+            auto_login_url=qr_data['auto_login_url'],
+            auto_login_token=qr_data['auto_login_token'],
+            qr_base64=qr_data['qr_base64']  # ✅ Pasar QR ya generado
+        )
+        
+        if not email_sent:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo enviar el correo electrónico"
+            )
+        
+        email_address = request.recipient_email or target_data_user.str_email
+        logger.info(f"📧 QR enviado a {email_address}")
+        
+        return SuccessResponse[Dict](
+            data={
+                'sent_to': email_address,
+                'qr_filename': qr_data['qr_filename'],
+                'auto_login_url': qr_data['auto_login_url'],
+                'expires_in_hours': 48
+            },
+            message="QR enviado exitosamente por correo"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al enviar QR por email: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al enviar QR: {str(e)}"
+        )
+
+
+@router.post(
+    "/bulk-qr",
+    summary="Genera QRs para múltiples usuarios",
+    description="Genera QRs personalizados en lote para una lista de usuarios",
+    response_model=SuccessResponse[BulkQRResponse]
+)
+async def generate_bulk_qr(
+    request: BulkQRRequest,
+    current_user: UserModel = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generación masiva de QRs.
+    
+    - Procesa múltiples usuarios en una sola petición
+    - Genera contraseñas temporales para cada uno
+    - Actualiza hashes en BD
+    - Retorna estadísticas de éxito/fallo
+    
+    **Uso:** Ideal para onboarding de múltiples residentes
+    """
+    try:
+        _check_admin_permissions(current_user)
+        
+        # Obtener información de todos los usuarios
+        result = await db.execute(
+            select(UserModel, DataUserModel, UserResidentialUnitModel, ResidentialUnitModel)
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+            .join(ResidentialUnitModel, UserResidentialUnitModel.int_residential_unit_id == ResidentialUnitModel.id)
+            .where(UserModel.id.in_(request.user_ids))
+        )
+        users_data = result.all()
+        
+        if not users_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se encontraron usuarios válidos"
+            )
+        
+        # Preparar datos para generación bulk
+        bulk_data = []
+        for target_user, target_data_user, user_residential_unit, residential_unit in users_data:
+            # Generar contraseña temporal para cada usuario
+            temp_password = _generate_temporary_password()
+            
+            # Actualizar hash en BD
+            await _update_user_password(db, target_user, temp_password)
+            
+            bulk_data.append({
+                'user_id': target_user.id,
+                'username': target_user.str_username,
+                'password': temp_password,
+                'firstname': target_data_user.str_firstname,
+                'lastname': target_data_user.str_lastname,
+                'apartment_number': user_residential_unit.str_apartment_number,
+                'residential_unit_name': residential_unit.str_name,
+                'email': target_data_user.str_email,
+                'role': 'Admin' if target_user.int_id_rol in [1, 2] else 'Resident'
+            })
+        
+        # Generar QRs en lote
+        qr_results = qr_service.generate_bulk_qr_codes(
+            users_data=bulk_data,
+            expiration_hours=request.expiration_hours
+        )
+        
+        # Calcular estadísticas
+        total_generated = len([r for r in qr_results if 'error' not in r])
+        total_failed = len([r for r in qr_results if 'error' in r])
+        
+        logger.info(f"📊 Generación bulk: {total_generated} exitosos, {total_failed} fallidos")
+        
+        return SuccessResponse[BulkQRResponse](
+            data=BulkQRResponse(
+                generated_qrs=qr_results,
+                total_generated=total_generated,
+                total_failed=total_failed
+            ),
+            message=f"Generación completada: {total_generated} QRs generados, {total_failed} errores"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en generación bulk: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en generación masiva de QRs: {str(e)}"
+        )

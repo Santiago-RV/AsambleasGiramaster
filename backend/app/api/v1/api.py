@@ -14,6 +14,7 @@ from app.api.v1.endpoints import admin_coowners
 from app.api.v1.endpoints import delegation_endpoint
 from app.auth.auth import get_current_user
 from app.api.v1.endpoints import guest_endpoint 
+from app.api.v1.endpoints import qr_endpoints  # Archivo unificado de QR
 
 api_router = APIRouter()
 
@@ -92,6 +93,16 @@ api_router.include_router(
     guest_endpoint.router,
     prefix="/guest",
     tags=["Guests"],
+    dependencies=[Depends(get_current_user)]
+)
+
+# ============================================
+# QR Codes - Archivo Unificado
+# ============================================
+api_router.include_router(
+    qr_endpoints.router,
+    prefix="/residents",
+    tags=["QR Codes"],
     dependencies=[Depends(get_current_user)]
 )
 
