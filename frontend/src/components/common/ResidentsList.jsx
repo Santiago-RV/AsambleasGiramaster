@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
+import QRCodeModal from './QRCodeModal';
 
 /**
  * Componente reutilizable para mostrar lista de residentes
@@ -29,6 +30,9 @@ const ResidentsList = ({
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const [searchTerm, setSearchTerm] = useState('');
+	const [qrModalOpen, setQrModalOpen] = useState(false);
+	const [selectedResidentForQR, setSelectedResidentForQR] = useState(null);
+	const [autoLoginUrl, setAutoLoginUrl] = useState('');
 	const menuButtonRefs = useRef({});
 
 	/**
@@ -151,6 +155,56 @@ const ResidentsList = ({
 			setSelectedResidents([]);
 			setSelectAll(false);
 		});
+	};
+
+	const handleGenerateQR = async (resident) => {
+		try {
+			// Mostrar loading
+			Swal.fire({
+				title: 'Generando acceso...',
+				html: 'Creando enlace de acceso directo',
+				allowOutsideClick: false,
+				allowEscapeKey: false,
+				didOpen: () => {
+					Swal.showLoading();
+				},
+			});
+
+			// Llamar a la API para generar el token de auto-login
+			const response = await fetch('/api/v1/residents/generate-auto-login', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+				},
+				body: JSON.stringify({
+					userId: resident.id
+				})
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				const token = data.data.auto_login_token;
+				const frontendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
+				const url = `${frontendUrl}/auto-login/${token}`;
+				
+				setAutoLoginUrl(url);
+				setSelectedResidentForQR(resident);
+				setQrModalOpen(true);
+				
+				Swal.close();
+			} else {
+				throw new Error('No se pudo generar el enlace de acceso');
+			}
+		} catch (error) {
+			console.error('Error generating QR:', error);
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: 'No se pudo generar el código QR de acceso',
+				confirmButtonColor: '#e74c3c'
+			});
+		}
 	};
 
 	const handleMenuOpen = (residentId, event) => {
@@ -419,6 +473,18 @@ const ResidentsList = ({
 												<img src="/Wpp.png" alt="WhatsApp" className="w-5 h-5" />
 											</button>
 
+											{/* Botón para generar QR */}
+											<button
+												onClick={(e) => {
+													e.stopPropagation();
+													handleGenerateQR(resident);
+												}}
+												className="p-2 hover:bg-purple-100 rounded-lg transition-colors group"
+												title="Generar código QR de acceso"
+											>
+												<QrCode size={20} className="text-purple-600 group-hover:text-purple-700" />
+											</button>
+
 											{/* Botón para enviar credenciales individual */}
 											<button
 												onClick={(e) => {
@@ -488,7 +554,22 @@ const ResidentsList = ({
 					onView={() => { }}
 					onEdit={onEditResident}
 					onDelete={onDeleteResident}
+					onGenerateQR={handleGenerateQR}
 					onClose={() => setSelectedResidentMenu(null)}
+				/>
+			)}
+
+			{/* Modal de QR Code */}
+			{selectedResidentForQR && (
+				<QRCodeModal
+					resident={selectedResidentForQR}
+					isOpen={qrModalOpen}
+					onClose={() => {
+						setQrModalOpen(false);
+						setSelectedResidentForQR(null);
+						setAutoLoginUrl('');
+					}}
+					autoLoginUrl={autoLoginUrl}
 				/>
 			)}
 		</div>

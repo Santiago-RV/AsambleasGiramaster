@@ -27,6 +27,123 @@ class EmailService:
     def __init__(self):
         self.templates_dir = Path(__file__).parent.parent / "templates"
     
+    async def send_qr_access_email(
+        self,
+        to_email: str,
+        resident_name: str,
+        apartment_number: str,
+        username: str,
+        auto_login_url: str,
+        auto_login_token: str
+    ):
+        """
+        Envía un correo electrónico con el código QR de acceso.
+        
+        Args:
+            to_email: Email del destinatario
+            resident_name: Nombre completo del residente
+            apartment_number: Número de apartamento
+            username: Nombre de usuario
+            auto_login_url: URL de auto-login
+            auto_login_token: Token JWT para auto-login
+        """
+        try:
+            # Asunto del correo
+            subject = "Tu Código de Acceso Directo - Asambleas Giramaster"
+            
+            # HTML del correo con el QR incrustado
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Código de Acceso - Asambleas Giramaster</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+                    .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+                    .qr-container {{ text-align: center; margin: 30px 0; }}
+                    .qr-info {{ background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3; }}
+                    .button {{ background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }}
+                    .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 12px; }}
+                    .info-box {{ background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ddd; }}
+                    .label {{ font-weight: bold; color: #2c3e50; }}
+                    .value {{ color: #34495e; }}
+                    .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🏢 Tu Código de Acceso Directo</h1>
+                    <p>Asambleas Giramaster</p>
+                </div>
+                
+                <div class="content">
+                    <p>¡Hola <strong>{resident_name}</strong>!</p>
+                    
+                    <p>Hemos generado un código QR para que accedas directamente al sistema de gestión de tu unidad residencial. Ya no necesitarás recordar tu contraseña.</p>
+                    
+                    <div class="info-box">
+                        <h3>📋 Tus Datos:</h3>
+                        <p><span class="label">Nombre Completo:</span> <span class="value">{resident_name}</span></p>
+                        <p><span class="label">Usuario:</span> <span class="value">{username}</span></p>
+                        <p><span class="label">Apartamento:</span> <span class="value">{apartment_number}</span></p>
+                    </div>
+                    
+                    <div class="qr-info">
+                        <h3>📱 ¿Cómo usar tu Código QR?</h3>
+                        <ol>
+                            <li>Abre la cámara de tu smartphone</li>
+                            <li>Enfoca el código QR que aparece en este correo</li>
+                            <li>Toca la notificación que aparece en tu pantalla</li>
+                            <li>¡Listo! Serás redirigido directamente al sistema</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>⚠️ Importante:</strong> Este código QR es personal y no debe compartirse con personas no autorizadas. Tiene una validez de 48 horas.
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <p style="margin-bottom: 10px;"><strong>Escanea este código QR:</strong></p>
+                        <div style="background: white; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={auto_login_url}" alt="Código QR de Acceso" />
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <a href="{auto_login_url}" class="button">🚀 Acceder Directamente</a>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px;">
+                        <p style="font-size: 12px; color: #666;">O copia y pega este enlace en tu navegador:</p>
+                        <p style="font-size: 10px; color: #999; word-break: break-all; margin: 5px 0;">{auto_login_url}</p>
+                    </div>
+                    
+                    <div class="footer">
+                        <p>Este correo fue enviado automáticamente por Asambleas Giramaster</p>
+                        <p>Si no solicitaste este acceso, por favor contacta al administrador de tu unidad residencial.</p>
+                        <p>© 2026 Asambleas Giramaster - Todos los derechos reservados</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Enviar el correo
+            await email_sender.send_email(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content
+            )
+            
+            logger.info(f"✅ Correo con código QR enviado a {to_email}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error al enviar correo con QR a {to_email}: {str(e)}")
+            raise
+    
     def _load_template(self, template_name: str) -> str:
         """Carga una plantilla HTML desde el sistema de archivos"""
         template_path = self.templates_dir / template_name

@@ -9,6 +9,69 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-01-26
+
+- **🔒 Mejoras Críticas de Seguridad - Plan de Acción Inmediato Completado**:
+  - **Rotación de SECRET_KEY y Credenciales Comprometidas**:
+    - Generado nuevo SECRET_KEY de 64 caracteres con criptografía segura
+    - Agregado REFRESH_SECRET_KEY para tokens de actualización
+    - Actualizado en config.py, .env y .env.production
+    - Eliminadas todas las claves comprometidas del sistema
+
+  - **Configuración CORS Segura y Dinámica**:
+    - Implementada configuración dinámica por ambiente (desarrollo/producción)
+    - Desarrollo: permite localhost con puertos específicos (3000, 5173)
+    - Producción: requiere configuración explícita de dominios en ALLOWED_HOSTS_PROD
+    - Validación automática de orígenes permitidos con fallback seguro
+    - Deshabilitación automática de credenciales si no hay orígenes configurados
+
+  - **Actualización de Dependencias Vulnerables**:
+    - **Frontend**: Reemplazado `xlsx` por `exceljs` (libre de vulnerabilidades Prototype Pollution)
+    - **Frontend**: Actualizado `lodash` a versión segura (elimina vulnerabilidad moderada)
+    - **Migración de funcionalidad Excel**: Función `downloadResidentsExcelTemplate()` migrada a ExcelJS manteniendo compatibilidad completa
+    - **Auditoría de dependencias**: 0 vulnerabilidades detectadas después de actualizaciones
+
+  - **Headers de Seguridad HTTP Implementados**:
+    - **Content-Security-Policy (CSP)**: Configuración dinámica por ambiente
+      - Desarrollo: permite inline styles/scripts para Vite/React
+      - Producción: política estricta sin inline允许
+    - **Headers adicionales**: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection
+    - **Permissions Policy**: Control de acceso a APIs del navegador (geolocalización, cámara, micrófono)
+    - **Strict-Transport-Security**: Forzado HTTPS con max-age de 1 año
+    - **Cross-Origin headers**: COEP, CORP para seguridad adicional
+
+  - **Rate Limiting Mejorado y Distribuido**:
+    - **Middleware RateLimitMiddleware** con validación avanzada:
+      - Límites específicos por endpoint (ej: login: 5 intentos/15min, QR: 10/hora)
+      - Detección de IP real detrás de proxies (X-Forwarded-For, X-Real-IP)
+      - Headers estándar: X-RateLimit-*, Retry-After
+      - Keys sanitizadas y longitud limitada para prevenir DOS
+    - **Respuesta 429 estandarizada**: JSON con información detallada de límites
+    - **Validación de keys**: Prevención de inyección en keys de rate limiting
+
+  - **Sistema Completo de Sanitización de Inputs**:
+    - **InputSanitizer class** con detección de patrones maliciosos:
+      - Detección XSS, SQL Injection, CSS Injection, Clickjacking
+      - Validación específica por tipo (email, phone, username, apartment)
+      - Patrones regex para cada tipo de dato con validación estricta
+      - Sanitización con bleach y markupsafe para HTML seguro
+      - Validación de longitud máxima por tipo de dato
+    - **Schemas de validación**: Soporte para sanitización de diccionarios completos
+    - **Integración en QR endpoints**: Uso de InputSanitizer para validación de datos
+    - **Dependencias adicionales**: bleach==6.1.0, markupsafe==3.0.2
+
+- **📊 Documentación de Seguridad**:
+  - **Análisis de Seguridad Completo**: Archivo `SEGURIDAD_ANALISIS.md` con:
+    - 12 vulnerabilidades identificadas y clasificadas
+    - Plan de acción priorizado con timeline
+    - Herramientas y configuraciones recomendadas
+    - Checklist de validación continua
+  - **Roadmap de Mejoras**: Archivo `ROADMAP_SEGURIDAD.md` con:
+    - 5 áreas principales de mejora para mediano plazo
+    - Timeline de implementación detallado
+    - Herramientas y tecnologías recomendadas
+    - Checklist de validación pre/post-producción
+
 #### 2026-01-19
 
 - **Corrección del sistema de votación con peso de voto en encuestas**:
