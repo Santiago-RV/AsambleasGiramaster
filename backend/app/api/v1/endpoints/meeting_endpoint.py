@@ -1,3 +1,4 @@
+from decimal import Decimal
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -335,14 +336,14 @@ async def start_meeting(
         # 5. Crear invitaciones automáticamente
         invitations_created = 0
         for coowner in coowners:
-            # ✅ Manejar NULL en quorum base
-            quorum_base = coowner.dec_default_voting_weight if coowner.dec_default_voting_weight is not None else 0.0
-            
+            # Manejar NULL en quorum base
+            quorum_base = coowner.dec_default_voting_weight if coowner.dec_default_voting_weight is not None else Decimal('0.0')
+
             invitation = MeetingInvitationModel(
                 int_meeting_id=meeting_id,
                 int_user_id=coowner.int_user_id,
-                dec_voting_weight=quorum_base,       # ✅ Peso actual
-                dec_quorum_base=quorum_base,         # ✅ Quorum base (AGREGADO)
+                dec_voting_weight=quorum_base,       # Peso actual
+                dec_quorum_base=quorum_base,         # Quorum base (NUNCA será None)
                 str_apartment_number=coowner.str_apartment_number,
                 str_invitation_status='sent',
                 str_response_status='pending',

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -233,10 +234,14 @@ class MeetingService:
             invitations_created = 0
             for user, user_residential_unit in copropietarios_data:
                 try:
+                    # Calcular quorum base
+                    quorum_base = user_residential_unit.dec_default_voting_weight or Decimal('1.0')
+
                     invitation = MeetingInvitationModel(
                         int_meeting_id=new_meeting.id,
                         int_user_id=user.id,
-                        dec_voting_weight=user_residential_unit.dec_default_voting_weight or 1,
+                        dec_voting_weight=quorum_base,           
+                        dec_quorum_base=quorum_base,             
                         str_apartment_number=user_residential_unit.str_apartment_number or "N/A",
                         str_invitation_status="pending",
                         str_response_status="no_response",
