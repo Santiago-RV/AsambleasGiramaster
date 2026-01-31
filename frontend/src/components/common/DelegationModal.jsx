@@ -1,47 +1,84 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserMinus, UserPlus, AlertCircle, Loader2 } from 'lucide-react';
+import { 
+  UserMinus, 
+  UserPlus, 
+  AlertCircle, 
+  Loader2, 
+  Search, 
+  UserCheck,
+  Lock,
+  CheckCircle2
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 import Modal from './Modal';
-import { MeetingService } from '../../services/api/MeetingService'; // CAMBIO AQUÍ
+import { MeetingService } from '../../services/api/MeetingService';
 import { DelegationService } from '../../services/api/DelegationService';
 
 export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
   const [selectedDelegators, setSelectedDelegators] = useState([]);
   const [selectedDelegate, setSelectedDelegate] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
   // Obtener invitaciones con quorum base
   const { data: invitationsData, isLoading } = useQuery({
     queryKey: ['meeting-invitations', meetingId],
-    queryFn: () => MeetingService.getMeetingInvitations(meetingId), // USAR ESTE MÉTODO
+    queryFn: () => MeetingService.getMeetingInvitations(meetingId),
     enabled: isOpen && !!meetingId,
   });
 
   const invitations = invitationsData?.data || [];
 
-  // Filtrar: disponibles para ceder (no han delegado y no son delegados seleccionados)
-  const availableDelegators = useMemo(() => {
+  // Filtrar por búsqueda
+  const filteredInvitations = useMemo(() => {
+    if (!searchTerm.trim()) return invitations;
+    
+    const search = searchTerm.toLowerCase();
     return invitations.filter(inv => 
-      !inv.int_delegated_id && 
+      inv.str_firstname?.toLowerCase().includes(search) ||
+      inv.str_lastname?.toLowerCase().includes(search) ||
+      inv.str_apartment_number?.toLowerCase().includes(search) ||
+      inv.str_email?.toLowerCase().includes(search)
+    );
+  }, [invitations, searchTerm]);
+
+  // Separar usuarios por estado
+  const usersByState = useMemo(() => {
+    const available = [];
+    const alreadyDelegated = [];
+    
+    filteredInvitations.forEach(inv => {
+      if (inv.int_delegated_id) {
+        alreadyDelegated.push(inv);
+      } else {
+        available.push(inv);
+      }
+    });
+    
+    return { available, alreadyDelegated };
+  }, [filteredInvitations]);
+
+  // Filtrar: disponibles para ceder (no han delegado y no son delegado seleccionado)
+  const availableDelegators = useMemo(() => {
+    return usersByState.available.filter(inv => 
       inv.int_user_id !== selectedDelegate?.int_user_id
     );
-  }, [invitations, selectedDelegate]);
+  }, [usersByState.available, selectedDelegate]);
 
-  // Filtrar: disponibles para recibir (no han delegado y no están en la lista de cedentes)
+  // Filtrar: disponibles para recibir (no han delegado y no están en lista de cedentes)
   const availableDelegates = useMemo(() => {
     if (selectedDelegators.length === 0) return [];
     
     const delegatorIds = selectedDelegators.map(d => d.int_user_id);
-    return invitations.filter(inv => 
-      !inv.int_delegated_id && 
+    return usersByState.available.filter(inv => 
       !delegatorIds.includes(inv.int_user_id)
     );
-  }, [invitations, selectedDelegators]);
+  }, [usersByState.available, selectedDelegators]);
 
   // Calcular peso total a ceder (suma de quorum base)
   const totalWeightToDelegate = useMemo(() => {
-    return selectedDelegators.reduce((sum, d) => sum + (d.dec_quorum_base || 0), 0);
+    return selectedDelegators.reduce((sum, d) => sum + (parseFloat(d.dec_quorum_base) || 0), 0);
   }, [selectedDelegators]);
 
   // Mutación para crear delegación
@@ -102,6 +139,7 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
   const handleReset = () => {
     setSelectedDelegators([]);
     setSelectedDelegate(null);
+    setSearchTerm('');
   };
 
   const handleConfirm = async () => {
@@ -156,7 +194,7 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Gestión de Poderes" size="xl">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Gestión de Poderes" size="3xl">
       <div className="p-6">
         {/* Header con instrucciones */}
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -165,69 +203,89 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
             <div className="text-sm text-gray-700">
               <p className="font-semibold mb-1">Instrucciones:</p>
               <ol className="list-decimal pl-5 space-y-1">
-                <li>Selecciona uno o más copropietarios que cederán su poder (izquierda)</li>
-                <li>Selecciona el copropietario que recibirá el poder acumulado (derecha)</li>
-                <li>Confirma la delegación</li>
+                <li>Busca y selecciona uno o más copropietarios que <strong>cederán</strong> su poder (izquierda)</li>
+                <li>Selecciona el copropietario que <strong>recibirá</strong> el poder acumulado (centro)</li>
+                <li>Los copropietarios que ya cedieron aparecen bloqueados (derecha)</li>
               </ol>
             </div>
           </div>
         </div>
 
-        {/* Grid de dos columnas */}
-        <div className="grid grid-cols-2 gap-6">
-          {/* COLUMNA IZQUIERDA: Cedentes */}
+        {/* Buscador */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Buscar por nombre, apellido, apartamento o email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          {searchTerm && (
+            <p className="text-sm text-gray-500 mt-2">
+              Mostrando {filteredInvitations.length} de {invitations.length} copropietarios
+            </p>
+          )}
+        </div>
+
+        {/* Grid de tres columnas */}
+        <div className="grid grid-cols-3 gap-4">
+          
+          {/* COLUMNA 1: Disponibles para CEDER */}
           <div className="border border-gray-200 rounded-lg">
             <div className="p-4 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200">
               <div className="flex items-center gap-2 text-red-700">
                 <UserMinus size={20} />
-                <h3 className="font-semibold">Copropietarios que ceden poder</h3>
+                <h3 className="font-semibold text-sm">Cedentes</h3>
               </div>
               <p className="text-xs text-gray-600 mt-1">
-                ({selectedDelegators.length} seleccionados)
+                {selectedDelegators.length} seleccionado(s) • {availableDelegators.length} disponibles
               </p>
             </div>
 
-            <div className="p-4 max-h-96 overflow-y-auto">
+            <div className="p-3 max-h-96 overflow-y-auto">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="animate-spin text-blue-600" size={32} />
+                </div>
+              ) : availableDelegators.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <UserMinus size={40} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No hay disponibles</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {availableDelegators.map(invitation => {
                     const isSelected = selectedDelegators.some(d => d.int_user_id === invitation.int_user_id);
-                    const isDisabled = selectedDelegate?.int_user_id === invitation.int_user_id;
                     const quorumBase = parseFloat(invitation.dec_quorum_base || 0);
 
                     return (
                       <label
                         key={invitation.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                          isDisabled
-                            ? 'bg-gray-100 border-gray-200 opacity-50 cursor-not-allowed'
-                            : isSelected
+                        className={`flex items-start gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all ${
+                          isSelected
                             ? 'bg-red-50 border-red-300 shadow-sm'
-                            : 'bg-white border-gray-200 hover:border-red-200 hover:bg-red-25'
+                            : 'bg-white border-gray-200 hover:border-red-200'
                         }`}
                       >
                         <input
                           type="checkbox"
-                          checked={!!isSelected}
-                          onChange={() => !isDisabled && handleDelegatorToggle(invitation)}
-                          disabled={isDisabled}
-                          className="w-5 h-5 text-red-600 focus:ring-red-500 disabled:cursor-not-allowed"
+                          checked={isSelected}
+                          onChange={() => handleDelegatorToggle(invitation)}
+                          className="mt-1 w-4 h-4 text-red-600 focus:ring-red-500"
                         />
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-800">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-gray-800 truncate">
                             {invitation.str_firstname} {invitation.str_lastname}
                           </p>
-                          {/* SOLO QUORUM BASE - NO VOTACIONES */}
-                          <div className="flex items-center justify-between mt-1">
+                          <div className="flex items-center justify-between mt-0.5">
                             <p className="text-xs text-gray-500">
                               Apto: {invitation.str_apartment_number}
                             </p>
-                            <p className="text-sm font-semibold text-red-600">
-                              {quorumBase.toFixed(2)} quorum
+                            <p className="text-xs font-semibold text-red-600">
+                              {quorumBase.toFixed(2)}
                             </p>
                           </div>
                         </div>
@@ -240,37 +298,38 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
 
             {/* Resumen de peso total */}
             {selectedDelegators.length > 0 && (
-              <div className="p-4 bg-red-50 border-t border-gray-200">
-                <p className="text-sm text-gray-600">Peso total a ceder:</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {totalWeightToDelegate.toFixed(2)} quorum
+              <div className="p-3 bg-red-50 border-t border-gray-200">
+                <p className="text-xs text-gray-600">Peso total a ceder:</p>
+                <p className="text-xl font-bold text-red-600">
+                  {totalWeightToDelegate.toFixed(2)}
                 </p>
               </div>
             )}
           </div>
 
-          {/* COLUMNA DERECHA: Receptor */}
+          {/* COLUMNA 2: Receptor del poder */}
           <div className="border border-gray-200 rounded-lg">
             <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
               <div className="flex items-center gap-2 text-green-700">
                 <UserPlus size={20} />
-                <h3 className="font-semibold">Receptor del poder</h3>
+                <h3 className="font-semibold text-sm">Receptor</h3>
               </div>
               <p className="text-xs text-gray-600 mt-1">
-                {selectedDelegate ? '1 seleccionado' : 'Ninguno seleccionado'}
+                {selectedDelegate ? '1 seleccionado' : 'Ninguno'} • {availableDelegates.length} disponibles
               </p>
             </div>
 
-            <div className="p-4 max-h-96 overflow-y-auto">
+            <div className="p-3 max-h-96 overflow-y-auto">
               {selectedDelegators.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
-                  <UserPlus size={48} className="mx-auto mb-3 opacity-30" />
-                  <p>Selecciona primero los copropietarios</p>
-                  <p className="text-sm mt-1">que cederán el poder</p>
+                  <UserPlus size={40} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Selecciona cedentes</p>
+                  <p className="text-xs mt-1">primero</p>
                 </div>
               ) : availableDelegates.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
-                  No hay receptores disponibles
+                  <p className="text-sm">No hay receptores</p>
+                  <p className="text-xs">disponibles</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -282,10 +341,10 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
                     return (
                       <label
                         key={invitation.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        className={`flex items-start gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-green-50 border-green-300 shadow-sm'
-                            : 'bg-white border-gray-200 hover:border-green-200 hover:bg-green-25'
+                            : 'bg-white border-gray-200 hover:border-green-200'
                         }`}
                       >
                         <input
@@ -293,32 +352,82 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
                           name="delegate"
                           checked={isSelected}
                           onChange={() => handleDelegateSelect(invitation)}
-                          className="w-5 h-5 text-green-600 focus:ring-green-500"
+                          className="mt-1 w-4 h-4 text-green-600 focus:ring-green-500"
                         />
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-800">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-gray-800 truncate">
                             {invitation.str_firstname} {invitation.str_lastname}
                           </p>
-                          {/* SOLO QUORUM BASE - NO VOTACIONES */}
-                          <div className="mt-1 text-xs space-y-1">
-                            <p className="text-gray-500">
-                              Apto: {invitation.str_apartment_number}
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-600">Quorum actual:</span>
-                              <span className="font-semibold text-gray-700">
-                                {currentQuorum.toFixed(2)}
-                              </span>
+                          <p className="text-xs text-gray-500">
+                            Apto: {invitation.str_apartment_number}
+                          </p>
+                          <div className="mt-1 text-xs bg-white rounded px-2 py-1 border border-gray-200">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Actual:</span>
+                              <span className="font-semibold">{currentQuorum.toFixed(2)}</span>
                             </div>
-                            <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                              <span className="text-green-600 font-semibold">Nuevo quorum:</span>
-                              <span className="font-bold text-green-600">
-                                {newQuorum.toFixed(2)} quorum
-                              </span>
+                            <div className="flex justify-between mt-0.5 pt-0.5 border-t border-gray-200">
+                              <span className="text-green-600 font-semibold">Nuevo:</span>
+                              <span className="font-bold text-green-600">{newQuorum.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
                       </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* COLUMNA 3: Ya cedieron (bloqueados) */}
+          <div className="border border-gray-200 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <div className="flex items-center gap-2 text-gray-700">
+                <Lock size={20} />
+                <h3 className="font-semibold text-sm">Ya Cedieron</h3>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                {usersByState.alreadyDelegated.length} copropietario(s)
+              </p>
+            </div>
+
+            <div className="p-3 max-h-96 overflow-y-auto">
+              {usersByState.alreadyDelegated.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <CheckCircle2 size={40} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Ninguno ha</p>
+                  <p className="text-xs mt-1">cedido poder</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {usersByState.alreadyDelegated.map(invitation => {
+                    const quorumBase = parseFloat(invitation.dec_quorum_base || 0);
+
+                    return (
+                      <div
+                        key={invitation.id}
+                        className="flex items-start gap-2 p-2 rounded-lg bg-gray-100 border-2 border-gray-200 opacity-60"
+                      >
+                        <Lock size={16} className="text-gray-400 mt-1" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-gray-700 truncate">
+                            {invitation.str_firstname} {invitation.str_lastname}
+                          </p>
+                          <div className="flex items-center justify-between mt-0.5">
+                            <p className="text-xs text-gray-500">
+                              Apto: {invitation.str_apartment_number}
+                            </p>
+                            <p className="text-xs font-semibold text-gray-500">
+                              {quorumBase.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1">
+                            <UserCheck size={12} className="text-gray-400" />
+                            <p className="text-xs text-gray-500">Poder cedido</p>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -338,7 +447,7 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
           </button>
           <button
             onClick={handleReset}
-            disabled={selectedDelegators.length === 0 && !selectedDelegate || createDelegationMutation.isPending}
+            disabled={(selectedDelegators.length === 0 && !selectedDelegate) || createDelegationMutation.isPending}
             className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
           >
             Limpiar
@@ -346,9 +455,16 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
           <button
             onClick={handleConfirm}
             disabled={!selectedDelegate || selectedDelegators.length === 0 || createDelegationMutation.isPending}
-            className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {createDelegationMutation.isPending ? 'Procesando...' : 'Confirmar Cesión'}
+            {createDelegationMutation.isPending ? (
+              <>
+                <Loader2 className="animate-spin" size={16} />
+                Procesando...
+              </>
+            ) : (
+              'Confirmar Cesión'
+            )}
           </button>
         </div>
       </div>
