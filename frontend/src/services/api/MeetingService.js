@@ -66,17 +66,23 @@ export class MeetingService {
 
   /**
    * Iniciar una reunión
+   * Cambia el estado a "En Curso" y crea invitaciones automáticamente
    */
-  static async startMeeting(id) {
-    const response = await axiosInstance.post(`/meetings/${id}/start`);
+  static async startMeeting(meetingId) {
+    const response = await axiosInstance.post(
+      `/meetings/${meetingId}/start`
+    );
     return response.data;
   }
 
   /**
    * Finalizar una reunión
+   * Cambia el estado a "Finalizada"
    */
-  static async endMeeting(id) {
-    const response = await axiosInstance.post(`/meetings/${id}/end`);
+  static async endMeeting(meetingId) {
+    const response = await axiosInstance.post(
+      `/meetings/${meetingId}/end`
+    );
     return response.data;
   }
 

@@ -277,7 +277,7 @@ async def create_invitation(
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
     summary="Obtener invitaciones de una reunión",
-    description="Obtiene todas las invitaciones de una reunión con quorum base y actual"
+    description="Obtiene todas las invitaciones con quorum base desde UserResidentialUnitModel"
 )
 async def get_meeting_invitations(
     meeting_id: int,
@@ -285,69 +285,70 @@ async def get_meeting_invitations(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Obtiene todas las invitaciones de una reunión con información completa.
-    
-    IMPORTANTE: Ahora retorna dec_quorum_base directamente desde meeting_invitations.
-    Ya NO requiere JOIN con user_residential_units.
-    
-    **Campos importantes en la respuesta:**
-    - dec_quorum_base: Peso/quorum ORIGINAL del usuario (no cambia)
-    - dec_voting_weight: Peso/quorum ACTUAL en la reunión (cambia con delegaciones)
-    - int_delegated_id: Si tiene valor, el usuario delegó su poder
+    Obtiene invitaciones con quorum base desde la relación user_residential_unit.
     """
     try:
         from app.models.meeting_invitation_model import MeetingInvitationModel
         from app.models.user_model import UserModel
         from app.models.data_user_model import DataUserModel
-        from sqlalchemy import select
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from app.models.meeting_model import MeetingModel
+        from sqlalchemy import select, and_
         
         logger.info(f"📋 Obteniendo invitaciones de meeting_id={meeting_id}")
         
-        # Query simplificado - dec_quorum_base ya está en meeting_invitations
+        # ✅ Query CON JOIN a UserResidentialUnitModel para obtener quorum base
         query = (
             select(
                 MeetingInvitationModel,
-                UserModel.str_firstname,
-                UserModel.str_lastname,
-                DataUserModel.str_email
+                DataUserModel.str_firstname,
+                DataUserModel.str_lastname,
+                DataUserModel.str_email,
+                UserResidentialUnitModel.dec_default_voting_weight.label('dec_quorum_base')  # ✅ QUORUM BASE
             )
             .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .outerjoin(
+                UserResidentialUnitModel,
+                and_(
+                    UserResidentialUnitModel.int_user_id == UserModel.id,
+                    UserResidentialUnitModel.int_residential_unit_id == (
+                        select(MeetingModel.int_id_residential_unit)
+                        .where(MeetingModel.id == meeting_id)
+                        .scalar_subquery()
+                    )
+                )
+            )
             .where(MeetingInvitationModel.int_meeting_id == meeting_id)
             .order_by(
-                UserModel.str_firstname.asc(),
-                UserModel.str_lastname.asc()
+                DataUserModel.str_firstname.asc(),
+                DataUserModel.str_lastname.asc()
             )
         )
 
         result = await db.execute(query)
         invitations_data = result.all()
 
-        # Formatear respuesta
+        # ✅ Formatear respuesta con quorum base
         invitations = []
-        for invitation, firstname, lastname, email in invitations_data:
+        for invitation, firstname, lastname, email, quorum_base in invitations_data:
             invitation_dict = {
                 "id": invitation.id,
                 "int_meeting_id": invitation.int_meeting_id,
                 "int_user_id": invitation.int_user_id,
                 
-                # 🔥 Campos de quorum
-                "dec_voting_weight": float(invitation.dec_voting_weight),  # Peso ACTUAL
-                "dec_quorum_base": float(invitation.dec_quorum_base),       # Peso ORIGINAL (BASE)
+                # ✅ Quorum: actual (dec_voting_weight) y base (desde UserResidentialUnit)
+                "dec_voting_weight": float(invitation.dec_voting_weight),  
+                "dec_quorum_base": float(quorum_base) if quorum_base is not None else 0.0,  # ✅ QUORUM BASE
                 
-                # Información de apartamento
                 "str_apartment_number": invitation.str_apartment_number,
-                
-                # Estados
                 "str_invitation_status": invitation.str_invitation_status,
                 "str_response_status": invitation.str_response_status,
                 "bln_will_attend": invitation.bln_will_attend,
                 "bln_actually_attended": invitation.bln_actually_attended,
-                
-                # Delegación
                 "int_delegated_id": invitation.int_delegated_id,
                 
-                # Información del usuario
+                # Info de usuario desde DataUserModel
                 "str_firstname": firstname,
                 "str_lastname": lastname,
                 "str_email": email,
@@ -361,14 +362,8 @@ async def get_meeting_invitations(
                 "updated_at": invitation.updated_at
             }
             invitations.append(invitation_dict)
-            
-            logger.info(
-                f"  👤 {firstname} {lastname} - Apto: {invitation.str_apartment_number} - "
-                f"Quorum base: {invitation.dec_quorum_base} - "
-                f"Peso actual: {invitation.dec_voting_weight}"
-            )
 
-        logger.info(f"✅ Retornando {len(invitations)} invitaciones")
+        logger.info(f"✅ Retornando {len(invitations)} invitaciones con quorum base")
 
         return SuccessResponse(
             success=True,
@@ -385,5 +380,3 @@ async def get_meeting_invitations(
             message=f"Error al obtener las invitaciones: {str(e)}",
             details={"original_error": str(e)}
         )
-
-

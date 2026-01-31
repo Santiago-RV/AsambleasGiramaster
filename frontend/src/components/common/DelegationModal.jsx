@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  UserMinus, 
-  UserPlus, 
-  AlertCircle, 
-  Loader2, 
-  Search, 
+import {
+  UserMinus,
+  UserPlus,
+  AlertCircle,
+  Loader2,
+  Search,
   UserCheck,
   Lock,
   CheckCircle2
@@ -16,6 +16,9 @@ import { MeetingService } from '../../services/api/MeetingService';
 import { DelegationService } from '../../services/api/DelegationService';
 
 export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
+
+  console.log("🟢 DelegationModal - isOpen:", isOpen);
+  console.log("🟢 DelegationModal - meetingId:", meetingId);
   const [selectedDelegators, setSelectedDelegators] = useState([]);
   const [selectedDelegate, setSelectedDelegate] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,14 +31,21 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
     enabled: isOpen && !!meetingId,
   });
 
+  // ← AGREGAR ESTOS LOGS DESPUÉS DE LA QUERY
+  console.log("🟡 Query enabled:", isOpen && !!meetingId);
+  console.log("🟡 invitationsData:", invitationsData);
+  console.log("🟡 isLoading:", isLoading);
+
   const invitations = invitationsData?.data || [];
+  console.log("🟡 invitations array:", invitations); // ← AGREGAR ESTO
+
 
   // Filtrar por búsqueda
   const filteredInvitations = useMemo(() => {
     if (!searchTerm.trim()) return invitations;
-    
+
     const search = searchTerm.toLowerCase();
-    return invitations.filter(inv => 
+    return invitations.filter(inv =>
       inv.str_firstname?.toLowerCase().includes(search) ||
       inv.str_lastname?.toLowerCase().includes(search) ||
       inv.str_apartment_number?.toLowerCase().includes(search) ||
@@ -47,7 +57,7 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
   const usersByState = useMemo(() => {
     const available = [];
     const alreadyDelegated = [];
-    
+
     filteredInvitations.forEach(inv => {
       if (inv.int_delegated_id) {
         alreadyDelegated.push(inv);
@@ -55,28 +65,26 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
         available.push(inv);
       }
     });
-    
+
     return { available, alreadyDelegated };
   }, [filteredInvitations]);
 
-  // Filtrar: disponibles para ceder (no han delegado y no son delegado seleccionado)
-  const availableDelegators = useMemo(() => {
-    return usersByState.available.filter(inv => 
-      inv.int_user_id !== selectedDelegate?.int_user_id
-    );
-  }, [usersByState.available, selectedDelegate]);
-
   // Filtrar: disponibles para recibir (no han delegado y no están en lista de cedentes)
   const availableDelegates = useMemo(() => {
-    if (selectedDelegators.length === 0) return [];
-    
     const delegatorIds = selectedDelegators.map(d => d.int_user_id);
-    return usersByState.available.filter(inv => 
+    return usersByState.available.filter(inv =>
       !delegatorIds.includes(inv.int_user_id)
     );
   }, [usersByState.available, selectedDelegators]);
 
-  // Calcular peso total a ceder (suma de quorum base)
+  // Filtrar: disponibles para ceder (no han delegado y no es el delegado seleccionado)
+  const availableDelegators = useMemo(() => {
+    return usersByState.available.filter(inv =>
+      inv.int_user_id !== selectedDelegate?.int_user_id
+    );
+  }, [usersByState.available, selectedDelegate]);
+
+  // Calcular peso total a ceder
   const totalWeightToDelegate = useMemo(() => {
     return selectedDelegators.reduce((sum, d) => sum + (parseFloat(d.dec_quorum_base) || 0), 0);
   }, [selectedDelegators]);
@@ -158,16 +166,18 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
       title: '¿Confirmar Delegación?',
       html: `
         <div class="text-left space-y-2">
-          <p class="text-gray-700"><strong>Cedentes:</strong></p>
-          <ul class="list-disc pl-5 text-sm text-gray-600">
-            ${selectedDelegators.map(d =>
-              `<li>${d.str_firstname} ${d.str_lastname} - Apto: ${d.str_apartment_number} (${parseFloat(d.dec_quorum_base).toFixed(2)} quorum)</li>`
-            ).join('')}
-          </ul>
-          <p class="mt-3 text-gray-700"><strong>Receptor:</strong></p>
+          <p class="text-gray-700"><strong>Receptor:</strong></p>
           <p class="text-sm text-gray-600 pl-5">
             ${selectedDelegate.str_firstname} ${selectedDelegate.str_lastname} - Apto: ${selectedDelegate.str_apartment_number}
           </p>
+          
+          <p class="mt-3 text-gray-700"><strong>Cedentes:</strong></p>
+          <ul class="list-disc pl-5 text-sm text-gray-600">
+            ${selectedDelegators.map(d =>
+        `<li>${d.str_firstname} ${d.str_lastname} - Apto: ${d.str_apartment_number} (${parseFloat(d.dec_quorum_base).toFixed(2)} quorum)</li>`
+      ).join('')}
+          </ul>
+          
           <p class="mt-3 text-lg font-bold text-green-600">
             Peso total a ceder: ${totalWeightToDelegate.toFixed(2)} quorum
           </p>
@@ -203,9 +213,9 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
             <div className="text-sm text-gray-700">
               <p className="font-semibold mb-1">Instrucciones:</p>
               <ol className="list-decimal pl-5 space-y-1">
-                <li>Busca y selecciona uno o más copropietarios que <strong>cederán</strong> su poder (izquierda)</li>
-                <li>Selecciona el copropietario que <strong>recibirá</strong> el poder acumulado (centro)</li>
-                <li>Los copropietarios que ya cedieron aparecen bloqueados (derecha)</li>
+                <li>Selecciona el copropietario que <strong>recibirá</strong> el poder (izquierda)</li>
+                <li>Selecciona uno o más copropietarios que <strong>cederán</strong> su poder (centro)</li>
+                <li>Los copropietarios que ya cedieron aparecen en el histórico (derecha)</li>
               </ol>
             </div>
           </div>
@@ -232,8 +242,81 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
 
         {/* Grid de tres columnas */}
         <div className="grid grid-cols-3 gap-4">
-          
-          {/* COLUMNA 1: Disponibles para CEDER */}
+
+          {/* COLUMNA 1: RECEPTOR (Izquierda) */}
+          <div className="border border-gray-200 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
+              <div className="flex items-center gap-2 text-green-700">
+                <UserPlus size={20} />
+                <h3 className="font-semibold text-sm">Receptor</h3>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                {selectedDelegate ? '1 seleccionado' : 'Ninguno'} • {availableDelegates.length} disponibles
+              </p>
+            </div>
+
+            <div className="p-3 max-h-96 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="animate-spin text-blue-600" size={32} />
+                </div>
+              ) : availableDelegates.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <UserPlus size={40} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No hay receptores</p>
+                  <p className="text-xs mt-1">disponibles</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {availableDelegates.map(invitation => {
+                    const isSelected = selectedDelegate?.int_user_id === invitation.int_user_id;
+                    const currentQuorum = parseFloat(invitation.dec_quorum_base || 0);
+                    const newQuorum = currentQuorum + totalWeightToDelegate;
+
+                    return (
+                      <label
+                        key={invitation.id}
+                        className={`flex items-start gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all ${isSelected
+                            ? 'bg-green-50 border-green-300 shadow-sm'
+                            : 'bg-white border-gray-200 hover:border-green-200'
+                          }`}
+                      >
+                        <input
+                          type="radio"
+                          name="delegate"
+                          checked={isSelected}
+                          onChange={() => handleDelegateSelect(invitation)}
+                          className="mt-1 w-4 h-4 text-green-600 focus:ring-green-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-gray-800 truncate">
+                            {invitation.str_firstname} {invitation.str_lastname}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Apto: {invitation.str_apartment_number}
+                          </p>
+                          {selectedDelegators.length > 0 && (
+                            <div className="mt-1 text-xs bg-white rounded px-2 py-1 border border-gray-200">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Actual:</span>
+                                <span className="font-semibold">{currentQuorum.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between mt-0.5 pt-0.5 border-t border-gray-200">
+                                <span className="text-green-600 font-semibold">Nuevo:</span>
+                                <span className="font-bold text-green-600">{newQuorum.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* COLUMNA 2: CEDENTES (Centro) */}
           <div className="border border-gray-200 rounded-lg">
             <div className="p-4 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200">
               <div className="flex items-center gap-2 text-red-700">
@@ -264,11 +347,10 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
                     return (
                       <label
                         key={invitation.id}
-                        className={`flex items-start gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all ${
-                          isSelected
+                        className={`flex items-start gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all ${isSelected
                             ? 'bg-red-50 border-red-300 shadow-sm'
                             : 'bg-white border-gray-200 hover:border-red-200'
-                        }`}
+                          }`}
                       >
                         <input
                           type="checkbox"
@@ -307,80 +389,7 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
             )}
           </div>
 
-          {/* COLUMNA 2: Receptor del poder */}
-          <div className="border border-gray-200 rounded-lg">
-            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
-              <div className="flex items-center gap-2 text-green-700">
-                <UserPlus size={20} />
-                <h3 className="font-semibold text-sm">Receptor</h3>
-              </div>
-              <p className="text-xs text-gray-600 mt-1">
-                {selectedDelegate ? '1 seleccionado' : 'Ninguno'} • {availableDelegates.length} disponibles
-              </p>
-            </div>
-
-            <div className="p-3 max-h-96 overflow-y-auto">
-              {selectedDelegators.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <UserPlus size={40} className="mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Selecciona cedentes</p>
-                  <p className="text-xs mt-1">primero</p>
-                </div>
-              ) : availableDelegates.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <p className="text-sm">No hay receptores</p>
-                  <p className="text-xs">disponibles</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {availableDelegates.map(invitation => {
-                    const isSelected = selectedDelegate?.int_user_id === invitation.int_user_id;
-                    const currentQuorum = parseFloat(invitation.dec_quorum_base || 0);
-                    const newQuorum = currentQuorum + totalWeightToDelegate;
-
-                    return (
-                      <label
-                        key={invitation.id}
-                        className={`flex items-start gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-green-50 border-green-300 shadow-sm'
-                            : 'bg-white border-gray-200 hover:border-green-200'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="delegate"
-                          checked={isSelected}
-                          onChange={() => handleDelegateSelect(invitation)}
-                          className="mt-1 w-4 h-4 text-green-600 focus:ring-green-500"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-gray-800 truncate">
-                            {invitation.str_firstname} {invitation.str_lastname}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Apto: {invitation.str_apartment_number}
-                          </p>
-                          <div className="mt-1 text-xs bg-white rounded px-2 py-1 border border-gray-200">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Actual:</span>
-                              <span className="font-semibold">{currentQuorum.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between mt-0.5 pt-0.5 border-t border-gray-200">
-                              <span className="text-green-600 font-semibold">Nuevo:</span>
-                              <span className="font-bold text-green-600">{newQuorum.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* COLUMNA 3: Ya cedieron (bloqueados) */}
+          {/* COLUMNA 3: HISTÓRICO (Derecha) */}
           <div className="border border-gray-200 rounded-lg">
             <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
               <div className="flex items-center gap-2 text-gray-700">

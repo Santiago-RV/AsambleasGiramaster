@@ -8,7 +8,7 @@ import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
 
-export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onEndMeeting, onTransferPower, onCreateGuest }) {
+export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest }) {
   const queryClient = useQueryClient();
 
   // Obtener los residentes de la unidad residencial
@@ -87,7 +87,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
   // Mutación para el envío masivo de credenciales
   const sendBulkCredentialsMutation = useMutation({
     mutationFn: async (residentIds) => {
-      return await CoownerService.sendBulkCredentials(residentIds);  // ← Quitar residentialUnitId
+      return await CoownerService.sendBulkCredentials(residentIds);
     },
     onSuccess: (response) => {
       const { successful, failed, total_processed } = response.data;
@@ -132,6 +132,99 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       });
     },
   });
+
+  // MUTACIÓN PARA INICIAR REUNIÓN
+  const startMeetingMutation = useMutation({
+    mutationFn: async (meetingId) => {
+      return await MeetingService.startMeeting(meetingId);
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+      queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Reunión Iniciada',
+        html: `
+          <div class="text-left">
+            <p class="mb-3">${response.message}</p>
+            <div class="bg-green-50 p-3 rounded-lg">
+              <p class="text-sm text-green-700">
+                ✅ Estado: <strong>En Curso</strong>
+              </p>
+            </div>
+          </div>
+        `,
+        confirmButtonColor: '#10b981',
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.message || error.message || 'Error al iniciar la reunión',
+        confirmButtonColor: '#dc2626',
+      });
+    },
+  });
+
+  // MUTACIÓN PARA FINALIZAR REUNIÓN
+  const endMeetingMutation = useMutation({
+    mutationFn: async (meetingId) => {
+      return await MeetingService.endMeeting(meetingId);
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+      Swal.fire({
+        icon: 'success',
+        title: 'Reunión Finalizada',
+        text: response.message || 'La reunión ha sido finalizada exitosamente',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.message || error.message || 'Error al finalizar la reunión',
+        confirmButtonColor: '#dc2626',
+      });
+    },
+  });
+
+  const handleStartMeeting = async (meeting) => {
+    const result = await Swal.fire({
+      title: '¿Iniciar Reunión?',
+      html: `
+        <div class="text-left">
+          <p class="mb-3">¿Estás seguro de iniciar esta reunión?</p>
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <p class="font-semibold text-blue-800">${meeting.titulo}</p>
+            <p class="text-sm text-blue-700 mt-1">
+              <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+            </p>
+          </div>
+          <p class="text-xs text-gray-600 mt-3">
+            ✅ Se crearán invitaciones automáticamente para todos los copropietarios
+          </p>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, Iniciar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      startMeetingMutation.mutate(meeting.id);
+    }
+  };
 
   const handleEndMeeting = async (meeting) => {
     const result = await Swal.fire({
@@ -411,7 +504,6 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             <Plus size={18} />
             <span>Agregar Copropietario</span>
           </button>
-          {/* ← AGREGAR ESTE BOTÓN NUEVO */}
           <button
             onClick={onCreateGuest}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:shadow-lg transition-all"
@@ -487,6 +579,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             isLoading={isLoadingMeetings}
             onCreateMeeting={onCreateMeeting}
             onJoinMeeting={onJoinMeeting}
+            onStartMeeting={handleStartMeeting}
             onEndMeeting={handleEndMeeting}
             variant="admin"
           />

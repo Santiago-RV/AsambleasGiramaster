@@ -12,9 +12,9 @@ const MeetingsList = ({
 	isLoading,
 	onCreateMeeting,
 	onJoinMeeting,
-	onStartMeeting, // Alias para compatibilidad con SuperAdmin
-	onEndMeeting, // Handler para finalizar reunión
-	variant = 'compact', // 'admin' o 'compact'
+	onStartMeeting,
+	onEndMeeting,
+	variant = 'compact',
 }) => {
 	const [activeTab, setActiveTab] = useState('upcoming');
 
@@ -107,11 +107,11 @@ const MeetingsList = ({
 		}
 	};
 
-	const canAccessMeeting = (meetingDate) => {
-		const now = new Date();
-		const oneHourBefore = new Date(meetingDate.getTime() - 60 * 60 * 1000);
-		return now >= oneHourBefore;
-	};
+	// const canAccessMeeting = (meetingDate) => {
+	// 	const now = new Date();
+	// 	const oneHourBefore = new Date(meetingDate.getTime() - 60 * 60 * 1000);
+	// 	return now >= oneHourBefore;
+	// };
 
 	const getTimeUntilMeeting = (meetingDate) => {
 		const now = new Date();
@@ -222,7 +222,6 @@ const MeetingsList = ({
 								const StatusIcon = statusInfo.icon;
 								const isActive = meeting.estado?.toLowerCase() === 'en curso' || meeting.estado?.toLowerCase() === 'activa';
 								const isProgrammed = meeting.estado?.toLowerCase() === 'programada';
-								const canAccess = isProgrammed && canAccessMeeting(meeting.fechaCompleta);
 								const timeUntil = getTimeUntilMeeting(meeting.fechaCompleta);
 
 								return (
@@ -291,6 +290,7 @@ const MeetingsList = ({
 										{/* Actions for upcoming */}
 										{activeTab === 'upcoming' && (
 											<div className="mt-4 pt-4 border-t border-gray-200">
+												{/* Botones para reuniones EN CURSO */}
 												{isActive && (
 													<div className="flex gap-3">
 														<button
@@ -313,36 +313,15 @@ const MeetingsList = ({
 													</div>
 												)}
 
+												{/* Botones para reuniones PROGRAMADAS */}
 												{isProgrammed && (
-													canAccess ? (
-														<button
-															onClick={() => handleJoinMeeting && handleJoinMeeting(meeting)}
-															className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all font-semibold shadow-md hover:shadow-lg"
-														>
-															<Video size={20} />
-															<span>Acceder a la Reunión</span>
-														</button>
-													) : (
-														<div className="space-y-2">
-															<button
-																disabled
-																className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-200 text-gray-500 rounded-xl cursor-not-allowed font-semibold"
-															>
-																<Clock size={20} />
-																<span>Reunión Programada</span>
-															</button>
-															<div className="flex items-center gap-2 justify-center text-xs text-gray-500">
-																<AlertCircle size={14} />
-																<span>
-																	Disponible desde{' '}
-																	{new Date(meeting.fechaCompleta.getTime() - 60 * 60 * 1000).toLocaleTimeString('es-ES', {
-																		hour: '2-digit',
-																		minute: '2-digit',
-																	})}
-																</span>
-															</div>
-														</div>
-													)
+													<button
+														onClick={() => onStartMeeting && onStartMeeting(meeting)}
+														className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-semibold shadow-md hover:shadow-lg"
+													>
+														<PlayCircle size={20} />
+														<span>Iniciar Reunión</span>
+													</button>
 												)}
 											</div>
 										)}
@@ -491,7 +470,6 @@ const MeetingsList = ({
 							const statusInfo = getStatusInfo(reunion.estado);
 							const isActive = reunion.estado?.toLowerCase() === 'en curso' || reunion.estado?.toLowerCase() === 'activa';
 							const isProgrammed = reunion.estado?.toLowerCase() === 'programada';
-							const canAccess = isProgrammed && canAccessMeeting(reunion.fechaCompleta);
 
 							return (
 								<div
@@ -555,32 +533,13 @@ const MeetingsList = ({
 
 											{/* Botón para reuniones programadas */}
 											{isProgrammed && (
-												canAccess ? (
-													<button
-														onClick={() => handleJoinMeeting && handleJoinMeeting(reunion)}
-														className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold text-sm"
-													>
-														<PlayCircle size={18} />
-														Acceder a la Reunión
-													</button>
-												) : (
-													<div className="w-full">
-														<button
-															disabled
-															className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed font-semibold text-sm"
-														>
-															<Clock size={18} />
-															Disponible 1 hora antes
-														</button>
-														<p className="text-xs text-center text-gray-500 mt-2">
-															El acceso se habilitará a las{' '}
-															{new Date(reunion.fechaCompleta.getTime() - 60 * 60 * 1000).toLocaleTimeString('es-ES', {
-																hour: '2-digit',
-																minute: '2-digit',
-															})}
-														</p>
-													</div>
-												)
+												<button
+													onClick={() => onStartMeeting && onStartMeeting(reunion)}
+													className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
+												>
+													<PlayCircle size={18} />
+													Iniciar Reunión
+												</button>
 											)}
 										</>
 									)}
