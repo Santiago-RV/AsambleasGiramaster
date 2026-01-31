@@ -277,88 +277,84 @@ async def create_invitation(
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
     summary="Obtener invitaciones de una reunión",
-    description="Obtiene todas las invitaciones de una reunión específica con quorum base"
+    description="Obtiene todas las invitaciones de una reunión con quorum base y actual"
 )
 async def get_meeting_invitations(
     meeting_id: int,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtiene todas las invitaciones de una reunión con el quorum base de cada copropietario"""
+    """
+    Obtiene todas las invitaciones de una reunión con información completa.
+    
+    IMPORTANTE: Ahora retorna dec_quorum_base directamente desde meeting_invitations.
+    Ya NO requiere JOIN con user_residential_units.
+    
+    **Campos importantes en la respuesta:**
+    - dec_quorum_base: Peso/quorum ORIGINAL del usuario (no cambia)
+    - dec_voting_weight: Peso/quorum ACTUAL en la reunión (cambia con delegaciones)
+    - int_delegated_id: Si tiene valor, el usuario delegó su poder
+    """
     try:
         from app.models.meeting_invitation_model import MeetingInvitationModel
         from app.models.user_model import UserModel
         from app.models.data_user_model import DataUserModel
-        from app.models.user_residential_unit_model import UserResidentialUnitModel
-        from app.models.meeting_model import MeetingModel
-        from sqlalchemy import select, and_
+        from sqlalchemy import select
         
-        # PASO 1: Obtener el residential_unit_id de la reunión
-        meeting_query = select(MeetingModel.int_id_residential_unit).where(MeetingModel.id == meeting_id)
-        meeting_result = await db.execute(meeting_query)
-        residential_unit_id = meeting_result.scalar_one_or_none()
+        logger.info(f"📋 Obteniendo invitaciones de meeting_id={meeting_id}")
         
-        if not residential_unit_id:
-            logger.error(f"❌ No se encontró la reunión con ID {meeting_id}")
-            return SuccessResponse(
-                success=False,
-                status_code=status.HTTP_404_NOT_FOUND,
-                message=f"No se encontró la reunión con ID {meeting_id}",
-                data=[]
-            )
-        
-        logger.info(f"🔍 Buscando invitaciones para meeting_id={meeting_id}, residential_unit_id={residential_unit_id}")
-        
-        # PASO 2: Query corregido - los nombres están en DataUserModel
+        # Query simplificado - dec_quorum_base ya está en meeting_invitations
         query = (
             select(
                 MeetingInvitationModel,
-                DataUserModel.str_firstname,
-                DataUserModel.str_lastname,
-                DataUserModel.str_email,
-                UserResidentialUnitModel.dec_default_voting_weight
+                UserModel.str_firstname,
+                UserModel.str_lastname,
+                DataUserModel.str_email
             )
             .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-            .outerjoin(
-                UserResidentialUnitModel,
-                and_(
-                    UserResidentialUnitModel.int_user_id == UserModel.id,
-                    UserResidentialUnitModel.int_residential_unit_id == residential_unit_id
-                )
-            )
             .where(MeetingInvitationModel.int_meeting_id == meeting_id)
             .order_by(
-                DataUserModel.str_firstname.asc(),
-                DataUserModel.str_lastname.asc()
+                UserModel.str_firstname.asc(),
+                UserModel.str_lastname.asc()
             )
         )
 
         result = await db.execute(query)
         invitations_data = result.all()
 
-        logger.info(f"📊 Se encontraron {len(invitations_data)} registros")
-
-        # PASO 3: Formatear respuesta
+        # Formatear respuesta
         invitations = []
-        for invitation, firstname, lastname, email, quorum_base in invitations_data:
+        for invitation, firstname, lastname, email in invitations_data:
             invitation_dict = {
                 "id": invitation.id,
                 "int_meeting_id": invitation.int_meeting_id,
                 "int_user_id": invitation.int_user_id,
-                "dec_voting_weight": float(invitation.dec_voting_weight),  # Peso actual en la reunión
-                "dec_quorum_base": float(quorum_base) if quorum_base is not None else 0.0,  # Quorum base
+                
+                # 🔥 Campos de quorum
+                "dec_voting_weight": float(invitation.dec_voting_weight),  # Peso ACTUAL
+                "dec_quorum_base": float(invitation.dec_quorum_base),       # Peso ORIGINAL (BASE)
+                
+                # Información de apartamento
                 "str_apartment_number": invitation.str_apartment_number,
+                
+                # Estados
                 "str_invitation_status": invitation.str_invitation_status,
                 "str_response_status": invitation.str_response_status,
                 "bln_will_attend": invitation.bln_will_attend,
+                "bln_actually_attended": invitation.bln_actually_attended,
+                
+                # Delegación
                 "int_delegated_id": invitation.int_delegated_id,
+                
+                # Información del usuario
                 "str_firstname": firstname,
                 "str_lastname": lastname,
                 "str_email": email,
+                
+                # Fechas
                 "dat_sent_at": invitation.dat_sent_at,
                 "dat_responded_at": invitation.dat_responded_at,
-                "bln_actually_attended": invitation.bln_actually_attended,
                 "dat_joined_at": invitation.dat_joined_at,
                 "dat_left_at": invitation.dat_left_at,
                 "created_at": invitation.created_at,
@@ -368,7 +364,7 @@ async def get_meeting_invitations(
             
             logger.info(
                 f"  👤 {firstname} {lastname} - Apto: {invitation.str_apartment_number} - "
-                f"Quorum base: {quorum_base if quorum_base else 'N/A'} - "
+                f"Quorum base: {invitation.dec_quorum_base} - "
                 f"Peso actual: {invitation.dec_voting_weight}"
             )
 
@@ -389,3 +385,5 @@ async def get_meeting_invitations(
             message=f"Error al obtener las invitaciones: {str(e)}",
             details={"original_error": str(e)}
         )
+
+

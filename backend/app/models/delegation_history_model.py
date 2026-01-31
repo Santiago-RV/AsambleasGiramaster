@@ -36,7 +36,7 @@ class DelegationHistoryModel(Base):
     # Foreign Keys
     int_meeting_id = Column(
         Integer, 
-        ForeignKey("meetings.id", ondelete="CASCADE"),
+        ForeignKey("tbl_meetings.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="ID de la reunión donde se realizó la delegación"
@@ -44,7 +44,7 @@ class DelegationHistoryModel(Base):
     
     int_delegator_user_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey("tbl_users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="ID del usuario que CEDE su poder (origen)"
@@ -52,7 +52,7 @@ class DelegationHistoryModel(Base):
     
     int_delegate_user_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey("tbl_users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="ID del usuario que RECIBE el poder (destino)"
@@ -90,8 +90,8 @@ class DelegationHistoryModel(Base):
     # Auditoría
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=True)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=True)
 
     # Relationships
     meeting = relationship("MeetingModel", back_populates="delegation_history")
