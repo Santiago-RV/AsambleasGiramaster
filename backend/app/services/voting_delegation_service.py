@@ -102,8 +102,8 @@ class VotingDelegationService:
 
         return {
             "int_user_id": user.id,
-            "str_firstname": user.str_firstname,
-            "str_lastname": user.str_lastname,
+            "str_firstname": data_user.str_firstname,
+            "str_lastname": data_user.str_lastname,   
             "str_email": data_user.str_email
         }
 

@@ -212,6 +212,7 @@ class RateLimiter:
       "/api/v1/auth/register": {"max_requests": 3, "window_minutes": 60},  # Registro: 3 en 1 hora
       "/api/v1/residents/generate-auto-login": {"max_requests": 10, "window_minutes": 60},  # QR generation
       "/api/v1/residents/send-qr-email": {"max_requests": 10, "window_minutes": 60},  # Email QR
+      "/api/v1/delegations/": {"max_requests": 100, "window_minutes": 60},
     }
     
     # Buscar límite específico para el endpoint

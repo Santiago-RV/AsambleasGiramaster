@@ -112,7 +112,7 @@ export default function PowersManagementPage() {
     if (result.isConfirmed) {
       revokeDelegationMutation.mutate({
         meetingId: selectedMeeting.id,
-        delegatorId: delegation.delegator.id
+        delegatorId: delegation.delegator.int_user_id 
       });
     }
   };
@@ -176,11 +176,10 @@ export default function PowersManagementPage() {
                   <button
                     key={meeting.id}
                     onClick={() => setSelectedMeeting(meeting)}
-                    className={`text-left p-4 rounded-lg border-2 transition-all ${
-                      selectedMeeting?.id === meeting.id
-                        ? 'bg-blue-50 border-blue-500 shadow-md'
-                        : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
-                    }`}
+                    className={`text-left p-4 rounded-lg border-2 transition-all ${selectedMeeting?.id === meeting.id
+                      ? 'bg-blue-50 border-blue-500 shadow-md'
+                      : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -199,11 +198,10 @@ export default function PowersManagementPage() {
                         </div>
                       </div>
                       <ChevronRight
-                        className={`flex-shrink-0 ml-2 ${
-                          selectedMeeting?.id === meeting.id
-                            ? 'text-blue-600'
-                            : 'text-gray-400'
-                        }`}
+                        className={`flex-shrink-0 ml-2 ${selectedMeeting?.id === meeting.id
+                          ? 'text-blue-600'
+                          : 'text-gray-400'
+                          }`}
                         size={20}
                       />
                     </div>
