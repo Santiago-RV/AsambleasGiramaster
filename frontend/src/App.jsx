@@ -13,57 +13,59 @@ import './App.css';
 
 function App() {
 	return (
+		
 		<AppProvider>
-			<Routes>
-				{/* ========================================== */}
-				{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
-				{/* ========================================== */}
-				
-				{/* Ruta pública - Login */}
-				<Route path="/login" element={<Login />} />
-				
-				{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
-				<Route path="/auto-login/:token" element={<AutoLogin />} />
+			<div className="w-full min-h-screen overflow-x-hidden">
+				<Routes>
+					{/* ========================================== */}
+					{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
+					{/* ========================================== */}
+					
+					{/* Ruta pública - Login */}
+					<Route path="/login" element={<Login />} />
+					
+					{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
+					<Route path="/auto-login/:token" element={<AutoLogin />} />
 
-				{/* ========================================== */}
-				{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
-				{/* ========================================== */}
-				
-				<Route path="/" element={<ProtectedRoute />}>
-					{/* Ruta para Super Administrador */}
-					<Route
-						path="super-admin"
-						element={
-							<RoleBasedRoute allowedRoles={['Super Administrador']}>
-								<HomeSA />
-							</RoleBasedRoute>
-						}
-					/>
-
+					{/* ========================================== */}
+					{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
+					{/* ========================================== */}
+					
+					<Route path="/" element={<ProtectedRoute />}>
+						{/* Ruta para Super Administrador */}
 						<Route
-							path="admin"
+							path="super-admin"
 							element={
-								<RoleBasedRoute allowedRoles={['Administrador']}>
-									<AppAdmin />
+								<RoleBasedRoute allowedRoles={['Super Administrador']}>
+									<HomeSA />
 								</RoleBasedRoute>
 							}
 						/>
 
-					{/* Ruta para Copropietario/Usuario */}
-					<Route
-						path="copropietario"
-						element={
-							<RoleBasedRoute allowedRoles={['Usuario']}>
-								<AppCopropietario />
-							</RoleBasedRoute>
-						}
-					/>
+							<Route
+								path="admin"
+								element={
+									<RoleBasedRoute allowedRoles={['Administrador']}>
+										<AppAdmin />
+									</RoleBasedRoute>
+								}
+							/>
 
-						<Route index element={<Navigate to="/login" replace />} />
-					</Route>
+						{/* Ruta para Copropietario/Usuario */}
+						<Route
+							path="copropietario"
+							element={
+								<RoleBasedRoute allowedRoles={['Usuario']}>
+									<AppCopropietario />
+								</RoleBasedRoute>
+							}
+						/>
 
-					<Route path="*" element={<NotFound />} />
-				</Routes>
+							<Route index element={<Navigate to="/login" replace />} />
+						</Route>
+
+						<Route path="*" element={<NotFound />} />
+					</Routes>
 			</div>
 		</AppProvider>
 	);
