@@ -8,6 +8,20 @@ import { MeetingService } from '../../services/api/MeetingService';
 const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 	const [selectedSection, setSelectedSection] = useState('meetings'); // meetings | polls | profile
 
+	// OBTENER DATOS DEL USUARIO PARA VERIFICAR ROL
+	const { data: userData } = useQuery({
+		queryKey: ['user'],
+		queryFn: () => {
+			const user = localStorage.getItem('user');
+			return user ? JSON.parse(user) : null;
+		},
+		staleTime: Infinity, // Los datos del usuario no cambian frecuentemente
+	});
+
+	// DETECTAR SI ES INVITADO (ROL 4)
+	const userRole = userData?.role || "Usuario"; // Default: copropietario (3)
+	const isGuest = userRole === "Invitado";
+
 	// Obtener reuniones de la unidad residencial del copropietario
 	const {
 		data: meetingsData,
@@ -107,7 +121,7 @@ const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 		return (
 			<div className="space-y-4">
 				{meetingsData.map((meeting) => (
-					<MeetingCard key={meeting.id} meeting={meeting} />
+					<MeetingCard key={meeting.id} meeting={meeting} isGuest={isGuest} />
 				))}
 			</div>
 		);
@@ -118,7 +132,7 @@ const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 			<div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-12 text-center">
 				<FileText className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
 				<h3 className="text-xl font-semibold text-yellow-800 mb-2">
-					🚧 Módulo de Encuestas en Desarrollo
+					Módulo de Encuestas en Desarrollo
 				</h3>
 				<p className="text-yellow-700 mb-4">
 					Próximamente podrás participar en encuestas y votaciones desde aquí
@@ -128,10 +142,10 @@ const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 						<strong>Funcionalidades planeadas:</strong>
 					</p>
 					<ul className="text-sm text-gray-600 mt-2 space-y-1 text-left">
-						<li>✅ Ver encuestas activas</li>
-						<li>✅ Votar en tiempo real</li>
-						<li>✅ Ver resultados parciales</li>
-						<li>✅ Historial de votaciones</li>
+						<li>Ver encuestas activas</li>
+						<li>Votar en tiempo real</li>
+						<li>Ver resultados parciales</li>
+						<li>Historial de votaciones</li>
 					</ul>
 				</div>
 			</div>
@@ -142,8 +156,21 @@ const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 		<div className="min-h-screen bg-gray-50">
 			{/* Header */}
 			<div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 shadow-lg">
-				<h1 className="text-3xl font-bold">Dashboard Copropietario</h1>
-				<p className="text-blue-100 mt-1">Bienvenido a tu panel de control</p>
+				<h1 className="text-3xl font-bold">
+					{isGuest ? 'Dashboard Invitado' : 'Dashboard Copropietario'}
+				</h1>
+				<p className="text-blue-100 mt-1">
+					{isGuest 
+						? '👋 Bienvenido como invitado - Puede asistir a reuniones como observador' 
+						: 'Bienvenido a tu panel de control'}
+				</p>
+				{isGuest && (
+					<div className="mt-3 bg-blue-700/50 border border-blue-500 rounded-lg p-3">
+						<p className="text-sm text-blue-50">
+							Como invitado, puede asistir a las asambleas pero no puede participar en votaciones ni encuestas
+						</p>
+					</div>
+				)}
 			</div>
 
 			{/* Navigation Tabs */}
@@ -161,20 +188,24 @@ const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 							<Video size={20} />
 							Reuniones
 						</button>
-						<button
-							onClick={() => setSelectedSection('polls')}
-							className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all border-b-2 ${
-								selectedSection === 'polls'
-									? 'border-blue-600 text-blue-600'
-									: 'border-transparent text-gray-600 hover:text-gray-800'
-							}`}
-						>
-							<FileText size={20} />
-							Encuestas
-							<span className="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full">
-								Próximamente
-							</span>
-						</button>
+						
+						{/* OCULTAR TAB DE ENCUESTAS SI ES INVITADO (ROL 4) */}
+						{!isGuest && (
+							<button
+								onClick={() => setSelectedSection('polls')}
+								className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all border-b-2 ${
+									selectedSection === 'polls'
+										? 'border-blue-600 text-blue-600'
+										: 'border-transparent text-gray-600 hover:text-gray-800'
+								}`}
+							>
+								<FileText size={20} />
+								Encuestas
+								<span className="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full">
+									Próximamente
+								</span>
+							</button>
+						)}
 					</div>
 				</div>
 			</div>
@@ -182,14 +213,14 @@ const CopropietarioDashboard = ({ userId, residentialUnitId }) => {
 			{/* Content */}
 			<div className="container mx-auto px-6 py-8">
 				{selectedSection === 'meetings' && renderMeetingsSection()}
-				{selectedSection === 'polls' && renderPollsSection()}
+				{selectedSection === 'polls' && !isGuest && renderPollsSection()}
 			</div>
 		</div>
 	);
 };
 
 // Componente de tarjeta de reunión
-const MeetingCard = ({ meeting }) => {
+const MeetingCard = ({ meeting, isGuest = false }) => {
 	const getStatusColor = () => {
 		switch (meeting.status) {
 			case 'En Curso':
@@ -225,6 +256,12 @@ const MeetingCard = ({ meeting }) => {
 							<span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor()}`}>
 								{meeting.status}
 							</span>
+							{/* BADGE DE INVITADO */}
+							{isGuest && (
+								<span className="px-3 py-1 rounded-full text-xs font-semibold border bg-orange-100 text-orange-700 border-orange-300">
+									👁️ Observador
+								</span>
+							)}
 						</div>
 						{meeting.description && (
 							<p className="text-gray-600 text-sm mb-3">{meeting.description}</p>
@@ -269,7 +306,16 @@ const MeetingCard = ({ meeting }) => {
 					</div>
 				</div>
 
-				{meeting.status === 'En Curso' && (
+				{/* ALERTA ESPECIAL PARA INVITADOS */}
+				{isGuest && canJoin && (
+					<div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+						<p className="text-orange-800 font-semibold text-sm">
+							👁️ Como invitado, podrá observar la reunión pero no participar en votaciones
+						</p>
+					</div>
+				)}
+
+				{meeting.status === 'En Curso' && !isGuest && (
 					<div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
 						<div className="flex items-center gap-2">
 							<div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
@@ -280,10 +326,10 @@ const MeetingCard = ({ meeting }) => {
 					</div>
 				)}
 
-				{meeting.status === 'Disponible' && (
+				{meeting.status === 'Disponible' && !isGuest && (
 					<div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
 						<p className="text-green-800 font-semibold text-sm">
-							✅ Ya puedes unirte a la reunión
+							Ya puedes unirte a la reunión
 						</p>
 					</div>
 				)}
@@ -294,12 +340,17 @@ const MeetingCard = ({ meeting }) => {
 						disabled={!canJoin}
 						className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
 							canJoin
-								? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg'
+								? isGuest
+									? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-lg'
+									: 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg'
 								: 'bg-gray-200 text-gray-500 cursor-not-allowed'
 						}`}
 					>
 						<Video size={18} />
-						{meeting.status === 'En Curso' ? 'Unirse Ahora' : meeting.status === 'Disponible' ? 'Unirse' : 'No Disponible'}
+						{isGuest 
+							? (meeting.status === 'En Curso' ? 'Observar Ahora' : meeting.status === 'Disponible' ? 'Observar' : 'No Disponible')
+							: (meeting.status === 'En Curso' ? 'Unirse Ahora' : meeting.status === 'Disponible' ? 'Unirse' : 'No Disponible')
+						}
 					</button>
 
 					{meeting.zoomMeetingId && (

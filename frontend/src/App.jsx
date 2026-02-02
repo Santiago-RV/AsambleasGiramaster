@@ -14,22 +14,31 @@ import './App.css';
 function App() {
 	return (
 		<AppProvider>
-			<div className="w-full min-h-screen overflow-x-hidden">
-				<Routes>
-					{/* RUTAS PÚBLICAS */}
-					<Route path="/login" element={<Login />} />
-					<Route path="/auto-login/:token" element={<AutoLogin />} />
+			<Routes>
+				{/* ========================================== */}
+				{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
+				{/* ========================================== */}
+				
+				{/* Ruta pública - Login */}
+				<Route path="/login" element={<Login />} />
+				
+				{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
+				<Route path="/auto-login/:token" element={<AutoLogin />} />
 
-					{/* RUTAS PROTEGIDAS */}
-					<Route path="/" element={<ProtectedRoute />}>
-						<Route
-							path="super-admin"
-							element={
-								<RoleBasedRoute allowedRoles={['Super Administrador']}>
-									<HomeSA />
-								</RoleBasedRoute>
-							}
-						/>
+				{/* ========================================== */}
+				{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
+				{/* ========================================== */}
+				
+				<Route path="/" element={<ProtectedRoute />}>
+					{/* Ruta para Super Administrador */}
+					<Route
+						path="super-admin"
+						element={
+							<RoleBasedRoute allowedRoles={['Super Administrador']}>
+								<HomeSA />
+							</RoleBasedRoute>
+						}
+					/>
 
 						<Route
 							path="admin"
@@ -40,14 +49,15 @@ function App() {
 							}
 						/>
 
-						<Route
-							path="copropietario"
-							element={
-								<RoleBasedRoute allowedRoles={['Usuario']}>
-									<AppCopropietario />
-								</RoleBasedRoute>
-							}
-						/>
+					{/* Ruta para Copropietario/Usuario */}
+					<Route
+						path="copropietario"
+						element={
+							<RoleBasedRoute allowedRoles={['Usuario']}>
+								<AppCopropietario />
+							</RoleBasedRoute>
+						}
+					/>
 
 						<Route index element={<Navigate to="/login" replace />} />
 					</Route>

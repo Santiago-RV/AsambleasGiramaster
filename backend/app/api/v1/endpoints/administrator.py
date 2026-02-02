@@ -146,33 +146,237 @@ async def create_invitation(
         )
 
 
+# @router.get(
+#     "/meeting/{meeting_id}",
+#     response_model=SuccessResponse,
+#     status_code=status.HTTP_200_OK,
+#     summary="Obtener invitaciones de una reunión",
+#     description="Obtiene todas las invitaciones de una reunión específica"
+# )
+# async def get_meeting_invitations(
+#     meeting_id: int,
+#     current_user: str = Depends(get_current_user),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     """Obtiene todas las invitaciones de una reunión"""
+#     try:
+#         invitation_service = MeetingInvitationService(db)
+#         invitations = await invitation_service.get_invitations_by_meeting(meeting_id)
+
+#         return SuccessResponse(
+#             success=True,
+#             status_code=status.HTTP_200_OK,
+#             message="Invitaciones obtenidas correctamente",
+#             data=[MeetingInvitationResponse.from_orm(inv).dict() for inv in invitations]
+#         )
+
+#     except Exception as e:
+#         raise ServiceException(
+#             message=f"Error al obtener las invitaciones: {str(e)}",
+#             details={"original_error": str(e)}
+#         )
+
+# @router.get(
+#     "/meeting/{meeting_id}",
+#     response_model=SuccessResponse,
+#     status_code=status.HTTP_200_OK,
+#     summary="Obtener invitaciones de una reunión",
+#     description="Obtiene todas las invitaciones de una reunión específica con quorum base"
+# )
+# async def get_meeting_invitations(
+#     meeting_id: int,
+#     current_user: str = Depends(get_current_user),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     """Obtiene todas las invitaciones de una reunión con el quorum base de cada copropietario"""
+#     try:
+#         from app.models.meeting_invitation_model import MeetingInvitationModel
+#         from app.models.user_model import UserModel
+#         from app.models.data_user_model import DataUserModel
+#         from app.models.user_residential_unit_model import UserResidentialUnitModel
+#         from app.models.meeting_model import MeetingModel
+#         from sqlalchemy import select, and_
+        
+#         # Query con JOIN para obtener el quorum base
+#         query = (
+#             select(
+#                 MeetingInvitationModel,
+#                 UserModel.str_firstname,
+#                 UserModel.str_lastname,
+#                 DataUserModel.str_email,
+#                 UserResidentialUnitModel.dec_default_voting_weight.label('dec_quorum_base')
+#             )
+#             .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
+#             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+#             .outerjoin(
+#                 UserResidentialUnitModel,
+#                 and_(
+#                     UserResidentialUnitModel.int_user_id == UserModel.id,
+#                     UserResidentialUnitModel.int_residential_unit_id == (
+#                         select(MeetingModel.int_id_residential_unit)
+#                         .where(MeetingModel.id == meeting_id)
+#                         .scalar_subquery()
+#                     )
+#                 )
+#             )
+#             .where(MeetingInvitationModel.int_meeting_id == meeting_id)
+#             .order_by(
+#                 UserModel.str_firstname.asc(),
+#                 UserModel.str_lastname.asc()
+#             )
+#         )
+
+#         result = await db.execute(query)
+#         invitations_data = result.all()
+
+#         # Formatear respuesta
+#         invitations = []
+#         for invitation, firstname, lastname, email, quorum_base in invitations_data:
+#             invitation_dict = {
+#                 "id": invitation.id,
+#                 "int_meeting_id": invitation.int_meeting_id,
+#                 "int_user_id": invitation.int_user_id,
+#                 "dec_voting_weight": float(invitation.dec_voting_weight),  # Peso actual en la reunión
+#                 "dec_quorum_base": float(quorum_base) if quorum_base is not None else 0.0,  # NUEVO: Quorum base
+#                 "str_apartment_number": invitation.str_apartment_number,
+#                 "str_invitation_status": invitation.str_invitation_status,
+#                 "str_response_status": invitation.str_response_status,
+#                 "bln_will_attend": invitation.bln_will_attend,
+#                 "int_delegated_id": invitation.int_delegated_id,
+#                 "str_firstname": firstname,
+#                 "str_lastname": lastname,
+#                 "str_email": email,
+#                 "dat_sent_at": invitation.dat_sent_at,
+#                 "dat_responded_at": invitation.dat_responded_at,
+#                 "bln_actually_attended": invitation.bln_actually_attended,
+#                 "dat_joined_at": invitation.dat_joined_at,
+#                 "dat_left_at": invitation.dat_left_at,
+#                 "created_at": invitation.created_at,
+#                 "updated_at": invitation.updated_at
+#             }
+#             invitations.append(invitation_dict)
+
+#         logger.info(f"✅ Se encontraron {len(invitations)} invitaciones para meeting_id={meeting_id}")
+
+#         return SuccessResponse(
+#             success=True,
+#             status_code=status.HTTP_200_OK,
+#             message=f"Se encontraron {len(invitations)} invitaciones",
+#             data=invitations
+#         )
+
+#     except Exception as e:
+#         logger.error(f"❌ Error al obtener invitaciones: {str(e)}")
+#         raise ServiceException(
+#             message=f"Error al obtener las invitaciones: {str(e)}",
+#             details={"original_error": str(e)}
+#         )
+
 @router.get(
     "/meeting/{meeting_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
     summary="Obtener invitaciones de una reunión",
-    description="Obtiene todas las invitaciones de una reunión específica"
+    description="Obtiene todas las invitaciones con quorum base desde UserResidentialUnitModel"
 )
 async def get_meeting_invitations(
     meeting_id: int,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtiene todas las invitaciones de una reunión"""
+    """
+    Obtiene invitaciones con quorum base desde la relación user_residential_unit.
+    """
     try:
-        invitation_service = MeetingInvitationService(db)
-        invitations = await invitation_service.get_invitations_by_meeting(meeting_id)
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from app.models.meeting_model import MeetingModel
+        from sqlalchemy import select, and_
+        
+        logger.info(f"📋 Obteniendo invitaciones de meeting_id={meeting_id}")
+        
+        # ✅ Query CON JOIN a UserResidentialUnitModel para obtener quorum base
+        query = (
+            select(
+                MeetingInvitationModel,
+                DataUserModel.str_firstname,
+                DataUserModel.str_lastname,
+                DataUserModel.str_email,
+                UserResidentialUnitModel.dec_default_voting_weight.label('dec_quorum_base')  # ✅ QUORUM BASE
+            )
+            .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .outerjoin(
+                UserResidentialUnitModel,
+                and_(
+                    UserResidentialUnitModel.int_user_id == UserModel.id,
+                    UserResidentialUnitModel.int_residential_unit_id == (
+                        select(MeetingModel.int_id_residential_unit)
+                        .where(MeetingModel.id == meeting_id)
+                        .scalar_subquery()
+                    )
+                )
+            )
+            .where(MeetingInvitationModel.int_meeting_id == meeting_id)
+            .order_by(
+                DataUserModel.str_firstname.asc(),
+                DataUserModel.str_lastname.asc()
+            )
+        )
+
+        result = await db.execute(query)
+        invitations_data = result.all()
+
+        # ✅ Formatear respuesta con quorum base
+        invitations = []
+        for invitation, firstname, lastname, email, quorum_base in invitations_data:
+            invitation_dict = {
+                "id": invitation.id,
+                "int_meeting_id": invitation.int_meeting_id,
+                "int_user_id": invitation.int_user_id,
+                
+                # ✅ Quorum: actual (dec_voting_weight) y base (desde UserResidentialUnit)
+                "dec_voting_weight": float(invitation.dec_voting_weight),  
+                "dec_quorum_base": float(quorum_base) if quorum_base is not None else 0.0,  # ✅ QUORUM BASE
+                
+                "str_apartment_number": invitation.str_apartment_number,
+                "str_invitation_status": invitation.str_invitation_status,
+                "str_response_status": invitation.str_response_status,
+                "bln_will_attend": invitation.bln_will_attend,
+                "bln_actually_attended": invitation.bln_actually_attended,
+                "int_delegated_id": invitation.int_delegated_id,
+                
+                # Info de usuario desde DataUserModel
+                "str_firstname": firstname,
+                "str_lastname": lastname,
+                "str_email": email,
+                
+                # Fechas
+                "dat_sent_at": invitation.dat_sent_at,
+                "dat_responded_at": invitation.dat_responded_at,
+                "dat_joined_at": invitation.dat_joined_at,
+                "dat_left_at": invitation.dat_left_at,
+                "created_at": invitation.created_at,
+                "updated_at": invitation.updated_at
+            }
+            invitations.append(invitation_dict)
+
+        logger.info(f"✅ Retornando {len(invitations)} invitaciones con quorum base")
 
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
-            message="Invitaciones obtenidas correctamente",
-            data=[MeetingInvitationResponse.from_orm(inv).dict() for inv in invitations]
+            message=f"Se encontraron {len(invitations)} invitaciones",
+            data=invitations
         )
 
     except Exception as e:
+        logger.error(f"❌ Error al obtener invitaciones: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise ServiceException(
             message=f"Error al obtener las invitaciones: {str(e)}",
             details={"original_error": str(e)}
         )
-

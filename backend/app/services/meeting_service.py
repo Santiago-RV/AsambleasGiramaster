@@ -1,3 +1,4 @@
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -9,6 +10,9 @@ import time
 
 from app.models.meeting_model import MeetingModel
 from app.models.residential_unit_model import ResidentialUnitModel
+from app.models.meeting_invitation_model import MeetingInvitationModel
+from app.models.user_residential_unit_model import UserResidentialUnitModel
+from app.models.user_model import UserModel
 from app.core.exceptions import ResourceNotFoundException, ServiceException
 from app.services.zoom_api_service import ZoomAPIService
 from app.core.logging_config import get_logger
@@ -51,13 +55,13 @@ class MeetingService:
                 ).where(MeetingModel.id == meeting_id)
             )
             meeting = result.scalar_one_or_none()
-            
+
             if not meeting:
                 raise ResourceNotFoundException(
                     message=f"Reunión con ID {meeting_id} no encontrada",
                     details={"meeting_id": meeting_id}
                 )
-            
+
             return meeting
         except ResourceNotFoundException:
             raise
@@ -65,6 +69,27 @@ class MeetingService:
             raise ServiceException(
                 message=f"Error al obtener la reunión: {str(e)}",
                 details={"original_error": str(e)}
+            )
+
+    async def get_meetings_by_residential_unit(self, residential_unit_id: int) -> List[MeetingModel]:
+        """
+        Obtiene todas las reuniones de una unidad residencial.
+        Retorna reuniones en curso y programadas (para encuestas).
+        """
+        try:
+            result = await self.db.execute(
+                select(MeetingModel).options(
+                    selectinload(MeetingModel.residential_unit)
+                ).where(
+                    MeetingModel.int_id_residential_unit == residential_unit_id
+                ).order_by(MeetingModel.dat_schedule_date.desc())
+            )
+            meetings = result.scalars().all()
+            return list(meetings)
+        except Exception as e:
+            raise ServiceException(
+                message=f"Error al obtener las reuniones de la unidad residencial: {str(e)}",
+                details={"original_error": str(e), "residential_unit_id": residential_unit_id}
             )
 
     async def create_meeting(
@@ -160,19 +185,20 @@ class MeetingService:
                     "en el .env para crear reuniones reales."
                 )
 
-            # Contar copropietarios de la unidad residencial antes de crear la reunión
-            from app.models.user_residential_unit_model import UserResidentialUnitModel
-            from app.models.user_model import UserModel
-
-            count_query = select(UserModel).join(
+            # Obtener copropietarios de la unidad residencial con sus datos
+            copropietarios_query = select(
+                UserModel,
+                UserResidentialUnitModel
+            ).join(
                 UserResidentialUnitModel,
                 UserModel.id == UserResidentialUnitModel.int_user_id
             ).where(
                 UserResidentialUnitModel.int_residential_unit_id == residential_unit_id,
                 UserModel.bln_allow_entry == True
             )
-            count_result = await self.db.execute(count_query)
-            total_copropietarios = len(count_result.scalars().all())
+            copropietarios_result = await self.db.execute(copropietarios_query)
+            copropietarios_data = copropietarios_result.all()
+            total_copropietarios = len(copropietarios_data)
 
             logger.info(f"📊 Total de copropietarios en la unidad residencial: {total_copropietarios}")
 
@@ -202,7 +228,38 @@ class MeetingService:
             self.db.add(new_meeting)
             await self.db.commit()
             await self.db.refresh(new_meeting)
-            
+
+            # Crear invitaciones en tbl_meeting_invitations para cada copropietario
+            logger.info(f"📨 Creando {total_copropietarios} invitaciones en base de datos...")
+            invitations_created = 0
+            for user, user_residential_unit in copropietarios_data:
+                try:
+                    # Calcular quorum base
+                    quorum_base = user_residential_unit.dec_default_voting_weight or Decimal('1.0')
+
+                    invitation = MeetingInvitationModel(
+                        int_meeting_id=new_meeting.id,
+                        int_user_id=user.id,
+                        dec_voting_weight=quorum_base,           
+                        dec_quorum_base=quorum_base,             
+                        str_apartment_number=user_residential_unit.str_apartment_number or "N/A",
+                        str_invitation_status="pending",
+                        str_response_status="no_response",
+                        dat_sent_at=datetime.now(),
+                        int_delivery_attemps=0,
+                        bln_will_attend=False,
+                        bln_actually_attended=False,
+                        created_by=user_id,
+                        updated_by=user_id
+                    )
+                    self.db.add(invitation)
+                    invitations_created += 1
+                except Exception as inv_error:
+                    logger.warning(f"Error al crear invitación para usuario {user.id}: {inv_error}")
+
+            await self.db.commit()
+            logger.info(f"✅ {invitations_created} invitaciones creadas en base de datos")
+
             # Recargar con la relación residential_unit
             result = await self.db.execute(
                 select(MeetingModel).options(
@@ -210,7 +267,7 @@ class MeetingService:
                 ).where(MeetingModel.id == new_meeting.id)
             )
             meeting_with_relations = result.scalar_one()
-            
+
             # Enviar invitaciones por correo automáticamente
             try:
                 from app.services.email_service import email_service
@@ -323,20 +380,29 @@ class MeetingService:
             )
 
     async def start_meeting(self, meeting_id: int, user_id: int) -> MeetingModel:
-        """Inicia una reunión"""
+        """
+        Inicia una reunión.
+        Solo cambia el estado si la reunión está en estado 'Programada'.
+        Si ya está 'En Curso', simplemente retorna la reunión sin modificar.
+        """
         try:
             meeting = await self.get_meeting_by_id(meeting_id)
-            
-            meeting.str_status = "En curso"
-            meeting.dat_actual_start_time = datetime.now()
-            meeting.updated_at = datetime.now()
-            meeting.updated_by = user_id
-            
-            await self.db.commit()
-            await self.db.refresh(meeting)
-            
+
+            # Solo iniciar si está en estado Programada
+            if meeting.str_status == "Programada":
+                meeting.str_status = "En Curso"
+                meeting.dat_actual_start_time = datetime.now()
+                meeting.updated_at = datetime.now()
+                meeting.updated_by = user_id
+
+                await self.db.commit()
+                await self.db.refresh(meeting)
+                logger.info(f"✅ Reunión {meeting_id} iniciada - Estado: En Curso")
+            else:
+                logger.info(f"ℹ️ Reunión {meeting_id} ya está en estado: {meeting.str_status}")
+
             return meeting
-            
+
         except ResourceNotFoundException:
             raise
         except Exception as e:
@@ -347,20 +413,29 @@ class MeetingService:
             )
 
     async def end_meeting(self, meeting_id: int, user_id: int) -> MeetingModel:
-        """Finaliza una reunión"""
+        """
+        Finaliza una reunión.
+        Solo cambia el estado si la reunión está 'En Curso'.
+        Si ya está 'Completada', simplemente retorna la reunión sin modificar.
+        """
         try:
             meeting = await self.get_meeting_by_id(meeting_id)
-            
-            meeting.str_status = "Completada"
-            meeting.dat_actual_end_time = datetime.now()
-            meeting.updated_at = datetime.now()
-            meeting.updated_by = user_id
-            
-            await self.db.commit()
-            await self.db.refresh(meeting)
-            
+
+            # Solo finalizar si está en curso
+            if meeting.str_status == "En Curso":
+                meeting.str_status = "Completada"
+                meeting.dat_actual_end_time = datetime.now()
+                meeting.updated_at = datetime.now()
+                meeting.updated_by = user_id
+
+                await self.db.commit()
+                await self.db.refresh(meeting)
+                logger.info(f"✅ Reunión {meeting_id} finalizada - Estado: Completada")
+            else:
+                logger.info(f"ℹ️ Reunión {meeting_id} no está en curso, estado actual: {meeting.str_status}")
+
             return meeting
-            
+
         except ResourceNotFoundException:
             raise
         except Exception as e:
@@ -368,5 +443,108 @@ class MeetingService:
             raise ServiceException(
                 message=f"Error al finalizar la reunión: {str(e)}",
                 details={"original_error": str(e)}
+            )
+
+    async def register_attendance(self, meeting_id: int, user_id: int) -> dict:
+        """
+        Registra la asistencia de un usuario a una reunión.
+        Actualiza dat_joined_at y bln_actually_attended en tbl_meeting_invitations.
+        Solo registra si el usuario no ha sido registrado previamente.
+        """
+        try:
+            # Buscar la invitación del usuario para esta reunión
+            query = select(MeetingInvitationModel).where(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_user_id == user_id
+            )
+            result = await self.db.execute(query)
+            invitation = result.scalar_one_or_none()
+
+            if not invitation:
+                logger.warning(f"⚠️ No se encontró invitación para usuario {user_id} en reunión {meeting_id}")
+                return {
+                    "success": False,
+                    "message": "No se encontró invitación para este usuario",
+                    "already_registered": False
+                }
+
+            # Solo registrar si no se ha registrado antes
+            if invitation.dat_joined_at is None:
+                invitation.dat_joined_at = datetime.now()
+                invitation.bln_actually_attended = True
+                invitation.str_response_status = "attended"
+                invitation.updated_at = datetime.now()
+                invitation.updated_by = user_id
+
+                await self.db.commit()
+                await self.db.refresh(invitation)
+
+                logger.info(f"✅ Asistencia registrada: Usuario {user_id} en reunión {meeting_id} a las {invitation.dat_joined_at}")
+
+                return {
+                    "success": True,
+                    "message": "Asistencia registrada correctamente",
+                    "already_registered": False,
+                    "joined_at": invitation.dat_joined_at.isoformat()
+                }
+            else:
+                logger.info(f"ℹ️ Usuario {user_id} ya registrado en reunión {meeting_id} desde {invitation.dat_joined_at}")
+                return {
+                    "success": True,
+                    "message": "Usuario ya registrado previamente",
+                    "already_registered": True,
+                    "joined_at": invitation.dat_joined_at.isoformat()
+                }
+
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"❌ Error al registrar asistencia: {str(e)}")
+            raise ServiceException(
+                message=f"Error al registrar asistencia: {str(e)}",
+                details={"original_error": str(e), "meeting_id": meeting_id, "user_id": user_id}
+            )
+
+    async def register_leave(self, meeting_id: int, user_id: int) -> dict:
+        """
+        Registra la hora de salida de un usuario de una reunión.
+        Actualiza dat_left_at en tbl_meeting_invitations.
+        """
+        try:
+            # Buscar la invitación del usuario para esta reunión
+            query = select(MeetingInvitationModel).where(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_user_id == user_id
+            )
+            result = await self.db.execute(query)
+            invitation = result.scalar_one_or_none()
+
+            if not invitation:
+                logger.warning(f"⚠️ No se encontró invitación para usuario {user_id} en reunión {meeting_id}")
+                return {
+                    "success": False,
+                    "message": "No se encontró invitación para este usuario"
+                }
+
+            invitation.dat_left_at = datetime.now()
+            invitation.updated_at = datetime.now()
+            invitation.updated_by = user_id
+
+            await self.db.commit()
+            await self.db.refresh(invitation)
+
+            logger.info(f"👋 Salida registrada: Usuario {user_id} de reunión {meeting_id} a las {invitation.dat_left_at}")
+
+            return {
+                "success": True,
+                "message": "Hora de salida registrada correctamente",
+                "left_at": invitation.dat_left_at.isoformat()
+            }
+
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"❌ Error al registrar salida: {str(e)}")
+            raise ServiceException(
+                message=f"Error al registrar salida: {str(e)}",
+                details={"original_error": str(e), "meeting_id": meeting_id, "user_id": user_id}
             )
 

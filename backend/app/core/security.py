@@ -142,7 +142,7 @@ class SecurityManager:
 security_manager = SecurityManager()
 
 class RateLimiter:
-  """ Gestiona el límite de solicitudes """
+  """ Gestiona el límite de solicitudes con seguridad mejorada """
 
   def __init__(self):
     self.request_counts = {}
@@ -152,11 +152,24 @@ class RateLimiter:
     key: str,
     max_requests: int = 50,
     window_minutes: int = 60,
-  ) -> bool:
-    """ Verifica si la solicitud está permitida """
+  ) -> tuple[bool, dict]:
+    """ 
+    Verifica si la solicitud está permitida
+    
+    Returns:
+      tuple: (permitido, info_adicional)
+      info_adicional contiene: remaining_requests, reset_time
+    """
 
     current_time = datetime.now()
     window_start = current_time - timedelta(minutes=window_minutes)
+
+    # Sanitizar key para evitar inyección
+    if not key or not isinstance(key, str):
+      key = f"unknown_{current_time.timestamp()}"
+
+    # Limitar longitud del key para prevenir DOS
+    key = key[:100] if len(key) > 100 else key
 
     # Limpiar registros antiguos
     if key in self.request_counts:
@@ -167,12 +180,50 @@ class RateLimiter:
     else:
       self.request_counts[key] = []
 
+    # Contar solicitudes actuales
+    current_requests = len(self.request_counts[key])
+    
     # Verificar límite
-    if len(self.request_counts[key]) >= max_requests:
-      return False
+    if current_requests >= max_requests:
+      reset_time = window_start + timedelta(minutes=window_minutes)
+      return False, {
+        "remaining_requests": 0,
+        "reset_time": reset_time.isoformat(),
+        "limit": max_requests,
+        "window": window_minutes
+      }
     
     # Registrar nueva solicitud
     self.request_counts[key].append(current_time)
-    return True
+    
+    return True, {
+      "remaining_requests": max_requests - current_requests - 1,
+      "reset_time": (window_start + timedelta(minutes=window_minutes)).isoformat(),
+      "limit": max_requests,
+      "window": window_minutes
+    }
+
+  def get_limits_for_endpoint(self, endpoint_path: str) -> dict:
+    """ Retorna límites específicos por endpoint """
+    
+    # Configuración de límites por endpoint
+    endpoint_limits = {
+      "/api/v1/auth/login": {"max_requests": 5, "window_minutes": 15},  # Login: 5 intentos en 15 min
+      "/api/v1/auth/register": {"max_requests": 3, "window_minutes": 60},  # Registro: 3 en 1 hora
+      "/api/v1/residents/generate-auto-login": {"max_requests": 10, "window_minutes": 60},  # QR generation
+      "/api/v1/residents/send-qr-email": {"max_requests": 10, "window_minutes": 60},  # Email QR
+      "/api/v1/delegations/": {"max_requests": 100, "window_minutes": 60},
+    }
+    
+    # Buscar límite específico para el endpoint
+    for pattern, limits in endpoint_limits.items():
+      if pattern in endpoint_path or endpoint_path in pattern:
+        return limits
+    
+    # Límites por defecto según método HTTP
+    if "POST" in endpoint_path or "PUT" in endpoint_path or "DELETE" in endpoint_path:
+      return {"max_requests": 30, "window_minutes": 60}  # Operaciones de escritura más restrictivas
+    else:
+      return {"max_requests": 100, "window_minutes": 60}  # Operaciones de lectura más permisivas
 
 rate_limiter = RateLimiter()

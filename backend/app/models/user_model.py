@@ -21,3 +21,9 @@ class UserModel(Base):
 
     data_user = relationship("DataUserModel", back_populates="users")
     rol = relationship("RolModel", back_populates="users")
+
+    # Relationships for cascade delete
+    email_notifications = relationship("EmailNotificationModel", cascade="all, delete-orphan", passive_deletes=True)
+    meeting_invitations = relationship("MeetingInvitationModel", foreign_keys="MeetingInvitationModel.int_user_id", cascade="all, delete-orphan", passive_deletes=True)
+    meeting_attendances = relationship("MeetingAttendanceModel", cascade="all, delete-orphan", passive_deletes=True)
+    poll_responses = relationship("PollResponseModel", cascade="all, delete-orphan", passive_deletes=True)

@@ -29,6 +29,58 @@ export class PollService {
   }
 
   /**
+ * Obtener encuestas de todas las reuniones de una unidad residencial
+ * @param {number} residentialUnitId - ID de la unidad residencial
+ * @returns {Promise}
+ */
+  static async getPollsByResidentialUnit(residentialUnitId) {
+    try {
+      // 1. Obtener todas las reuniones de la unidad
+      const meetingsResponse = await axiosInstance.get(`/meetings/residential-unit/${residentialUnitId}`);
+
+      if (!meetingsResponse.data.success || !meetingsResponse.data.data) {
+        return { success: true, data: [] };
+      }
+
+      const meetings = meetingsResponse.data.data;
+
+      // 2. Obtener encuestas de cada reunión
+      const pollsPromises = meetings.map(meeting =>
+        this.getPollsByMeeting(meeting.id).catch(() => ({ success: false, data: [] }))
+      );
+
+      const pollsResponses = await Promise.all(pollsPromises);
+
+      // 3. Combinar todas las encuestas con información de la reunión
+      const allPolls = [];
+      pollsResponses.forEach((pollsResponse, index) => {
+        if (pollsResponse.success && pollsResponse.data) {
+          const meeting = meetings[index];
+          pollsResponse.data.forEach(poll => {
+            allPolls.push({
+              ...poll,
+              meeting: {
+                id: meeting.id,
+                str_title: meeting.str_title,
+                dat_schedule_date: meeting.dat_schedule_date
+              }
+            });
+          });
+        }
+      });
+
+      // 4. Ordenar por fecha de creación (más recientes primero)
+      allPolls.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      console.log('📊 [PollService] Encuestas obtenidas:', allPolls.length);
+      return { success: true, data: allPolls };
+    } catch (error) {
+      console.error('Error al obtener encuestas de la unidad:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
    * Obtener una encuesta por ID (requiere autenticación)
    * @param {number} pollId - ID de la encuesta
    * @returns {Promise}
@@ -166,8 +218,8 @@ export class PollService {
 
       // Esperar a que todos los votos se envíen
       const responses = await Promise.all(votePromises);
-      
-      console.log('✅ [PollService] Todos los votos enviados:', responses.length);
+
+      console.log('[PollService] Todos los votos enviados:', responses.length);
 
       // Retornar el último response (o el primero para single choice)
       return responses[responses.length - 1].data;
@@ -301,6 +353,7 @@ export class PollService {
 
   /**
    * Obtener reuniones en vivo para gestión de encuestas
+   * Incluye reuniones en curso y programadas para la próxima hora
    */
   static async getLiveMeetings(residentialUnitId) {
     const response = await axiosInstance.get(`/meetings/residential-unit/${residentialUnitId}`);
@@ -310,9 +363,26 @@ export class PollService {
       const ONE_HOUR_MS = 60 * 60 * 1000;
 
       const liveMeetings = response.data.data.filter((meeting) => {
-        const isValidStatus = meeting.str_status === 'Programada' || meeting.str_status === 'En Curso';
-        console.log('🔍 [getLiveMeetings] Reunión:', meeting.str_title, '- Status válido:', isValidStatus, '- Estado:', meeting.str_status);
-        return isValidStatus;
+        const status = (meeting.str_status || '').toLowerCase();
+
+        // Reuniones en curso siempre se muestran
+        if (status === 'en curso') {
+          console.log('🔍 [getLiveMeetings] Reunión en curso:', meeting.str_title);
+          return true;
+        }
+
+        // Reuniones programadas: mostrar si están dentro de la próxima hora
+        if (status === 'programada') {
+          const scheduleDate = new Date(meeting.dat_schedule_date);
+          const timeDiff = scheduleDate.getTime() - now.getTime();
+
+          // Mostrar si la reunión está programada para dentro de una hora o ya pasó la hora (pero aún está programada)
+          const isWithinOneHour = timeDiff <= ONE_HOUR_MS && timeDiff >= -ONE_HOUR_MS;
+          console.log('🔍 [getLiveMeetings] Reunión programada:', meeting.str_title, '- Fecha:', scheduleDate, '- Dentro de 1 hora:', isWithinOneHour);
+          return isWithinOneHour;
+        }
+
+        return false;
       });
 
       console.log('📊 [getLiveMeetings] Reuniones filtradas:', liveMeetings.length);

@@ -257,17 +257,19 @@ class UserService:
         self,
         user_id: int,
         unit_id: int,
-        send_email: bool = True
+        send_email: bool = True,
+        is_super_admin: bool = False
     ) -> dict:
         """
         Habilita el acceso de un copropietario al sistema.
         Usado por: POST /admin/coowners/{coowner_id}/enable
-        
+
         Args:
             user_id: ID del copropietario
             unit_id: ID de la unidad residencial
             send_email: Si se debe enviar correo de notificación
-        
+            is_super_admin: Si es SuperAdmin puede modificar acceso de administradores
+
         Returns:
             dict: Información del copropietario habilitado
         """
@@ -305,13 +307,13 @@ class UserService:
                     error_code="COOWNER_NOT_IN_UNIT"
                 )
             
-            # Verificar que no sea un administrador
-            if user.int_id_rol == 2:
+            # Verificar que no sea un administrador (solo si no es SuperAdmin)
+            if user.int_id_rol == 2 and not is_super_admin:
                 raise ServiceException(
                     message="No se puede modificar el acceso de un administrador",
                     details={"user_id": user_id, "role_id": user.int_id_rol}
                 )
-            
+
             # Si ya está habilitado, no hacer nada
             if user.bln_allow_entry:
                 return {
@@ -366,17 +368,19 @@ class UserService:
         self,
         user_id: int,
         unit_id: int,
-        send_email: bool = True
+        send_email: bool = True,
+        is_super_admin: bool = False
     ) -> dict:
         """
         Deshabilita el acceso de un copropietario al sistema.
         Usado por: POST /admin/coowners/{coowner_id}/disable
-        
+
         Args:
             user_id: ID del copropietario
             unit_id: ID de la unidad residencial
             send_email: Si se debe enviar correo de notificación
-        
+            is_super_admin: Si es SuperAdmin puede modificar acceso de administradores
+
         Returns:
             dict: Información del copropietario deshabilitado
         """
@@ -413,14 +417,14 @@ class UserService:
                     message="El copropietario no pertenece a esta unidad residencial",
                     error_code="COOWNER_NOT_IN_UNIT"
                 )
-            
-            # Verificar que no sea un administrador
-            if user.int_id_rol == 2:
+
+            # Verificar que no sea un administrador (solo si no es SuperAdmin)
+            if user.int_id_rol == 2 and not is_super_admin:
                 raise ServiceException(
                     message="No se puede modificar el acceso de un administrador",
                     details={"user_id": user_id, "role_id": user.int_id_rol}
                 )
-            
+
             # Si ya está deshabilitado, no hacer nada
             if not user.bln_allow_entry:
                 return {

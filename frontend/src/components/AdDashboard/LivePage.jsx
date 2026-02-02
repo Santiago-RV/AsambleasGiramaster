@@ -54,16 +54,16 @@ export default function LivePage() {
 
   return (
     <section className="space-y-6">
-      <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl shadow-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl shadow-lg p-6 text-white">
         <h2 className="text-2xl font-bold mb-2">Gestión de Encuestas</h2>
-        <p className="text-purple-100">
+        <p className="text-green-100">
           Selecciona una reunión en vivo para crear encuestas y votaciones
         </p>
       </div>
 
       {(isLoadingMeetings || isLoadingUnit) && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-purple-600" size={48} />
+          <Loader2 className="animate-spin text-green-600" size={48} />
         </div>
       )}
 

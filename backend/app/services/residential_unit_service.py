@@ -233,6 +233,8 @@ class ResidentialUnitService:
                     "is_external_delegate": user.bln_is_external_delegate,
                     "user_temporary": user.bln_user_temporary,
                     "is_active": user.bln_allow_entry,  # ← CAMBIO: usar bln_allow_entry
+                    "bln_allow_entry": user.bln_allow_entry,
+                    "int_id_rol": user.int_id_rol,  # 1: SuperAdmin, 2: Admin, 3: Copropietario, 4: Invitado
                     "created_at": user.created_at,
                 })
             
@@ -981,7 +983,7 @@ class ResidentialUnitService:
             if 'password' in update_data and update_data['password']:
                 hashed_password = security_manager.create_password_hash(update_data['password'])
                 user.str_password_hash = hashed_password
-                logger.info(f"🔐 Contraseña actualizada para {user.str_username}")
+                logger.info(f"Contraseña actualizada para {user.str_username}")
             
             # Actualizar estado de acceso
             if 'is_active' in update_data and update_data['is_active'] is not None:
@@ -1228,7 +1230,7 @@ class ResidentialUnitService:
             
             user, data_user, user_unit = user_data
             
-            logger.info(f"✅ Usuario encontrado: {user.str_username} ({data_user.str_email})")
+            logger.info(f"Usuario encontrado: {user.str_username} ({data_user.str_email})")
             
             # ============================================
             # PASO 2: Obtener información de la unidad residencial
@@ -1240,7 +1242,7 @@ class ResidentialUnitService:
                     error_code="RESIDENTIAL_UNIT_NOT_FOUND"
                 )
             
-            logger.info(f"✅ Unidad residencial: {residential_unit.str_name}")
+            logger.info(f"Unidad residencial: {residential_unit.str_name}")
             
             # ============================================
             # PASO 3: Generar nueva contraseña temporal
@@ -1252,7 +1254,7 @@ class ResidentialUnitService:
             alphabet = string.ascii_letters + string.digits + "!@#$%"
             temporary_password = ''.join(secrets.choice(alphabet) for i in range(12))
             
-            logger.info(f"🔐 Contraseña temporal generada para {data_user.str_email}")
+            logger.info(f"Contraseña temporal generada para {data_user.str_email}")
             
             # ============================================
             # PASO 4: Generar JWT de auto-login
@@ -1263,7 +1265,7 @@ class ResidentialUnitService:
                 expiration_hours=48
             )
             
-            logger.info(f"🔑 JWT de auto-login generado para {user.str_username}")
+            logger.info(f"JWT de auto-login generado para {user.str_username}")
             
             # ============================================
             # PASO 5: Actualizar contraseña en la base de datos
@@ -1275,10 +1277,10 @@ class ResidentialUnitService:
             # COMMIT O FLUSH según el modo
             if auto_commit:
                 await self.db.commit()
-                logger.info(f"✅ Contraseña actualizada y confirmada (commit) para user_id={user_id}")
+                logger.info(f"Contraseña actualizada y confirmada (commit) para user_id={user_id}")
             else:
                 await self.db.flush()
-                logger.info(f"✅ Contraseña actualizada (flush) para user_id={user_id}")
+                logger.info(f"Contraseña actualizada (flush) para user_id={user_id}")
             
             # ============================================
             # PASO 6: Registrar notificación en estado "pending"
@@ -1295,7 +1297,7 @@ class ResidentialUnitService:
                 )
                 
                 logger.info(
-                    f"📧 Notificación creada (ID: {notification.id}) para {data_user.str_email}"
+                    f"Notificación creada (ID: {notification.id}) para {data_user.str_email}"
                 )
                 
                 # ============================================
@@ -1329,7 +1331,7 @@ class ResidentialUnitService:
                 # ============================================
                 if email_sent:
                     logger.info(
-                        f"✅ Credenciales reenviadas exitosamente a {data_user.str_email} "
+                        f"Credenciales reenviadas exitosamente a {data_user.str_email} "
                         f"- Notificación ID: {notification.id} registrada como '{status}'"
                     )
                     return {
@@ -1355,7 +1357,7 @@ class ResidentialUnitService:
             except ServiceException:
                 raise
             except Exception as e:
-                logger.error(f"❌ Error al enviar correo/notificación: {str(e)}")
+                logger.error(f"Error al enviar correo/notificación: {str(e)}")
                 raise ServiceException(
                     message=f"Error al procesar el envío de credenciales: {str(e)}",
                     details={"original_error": str(e)}
@@ -1371,9 +1373,9 @@ class ResidentialUnitService:
             # Solo hacer rollback si estamos en modo auto_commit
             if auto_commit:
                 await self.db.rollback()
-                logger.error(f"❌ Rollback ejecutado por error inesperado: {str(e)}")
+                logger.error(f"Rollback ejecutado por error inesperado: {str(e)}")
             
-            logger.error(f"❌ Error al reenviar credenciales a user_id={user_id}: {str(e)}")
+            logger.error(f"Error al reenviar credenciales a user_id={user_id}: {str(e)}")
             raise ServiceException(
                 message=f"Error al reenviar credenciales: {str(e)}",
                 details={"original_error": str(e)}
@@ -1841,4 +1843,326 @@ class ResidentialUnitService:
             raise ServiceException(
                 message=f"Error al obtener unidad residencial: {str(e)}",
                 details={"user_id": user_id}
+            )
+            
+    async def create_guest(self, unit_id: int, guest_data: dict) -> dict:
+        """
+        Crea un invitado con acceso a la aplicación.
+        
+        Los invitados AHORA:
+        - Tienen credenciales generadas automáticamente (TODO en minúsculas)
+        - Tienen acceso a la aplicación (bln_allow_entry=True)
+        - Reciben correo con credenciales y auto-login
+        - NO pueden votar (peso = 0)
+        - NO ven encuestas en la interfaz
+        
+        Args:
+            unit_id: ID de la unidad residencial
+            guest_data: Dict con firstname, lastname, email
+        
+        Returns:
+            dict: Datos del invitado creado
+        """
+        try:
+            # 1. Verificar unidad residencial
+            unit = await self.get_residential_unit_by_id(unit_id)
+            if not unit:
+                raise ResourceNotFoundException(
+                    message=f"Unidad residencial con ID {unit_id} no encontrada",
+                    resource_type="ResidentialUnit"
+                )
+            
+            # 2. Verificar email único
+            email_check = await self.db.execute(
+                select(DataUserModel).where(DataUserModel.str_email == guest_data['email'])
+            )
+            if email_check.scalar_one_or_none():
+                raise ServiceException(
+                    message=f"El correo {guest_data['email']} ya está registrado",
+                    error_code="EMAIL_ALREADY_EXISTS"
+                )
+            
+            # 3. Crear registro en tbl_data_users
+            data_user = DataUserModel(
+                str_firstname=guest_data['firstname'],
+                str_lastname=guest_data['lastname'],
+                str_email=guest_data['email'],
+                str_phone=None,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(data_user)
+            await self.db.flush()
+            
+            # 4. Generar credenciales automáticas
+            import secrets
+            import string
+            
+            # CORREGIDO: Username TODO en minúsculas (incluyendo nombres y "invitado")
+            # Limpiar y normalizar cada parte primero
+            firstname_clean = guest_data['firstname'].strip().lower().replace(" ", "")
+            lastname_clean = guest_data['lastname'].strip().lower().replace(" ", "")
+            username = f"{firstname_clean}.{lastname_clean}.invitado"
+            
+            # Password aleatorio seguro de 12 caracteres
+            alphabet = string.ascii_letters + string.digits + "!@#$%"
+            password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            
+            # Hashear contraseña
+            from app.core.security import security_manager
+            hashed_password = security_manager.create_password_hash(password)
+            
+            logger.info(f"Credenciales generadas para invitado: {username}")
+            
+            # 5. Crear usuario con rol 4 y ACCESO HABILITADO
+            user = UserModel(
+                int_data_user_id=data_user.id,
+                str_username=username,  # Username completamente en minúsculas
+                str_password_hash=hashed_password,
+                int_id_rol=4,  # 4: Invitado
+                bln_allow_entry=False,  # Acceso habilitado
+                bln_is_external_delegate=False,
+                bln_user_temporary=False,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(user)
+            await self.db.flush()
+            
+            logger.info(
+                f"👤 Usuario invitado creado: {username} - "
+                f"Email: {guest_data['email']} - Acceso: HABILITADO"
+            )
+            
+            # 6. Crear relación en tbl_user_residential_units
+            user_unit = UserResidentialUnitModel(
+                int_user_id=user.id,
+                int_residential_unit_id=unit_id,
+                str_apartment_number="INVITADO",
+                bool_is_admin=False,
+                dec_default_voting_weight=0.0,  # Sin derecho a voto
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            self.db.add(user_unit)
+            
+            await self.db.commit()
+            
+            # 7. Generar token de auto-login
+            from app.services.simple_auto_login_service import SimpleAutoLoginService
+            auto_login_service = SimpleAutoLoginService()
+            auto_login_token = auto_login_service.generate_auto_login_token(
+                username=username,  # Username en minúsculas
+                password=password,  # Contraseña sin hashear
+                expiration_hours=48
+            )
+            
+            logger.info(f"🎟️ Token de auto-login generado para {username}")
+            
+            # 8. Enviar email de bienvenida
+            try:
+                from app.services.email_service import EmailService
+                email_service = EmailService()
+                
+                email_sent = await email_service.send_guest_credentials_email(
+                    to_email=guest_data['email'],
+                    firstname=guest_data['firstname'],
+                    lastname=guest_data['lastname'],
+                    username=username,  # Username en minúsculas
+                    password=password,
+                    residential_unit_name=unit.str_name,
+                    auto_login_token=auto_login_token
+                )
+                
+                if email_sent:
+                    logger.info(f"Email de bienvenida enviado a {guest_data['email']}")
+                else:
+                    logger.warning(f"⚠️ No se pudo enviar email a {guest_data['email']}")
+                    
+            except Exception as e:
+                logger.error(f"Error al enviar email: {e}")
+                # No fallar si el correo falla
+            
+            # 9. Retornar datos del invitado
+            return {
+                "id": user.id,
+                "data_user_id": data_user.id,
+                "username": username,  # Username en minúsculas
+                "firstname": data_user.str_firstname,
+                "lastname": data_user.str_lastname,
+                "email": data_user.str_email,
+                "residential_unit_id": unit_id,
+                "residential_unit_name": unit.str_name,
+                "role": "Invitado",
+                "has_access": True,
+                "can_vote": False,
+                "created_at": user.created_at.isoformat()
+            }
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al crear invitado: {e}")
+            raise ServiceException(
+                message=f"Error al crear invitado: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
+
+    async def get_guests_by_unit(self, unit_id: int) -> list:
+        """
+        Obtiene todos los invitados (rol 4) de una unidad residencial.
+        
+        Args:
+            unit_id: ID de la unidad residencial
+        
+        Returns:
+            list: Lista de invitados
+        """
+        try:
+            # Verificar que la unidad existe
+            unit = await self.get_residential_unit_by_id(unit_id)
+            if not unit:
+                raise ResourceNotFoundException(
+                    message=f"Unidad residencial con ID {unit_id} no encontrada",
+                    resource_type="ResidentialUnit"
+                )
+            
+            # Obtener invitados (rol 4) de la unidad
+            query = (
+                select(UserModel)
+                .options(selectinload(UserModel.data_user))
+                .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                .where(
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                    UserModel.int_id_rol == 4  # Solo invitados
+                )
+            )
+            
+            result = await self.db.execute(query)
+            guests = result.scalars().all()
+            
+            # Formatear respuesta
+            guests_list = []
+            for guest in guests:
+                if guest.data_user:
+                    guests_list.append({
+                        "id": guest.id,
+                        "data_user_id": guest.data_user.id,
+                        "firstname": guest.data_user.str_firstname,
+                        "lastname": guest.data_user.str_lastname,
+                        "email": guest.data_user.str_email,
+                        "role": "Invitado",
+                        "has_access": False,
+                        "can_vote": False,
+                        "created_at": guest.created_at.isoformat() if guest.created_at else None
+                    })
+            
+            logger.info(f"Se encontraron {len(guests_list)} invitados para la unidad {unit_id}")
+            return guests_list
+            
+        except ResourceNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"Error al obtener invitados: {e}")
+            raise ServiceException(
+                message=f"Error al obtener invitados: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
+
+    async def delete_guest(self, unit_id: int, guest_id: int) -> None:
+        """
+        Elimina un invitado de una unidad residencial.
+        
+        Elimina en el siguiente orden para respetar las foreign keys:
+        1. Notificaciones de email (tbl_email_notifications)
+        2. Relación unidad-usuario (tbl_user_residential_units)
+        3. Usuario (tbl_users)
+        4. Datos del usuario (tbl_data_users)
+        
+        Args:
+            unit_id: ID de la unidad residencial
+            guest_id: ID del usuario invitado
+        """
+        try:
+            from app.models.email_notification_model import EmailNotificationModel
+            
+            # 1. Verificar que el usuario existe y es invitado (rol 4)
+            query = (
+                select(UserModel)
+                .options(selectinload(UserModel.data_user))
+                .where(UserModel.id == guest_id, UserModel.int_id_rol == 4)
+            )
+            result = await self.db.execute(query)
+            guest = result.scalar_one_or_none()
+            
+            if not guest:
+                raise ResourceNotFoundException(
+                    message=f"Invitado con ID {guest_id} no encontrado",
+                    resource_type="Guest"
+                )
+            
+            # 2. Verificar que el invitado pertenece a la unidad
+            unit_relation_query = select(UserResidentialUnitModel).where(
+                UserResidentialUnitModel.int_user_id == guest_id,
+                UserResidentialUnitModel.int_residential_unit_id == unit_id
+            )
+            unit_relation_result = await self.db.execute(unit_relation_query)
+            unit_relation = unit_relation_result.scalar_one_or_none()
+            
+            if not unit_relation:
+                raise ServiceException(
+                    message=f"El invitado no pertenece a la unidad residencial {unit_id}",
+                    error_code="GUEST_NOT_IN_UNIT"
+                )
+            
+            # 3. Guardar ID de data_user para eliminarlo después
+            data_user_id = guest.int_data_user_id
+            
+            # 4. Eliminar notificaciones de email asociadas al invitado PRIMERO
+            email_notifications_query = select(EmailNotificationModel).where(
+                EmailNotificationModel.int_user_id == guest_id
+            )
+            email_notifications_result = await self.db.execute(email_notifications_query)
+            email_notifications = email_notifications_result.scalars().all()
+            
+            for notification in email_notifications:
+                await self.db.delete(notification)
+            
+            if email_notifications:
+                logger.info(f"🗑️ Eliminadas {len(email_notifications)} notificaciones de email del invitado {guest_id}")
+            
+            # CRÍTICO: Flush para ejecutar los DELETEs de notificaciones AHORA
+            await self.db.flush()
+            
+            # 5. Eliminar relación unidad-usuario
+            await self.db.delete(unit_relation)
+            
+            # CRÍTICO: Flush para ejecutar el DELETE de la relación AHORA
+            await self.db.flush()
+            
+            # 6. Eliminar usuario
+            await self.db.delete(guest)
+            
+            # CRÍTICO: Flush para ejecutar el DELETE del usuario AHORA
+            await self.db.flush()
+            
+            # 7. Eliminar datos del usuario
+            if data_user_id and guest.data_user:
+                await self.db.delete(guest.data_user)
+            
+            # 8. Commit final
+            await self.db.commit()
+            
+            logger.info(f"Invitado {guest_id} eliminado completamente de la unidad {unit_id}")
+            
+        except (ServiceException, ResourceNotFoundException):
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"❌ Error al eliminar invitado: {e}")
+            raise ServiceException(
+                message=f"Error al eliminar invitado: {str(e)}",
+                details={"original_error": str(e)}
             )

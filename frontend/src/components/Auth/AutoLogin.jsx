@@ -81,7 +81,7 @@ const AutoLogin = () => {
             'Super Administrador': '/super-admin',
             'Administrador': '/admin',
             'Usuario': '/copropietario',
-            'Copropietario': '/copropietario',
+            'Invitado': '/copropietario',
           };
 
           const redirectPath = roleRoutes[user.role] || '/';

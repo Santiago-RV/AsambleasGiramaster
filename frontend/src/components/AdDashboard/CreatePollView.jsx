@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Plus, Trash2, Save, Play } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Play, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function CreatePollView({ meeting, onBack, onPollCreated }) {
@@ -19,6 +19,8 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
     { str_option_text: '', int_option_order: 1 },
     { str_option_text: '', int_option_order: 2 },
   ]);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -79,7 +81,13 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
   };
 
   const handleSubmit = async (startImmediately = false) => {
-    console.log('📝 [CreatePollView] handleSubmit llamado:', { startImmediately });
+    console.log('📝 [CreatePollView] handleSubmit llamado:', { startImmediately, isSubmitting });
+
+    // Evitar múltiples envíos simultáneos
+    if (isSubmitting) {
+      console.warn('⚠️ [CreatePollView] Ya hay una encuesta en proceso de creación');
+      return;
+    }
 
     if (!validateForm()) {
       console.warn('⚠️ [CreatePollView] Validación fallida');
@@ -109,8 +117,16 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
     });
 
     if (onPollCreated) {
-      console.log('🚀 [CreatePollView] Llamando a onPollCreated...');
-      onPollCreated(pollData, startImmediately);
+      try {
+        setIsSubmitting(true);
+        console.log('🚀 [CreatePollView] Llamando a onPollCreated...');
+        await onPollCreated(pollData, startImmediately);
+        console.log('✅ [CreatePollView] onPollCreated completado exitosamente');
+      } catch (error) {
+        console.error('❌ [CreatePollView] Error en onPollCreated:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
       console.error('❌ [CreatePollView] onPollCreated no está definido');
     }
@@ -149,7 +165,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                 name="str_title"
                 value={formData.str_title}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 placeholder="Ej: ¿Aprueba usted el presupuesto 2024?"
                 required
               />
@@ -163,7 +179,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                 name="str_description"
                 value={formData.str_description}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 placeholder="Descripción adicional de la encuesta (opcional)"
                 rows={3}
               />
@@ -178,7 +194,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                   name="str_poll_type"
                   value={formData.str_poll_type}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
                   <option value="single">Selección Única</option>
                   <option value="multiple">Selección Múltiple</option>
@@ -198,7 +214,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                     value={formData.int_max_selections}
                     onChange={handleInputChange}
                     min="1"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
               )}
@@ -213,7 +229,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                   value={formData.int_duration_minutes || ''}
                   onChange={handleInputChange}
                   min="1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="Dejar vacío para sin límite"
                 />
               </div>
@@ -227,7 +243,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                   id="bln_is_anonymous"
                   checked={formData.bln_is_anonymous}
                   onChange={handleInputChange}
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
                 />
                 <label htmlFor="bln_is_anonymous" className="ml-2 text-sm text-gray-700">
                   Encuesta Anónima
@@ -241,7 +257,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                   id="bln_allows_abstention"
                   checked={formData.bln_allows_abstention}
                   onChange={handleInputChange}
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
                 />
                 <label htmlFor="bln_allows_abstention" className="ml-2 text-sm text-gray-700">
                   Permitir Abstención
@@ -255,7 +271,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                   id="bln_requires_quorum"
                   checked={formData.bln_requires_quorum}
                   onChange={handleInputChange}
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
                 />
                 <label htmlFor="bln_requires_quorum" className="ml-2 text-sm text-gray-700">
                   Requiere Quórum
@@ -274,7 +290,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                     onChange={handleInputChange}
                     min="0"
                     max="100"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
               )}
@@ -289,7 +305,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                   <button
                     type="button"
                     onClick={addOption}
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
                     <Plus size={16} />
                     Agregar Opción
@@ -306,7 +322,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
                         type="text"
                         value={option.str_option_text}
                         onChange={(e) => handleOptionChange(index, e.target.value)}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         placeholder={`Opción ${index + 1}`}
                       />
                       {options.length > 2 && (
@@ -328,18 +344,38 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
               <button
                 type="button"
                 onClick={() => handleSubmit(false)}
-                className="flex-1 flex items-center justify-center gap-2 bg-gray-600 text-white font-semibold py-3 rounded-lg hover:bg-gray-700 transition-colors shadow-md"
+                disabled={isSubmitting}
+                className="flex-1 flex items-center justify-center gap-2 bg-gray-600 text-white font-semibold py-3 rounded-lg hover:bg-gray-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-600"
               >
-                <Save size={20} />
-                Guardar como Borrador
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save size={20} />
+                    Guardar como Borrador
+                  </>
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => handleSubmit(true)}
-                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold py-3 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-md hover:shadow-lg"
+                disabled={isSubmitting}
+                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-600 disabled:hover:to-green-700"
               >
-                <Play size={20} />
-                Crear e Iniciar
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <Play size={20} />
+                    Crear e Iniciar
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -27,7 +27,7 @@ export default function UsersTable({ users = [], onEdit, onTransferPower, onRevo
                 </span>
               </td>
               <td className="p-3 flex gap-2">
-                <button onClick={() => onEdit(u)} className="px-3 py-1 bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white rounded">Editar</button>
+                <button onClick={() => onEdit(u)} className="px-3 py-1 bg-gradient-to-br from-[#059669] to-[#10b981] text-white rounded">Editar</button>
                 <button onClick={() => onTransferPower(u)} className="px-3 py-1 bg-gray-300 rounded">Ceder Poder</button>
                 <button onClick={() => onRevoke(u)} className="px-3 py-1 bg-red-500 text-white rounded">Revocar</button>
               </td>

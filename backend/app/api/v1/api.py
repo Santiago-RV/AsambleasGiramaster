@@ -11,7 +11,11 @@ from app.api.v1.endpoints import user_endpoint
 from app.api.v1.endpoints import zoom_signature_endpoint
 from app.api.v1.endpoints import simple_auto_login_endpoint
 from app.api.v1.endpoints import admin_coowners
-from app.auth.auth import get_current_user 
+from app.api.v1.endpoints import delegation_endpoint
+from app.auth.auth import get_current_user
+from app.api.v1.endpoints import guest_endpoint 
+from app.api.v1.endpoints import qr_endpoints
+from app.api.v1.endpoints import delegation_history_endpoint  
 
 api_router = APIRouter()
 
@@ -84,4 +88,35 @@ api_router.include_router(
 api_router.include_router(
     admin_coowners.router,
     prefix="/admin/coowners"
+)
+
+api_router.include_router(
+    guest_endpoint.router,
+    prefix="/guest",
+    tags=["Guests"],
+    dependencies=[Depends(get_current_user)]
+)
+
+# ============================================
+# QR Codes - Archivo Unificado
+# ============================================
+api_router.include_router(
+    qr_endpoints.router,
+    prefix="/residents",
+    tags=["QR Codes"],
+    dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
+    delegation_endpoint.router,
+    prefix="/delegations",
+    tags=["Delegations"],
+    dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
+    delegation_history_endpoint.router,
+    prefix="/delegation-history",
+    tags=["Delegation History"],
+    dependencies=[Depends(get_current_user)]
 )

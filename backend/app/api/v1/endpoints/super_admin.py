@@ -730,17 +730,20 @@ async def toggle_resident_access(
             )
         
         # Habilitar o deshabilitar según el parámetro
+        # SuperAdmin puede modificar acceso de todos, incluyendo administradores
         if enabled:
             result = await user_service.enable_coowner_access(
                 user_id=user_id,
                 unit_id=unit_id,
-                send_email=False
+                send_email=False,
+                is_super_admin=True
             )
         else:
             result = await user_service.disable_coowner_access(
                 user_id=user_id,
                 unit_id=unit_id,
-                send_email=False
+                send_email=False,
+                is_super_admin=True
             )
         
         return SuccessResponse(
@@ -803,17 +806,20 @@ async def toggle_residents_access_bulk(
         
         for user_id in request_data.user_ids:
             try:
+                # SuperAdmin puede modificar acceso de todos, incluyendo administradores
                 if request_data.enabled:
                     result = await user_service.enable_coowner_access(
                         user_id=user_id,
                         unit_id=unit_id,
-                        send_email=False
+                        send_email=False,
+                        is_super_admin=True
                     )
                 else:
                     result = await user_service.disable_coowner_access(
                         user_id=user_id,
                         unit_id=unit_id,
-                        send_email=False
+                        send_email=False,
+                        is_super_admin=True
                     )
                 
                 if result['status'] in ['already_enabled', 'already_disabled']:

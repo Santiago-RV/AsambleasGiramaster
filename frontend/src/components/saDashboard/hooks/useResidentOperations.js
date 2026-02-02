@@ -16,10 +16,11 @@ export const useResidentOperations = (unitId) => {
 				icon: 'success',
 				title: '¡Éxito!',
 				text: response.message || 'Copropietario creado exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {
@@ -45,10 +46,11 @@ export const useResidentOperations = (unitId) => {
 				icon: 'success',
 				title: '¡Éxito!',
 				text: response.message || 'Copropietario actualizado exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {
@@ -73,12 +75,12 @@ export const useResidentOperations = (unitId) => {
 			Swal.fire({
 				icon: 'success',
 				title: '¡Eliminado!',
-				text:
-					response.message || 'El usuario ha sido eliminado exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
+				text: response.message || 'El usuario ha sido eliminado exitosamente',
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {
@@ -106,11 +108,12 @@ export const useResidentOperations = (unitId) => {
 			Swal.fire({
 				icon: 'success',
 				title: '¡Acceso Modificado!',
-				html: `<p class="text-sm">Acceso ${action} exitosamente</p>`,
-				timer: 2000,
-				showConfirmButton: false,
+				text: `Acceso ${action} exitosamente`,
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {

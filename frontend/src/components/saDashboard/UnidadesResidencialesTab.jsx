@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResidentialCode } from '../../hooks/useResidentialCode';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
-import { Building2, FileText, MapPin, Hash, Home, Users, Calendar, Map, Plus, UserCog, Mail, Phone, User } from 'lucide-react';
+import { Building2, FileText, MapPin, Hash, Home, Users, Map, Plus, Phone, User, Briefcase, MoreVertical, Edit2, Trash2, LayoutGrid, List } from 'lucide-react';
 import Modal from '../common/Modal';
 
 const UnidadesResidencialesTab = ({ onViewDetails }) => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [isEditMode, setIsEditMode] = useState(false);
+	const [editingUnit, setEditingUnit] = useState(null);
+	const [openDropdownId, setOpenDropdownId] = useState(null);
+	const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 	const queryClient = useQueryClient();
 
 	const {
@@ -80,13 +84,12 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			Swal.fire({
 				icon: 'success',
 				title: '¡Éxito!',
-				text:
-					response.message ||
-					'Unidad residencial creada exitosamente',
-				showConfirmButton: false,
-				timer: 2000,
+				text: response.message || 'Unidad residencial creada exitosamente',
 				toast: true,
 				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
 			});
 		},
 		onError: (error) => {
@@ -142,6 +145,11 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			// 	data.int_max_concurrent_meetings
 			// ),
 
+			// Información de la empresa administradora
+			str_management_company: data.str_management_company || null,
+			str_contact_person: data.str_contact_person || null,
+			str_contact_phone: data.str_contact_phone || null,
+
 			administrator: {
         str_firstname: data.admin_str_firstname,
         str_lastname: data.admin_str_lastname,
@@ -155,8 +163,84 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 
 	const handleCloseModal = () => {
 		setIsModalOpen(false);
+		setIsEditMode(false);
+		setEditingUnit(null);
 		reset();
 	};
+
+	const handleEdit = (unidad, e) => {
+		e.stopPropagation();
+		setEditingUnit(unidad);
+		setIsEditMode(true);
+
+		// Prellenar el formulario con los datos de la unidad
+		reset({
+			str_name: unidad.str_name,
+			str_nit: unidad.str_nit,
+			int_total_apartments: unidad.int_total_apartments,
+			str_unit_type: unidad.str_unit_type,
+			str_address: unidad.str_address,
+			str_city: unidad.str_city,
+			str_state: unidad.str_state,
+			str_management_company: unidad.str_management_company || '',
+			str_contact_person: unidad.str_contact_person || '',
+			str_contact_phone: unidad.str_contact_phone || '',
+			bln_is_active: unidad.bln_is_active,
+		});
+
+		setIsModalOpen(true);
+		setOpenDropdownId(null);
+	};
+
+	const handleDelete = (unidad, e) => {
+		e.stopPropagation();
+		setOpenDropdownId(null);
+
+		Swal.fire({
+			title: '¿Estás seguro?',
+			html: `¿Deseas eliminar la unidad residencial <strong>${unidad.str_name}</strong>?<br/><br/><small class="text-red-600">Esta acción eliminará todas las reuniones, encuestas y datos asociados.</small>`,
+			icon: 'warning',
+			showCancelButton: true,
+			confirmButtonColor: '#ef4444',
+			cancelButtonColor: '#6b7280',
+			confirmButtonText: 'Sí, eliminar',
+			cancelButtonText: 'Cancelar',
+			reverseButtons: true,
+		}).then((result) => {
+			if (result.isConfirmed) {
+				// TODO: Implementar la llamada al servicio de eliminación
+				Swal.fire({
+					icon: 'success',
+					title: 'Eliminada',
+					text: 'La unidad residencial ha sido eliminada exitosamente.',
+					toast: true,
+					position: 'top-end',
+					showConfirmButton: false,
+					timer: 3000,
+					backdrop: false,
+				});
+			}
+		});
+	};
+
+	const toggleDropdown = (id, e) => {
+		e.stopPropagation();
+		setOpenDropdownId(openDropdownId === id ? null : id);
+	};
+
+	// Cerrar dropdown al hacer clic fuera
+	useEffect(() => {
+		const handleClickOutside = () => {
+			if (openDropdownId) {
+				setOpenDropdownId(null);
+			}
+		};
+
+		document.addEventListener('click', handleClickOutside);
+		return () => {
+			document.removeEventListener('click', handleClickOutside);
+		};
+	}, [openDropdownId]);
 
 	return (
 		<div className="space-y-8">
@@ -170,13 +254,42 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 						Gestión de edificios y conjuntos residenciales
 					</p>
 				</div>
-				<button
-					onClick={() => setIsModalOpen(true)}
-					className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
-				>
-					<Plus size={20} />
-					Nueva Unidad
-				</button>
+				<div className="flex items-center gap-3">
+					{/* Toggle de vista */}
+					{unidadesData && unidadesData.length > 0 && (
+						<div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+							<button
+								onClick={() => setViewMode('grid')}
+								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+									viewMode === 'grid'
+										? 'bg-white text-blue-600 shadow-sm'
+										: 'text-gray-600 hover:text-gray-800'
+								}`}
+							>
+								<LayoutGrid size={18} />
+								<span className="text-sm font-medium">Tarjetas</span>
+							</button>
+							<button
+								onClick={() => setViewMode('list')}
+								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+									viewMode === 'list'
+										? 'bg-white text-blue-600 shadow-sm'
+										: 'text-gray-600 hover:text-gray-800'
+								}`}
+							>
+								<List size={18} />
+								<span className="text-sm font-medium">Lista</span>
+							</button>
+						</div>
+					)}
+					<button
+						onClick={() => setIsModalOpen(true)}
+						className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+					>
+						<Plus size={20} />
+						Nueva Unidad
+					</button>
+				</div>
 			</div>
 
 			{/* Listado de unidades */}
@@ -246,7 +359,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 						</p>
 					</div>
 				</div>
-			) : (
+			) : viewMode === 'grid' ? (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 					{unidadesData.map((unidad) => (
 						<div
@@ -254,23 +367,52 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 							onClick={() =>
 								onViewDetails && onViewDetails(unidad.id)
 							}
-							className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all cursor-pointer"
+							className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all cursor-pointer relative"
 						>
 							<div className="flex items-start justify-between mb-4">
 								<div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shadow-lg">
 									<Building2 size={28} />
 								</div>
-								<span
-									className={`px-3 py-1 rounded-full text-xs font-semibold ${
-										unidad.bln_is_active
-											? 'bg-green-100 text-green-700'
-											: 'bg-red-100 text-red-700'
-									}`}
-								>
-									{unidad.bln_is_active
-										? 'Activa'
-										: 'Inactiva'}
-								</span>
+								<div className="flex items-center gap-2">
+									<span
+										className={`px-3 py-1 rounded-full text-xs font-semibold ${
+											unidad.bln_is_active
+												? 'bg-green-100 text-green-700'
+												: 'bg-red-100 text-red-700'
+										}`}
+									>
+										{unidad.bln_is_active
+											? 'Activa'
+											: 'Inactiva'}
+									</span>
+									{/* Menú desplegable */}
+									<div className="relative">
+										<button
+											onClick={(e) => toggleDropdown(unidad.id, e)}
+											className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+										>
+											<MoreVertical size={18} className="text-gray-600" />
+										</button>
+										{openDropdownId === unidad.id && (
+											<div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+												<button
+													onClick={(e) => handleEdit(unidad, e)}
+													className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+												>
+													<Edit2 size={16} />
+													Editar
+												</button>
+												<button
+													onClick={(e) => handleDelete(unidad, e)}
+													className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+												>
+													<Trash2 size={16} />
+													Eliminar
+												</button>
+											</div>
+										)}
+									</div>
+								</div>
 							</div>
 
 							<h3 className="text-xl font-bold text-gray-800 mb-2">
@@ -315,13 +457,125 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 						</div>
 					))}
 				</div>
+			) : (
+				<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+					<table className="w-full">
+						<thead className="bg-gray-50 border-b border-gray-200">
+							<tr>
+								<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+									Unidad Residencial
+								</th>
+								<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+									Ubicación
+								</th>
+								<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+									Tipo
+								</th>
+								<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+									Unidades
+								</th>
+								<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+									Estado
+								</th>
+								<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+									Acciones
+								</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y divide-gray-200">
+							{unidadesData.map((unidad) => (
+								<tr
+									key={unidad.id}
+									onClick={() => onViewDetails && onViewDetails(unidad.id)}
+									className="hover:bg-gray-50 transition-colors cursor-pointer"
+								>
+									<td className="px-6 py-4">
+										<div className="flex items-center gap-3">
+											<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white flex-shrink-0">
+												<Building2 size={20} />
+											</div>
+											<div>
+												<div className="font-semibold text-gray-800">
+													{unidad.str_name}
+												</div>
+												<div className="text-xs font-mono text-gray-500">
+													{unidad.str_residential_code}
+												</div>
+											</div>
+										</div>
+									</td>
+									<td className="px-6 py-4">
+										<div className="text-sm text-gray-800">
+											{unidad.str_city}, {unidad.str_state}
+										</div>
+										<div className="text-xs text-gray-500">
+											{unidad.str_address || 'Sin dirección'}
+										</div>
+									</td>
+									<td className="px-6 py-4">
+										<div className="text-sm text-gray-700">
+											{unidad.str_unit_type || 'N/A'}
+										</div>
+									</td>
+									<td className="px-6 py-4 text-center">
+										<div className="flex items-center justify-center gap-2">
+											<Users size={16} className="text-gray-500" />
+											<span className="text-sm font-medium text-gray-700">
+												{unidad.int_total_apartments}
+											</span>
+										</div>
+									</td>
+									<td className="px-6 py-4 text-center">
+										<span
+											className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+												unidad.bln_is_active
+													? 'bg-green-100 text-green-700'
+													: 'bg-red-100 text-red-700'
+											}`}
+										>
+											{unidad.bln_is_active ? 'Activa' : 'Inactiva'}
+										</span>
+									</td>
+									<td className="px-6 py-4 text-center">
+										<div className="relative inline-block">
+											<button
+												onClick={(e) => toggleDropdown(unidad.id, e)}
+												className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+											>
+												<MoreVertical size={18} className="text-gray-600" />
+											</button>
+											{openDropdownId === unidad.id && (
+												<div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+													<button
+														onClick={(e) => handleEdit(unidad, e)}
+														className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+													>
+														<Edit2 size={16} />
+														Editar
+													</button>
+													<button
+														onClick={(e) => handleDelete(unidad, e)}
+														className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+													>
+														<Trash2 size={16} />
+														Eliminar
+													</button>
+												</div>
+											)}
+										</div>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
 			)}
 
-			{/* Modal de creación */}
+			{/* Modal de creación/edición */}
 			<Modal
 				isOpen={isModalOpen}
 				onClose={handleCloseModal}
-				title="Crear Nueva Unidad Residencial"
+				title={isEditMode ? "Editar Unidad Residencial" : "Crear Nueva Unidad Residencial"}
 				size="xl"
 			>
 				<form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -519,6 +773,78 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
                 placeholder="Ej: Carrera 15 # 25-30"
                 className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
               />
+            </div>
+
+          </div>
+        </div>
+
+        {/* SECCIÓN: Empresa Administradora */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+            <Briefcase className="w-5 h-5 text-teal-600" />
+            <h3 className="text-lg font-bold text-gray-800">Empresa Administradora</h3>
+            <span className="ml-auto text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Opcional</span>
+          </div>
+
+          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+
+            {/* Nombre de la Empresa */}
+            <div className="group md:col-span-2">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Briefcase className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
+                Nombre de la Empresa
+              </label>
+              <input
+                type="text"
+                {...register('str_management_company')}
+                placeholder="Ej: Administración Integral S.A.S."
+                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all hover:border-gray-300"
+              />
+              <p className="text-xs text-gray-500 mt-1.5">
+                Nombre de la empresa que administra la unidad residencial
+              </p>
+            </div>
+
+            {/* Persona de Contacto */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <User className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
+                Persona de Contacto
+              </label>
+              <input
+                type="text"
+                {...register('str_contact_person')}
+                placeholder="Ej: María Rodríguez"
+                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all hover:border-gray-300"
+              />
+            </div>
+
+            {/* Teléfono de Contacto */}
+            <div className="group">
+              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                <Phone className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
+                Teléfono de Contacto
+              </label>
+              <input
+                type="tel"
+                {...register('str_contact_phone', {
+                  pattern: {
+                    value: /^[0-9]{10}$/,
+                    message: 'Teléfono inválido (10 dígitos sin espacios)'
+                  }
+                })}
+                placeholder="Ej: 3102456987"
+                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
+                  errors.str_contact_phone
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+                    : 'border-gray-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-100'
+                }`}
+              />
+              {errors.str_contact_phone && (
+                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="font-medium">⚠</span> {errors.str_contact_phone.message}
+                </p>
+              )}
             </div>
 
           </div>
@@ -761,8 +1087,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               </>
             ) : (
               <>
-                <Plus className="w-5 h-5" />
-                Guardar Unidad Residencial
+                {isEditMode ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                {isEditMode ? 'Actualizar Unidad Residencial' : 'Guardar Unidad Residencial'}
               </>
             )}
           </button>

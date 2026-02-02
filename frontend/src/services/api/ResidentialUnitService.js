@@ -1,4 +1,5 @@
 import axiosInstance from "./axiosconfig";
+import ExcelJS from 'exceljs';
 
 /**
  * Servicio para manejar las operaciones de unidades residenciales
@@ -441,36 +442,67 @@ export class ResidentialUnitService {
   /**
    * Descarga plantilla de Excel para carga masiva de copropietarios
    */
-  static downloadResidentsExcelTemplate() {
-    const headers = [
-      'email',
-      'firstname',
-      'lastname',
-      'phone',
-      'apartment_number',
-      'voting_weight',
-      'password'
-    ];
+  static async downloadResidentsExcelTemplate() {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Copropietarios');
 
-    const exampleRows = [
-      ['juan.perez@example.com', 'Juan', 'Pérez', '+57 300 111 2222', '101', '0.25', 'Temporal123!'],
-      ['maria.garcia@example.com', 'María', 'García', '+57 300 222 3333', '102', '0.30', 'Temporal123!'],
-    ];
+      // Definir columnas
+      worksheet.columns = [
+        { header: 'email', key: 'email', width: 30 },
+        { header: 'firstname', key: 'firstname', width: 20 },
+        { header: 'lastname', key: 'lastname', width: 20 },
+        { header: 'phone', key: 'phone', width: 20 },
+        { header: 'apartment_number', key: 'apartment_number', width: 15 },
+        { header: 'voting_weight', key: 'voting_weight', width: 15 }
+      ];
 
-    const csvContent = [
-      headers.join(','),
-      ...exampleRows.map(row => row.join(','))
-    ].join('\n');
+      // Agregar datos de ejemplo
+      worksheet.addRows([
+        {
+          email: 'juan.perez@example.com',
+          firstname: 'Juan',
+          lastname: 'Pérez',
+          phone: '+57 300 111 2222',
+          apartment_number: '101',
+          voting_weight: 0.25
+        },
+        {
+          email: 'maria.garcia@example.com',
+          firstname: 'María',
+          lastname: 'García',
+          phone: '+57 300 222 3333',
+          apartment_number: '102',
+          voting_weight: 0.30
+        }
+      ]);
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+      // Estilizar encabezados
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE6E6FA' }
+      };
 
-    link.href = url;
-    link.download = 'plantilla_copropietarios.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      // Generar y descargar el archivo
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'plantilla_copropietarios.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Error generando plantilla Excel:', error);
+      throw new Error('No se pudo generar la plantilla de Excel');
+    }
   }
 }

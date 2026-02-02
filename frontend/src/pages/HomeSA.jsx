@@ -1,25 +1,51 @@
 import React, { useState } from 'react';
-import { Bell, Settings, LogOut, LayoutDashboard, Building2, Calendar, FileText } from 'lucide-react';
+import { Bell, Settings, LogOut, LayoutDashboard, Building2, Calendar, FileText, HandCoins } from 'lucide-react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import DashboardTab from '../components/saDashboard/DashboardTab';
 import UnidadesResidencialesTab from '../components/saDashboard/UnidadesResidencialesTab';
 import ReunionActivaTab from '../components/saDashboard/ReunionActivaTab';
 import InformesTab from '../components/saDashboard/InformesTab';
 import ConfiguracionTab from '../components/saDashboard/ConfiguracionTab';
+import PowersManagementPage from '../components/saDashboard/PowersManagementPage';
 import ZoomMeetingContainer from '../components/AdDashboard/ZoomMeetingContainer';
 import UnidadResidencialDetalles from '../components/saDashboard/UnidadResidencialDetalles';
+import GuestModal from '../components/saDashboard/components/modals/GuestModal';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthContext } from '../providers/AuthProvider';
+import { useGuestOperations } from '../components/saDashboard/hooks/useGuestOperations';
+import { useQuery } from '@tanstack/react-query';
+import { GuestService } from '../services/api/GuestService';
 
 const HomeSA = () => {
+	// ==========================================
+	// ESTADOS GENERALES
+	// ==========================================
 	const [activeTab, setActiveTab] = useState('dashboard');
 	const [meetingData, setMeetingData] = useState(null);
 	const [selectedUnitId, setSelectedUnitId] = useState(null);
 	const [previousTab, setPreviousTab] = useState('dashboard');
+	const [guestModalOpen, setGuestModalOpen] = useState(false);
+	
+	// ==========================================
+	// HOOKS
+	// ==========================================
 	const { logout } = useAuth();
 	const { user } = useAuthContext();
+	
+	// Hook de operaciones de invitados - USA selectedUnitId CORRECTAMENTE
+	const { createGuestMutation } = useGuestOperations(selectedUnitId);
 
-	// Configuración del menú del sidebar
+	// Query para obtener invitados de la unidad seleccionada
+	const { data: guestsData, refetch: refetchGuests } = useQuery({
+		queryKey: ['guests', selectedUnitId],
+		queryFn: () => GuestService.getGuestsByUnit(selectedUnitId),
+		enabled: !!selectedUnitId, // Solo ejecutar si hay una unidad seleccionada
+		retry: 1,
+	});
+
+	// ==========================================
+	// CONFIGURACIÓN DEL MENÚ
+	// ==========================================
 	const menuItems = [
 		{
 			id: 'dashboard',
@@ -37,24 +63,21 @@ const HomeSA = () => {
 			icon: Calendar,
 		},
 		{
+			id: 'powers',
+			label: 'Poderes',
+			icon: HandCoins,
+		},
+		{
 			id: 'informes',
 			label: 'Informes',
 			icon: FileText,
 		},
 	];
 
-	// Función para iniciar una reunión
-	const handleStartMeeting = (meeting) => {
-		setMeetingData(meeting);
-		setActiveTab('zoom-meeting');
-	};
-
-	// Función para cerrar la reunión (callback para ZoomMeetingContainer)
-	const handleCloseZoomMeeting = () => {
-		setMeetingData(null);
-		setActiveTab('reuniones');
-	};
-
+	// ==========================================
+	// FUNCIONES DE NAVEGACIÓN
+	// ==========================================
+	
 	// Función para navegar a detalles de unidad residencial
 	const handleViewUnitDetails = (unitId) => {
 		setSelectedUnitId(unitId);
@@ -78,7 +101,53 @@ const HomeSA = () => {
 		setActiveTab(previousTab);
 	};
 
-	// Renderizar el componente según el tab activo
+	// ==========================================
+	// FUNCIONES DE REUNIONES
+	// ==========================================
+	
+	// Función para iniciar una reunión
+	const handleStartMeeting = (meeting) => {
+		setMeetingData(meeting);
+		setActiveTab('zoom-meeting');
+	};
+
+	// Función para cerrar la reunión
+	const handleCloseZoomMeeting = () => {
+		setMeetingData(null);
+		setActiveTab('reuniones');
+	};
+
+	// ==========================================
+	// FUNCIONES DE INVITADOS
+	// ==========================================
+	
+	const handleOpenGuestModal = () => {
+		if (!selectedUnitId) {
+			// Si no hay unidad seleccionada, mostrar advertencia
+			console.warn('No hay unidad residencial seleccionada');
+			return;
+		}
+		setGuestModalOpen(true);
+	};
+
+	const handleCloseGuestModal = () => {
+		setGuestModalOpen(false);
+	};
+
+	const handleCreateGuest = (guestData, resetForm) => {
+		createGuestMutation.mutate(guestData, {
+			onSuccess: () => {
+				handleCloseGuestModal();
+				if (resetForm) resetForm();
+				refetchGuests(); // Refrescar lista de invitados
+			},
+		});
+	};
+
+	// ==========================================
+	// RENDERIZADO DE CONTENIDO
+	// ==========================================
+	
 	const renderContent = () => {
 		switch (activeTab) {
 			case 'dashboard':
@@ -95,10 +164,14 @@ const HomeSA = () => {
 						unitId={selectedUnitId}
 						onBack={handleBackToUnits}
 						onStartMeeting={handleStartMeeting}
+						// Pasar la función para abrir el modal de invitados
+						onOpenGuestModal={handleOpenGuestModal}
 					/>
 				);
 			case 'reuniones':
 				return <ReunionActivaTab />;
+			case 'powers':
+				return <PowersManagementPage />;
 			case 'informes':
 				return <InformesTab />;
 			case 'configuracion':
@@ -116,7 +189,10 @@ const HomeSA = () => {
 		}
 	};
 
-	// Componente Header personalizado
+	// ==========================================
+	// HEADER PERSONALIZADO
+	// ==========================================
+	
 	const headerContent = (
 		<div className="px-8 py-4 flex justify-between items-center">
 			<div className="flex items-center gap-4">
@@ -168,6 +244,10 @@ const HomeSA = () => {
 		</div>
 	);
 
+	// ==========================================
+	// RENDERIZADO PRINCIPAL
+	// ==========================================
+	
 	// Si estamos en zoom-meeting o configuración, mostrar sin layout
 	if (activeTab === 'zoom-meeting' || activeTab === 'configuracion') {
 		return (
@@ -181,19 +261,29 @@ const HomeSA = () => {
 
 	// Usar el layout normal para las demás páginas
 	return (
-		<DashboardLayout
-			title="Giramaster"
-			subtitle="Super Administrador"
-			menuItems={menuItems}
-			activeTab={activeTab}
-			onTabChange={setActiveTab}
-			gradientFrom="#2c3e50"
-			gradientTo="#34495e"
-			accentColor="#3498db"
-			header={headerContent}
-		>
-			{renderContent()}
-		</DashboardLayout>
+		<>
+			<DashboardLayout
+				title="Giramaster"
+				subtitle="Super Administrador"
+				menuItems={menuItems}
+				activeTab={activeTab}
+				onTabChange={setActiveTab}
+				gradientFrom="#2c3e50"
+				gradientTo="#34495e"
+				accentColor="#3498db"
+				header={headerContent}
+			>
+				{renderContent()}
+			</DashboardLayout>
+
+			{/* Modal para agregar invitado */}
+			<GuestModal
+				isOpen={guestModalOpen}
+				onClose={handleCloseGuestModal}
+				onSubmit={handleCreateGuest}
+				isSubmitting={createGuestMutation.isPending}
+			/>
+		</>
 	);
 };
 

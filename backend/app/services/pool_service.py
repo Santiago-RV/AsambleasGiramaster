@@ -318,6 +318,19 @@ class PollService:
             ))
         )
         return result.scalar_one_or_none() is not None
+    
+    async def user_has_voted(self, poll_id: int, user_id: int) -> bool:
+        """
+        Verifica si un usuario ya votó en una encuesta (método público)
+        
+        Args:
+            poll_id: ID de la encuesta
+            user_id: ID del usuario
+            
+        Returns:
+            bool: True si ya votó, False si no
+        """
+        return await self._user_has_voted(poll_id, user_id)
 
     async def _validate_response(self, poll: PollModel, response_data: PollResponseCreate):
         """Valida la respuesta según el tipo de encuesta"""
@@ -363,6 +376,10 @@ class PollService:
         from app.models.meeting_model import MeetingModel
         from app.models.user_model import UserModel
         from app.models.residential_unit_model import ResidentialUnitModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from app.core.logging_config import get_logger
+
+        logger = get_logger(__name__)
 
         # Obtener información de la reunión
         meeting_result = await self.db.execute(
@@ -379,12 +396,16 @@ class PollService:
 
         organizer_id, residential_unit_id, meeting_creator_id = meeting_info
 
+        logger.info(f"🗳️ Obteniendo peso de votación para user_id={user_id} en meeting_id={meeting_id}")
+
         # Si el usuario es el organizador, tiene peso de votación 1.0
         if organizer_id == user_id:
+            logger.info(f"   Usuario es organizador, peso=1.0")
             return 1.0
 
         # Si el usuario creó la reunión, tiene peso de votación 1.0
         if meeting_creator_id == user_id:
+            logger.info(f"   Usuario creó la reunión, peso=1.0")
             return 1.0
 
         # Verificar si el usuario es administrador (rol ID 2)
@@ -404,25 +425,55 @@ class PollService:
 
             # Si el administrador creó la unidad residencial, puede votar
             if residential_unit_creator_id == user_id:
+                logger.info(f"   Usuario es administrador de la unidad, peso=1.0")
                 return 1.0
 
-        # Si no es organizador, creador ni administrador, buscar en la lista de invitados
-        result = await self.db.execute(
-            select(MeetingInvitationModel.dec_voting_weight)
+        # PRIORIDAD 1: Buscar en la lista de invitados de la reunión
+        # IMPORTANTE: También verificar si el usuario delegó su voto
+        invitation_result = await self.db.execute(
+            select(
+                MeetingInvitationModel.dec_voting_weight,
+                MeetingInvitationModel.int_delegated_id
+            )
             .where(and_(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
                 MeetingInvitationModel.int_user_id == user_id
             ))
         )
-        voting_weight = result.scalar_one_or_none()
+        invitation_data = invitation_result.one_or_none()
 
-        if voting_weight is None:
-            raise ValidationException(
-                message="El usuario no está invitado a esta reunión",
-                error_code="USER_NOT_INVITED"
-            )
+        if invitation_data is not None:
+            invitation_weight, delegated_id = invitation_data
 
-        return float(voting_weight)
+            # Si el usuario delegó su poder, no puede votar (peso = 0)
+            if delegated_id is not None:
+                logger.info(f"   🚫 Usuario delegó su poder a user_id={delegated_id}, peso=0")
+                return 0.0
+
+            # Retorna peso normal (puede incluir poderes recibidos de otros)
+            weight = float(invitation_weight)
+            logger.info(f"   Peso encontrado en invitación: {weight}")
+            return weight
+
+        # PRIORIDAD 2: Buscar el peso por defecto del usuario en la unidad residencial
+        user_unit_result = await self.db.execute(
+            select(UserResidentialUnitModel.dec_default_voting_weight)
+            .where(and_(
+                UserResidentialUnitModel.int_user_id == user_id,
+                UserResidentialUnitModel.int_residential_unit_id == residential_unit_id
+            ))
+        )
+        default_weight = user_unit_result.scalar_one_or_none()
+
+        if default_weight is not None:
+            weight = float(default_weight)
+            logger.info(f"   Peso encontrado en unidad residencial (default): {weight}")
+            return weight
+
+        # Si no se encuentra en ninguna parte, usar peso por defecto de 1.0
+        # (esto permite que usuarios de la unidad voten aunque no tengan invitación explícita)
+        logger.warning(f"   ⚠️ No se encontró peso de votación para user_id={user_id}, usando peso por defecto=1.0")
+        return 1.0
 
     async def _update_option_stats(self, option_id: int, voting_weight: float):
         """Actualiza las estadísticas de una opción"""
@@ -479,6 +530,16 @@ class PollService:
         # Contar abstenciones
         total_abstentions = total_responses - total_votes
 
+        # Calcular peso total votado (suma de dec_voting_weight de todas las respuestas)
+        total_weight_result = await self.db.execute(
+            select(func.sum(PollResponseModel.dec_voting_weight))
+            .where(and_(
+                PollResponseModel.int_poll_id == poll_id,
+                PollResponseModel.bln_is_abstention == False
+            ))
+        )
+        total_weight_voted = float(total_weight_result.scalar() or 0)
+
         # Calcular participación real (total de invitados a la reunión)
         from app.models.meeting_invitation_model import MeetingInvitationModel
 
@@ -488,17 +549,30 @@ class PollService:
         )
         total_participants = total_participants_result.scalar()
 
-        # Calcular porcentaje de participación
+        # Calcular peso total de participantes invitados
+        total_weight_invited_result = await self.db.execute(
+            select(func.sum(MeetingInvitationModel.dec_voting_weight))
+            .where(MeetingInvitationModel.int_meeting_id == poll.int_meeting_id)
+        )
+        total_weight_invited = float(total_weight_invited_result.scalar() or 0)
+
+        # Calcular porcentaje de participación por peso
+        weight_participation_percentage = (total_weight_voted / total_weight_invited * 100) if total_weight_invited > 0 else 0
+
+        # Calcular porcentaje de participación por personas
         participation_percentage = (total_responses / total_participants * 100) if total_participants > 0 else 0
 
-        # Verificar quorum
-        quorum_reached = participation_percentage >= float(poll.dec_minimum_quorum_percentage)
+        # Verificar quorum (basado en peso de votación)
+        quorum_reached = weight_participation_percentage >= float(poll.dec_minimum_quorum_percentage)
 
         return {
             "poll": poll,
             "total_responses": total_responses,
             "total_votes": total_votes,
             "total_abstentions": total_abstentions,
+            "total_weight_voted": total_weight_voted,
+            "total_weight_invited": total_weight_invited,
+            "weight_participation_percentage": weight_participation_percentage,
             "quorum_reached": quorum_reached,
             "participation_percentage": participation_percentage
         }

@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { LayoutDashboard, Users, Calendar, Video, FileText, Settings, LogOut } from 'lucide-react';
+import { Users, Video, FileText, Settings, LogOut, HandCoins } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DashboardLayout from "../components/layout/DashboardLayout";
-import DashboardPage from "../components/AdDashboard/DashboardPage";
 import UsersPage from "../components/AdDashboard/UsersPage";
 import AssembliesPage from "../components/AdDashboard/AssembliesPage";
 import LivePage from "../components/AdDashboard/LivePage";
 import ReportsPage from "../components/AdDashboard/ReportsPage";
 import SettingsPage from "../components/AdDashboard/SettingsPage";
+import PowersManagementPage from "../components/AdDashboard/PowersManagementPage";
 import PowerModal from "../components/AdDashboard/PowerModal";
 import ResidentModal from "../components/saDashboard/components/modals/ResidentModal";
 import ExcelUploadModal from "../components/saDashboard/components/modals/ExcelUploadModal";
@@ -21,8 +21,12 @@ import { ResidentialUnitService } from "../services/api/ResidentialUnitService";
 import { ResidentService } from "../services/api/ResidentService";
 import { MeetingService } from "../services/api/MeetingService";
 
+import GuestModal from '../components/saDashboard/components/modals/GuestModal';
+import { useGuestOperations } from '../components/saDashboard/hooks/useGuestOperations';
+import { GuestService } from '../services/api/GuestService';
+
 export default function AppAdmin() {
-  const [section, setSection] = useState("dashboard");
+  const [section, setSection] = useState("users");
   const [showUserForm, setShowUserForm] = useState(false);
   const [showAssemblyForm, setShowAssemblyForm] = useState(false);
   const [powerModalData, setPowerModalData] = useState(null);
@@ -36,6 +40,18 @@ export default function AppAdmin() {
   const { logout } = useAuth();
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
+  const [showGuestModal, setShowGuestModal] = useState(false);
+
+  // Hook para operaciones de invitados
+  const { createGuestMutation } = useGuestOperations(residentialUnitId);
+
+  // Query para obtener invitados
+  const { data: guestsData, refetch: refetchGuests } = useQuery({
+    queryKey: ['guests', residentialUnitId],
+    queryFn: () => GuestService.getGuestsByUnit(residentialUnitId),
+    enabled: !!residentialUnitId,
+    retry: 1,
+  });
 
   // Obtener la unidad residencial del administrador
   const {
@@ -74,20 +90,20 @@ export default function AppAdmin() {
 
   // Configuración del menú del sidebar
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'Gestión de Copropietarios', icon: Users },
     // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
+    { id: 'powers', label: 'Poderes', icon: HandCoins },
     { id: 'reports', label: 'Reportes', icon: FileText },
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
 
   // Títulos para cada sección
   const sectionTitles = {
-    dashboard: "Dashboard",
     users: "Gestión de Copropietarios",
     // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
+    powers: "Gestión de Poderes",
     reports: "Reportes",
     settings: "Configuración",
   };
@@ -109,10 +125,11 @@ export default function AppAdmin() {
         icon: 'success',
         title: '¡Éxito!',
         text: response.message || 'Copropietario creado exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -134,10 +151,11 @@ export default function AppAdmin() {
         icon: 'success',
         title: '¡Éxito!',
         text: response.message || 'Copropietario actualizado exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -179,8 +197,9 @@ export default function AppAdmin() {
           text: 'No se detectaron cambios para guardar',
           toast: true,
           position: 'top-end',
-          timer: 2000,
           showConfirmButton: false,
+          timer: 3000,
+          backdrop: false,
         });
         return;
       }
@@ -198,6 +217,48 @@ export default function AppAdmin() {
     }
   };
 
+  // Handler para abrir modal de invitado
+  const handleOpenGuestModal = () => {
+    setShowGuestModal(true);
+  };
+
+  // Handler para cerrar modal de invitado
+  const handleCloseGuestModal = () => {
+    setShowGuestModal(false);
+  };
+
+  // Handler para crear invitado
+  const handleCreateGuest = (guestData, resetForm) => {
+    createGuestMutation.mutate(guestData, {
+      onSuccess: () => {
+        setShowGuestModal(false);
+        if (resetForm) resetForm();
+        refetchGuests(); // Recargar lista de invitados
+        // También refrescar la lista de residentes para que aparezca el invitado
+        queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+        Swal.fire({
+          icon: 'success',
+          title: '¡Invitado Creado!',
+          text: 'El invitado ha sido creado exitosamente y recibirá un correo con sus credenciales.',
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3000,
+          backdrop: false,
+        });
+      },
+      onError: (error) => {
+        console.error('Error al crear invitado:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error.response?.data?.detail || 'No se pudo crear el invitado',
+          confirmButtonColor: '#ef4444',
+        });
+      },
+    });
+  };
+
   // Mutación para crear reunión
   const createMeetingMutation = useMutation({
     mutationFn: async (data) => {
@@ -209,10 +270,11 @@ export default function AppAdmin() {
         icon: 'success',
         title: '¡Reunión Creada!',
         text: response.message || 'La reunión de Zoom ha sido creada exitosamente',
-        showConfirmButton: false,
-        timer: 2000,
         toast: true,
         position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
       });
     },
     onError: (error) => {
@@ -292,13 +354,72 @@ export default function AppAdmin() {
     setShowZoomMeeting(null);
   };
 
+  // Mutación para finalizar reunión
+  const endMeetingMutation = useMutation({
+    mutationFn: async (meetingId) => {
+      return await MeetingService.endMeeting(meetingId);
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+      Swal.fire({
+        icon: 'success',
+        title: 'Reunión Finalizada',
+        text: response.message || 'La reunión ha sido finalizada exitosamente',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        backdrop: false,
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.message || error.message || 'Error al finalizar la reunión',
+      });
+    },
+  });
+
+  // Handler para finalizar una reunión
+  const handleEndMeeting = async (meeting) => {
+    const result = await Swal.fire({
+      title: '¿Finalizar Reunión?',
+      html: `
+        <div class="text-left">
+          <p class="mb-3">¿Estás seguro de que deseas finalizar esta reunión?</p>
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <p class="font-semibold text-blue-800">${meeting.titulo}</p>
+            <p class="text-sm text-blue-700 mt-1">
+              <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+            </p>
+          </div>
+          <p class="text-xs text-gray-600 mt-3">
+            ⚠️ Esta acción marcará la reunión como finalizada y no podrá deshacerse.
+          </p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, Finalizar',
+      cancelButtonText: 'Cancelar',
+      width: '500px',
+    });
+
+    if (result.isConfirmed) {
+      endMeetingMutation.mutate(meeting.id);
+    }
+  };
+
   // Mostrar loading mientras carga la unidad residencial
   if (isLoadingUnit || isLoadingDetails) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
           <svg
-            className="animate-spin h-12 w-12 text-purple-500 mx-auto mb-4"
+            className="animate-spin h-12 w-12 text-green-500 mx-auto mb-4"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -369,7 +490,7 @@ export default function AppAdmin() {
 
         {/* Perfil de usuario */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#667eea] to-[#764ba2] flex items-center justify-center text-white font-bold shadow-md">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#059669] to-[#10b981] flex items-center justify-center text-white font-bold shadow-md">
             {user?.name
               ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
               : user?.role?.charAt(0).toUpperCase() || 'A'
@@ -397,7 +518,7 @@ export default function AppAdmin() {
           {/* Menú desplegable */}
           <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
             <button
-              onClick={() => setSection('dashboard')}
+              onClick={() => setSection('users')}
               className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors"
             >
               Volver al Inicio
@@ -435,13 +556,12 @@ export default function AppAdmin() {
       menuItems={menuItems}
       activeTab={section}
       onTabChange={setSection}
-      gradientFrom="#2c3e50"
-      gradientTo="#764ba2"
-      accentColor="#fbbf24"
+      gradientFrom="#047857"
+      gradientTo="#065f46"
+      accentColor="#10b981"
       header={headerContent}
     >
 
-      {section === "dashboard" && <DashboardPage />}
       {section === "users" && (
         <UsersPage
           residentialUnitId={residentialUnitId}
@@ -450,9 +570,11 @@ export default function AppAdmin() {
           onUploadExcel={() => setShowExcelModal(true)}
           onCreateMeeting={handleCreateMeeting}
           onJoinMeeting={handleJoinMeeting}
+          onEndMeeting={handleEndMeeting}
           onTransferPower={(fromLabel, onConfirm) =>
             openPowerModal(fromLabel, onConfirm)
           }
+          onCreateGuest={handleOpenGuestModal}
         />
       )}
       {section === "assemblies" && (
@@ -461,6 +583,7 @@ export default function AppAdmin() {
         />
       )}
       {section === "live" && <LivePage />}
+      {section === "powers" && <PowersManagementPage />}
       {section === "reports" && <ReportsPage />}
       {section === "settings" && <SettingsPage />}
 
@@ -529,6 +652,14 @@ export default function AppAdmin() {
           }}
         />
       )}
+
+      {/* Modal para crear invitado */}
+      <GuestModal
+        isOpen={showGuestModal}
+        onClose={handleCloseGuestModal}
+        onSubmit={handleCreateGuest}
+        isSubmitting={createGuestMutation.isPending}
+      />
     </DashboardLayout>
   );
 }

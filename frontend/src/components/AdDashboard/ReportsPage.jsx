@@ -6,17 +6,17 @@ export default function ReportsPage() {
         <div className="bg-white p-4 rounded shadow">
           <h4 className="font-semibold mb-2">Reporte de Participación</h4>
           <p className="text-sm text-gray-600">Genera reportes detallados de asistencia y participación.</p>
-          <button className="mt-3 px-3 py-1 bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white rounded" onClick={() => alert("Generando reporte")}>Ver Reporte</button>
+          <button className="mt-3 px-3 py-1 bg-gradient-to-br from-[#059669] to-[#10b981] text-white rounded" onClick={() => alert("Generando reporte")}>Ver Reporte</button>
         </div>
         <div className="bg-white p-4 rounded shadow">
           <h4 className="font-semibold mb-2">Reporte de Votaciones</h4>
           <p className="text-sm text-gray-600">Resumen de todas las votaciones y decisiones.</p>
-          <button className="mt-3 px-3 py-1 bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white rounded" onClick={() => alert("Generando reporte")}>Ver Reporte</button>
+          <button className="mt-3 px-3 py-1 bg-gradient-to-br from-[#059669] to-[#10b981] text-white rounded" onClick={() => alert("Generando reporte")}>Ver Reporte</button>
         </div>
         <div className="bg-white p-4 rounded shadow">
           <h4 className="font-semibold mb-2">Análisis de Quórum</h4>
           <p className="text-sm text-gray-600">Estadísticas históricas de cumplimiento de quórum.</p>
-          <button className="mt-3 px-3 py-1 bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white rounded" onClick={() => alert("Generando reporte")}>Ver Reporte</button>
+          <button className="mt-3 px-3 py-1 bg-gradient-to-br from-[#059669] to-[#10b981] text-white rounded" onClick={() => alert("Generando reporte")}>Ver Reporte</button>
         </div>
       </div>
     </section>

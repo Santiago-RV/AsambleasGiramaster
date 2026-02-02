@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, QrCode } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const ResidentActionsMenu = ({
@@ -8,6 +8,7 @@ const ResidentActionsMenu = ({
 	onView,
 	onEdit,
 	onDelete,
+	onGenerateQR,
 	onClose,
 }) => {
 	const handleView = () => {
@@ -21,7 +22,7 @@ const ResidentActionsMenu = ({
 					<p><strong>Email:</strong> ${resident.email}</p>
 					${resident.phone ? `<p><strong>Teléfono:</strong> ${resident.phone}</p>` : ''}
 					<p><strong>Apartamento:</strong> ${resident.apartment_number}</p>
-					<p><strong>Estado:</strong> ${resident.is_active ? 'Activo' : 'Inactivo'}</p>
+					<p><strong>Estado:</strong> ${resident.bln_allow_entry ? 'Activo' : 'Inactivo'}</p>
 				</div>
 			`,
 			confirmButtonColor: '#3498db',
@@ -40,6 +41,11 @@ const ResidentActionsMenu = ({
 			`${resident.firstname} ${resident.lastname}`,
 			resident.apartment_number === 'ADMIN'
 		);
+	};
+
+	const handleGenerateQR = () => {
+		onClose();
+		onGenerateQR(resident);
 	};
 
 	return (
@@ -72,6 +78,13 @@ const ResidentActionsMenu = ({
 				>
 					<Edit size={16} />
 					Editar
+				</button>
+				<button
+					onClick={handleGenerateQR}
+					className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+				>
+					<QrCode size={16} />
+					Generar QR
 				</button>
 				<button
 					onClick={handleDelete}

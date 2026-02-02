@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from datetime import datetime
 from typing import List, Dict, Optional
 import pandas as pd
@@ -22,12 +23,17 @@ class MeetingInvitationService:
         self.db = db
 
     async def create_invitation(self, invitation_data: MeetingInvitationCreate, created_by: int) -> MeetingInvitationModel:
-        """Crea una invitación individual"""
+        """
+        Crea una invitación individual.
+        
+        IMPORTANTE: Inicializa dec_quorum_base y dec_voting_weight con el mismo valor.
+        """
         try:
             invitation = MeetingInvitationModel(
                 int_meeting_id=invitation_data.int_meeting_id,
                 int_user_id=invitation_data.int_user_id,
-                dec_voting_weight=invitation_data.dec_voting_weight,
+                dec_voting_weight=invitation_data.dec_voting_weight,  # Peso actual
+                dec_quorum_base=invitation_data.dec_voting_weight,    # 🔥 NUEVO: Peso base (mismo valor inicial)
                 str_apartment_number=invitation_data.str_apartment_number,
                 str_invitation_status=invitation_data.str_invitation_status,
                 str_response_status=invitation_data.str_response_status,
@@ -43,10 +49,16 @@ class MeetingInvitationService:
             self.db.add(invitation)
             await self.db.commit()
             await self.db.refresh(invitation)
+            
+            logger.info(
+                f"✅ Invitación creada - User: {invitation_data.int_user_id}, "
+                f"Quorum base: {invitation_data.dec_voting_weight}"
+            )
+            
             return invitation
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Error al crear invitación: {e}")
+            logger.error(f"❌ Error al crear invitación: {e}")
             raise
 
     async def validate_meeting_exists(self, meeting_id: int) -> bool:
@@ -64,69 +76,56 @@ class MeetingInvitationService:
         return result.scalar_one_or_none()
 
     async def create_user_from_excel(self, row_data: dict, created_by: int) -> UserModel:
-        """Crea un usuario completo (DataUser + User) desde los datos del Excel"""
+        """
+        Crea un usuario desde datos del Excel.
+        Genera una contraseña temporal y crea el registro completo.
+        """
         try:
+            # Extraer y limpiar datos
             email = str(row_data['email']).strip().lower()
+            firstname = str(row_data['firstname']).strip()
+            lastname = str(row_data['lastname']).strip()
             
-            # Verificar si el usuario ya existe
-            existing_user = await self.get_user_by_email(email)
-            if existing_user:
-                return existing_user
-
+            # Generar contraseña temporal
+            temp_password = security_manager.generate_temp_password()
+            hashed_password = security_manager.hash_password(temp_password)
+            
             # Crear DataUser
-            data_user_data = DataUserCreate(
-                str_firstname=str(row_data['firstname']).strip(),
-                str_lastname=str(row_data['lastname']).strip(),
-                str_email=email,
-                str_phone=str(row_data.get('phone', '')).strip() if row_data.get('phone') else None
-            )
-
             data_user = DataUserModel(
-                str_firstname=data_user_data.str_firstname,
-                str_lastname=data_user_data.str_lastname,
-                str_email=data_user_data.str_email,
-                str_phone=data_user_data.str_phone
-            )
-            
-            self.db.add(data_user)
-            await self.db.flush()  # Para obtener el ID sin hacer commit
-
-            # Hashear contraseña (usa una temporal si no viene en el Excel)
-            password = str(row_data.get('password', 'Temporal123!'))
-            hashed_password = security_manager.create_password_hash(password)
-
-            # Crear User
-            user = UserModel(
-                str_username=email,
-                str_password_hash=hashed_password,
-                int_data_user_id=data_user.id,
-                int_id_rol=3,  # Rol de usuario por defecto
-                bln_is_active=True,
+                str_email=email,
+                str_password=hashed_password,
+                bln_is_temp_password=True,
                 created_by=created_by,
                 updated_by=created_by
             )
-
+            self.db.add(data_user)
+            await self.db.flush()
+            
+            # Crear User
+            user = UserModel(
+                str_username=email,
+                str_firstname=firstname,
+                str_lastname=lastname,
+                int_id_rol=3,  # Rol de copropietario
+                int_data_user_id=data_user.id,
+                created_by=created_by,
+                updated_by=created_by
+            )
             self.db.add(user)
             await self.db.flush()
             
+            logger.info(f"✅ Usuario creado desde Excel: {email}")
             return user
-
+            
         except Exception as e:
-            logger.error(f"Error al crear usuario desde Excel: {e}")
+            logger.error(f"❌ Error al crear usuario desde Excel: {e}")
             raise
 
     async def process_excel_file(self, file_content: bytes, meeting_id: int, created_by: int) -> Dict:
         """
-        Procesa el archivo Excel y crea usuarios e invitaciones masivamente
+        Procesa un archivo Excel para carga masiva de invitaciones.
         
-        El Excel debe tener las siguientes columnas:
-        - email: Email del usuario
-        - firstname: Nombre del usuario
-        - lastname: Apellido del usuario
-        - phone: (Opcional) Teléfono del usuario
-        - apartment_number: Número de apartamento
-        - voting_weight: Peso de votación (coeficiente)
-        - password: (Opcional) Contraseña inicial (default: Temporal123!)
+        IMPORTANTE: Cada invitación inicializa dec_quorum_base = dec_voting_weight
         """
         try:
             # Validar que la reunión exista
@@ -171,11 +170,12 @@ class MeetingInvitationService:
                         user_was_created = True
                         results['users_created'] += 1
 
-                    # Crear invitación
+                    # 🔥 Crear invitación con dec_quorum_base
                     invitation = MeetingInvitationModel(
                         int_meeting_id=meeting_id,
                         int_user_id=user.id,
-                        dec_voting_weight=voting_weight,
+                        dec_voting_weight=voting_weight,      # Peso actual
+                        dec_quorum_base=voting_weight,         # 🔥 NUEVO: Peso base (mismo valor inicial)
                         str_apartment_number=apartment_number,
                         str_invitation_status='pending',
                         str_response_status='no_response',
@@ -190,34 +190,105 @@ class MeetingInvitationService:
                     self.db.add(invitation)
                     results['invitations_created'] += 1
                     results['successful'] += 1
+                    
+                    logger.info(
+                        f"  ✅ Fila {index + 1}: {email} - Apto: {apartment_number} - "
+                        f"Quorum: {voting_weight} - Usuario {'creado' if user_was_created else 'existente'}"
+                    )
 
                 except Exception as e:
-                    results['errors'].append({
-                        'row': index + 2,  # +2 porque Excel empieza en 1 y tiene header
-                        'email': row_dict.get('email', 'N/A'),
-                        'error': str(e)
-                    })
                     results['failed'] += 1
-                    logger.error(f"Error procesando fila {index + 2}: {e}")
+                    error_msg = f"Fila {index + 1}: {str(e)}"
+                    results['errors'].append(error_msg)
+                    logger.error(f"  ❌ {error_msg}")
+                    continue
 
-            # Commit de todas las operaciones exitosas
-            if results['successful'] > 0:
-                await self.db.commit()
-            else:
-                await self.db.rollback()
+            # Commit final
+            await self.db.commit()
+            
+            logger.info(
+                f"📊 Proceso completado - Total: {results['total_rows']}, "
+                f"Exitosos: {results['successful']}, Fallidos: {results['failed']}, "
+                f"Usuarios creados: {results['users_created']}"
+            )
 
             return results
 
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Error procesando archivo Excel: {e}")
+            logger.error(f"❌ Error al procesar Excel: {e}")
             raise
 
-    async def get_invitations_by_meeting(self, meeting_id: int) -> List[MeetingInvitationModel]:
+    async def get_meeting_invitations(self, meeting_id: int) -> List[MeetingInvitationModel]:
         """Obtiene todas las invitaciones de una reunión"""
-        result = await self.db.execute(
-            select(MeetingInvitationModel).where(
-                MeetingInvitationModel.int_meeting_id == meeting_id
+        try:
+            result = await self.db.execute(
+                select(MeetingInvitationModel)
+                .where(MeetingInvitationModel.int_meeting_id == meeting_id)
+                .options(selectinload(MeetingInvitationModel.user))
             )
-        )
-        return result.scalars().all()
+            invitations = result.scalars().all()
+            return list(invitations)
+        except Exception as e:
+            logger.error(f"Error al obtener invitaciones: {e}")
+            raise
+
+    async def get_invitation_by_id(self, invitation_id: int) -> Optional[MeetingInvitationModel]:
+        """Obtiene una invitación por su ID"""
+        try:
+            result = await self.db.execute(
+                select(MeetingInvitationModel)
+                .where(MeetingInvitationModel.id == invitation_id)
+                .options(selectinload(MeetingInvitationModel.user))
+            )
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error al obtener invitación: {e}")
+            raise
+
+    async def update_invitation_status(
+        self, 
+        invitation_id: int, 
+        new_status: str,
+        updated_by: int
+    ) -> Optional[MeetingInvitationModel]:
+        """Actualiza el estado de una invitación"""
+        try:
+            invitation = await self.get_invitation_by_id(invitation_id)
+            
+            if not invitation:
+                return None
+            
+            invitation.str_invitation_status = new_status
+            invitation.updated_at = datetime.now()
+            invitation.updated_by = updated_by
+            
+            await self.db.commit()
+            await self.db.refresh(invitation)
+            
+            logger.info(f"✅ Invitación {invitation_id} actualizada a estado: {new_status}")
+            return invitation
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al actualizar invitación: {e}")
+            raise
+
+    async def delete_invitation(self, invitation_id: int) -> bool:
+        """Elimina una invitación"""
+        try:
+            invitation = await self.get_invitation_by_id(invitation_id)
+            
+            if not invitation:
+                return False
+            
+            await self.db.delete(invitation)
+            await self.db.commit()
+            
+            logger.info(f"✅ Invitación {invitation_id} eliminada")
+            return True
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al eliminar invitación: {e}")
+            raise

@@ -16,6 +16,14 @@ from app.core.exceptions import (
     ServiceException
 )
 
+from sqlalchemy import select, and_
+from app.models.poll_response_model import PollResponseModel
+from app.models.poll_option_model import PollOptionModel
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 # ==================== CRUD de Encuestas ====================
@@ -191,56 +199,191 @@ async def get_poll_by_code(
         )
 
 
+# @router.get(
+#     "/meeting/{meeting_id}/polls",
+#     response_model=SuccessResponse,
+#     summary="Listar encuestas de reunión",
+#     description="Obtiene todas las encuestas de una reunión"
+# )
+# async def get_meeting_polls(
+#     meeting_id: int,
+#     current_user: str = Depends(get_current_user),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     """Lista todas las encuestas de una reunión"""
+#     try:
+#         poll_service = PollService(db)
+#         polls = await poll_service.get_polls_by_meeting(meeting_id)
+
+#         return SuccessResponse(
+#             success=True,
+#             status_code=status.HTTP_200_OK,
+#             message=f"Se encontraron {len(polls)} encuestas",
+#             data=[
+#                 {
+#                     "id": poll.id,
+#                     "str_poll_code": poll.str_poll_code,
+#                     "str_title": poll.str_title,
+#                     "str_description": poll.str_description,
+#                     "str_poll_type": poll.str_poll_type,
+#                     "str_status": poll.str_status,
+#                     "bln_is_anonymous": poll.bln_is_anonymous,
+#                     "bln_allows_abstention": poll.bln_allows_abstention,
+#                     "bln_requires_quorum": poll.bln_requires_quorum,
+#                     "dec_minimum_quorum_percentage": poll.dec_minimum_quorum_percentage,
+#                     "int_max_selections": poll.int_max_selections,
+#                     "int_duration_minutes": poll.int_duration_minutes,
+#                     "created_at": poll.created_at,
+#                     "dat_started_at": poll.dat_started_at,
+#                     "dat_ended_at": poll.dat_ended_at,
+#                     "options": [
+#                         {
+#                             "id": option.id,
+#                             "str_option_text": option.str_option_text,
+#                             "int_option_order": option.int_option_order
+#                         } for option in poll.options
+#                     ]
+#                 } for poll in polls
+#             ]
+#         )
+#     except Exception as e:
+#         raise ServiceException(
+#             message=f"Error al listar las encuestas: {str(e)}",
+#             details={"original_error": str(e)}
+#         )
+
 @router.get(
     "/meeting/{meeting_id}/polls",
     response_model=SuccessResponse,
     summary="Listar encuestas de reunión",
-    description="Obtiene todas las encuestas de una reunión"
+    description="Obtiene todas las encuestas de una reunión con indicador de si el usuario ya votó y qué opciones seleccionó"
 )
 async def get_meeting_polls(
     meeting_id: int,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista todas las encuestas de una reunión"""
+    """Lista todas las encuestas de una reunión con estado de voto del usuario y opciones votadas"""
     try:
         poll_service = PollService(db)
-        polls = await poll_service.get_polls_by_meeting(meeting_id)
+        user_service = UserService(db)
+        
+        # Obtener usuario actual
+        user = await user_service.get_user_by_username(current_user)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no autenticado"
+            )
+        
+        # ============================================================================
+        # ✅ MODIFICACIÓN PRINCIPAL: Obtener todas las encuestas y filtrar por rol
+        # ============================================================================
+        all_polls = await poll_service.get_polls_by_meeting(meeting_id)
+        
+        # 🔒 FILTRO DE SEGURIDAD: Ocultar encuestas 'draft' a copropietarios e invitados
+        # Roles del sistema:
+        #   1 = Super Admin    → Ve TODAS las encuestas (incluyendo draft)
+        #   2 = Administrador  → Ve TODAS las encuestas (incluyendo draft)
+        #   3 = Copropietario  → NO ve encuestas en estado 'draft'
+        #   4 = Invitado       → NO ve encuestas en estado 'draft'
+        
+        if user.int_id_rol in [3, 4]:  # Copropietario o Invitado
+            # Filtrar: NO mostrar encuestas en estado 'draft'
+            polls = [poll for poll in all_polls if poll.str_status != 'draft']
+            
+            # Log informativo para debugging
+            logger.info(
+                f"👥 Copropietario/Invitado '{current_user}' (rol={user.int_id_rol}) - "
+                f"Filtrando encuestas draft. Total: {len(all_polls)} -> Visibles: {len(polls)}"
+            )
+        else:  # Super Admin (rol 1) o Administrador (rol 2)
+            # Mostrar TODAS las encuestas sin filtrar
+            polls = all_polls
+            
+            # Log informativo para debugging
+            logger.info(
+                f"👨‍💼 Admin '{current_user}' (rol={user.int_id_rol}) - "
+                f"Mostrando todas las encuestas (incluyendo draft). Total: {len(polls)}"
+            )
+        # ============================================================================
+        # FIN DE LA MODIFICACIÓN
+        # ============================================================================
+
+        # Preparar respuesta con has_voted y user_votes
+        polls_data = []
+        for poll in polls:
+            # Verificar si el usuario ya votó en esta encuesta
+            has_voted = await poll_service.user_has_voted(poll.id, user.id) if not poll.bln_is_anonymous else False
+            
+            # ✅ Obtener las opciones votadas por el usuario
+            user_voted_options = []
+            if has_voted and not poll.bln_is_anonymous:
+                # Buscar los votos del usuario en esta encuesta
+                from app.models.poll_response_model import PollResponseModel
+                from app.models.poll_option_model import PollOptionModel
+                
+                vote_query = (
+                    select(PollResponseModel, PollOptionModel)
+                    .join(PollOptionModel, PollResponseModel.int_option_id == PollOptionModel.id)
+                    .where(and_(
+                        PollResponseModel.int_poll_id == poll.id,
+                        PollResponseModel.int_user_id == user.id,
+                        PollResponseModel.bln_is_abstention == False
+                    ))
+                )
+                
+                vote_result = await db.execute(vote_query)
+                votes = vote_result.all()
+                
+                for vote_response, vote_option in votes:
+                    user_voted_options.append({
+                        "option_id": vote_option.id,
+                        "option_text": vote_option.str_option_text,
+                        "voted_at": vote_response.dat_response_at
+                    })
+            
+            polls_data.append({
+                "id": poll.id,
+                "str_poll_code": poll.str_poll_code,
+                "str_title": poll.str_title,
+                "str_description": poll.str_description,
+                "str_poll_type": poll.str_poll_type,
+                "str_status": poll.str_status,
+                "bln_is_anonymous": poll.bln_is_anonymous,
+                "bln_requires_quorum": poll.bln_requires_quorum,
+                "dec_minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
+                "bln_allows_abstention": poll.bln_allows_abstention,
+                "bln_allow_multiple_selection": poll.str_poll_type == 'multiple',
+                "int_max_selections": poll.int_max_selections,
+                "int_duration_minutes": poll.int_duration_minutes,
+                "dat_started_at": poll.dat_started_at,
+                "dat_ended_at": poll.dat_ended_at,
+                "has_voted": has_voted,
+                "user_votes": user_voted_options,
+                "options": [
+                    {
+                        "id": opt.id,
+                        "str_option_text": opt.str_option_text,
+                        "int_option_order": opt.int_option_order,
+                        "int_votes_count": opt.int_votes_count,
+                        "dec_percentage": float(opt.dec_percentage) if opt.dec_percentage else 0
+                    } for opt in sorted(poll.options, key=lambda x: x.int_option_order)
+                ]
+            })
 
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
             message=f"Se encontraron {len(polls)} encuestas",
-            data=[
-                {
-                    "id": poll.id,
-                    "str_poll_code": poll.str_poll_code,
-                    "str_title": poll.str_title,
-                    "str_description": poll.str_description,
-                    "str_poll_type": poll.str_poll_type,
-                    "str_status": poll.str_status,
-                    "bln_is_anonymous": poll.bln_is_anonymous,
-                    "bln_allows_abstention": poll.bln_allows_abstention,
-                    "bln_requires_quorum": poll.bln_requires_quorum,
-                    "dec_minimum_quorum_percentage": poll.dec_minimum_quorum_percentage,
-                    "int_max_selections": poll.int_max_selections,
-                    "int_duration_minutes": poll.int_duration_minutes,
-                    "created_at": poll.created_at,
-                    "dat_started_at": poll.dat_started_at,
-                    "dat_ended_at": poll.dat_ended_at,
-                    "options": [
-                        {
-                            "id": option.id,
-                            "str_option_text": option.str_option_text,
-                            "int_option_order": option.int_option_order
-                        } for option in poll.options
-                    ]
-                } for poll in polls
-            ]
+            data=polls_data
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error al obtener encuestas: {str(e)}")
         raise ServiceException(
-            message=f"Error al listar las encuestas: {str(e)}",
+            message=f"Error al obtener las encuestas: {str(e)}",
             details={"original_error": str(e)}
         )
 

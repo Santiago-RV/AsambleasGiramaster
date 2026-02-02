@@ -1,13 +1,15 @@
-from typing import Optional, Any
+from typing import Optional, Any, Generic, TypeVar
 from pydantic import BaseModel, Field
 
-class SuccessResponse(BaseModel):
+T = TypeVar('T')
+
+class SuccessResponse(BaseModel, Generic[T]):
   """ Respuesta estándar para todas las APIs """
 
   success: bool = Field(default=True, description="Indica si la operación fue exitosa")
   status_code: int = Field(default=200, description="Código de estado HTTP")
   message: str = Field(default="Operación exitosa", description="Mensaje descriptivo de la operación")
-  data: Optional[Any] = Field(default=None, description="Datos de la respuesta (especificos segun el endpoint)")
+  data: Optional[T] = Field(default=None, description="Datos de la respuesta (específicos según el endpoint)")
   meta: Optional[dict] = Field(default=None, description="Metadatos adicionales de la respuesta")
   
   class Config:
@@ -17,9 +19,9 @@ class SuccessResponse(BaseModel):
         "message": "Operación exitosa",
         "data": {"example": "data"},
         "meta": {
-          "total": 10,
-          "page": 1,
-          "limit": 10
+          "total":10,
+          "page":1,
+          "limit":10
         }
       }
     }

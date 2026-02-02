@@ -9,6 +9,9 @@ from contextlib import asynccontextmanager
 import uvicorn
 import time
 
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
+
 from app.core.config import settings
 from app.api.v1.api import api_router
 from app.core.database import init_db, close_db, check_db_connection
@@ -124,14 +127,27 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(IntegrityError, integrity_error_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
+# Configurar CORS dinámicamente según el ambiente
+allowed_origins = list(settings.ALLOWED_HOSTS)
+
+# En desarrollo, permitirlocalhost para facilidad de uso
+if settings.ENVIRONMENT == "development":
+    if not allowed_origins:
+        allowed_origins = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"]
+
+# En producción, solo permitir orígenes configurados explícitamente
+if settings.ENVIRONMENT == "production" and not allowed_origins:
+    # Seguridad: si no hay orígenes configurados en producción, denegar todo
+    allowed_origins = []
+
 app.add_middleware(
   CORSMiddleware,
-  allow_origins=list(settings.ALLOWED_HOSTS),
-  allow_credentials=True,
-  allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allow_origins=allowed_origins,
+  allow_credentials=True if len(allowed_origins) > 0 else False,
+  allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"] if len(allowed_origins) > 0 else [],
   allow_headers=[
     "Authorization",
-    "X-Requested-With",
+    "X-Requested-With", 
     "Content-Type",
     "DNT",
     "Accept",
@@ -140,10 +156,14 @@ app.add_middleware(
     "User-Agent",
     "Origin",
     "If-Modified-Since"
-    ],
-    expose_headers=["Content-Type", "X-Total-Count"],
-    max_age=600,
+    ] if len(allowed_origins) > 0 else [],
+  expose_headers=["Content-Type", "X-Total-Count"] if len(allowed_origins) > 0 else [],
+  max_age=600 if len(allowed_origins) > 0 else 0,
 )
+
+# Agregar middleware de seguridad (orden importa)
+app.add_middleware(RateLimitMiddleware)  # Primero rate limiting
+app.add_middleware(SecurityHeadersMiddleware)  # Luego headers de seguridad
 
 app.include_router(api_router, prefix="/api/v1")
 

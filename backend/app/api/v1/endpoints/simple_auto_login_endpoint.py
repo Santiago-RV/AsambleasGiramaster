@@ -149,4 +149,3 @@ async def auto_login_simple(
             detail="Error al procesar el auto-login"
         )
 
-
