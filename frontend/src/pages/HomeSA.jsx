@@ -25,13 +25,13 @@ const HomeSA = () => {
 	const [selectedUnitId, setSelectedUnitId] = useState(null);
 	const [previousTab, setPreviousTab] = useState('dashboard');
 	const [guestModalOpen, setGuestModalOpen] = useState(false);
-	
+
 	// ==========================================
 	// HOOKS
 	// ==========================================
 	const { logout } = useAuth();
 	const { user } = useAuthContext();
-	
+
 	// Hook de operaciones de invitados - USA selectedUnitId CORRECTAMENTE
 	const { createGuestMutation } = useGuestOperations(selectedUnitId);
 
@@ -77,7 +77,7 @@ const HomeSA = () => {
 	// ==========================================
 	// FUNCIONES DE NAVEGACIÓN
 	// ==========================================
-	
+
 	// Función para navegar a detalles de unidad residencial
 	const handleViewUnitDetails = (unitId) => {
 		setSelectedUnitId(unitId);
@@ -104,7 +104,7 @@ const HomeSA = () => {
 	// ==========================================
 	// FUNCIONES DE REUNIONES
 	// ==========================================
-	
+
 	// Función para iniciar una reunión
 	const handleStartMeeting = (meeting) => {
 		setMeetingData(meeting);
@@ -120,7 +120,7 @@ const HomeSA = () => {
 	// ==========================================
 	// FUNCIONES DE INVITADOS
 	// ==========================================
-	
+
 	const handleOpenGuestModal = () => {
 		if (!selectedUnitId) {
 			// Si no hay unidad seleccionada, mostrar advertencia
@@ -147,7 +147,7 @@ const HomeSA = () => {
 	// ==========================================
 	// RENDERIZADO DE CONTENIDO
 	// ==========================================
-	
+
 	const renderContent = () => {
 		switch (activeTab) {
 			case 'dashboard':
@@ -192,7 +192,7 @@ const HomeSA = () => {
 	// ==========================================
 	// HEADER PERSONALIZADO
 	// ==========================================
-	
+
 	const headerContent = (
 		<div className="px-8 py-4 flex justify-between items-center">
 			<div className="flex items-center gap-4">
@@ -222,7 +222,7 @@ const HomeSA = () => {
 							: user?.role?.charAt(0).toUpperCase() || 'U'
 						}
 					</div>
-					<div className="flex flex-col">
+					<div className="hidden md:flex flex-col">
 						<span className="text-sm font-semibold text-gray-800">
 							{user?.name || user?.role || 'Usuario'}
 						</span>
@@ -230,6 +230,7 @@ const HomeSA = () => {
 							{user?.email || ''}
 						</span>
 					</div>
+
 				</div>
 
 				{/* Cerrar sesión */}
@@ -247,7 +248,7 @@ const HomeSA = () => {
 	// ==========================================
 	// RENDERIZADO PRINCIPAL
 	// ==========================================
-	
+
 	// Si estamos en zoom-meeting o configuración, mostrar sin layout
 	if (activeTab === 'zoom-meeting' || activeTab === 'configuracion') {
 		return (

@@ -16,6 +16,7 @@ const DashboardLayout = ({
   sidebarFooter,
   className = '',
 }) => {
+  {/* Bloquear deslisamiento verical con menu abierto */}
   const [sidebarOpen, setSidebarOpen] = useState(false);
   useEffect(() => {
     if (sidebarOpen) {
@@ -84,11 +85,12 @@ const DashboardLayout = ({
             bg-white
             shadow-sm
             border-b border-gray-200
-            h-14
-            flex
-            items-center
+            min-h-[56px]
+            flex items-center
             px-4 md:px-6
             gap-3
+            overflow-hidden
+            flex-nowrap
           "
         >
           {/* Botón menú mobile) */}
@@ -100,7 +102,7 @@ const DashboardLayout = ({
           </button>
 
           {/* Header content */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             {header}
           </div>
         </header>
