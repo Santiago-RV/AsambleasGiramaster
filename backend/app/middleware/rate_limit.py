@@ -36,7 +36,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
         
         if not is_allowed:
-            # Retornar error 429 Too Many Requests
+            # Obtener origen para CORS
+            origin = request.headers.get("Origin", "*")
+            
+            # Retornar error 429 Too Many Requests con headers CORS
             return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 content={
@@ -50,7 +53,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     "X-RateLimit-Limit": str(limits["max_requests"]),
                     "X-RateLimit-Remaining": str(info["remaining_requests"]),
                     "X-RateLimit-Reset": str(info["reset_time"]),
-                    "Retry-After": str(limits["window_minutes"] * 60)
+                    "Retry-After": str(limits["window_minutes"] * 60),
+                    # Headers CORS críticos para permitir que el navegador lea la respuesta
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Requested-With",
+                    "Access-Control-Expose-Headers": "X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After"
                 }
             )
         
