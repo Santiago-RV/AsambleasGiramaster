@@ -20,6 +20,7 @@ from datetime import datetime
 import logging
 import secrets
 import string
+import os
 
 from app.core.database import get_db
 from app.auth.auth import get_current_user_obj
@@ -90,6 +91,30 @@ class BulkQRResponse(BaseModel):
     generated_qrs: List[Dict]
     total_generated: int
     total_failed: int
+
+
+class BulkQRSimpleRequest(BaseModel):
+    """Request para generar tokens QR simples en masa (sin imágenes)"""
+    user_ids: List[int]
+    expiration_hours: int = 48
+
+
+class QRTokenData(BaseModel):
+    """Datos de un token QR individual"""
+    user_id: int
+    auto_login_token: str
+    auto_login_url: str
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    apartment_number: Optional[str] = None
+
+
+class BulkQRSimpleResponse(BaseModel):
+    """Response de generación masiva de tokens QR (sin imágenes)"""
+    qr_tokens: List[QRTokenData]
+    total_generated: int
+    total_failed: int
+    failed_users: List[Dict] = []
 
 
 # ============================================
@@ -508,4 +533,131 @@ async def generate_bulk_qr(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error en generación masiva de QRs: {str(e)}"
+        )
+
+
+@router.post(
+    "/generate-qr-bulk-simple",
+    summary="Genera tokens QR simples para múltiples usuarios (sin imágenes)",
+    description="Genera solo los tokens de auto-login para múltiples usuarios sin generar las imágenes QR. Ideal para generar PDFs en el frontend.",
+    response_model=SuccessResponse[BulkQRSimpleResponse]
+)
+async def generate_qr_bulk_simple(
+    request: BulkQRSimpleRequest,
+    current_user: UserModel = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generación masiva de tokens QR (sin imágenes).
+    
+    - Procesa múltiples usuarios en una sola petición
+    - Genera contraseñas temporales y tokens de auto-login
+    - NO genera las imágenes QR (más rápido y eficiente)
+    - El frontend genera las imágenes QR localmente
+    
+    **Uso:** Ideal para generar PDFs con múltiples QRs en el frontend
+    
+    **Límite de Rate:** 10 peticiones por hora
+    """
+    try:
+        _check_admin_permissions(current_user)
+        
+        # Validar número de usuarios
+        if len(request.user_ids) > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se pueden procesar más de 100 usuarios a la vez"
+            )
+        
+        if not request.user_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe proporcionar al menos un user_id"
+            )
+        
+        logger.info(f"🔄 Generando tokens QR para {len(request.user_ids)} usuarios")
+        
+        # Obtener información de todos los usuarios
+        result = await db.execute(
+            select(UserModel, DataUserModel, UserResidentialUnitModel)
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .outerjoin(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+            .where(UserModel.id.in_(request.user_ids))
+        )
+        users_data = result.all()
+        
+        if not users_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se encontraron usuarios válidos"
+            )
+        
+        qr_tokens = []
+        failed_users = []
+        
+        # Procesar cada usuario
+        for target_user, target_data_user, user_residential_unit in users_data:
+            try:
+                # Generar contraseña temporal
+                temp_password = _generate_temporary_password()
+                
+                # Actualizar hash en BD
+                await _update_user_password(db, target_user, temp_password)
+                
+                # Generar token de auto-login
+                token = simple_auto_login_service.generate_auto_login_token(
+                    username=target_user.str_username,
+                    password=temp_password,
+                    expiration_hours=request.expiration_hours
+                )
+                
+                # Construir URL de auto-login
+                frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+                auto_login_url = f"{frontend_url}/auto-login/{token}"
+                
+                # Añadir a resultados exitosos
+                qr_tokens.append(QRTokenData(
+                    user_id=target_user.id,
+                    auto_login_token=token,
+                    auto_login_url=auto_login_url,
+                    firstname=target_data_user.str_firstname,
+                    lastname=target_data_user.str_lastname,
+                    apartment_number=user_residential_unit.str_apartment_number if user_residential_unit else "N/A"
+                ))
+                
+                logger.info(f"✅ Token generado para usuario {target_user.id}: {target_user.str_username}")
+                
+            except Exception as user_error:
+                logger.error(f"❌ Error procesando usuario {target_user.id}: {str(user_error)}")
+                failed_users.append({
+                    "user_id": target_user.id,
+                    "username": target_user.str_username,
+                    "error": str(user_error)
+                })
+        
+        # Commit de todos los cambios de contraseñas
+        await db.commit()
+        
+        total_generated = len(qr_tokens)
+        total_failed = len(failed_users)
+        
+        logger.info(f"📊 Generación bulk simple: {total_generated} exitosos, {total_failed} fallidos")
+        
+        return SuccessResponse[BulkQRSimpleResponse](
+            data=BulkQRSimpleResponse(
+                qr_tokens=qr_tokens,
+                total_generated=total_generated,
+                total_failed=total_failed,
+                failed_users=failed_users
+            ),
+            message=f"Tokens generados: {total_generated} exitosos, {total_failed} errores"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en generación bulk simple: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en generación masiva de tokens QR: {str(e)}"
         )

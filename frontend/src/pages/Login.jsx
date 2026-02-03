@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
 import { User, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import Swal from 'sweetalert2';
-import logo from '../assets/logo_giramaster.jpeg';
+import logo from '../assets/logo-giramaster.jpeg';
 import background from '../assets/background_giramaster.jpeg';
 
 const Login = () => {
