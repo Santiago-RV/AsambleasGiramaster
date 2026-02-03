@@ -5,6 +5,9 @@ import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
 import { jsPDF } from 'jspdf';
 import QRCodeLib from 'qrcode';
+import { useQuery } from '@tanstack/react-query';
+import { UserService } from '../../services/api/UserService';
+import logoGiramaster from '../../assets/logo-giramaster.jpeg';
 
 /**
  * Componente reutilizable para mostrar lista de residentes
@@ -37,6 +40,20 @@ const ResidentsList = ({
 	const [autoLoginUrl, setAutoLoginUrl] = useState('');
 	const [isSendingQRs, setIsSendingQRs] = useState(false);
 	const menuButtonRefs = useRef({});
+
+	// Obtener datos del usuario actual para nombre de unidad residencial
+	const { data: userData } = useQuery({
+		queryKey: ['current-user-data'],
+		queryFn: async () => {
+			const response = await UserService.getCurrentUserData();
+			return response.data;
+		},
+		retry: 1,
+		refetchOnWindowFocus: false
+	});
+
+	// Extraer nombre de la unidad residencial
+	const residentialUnitName = userData?.residential_unit?.str_name || 'Unidad Residencial';
 
 	/**
 	 * Determina si se puede modificar el acceso de un residente
@@ -158,6 +175,103 @@ const ResidentsList = ({
 			setSelectedResidents([]);
 			setSelectAll(false);
 		});
+	};
+
+	// Función helper para convertir imagen a Base64
+	const loadImageAsBase64 = (url) => {
+		return new Promise((resolve, reject) => {
+			const img = new Image();
+			img.crossOrigin = 'Anonymous';
+			img.onload = () => {
+				const canvas = document.createElement('canvas');
+				canvas.width = img.width;
+				canvas.height = img.height;
+				const ctx = canvas.getContext('2d');
+				ctx.drawImage(img, 0, 0);
+				resolve(canvas.toDataURL('image/jpeg'));
+			};
+			img.onerror = reject;
+			img.src = url;
+		});
+	};
+
+	// Función para agregar header en cada página del PDF
+	const addHeader = (pdf, pageNumber, totalPages, logoBase64, unitName) => {
+		const pageWidth = pdf.internal.pageSize.getWidth();
+		const margin = 20;
+		
+		// Agregar logo (esquina superior izquierda)
+		const logoWidth = 40;
+		const logoHeight = 15.6; // Mantiene proporción 2.56:1 del logo 948x370
+		pdf.addImage(logoBase64, 'JPEG', margin, margin - 5, logoWidth, logoHeight);
+		
+		// Título principal (centrado)
+		pdf.setFontSize(16);
+		pdf.setFont('helvetica', 'bold');
+		pdf.setTextColor(41, 128, 185); // Azul corporativo
+		pdf.text('CÓDIGOS QR DE ACCESO', pageWidth / 2, margin + 2, { align: 'center' });
+		
+		// Nombre de la unidad residencial (centrado, debajo del título)
+		pdf.setFontSize(14);
+		pdf.setFont('helvetica', 'bold');
+		pdf.setTextColor(52, 73, 94); // Gris oscuro
+		pdf.text(unitName, pageWidth / 2, margin + 10, { align: 'center' });
+		
+		// Fecha de generación (centrado, debajo de unidad)
+		pdf.setFontSize(9);
+		pdf.setFont('helvetica', 'normal');
+		pdf.setTextColor(127, 140, 141); // Gris claro
+		const currentDate = new Date().toLocaleDateString('es-ES', { 
+			year: 'numeric', 
+			month: 'long', 
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+		pdf.text(`Generado el ${currentDate}`, pageWidth / 2, margin + 16, { align: 'center' });
+		
+		// Línea separadora
+		pdf.setDrawColor(189, 195, 199);
+		pdf.setLineWidth(0.5);
+		pdf.line(margin, margin + 20, pageWidth - margin, margin + 20);
+		
+		// Resetear colores
+		pdf.setTextColor(0, 0, 0);
+	};
+
+	// Función para agregar footer en cada página del PDF
+	const addFooter = (pdf, pageNumber, totalPages) => {
+		const pageWidth = pdf.internal.pageSize.getWidth();
+		const pageHeight = pdf.internal.pageSize.getHeight();
+		const margin = 20;
+		
+		// Línea separadora superior
+		pdf.setDrawColor(189, 195, 199);
+		pdf.setLineWidth(0.5);
+		pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+		
+		// Número de página
+		pdf.setFontSize(9);
+		pdf.setFont('helvetica', 'normal');
+		pdf.setTextColor(127, 140, 141);
+		pdf.text(
+			`Página ${pageNumber} de ${totalPages}`,
+			pageWidth / 2,
+			pageHeight - 8,
+			{ align: 'center' }
+		);
+		
+		// Marca de agua
+		pdf.setFontSize(8);
+		pdf.text(
+			'Sistema de Gestión de Asambleas - GIRAMASTER',
+			pageWidth / 2,
+			pageHeight - 4,
+			{ align: 'center' }
+		);
+		
+		// Resetear colores
+		pdf.setTextColor(0, 0, 0);
 	};
 
 	const handleGenerateBulkQRsPDF = async () => {
@@ -314,94 +428,107 @@ const ResidentsList = ({
 			throw fetchError;
 		}
 
-			// Si hay al menos un QR generado, crear el PDF
-			if (qrData.length > 0) {
-				Swal.update({
-					title: 'Creando documento PDF...',
-					html: 'Generando documento con los códigos QR'
-				});
+		// Si hay al menos un QR generado, crear el PDF
+		if (qrData.length > 0) {
+			Swal.update({
+				title: 'Creando documento PDF...',
+				html: 'Cargando logo y preparando documento...'
+			});
 
-				// Crear PDF con jsPDF
-				const pdf = new jsPDF({
-					orientation: 'portrait',
-					unit: 'mm',
-					format: 'a4'
-				});
+			// Cargar logo como base64
+			const logoBase64 = await loadImageAsBase64(logoGiramaster);
 
-				const pageWidth = pdf.internal.pageSize.getWidth();
-				const pageHeight = pdf.internal.pageSize.getHeight();
-				const margin = 20;
-				const qrSize = 60; // Tamaño del QR en mm
-				const cellWidth = (pageWidth - 2 * margin) / 2; // Ancho de cada celda (2 columnas)
-				const cellHeight = (pageHeight - 2 * margin - 20) / 2; // Alto de cada celda (2 filas) - 20mm para header
+			// Crear PDF con jsPDF
+			const pdf = new jsPDF({
+				orientation: 'portrait',
+				unit: 'mm',
+				format: 'a4'
+			});
 
-				// Añadir título en la primera página
-				pdf.setFontSize(18);
+			const pageWidth = pdf.internal.pageSize.getWidth();
+			const pageHeight = pdf.internal.pageSize.getHeight();
+			const margin = 20;
+			const headerHeight = 30; // Espacio para el nuevo header con logo
+			const footerHeight = 20; // Espacio para footer
+			const qrSize = 60; // Tamaño del QR en mm
+			const cellWidth = (pageWidth - 2 * margin) / 2; // Ancho de cada celda (2 columnas)
+			const cellHeight = (pageHeight - 2 * margin - headerHeight - footerHeight) / 2; // Alto ajustado
+
+			// Calcular total de páginas
+			const totalPages = Math.ceil(qrData.length / 4);
+			let currentPage = 1;
+			let pageQRCount = 0;
+
+			// Agregar header a la primera página
+			addHeader(pdf, currentPage, totalPages, logoBase64, residentialUnitName);
+
+			Swal.update({
+				html: 'Generando documento con los códigos QR...'
+			});
+
+			// Iterar sobre cada QR y añadirlo al PDF (4 por página en grid 2x2)
+			for (let i = 0; i < qrData.length; i++) {
+				const { resident, qrImageUrl } = qrData[i];
+
+				// Calcular posición en el grid 2x2
+				const col = pageQRCount % 2; // 0 o 1
+				const row = Math.floor(pageQRCount / 2); // 0 o 1
+
+				const x = margin + col * cellWidth;
+				const y = margin + headerHeight + row * cellHeight; // Ajustado para nuevo header
+
+				// Centrar QR en la celda
+				const qrX = x + (cellWidth - qrSize) / 2;
+				const qrY = y + 10;
+
+				// Añadir imagen QR
+				pdf.addImage(qrImageUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+				// Añadir nombre del residente (centrado, debajo del QR)
+				pdf.setFontSize(12);
 				pdf.setFont('helvetica', 'bold');
-				pdf.text('Códigos QR de Acceso', pageWidth / 2, margin, { align: 'center' });
+				const nameY = qrY + qrSize + 8;
+				pdf.text(
+					`${resident.firstname} ${resident.lastname}`,
+					x + cellWidth / 2,
+					nameY,
+					{ align: 'center', maxWidth: cellWidth - 10 }
+				);
 
+				// Añadir apartamento (centrado, debajo del nombre)
 				pdf.setFontSize(10);
 				pdf.setFont('helvetica', 'normal');
-				const currentDate = new Date().toLocaleDateString('es-ES', { 
-					year: 'numeric', 
-					month: 'long', 
-					day: 'numeric' 
-				});
-				pdf.text(`Generado el ${currentDate}`, pageWidth / 2, margin + 6, { align: 'center' });
+				pdf.setTextColor(100, 100, 100);
+				pdf.text(
+					`Apt. ${resident.apartment_number}`,
+					x + cellWidth / 2,
+					nameY + 6,
+					{ align: 'center' }
+				);
 
-				let pageQRCount = 0;
+				// Resetear color de texto
+				pdf.setTextColor(0, 0, 0);
 
-				// Iterar sobre cada QR y añadirlo al PDF (4 por página en grid 2x2)
-				for (let i = 0; i < qrData.length; i++) {
-					const { resident, qrImageUrl } = qrData[i];
+				pageQRCount++;
 
-					// Calcular posición en el grid 2x2
-					const col = pageQRCount % 2; // 0 o 1
-					const row = Math.floor(pageQRCount / 2); // 0 o 1
-
-					const x = margin + col * cellWidth;
-					const y = margin + 20 + row * cellHeight; // +20 para el header
-
-					// Centrar QR en la celda
-					const qrX = x + (cellWidth - qrSize) / 2;
-					const qrY = y + 10;
-
-					// Añadir imagen QR
-					pdf.addImage(qrImageUrl, 'PNG', qrX, qrY, qrSize, qrSize);
-
-					// Añadir nombre del residente (centrado, debajo del QR)
-					pdf.setFontSize(12);
-					pdf.setFont('helvetica', 'bold');
-					const nameY = qrY + qrSize + 8;
-					pdf.text(
-						`${resident.firstname} ${resident.lastname}`,
-						x + cellWidth / 2,
-						nameY,
-						{ align: 'center', maxWidth: cellWidth - 10 }
-					);
-
-					// Añadir apartamento (centrado, debajo del nombre)
-					pdf.setFontSize(10);
-					pdf.setFont('helvetica', 'normal');
-					pdf.setTextColor(100, 100, 100);
-					pdf.text(
-						`Apt. ${resident.apartment_number}`,
-						x + cellWidth / 2,
-						nameY + 6,
-						{ align: 'center' }
-					);
-
-					// Resetear color de texto
-					pdf.setTextColor(0, 0, 0);
-
-					pageQRCount++;
-
-					// Si completamos 4 QRs y hay más residentes, añadir nueva página
-					if (pageQRCount === 4 && i < qrData.length - 1) {
-						pdf.addPage();
-						pageQRCount = 0;
-					}
+				// Si completamos 4 QRs y hay más residentes, añadir nueva página
+				if (pageQRCount === 4 && i < qrData.length - 1) {
+					// Agregar footer a la página actual
+					addFooter(pdf, currentPage, totalPages);
+					
+					// Crear nueva página
+					pdf.addPage();
+					currentPage++;
+					
+					// Agregar header a la nueva página
+					addHeader(pdf, currentPage, totalPages, logoBase64, residentialUnitName);
+					
+					pageQRCount = 0;
 				}
+			}
+
+			// Agregar footer a la última página
+			addFooter(pdf, currentPage, totalPages);
 
 				// Guardar PDF
 				const fileName = `QR_Residentes_${new Date().toISOString().split('T')[0]}.pdf`;
