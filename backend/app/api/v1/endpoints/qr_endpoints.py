@@ -244,7 +244,7 @@ async def generate_qr_simple(
         )
         
         # Construir URL del frontend
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://10.1.1.171:5173')
         auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
         
         logger.info(
