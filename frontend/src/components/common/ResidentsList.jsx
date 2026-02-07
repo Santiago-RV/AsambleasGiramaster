@@ -199,42 +199,42 @@ const ResidentsList = ({
 	const addHeader = (pdf, pageNumber, totalPages, logoBase64, unitName) => {
 		const pageWidth = pdf.internal.pageSize.getWidth();
 		const margin = 20;
-		
+
 		// Agregar logo (esquina superior izquierda)
 		const logoWidth = 40;
 		const logoHeight = 15.6; // Mantiene proporción 2.56:1 del logo 948x370
 		pdf.addImage(logoBase64, 'JPEG', margin, margin - 5, logoWidth, logoHeight);
-		
+
 		// Título principal (centrado)
 		pdf.setFontSize(16);
 		pdf.setFont('helvetica', 'bold');
 		pdf.setTextColor(41, 128, 185); // Azul corporativo
 		pdf.text('CÓDIGOS QR DE ACCESO', pageWidth / 2, margin + 2, { align: 'center' });
-		
+
 		// Nombre de la unidad residencial (centrado, debajo del título)
 		pdf.setFontSize(14);
 		pdf.setFont('helvetica', 'bold');
 		pdf.setTextColor(52, 73, 94); // Gris oscuro
 		pdf.text(unitName, pageWidth / 2, margin + 10, { align: 'center' });
-		
+
 		// Fecha de generación (centrado, debajo de unidad)
 		pdf.setFontSize(9);
 		pdf.setFont('helvetica', 'normal');
 		pdf.setTextColor(127, 140, 141); // Gris claro
-		const currentDate = new Date().toLocaleDateString('es-ES', { 
-			year: 'numeric', 
-			month: 'long', 
+		const currentDate = new Date().toLocaleDateString('es-ES', {
+			year: 'numeric',
+			month: 'long',
 			day: 'numeric',
 			hour: '2-digit',
 			minute: '2-digit'
 		});
 		pdf.text(`Generado el ${currentDate}`, pageWidth / 2, margin + 16, { align: 'center' });
-		
+
 		// Línea separadora
 		pdf.setDrawColor(189, 195, 199);
 		pdf.setLineWidth(0.5);
 		pdf.line(margin, margin + 20, pageWidth - margin, margin + 20);
-		
+
 		// Resetear colores
 		pdf.setTextColor(0, 0, 0);
 	};
@@ -244,12 +244,12 @@ const ResidentsList = ({
 		const pageWidth = pdf.internal.pageSize.getWidth();
 		const pageHeight = pdf.internal.pageSize.getHeight();
 		const margin = 20;
-		
+
 		// Línea separadora superior
 		pdf.setDrawColor(189, 195, 199);
 		pdf.setLineWidth(0.5);
 		pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
-		
+
 		// Número de página
 		pdf.setFontSize(9);
 		pdf.setFont('helvetica', 'normal');
@@ -260,7 +260,7 @@ const ResidentsList = ({
 			pageHeight - 8,
 			{ align: 'center' }
 		);
-		
+
 		// Marca de agua
 		pdf.setFontSize(8);
 		pdf.text(
@@ -269,7 +269,7 @@ const ResidentsList = ({
 			pageHeight - 4,
 			{ align: 'center' }
 		);
-		
+
 		// Resetear colores
 		pdf.setTextColor(0, 0, 0);
 	};
@@ -288,7 +288,7 @@ const ResidentsList = ({
 		// Confirmar acción
 		const result = await Swal.fire({
 			title: '¿Generar documento PDF con códigos QR?',
-			html: `Se generará un documento PDF con <strong>${selectedResidents.length}</strong> código(s) QR (4 por página).`,
+			html: `Se generará un documento PDF con <strong>${selectedResidents.length}</strong> código(s) QR (21 por página).`,
 			icon: 'question',
 			showCancelButton: true,
 			confirmButtonColor: '#9333ea',
@@ -303,232 +303,222 @@ const ResidentsList = ({
 
 		try {
 			const token = localStorage.getItem('access_token');
-			
+
 			if (!token) {
 				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
 			}
 
-		console.log('🔄 Generando PDF con QRs para:', selectedResidents.length, 'residentes');
+			console.log('🔄 Generando PDF con QRs para:', selectedResidents.length, 'residentes');
 
-		// Mostrar progreso
-		Swal.fire({
-			title: 'Generando códigos QR...',
-			html: 'Generando tokens de acceso para todos los residentes...',
-			allowOutsideClick: false,
-			allowEscapeKey: false,
-			didOpen: () => {
-				Swal.showLoading();
-			},
-		});
-
-		const qrData = [];
-		let successCount = 0;
-		let errorCount = 0;
-		const errors = [];
-
-		try {
-			// ⭐ NUEVA IMPLEMENTACIÓN: Una sola petición al endpoint bulk
-			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
-			const endpoint = `${apiUrl}/residents/generate-qr-bulk-simple`;
-
-			const response = await fetch(endpoint, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${token}`
+			// Mostrar progreso
+			Swal.fire({
+				title: 'Generando códigos QR...',
+				html: 'Generando tokens de acceso para todos los residentes...',
+				allowOutsideClick: false,
+				allowEscapeKey: false,
+				didOpen: () => {
+					Swal.showLoading();
 				},
-				body: JSON.stringify({
-					user_ids: selectedResidents,
-					expiration_hours: 48
-				})
 			});
 
-		if (!response.ok) {
-			// Manejo especial para rate limit (429)
-			if (response.status === 429) {
-				const retryAfter = response.headers.get('Retry-After');
-				const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 60;
-				const resetTime = response.headers.get('X-RateLimit-Reset');
-				
-				let message = `⏱️ Límite de solicitudes excedido.\n\nPor favor, intenta nuevamente en ${minutes} minutos.`;
-				
-				if (resetTime) {
-					const resetDate = new Date(resetTime);
-					message += `\n\n🕐 Disponible nuevamente: ${resetDate.toLocaleTimeString('es-ES')}`;
-				}
-				
-				throw new Error(message);
-			}
-			
-			const errorData = await response.json().catch(() => ({}));
-			throw new Error(errorData.detail || `Error HTTP ${response.status}`);
-		}
+			const qrData = [];
+			let successCount = 0;
+			let errorCount = 0;
+			const errors = [];
 
-			const data = await response.json();
-			
-			if (!data.success || !data.data) {
-				throw new Error('Respuesta inválida del servidor');
-			}
+			try {
+				// Petición al endpoint bulk
+				const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+				const endpoint = `${apiUrl}/residents/generate-qr-bulk-simple`;
 
-			// Actualizar progreso: generando imágenes QR
-			Swal.update({
-				html: 'Generando imágenes QR localmente...'
-			});
+				const response = await fetch(endpoint, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${token}`
+					},
+					body: JSON.stringify({
+						user_ids: selectedResidents,
+						expiration_hours: 48
+					})
+				});
 
-			// Procesar cada token y generar la imagen QR localmente
-			for (let i = 0; i < data.data.qr_tokens.length; i++) {
-				const tokenData = data.data.qr_tokens[i];
-				
-				try {
-					// Generar imagen QR como Data URL
-					const qrImageUrl = await QRCodeLib.toDataURL(tokenData.auto_login_url, {
-						width: 300,
-						margin: 2,
-						color: {
-							dark: '#1e40af',
-							light: '#ffffff'
-						}
-					});
+				if (!response.ok) {
+					// Manejo especial para rate limit (429)
+					if (response.status === 429) {
+						const retryAfter = response.headers.get('Retry-After');
+						const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 5;
 
-					qrData.push({
-						resident: {
-							id: tokenData.user_id,
-							firstname: tokenData.firstname,
-							lastname: tokenData.lastname,
-							apartment_number: tokenData.apartment_number
-						},
-						qrImageUrl,
-						url: tokenData.auto_login_url
-					});
+						await Swal.fire({
+							icon: 'warning',
+							title: 'Límite de solicitudes alcanzado',
+							html: `Por favor, espera <strong>${minutes}</strong> minuto(s) antes de intentar nuevamente.`,
+							confirmButtonColor: '#3498db'
+						});
 
-					successCount++;
-					console.log(`✅ QR generado para: ${tokenData.firstname} ${tokenData.lastname}`);
-				} catch (qrError) {
-					errorCount++;
-					errors.push(`${tokenData.firstname} ${tokenData.lastname}: Error generando imagen QR`);
-					console.error(`❌ Error generando imagen QR:`, qrError);
+						setIsSendingQRs(false);
+						return;
+					}
+
+					const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }));
+					throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
 				}
 
-				// Actualizar progreso
+				const data = await response.json();
+				console.log('✅ Respuesta del backend:', data);
+
+				// Procesar tokens recibidos
+				for (let i = 0; i < data.data.qr_tokens.length; i++) {
+					const tokenData = data.data.qr_tokens[i];
+
+					try {
+						// Generar QR como imagen
+						const qrImageUrl = await QRCodeLib.toDataURL(tokenData.auto_login_url, {
+							width: 512,
+							margin: 1,
+							color: {
+								dark: '#1e40af',
+								light: '#ffffff'
+							}
+						});
+
+						qrData.push({
+							resident: tokenData,
+							qrImageUrl
+						});
+
+						successCount++;
+						console.log(`✅ QR generado para: ${tokenData.firstname} ${tokenData.lastname}`);
+					} catch (qrError) {
+						errorCount++;
+						errors.push(`${tokenData.firstname} ${tokenData.lastname}: Error generando imagen QR`);
+						console.error(`❌ Error generando imagen QR:`, qrError);
+					}
+
+					// Actualizar progreso
+					Swal.update({
+						html: `Generando imágenes QR: ${i + 1} de ${data.data.qr_tokens.length}`
+					});
+				}
+
+				// Reportar errores del backend si los hay
+				if (data.data.failed_users && data.data.failed_users.length > 0) {
+					data.data.failed_users.forEach(failed => {
+						errorCount++;
+						errors.push(`Usuario ID ${failed.user_id}: ${failed.error}`);
+					});
+				}
+
+			} catch (fetchError) {
+				console.error('❌ Error en petición bulk:', fetchError);
+				throw fetchError;
+			}
+
+			// Si hay al menos un QR generado, crear el PDF
+			if (qrData.length > 0) {
 				Swal.update({
-					html: `Generando imágenes QR: ${i + 1} de ${data.data.qr_tokens.length}`
+					title: 'Creando documento PDF...',
+					html: 'Preparando documento con códigos QR...'
 				});
-			}
 
-			// Reportar errores del backend si los hay
-			if (data.data.failed_users && data.data.failed_users.length > 0) {
-				data.data.failed_users.forEach(failed => {
-					errorCount++;
-					errors.push(`Usuario ID ${failed.user_id}: ${failed.error}`);
+				// Crear PDF con jsPDF
+				const pdf = new jsPDF({
+					orientation: 'portrait',
+					unit: 'mm',
+					format: 'a4'
 				});
-			}
 
-		} catch (fetchError) {
-			console.error('❌ Error en petición bulk:', fetchError);
-			throw fetchError;
-		}
+				const pageWidth = pdf.internal.pageSize.getWidth();
+				const pageHeight = pdf.internal.pageSize.getHeight();
+				const margin = 10; // Márgenes reducidos
 
-		// Si hay al menos un QR generado, crear el PDF
-		if (qrData.length > 0) {
-			Swal.update({
-				title: 'Creando documento PDF...',
-				html: 'Cargando logo y preparando documento...'
-			});
+				// Configuración del grid: 3 columnas x 7 filas
+				const cols = 3;
+				const rows = 7;
+				const qrsPerPage = cols * rows; // 21 QR por página
 
-			// Cargar logo como base64
-			const logoBase64 = await loadImageAsBase64(logoGiramaster);
+				const availableWidth = pageWidth - (2 * margin);
+				const availableHeight = pageHeight - (2 * margin);
 
-			// Crear PDF con jsPDF
-			const pdf = new jsPDF({
-				orientation: 'portrait',
-				unit: 'mm',
-				format: 'a4'
-			});
+				const cellWidth = availableWidth / cols;
+				const cellHeight = availableHeight / rows;
 
-			const pageWidth = pdf.internal.pageSize.getWidth();
-			const pageHeight = pdf.internal.pageSize.getHeight();
-			const margin = 20;
-			const headerHeight = 30; // Espacio para el nuevo header con logo
-			const footerHeight = 20; // Espacio para footer
-			const qrSize = 60; // Tamaño del QR en mm
-			const cellWidth = (pageWidth - 2 * margin) / 2; // Ancho de cada celda (2 columnas)
-			const cellHeight = (pageHeight - 2 * margin - headerHeight - footerHeight) / 2; // Alto ajustado
+				// Tamaño del QR (ajustado para que quepa con el texto)
+				const qrSize = Math.min(cellWidth * 0.75, cellHeight * 0.55);
 
-			// Calcular total de páginas
-			const totalPages = Math.ceil(qrData.length / 4);
-			let currentPage = 1;
-			let pageQRCount = 0;
+				let currentPage = 1;
+				let pageQRCount = 0;
 
-			// Agregar header a la primera página
-			addHeader(pdf, currentPage, totalPages, logoBase64, residentialUnitName);
+				Swal.update({
+					html: 'Generando documento con los códigos QR...'
+				});
 
-			Swal.update({
-				html: 'Generando documento con los códigos QR...'
-			});
+				// Iterar sobre cada QR y añadirlo al PDF
+				for (let i = 0; i < qrData.length; i++) {
+					const { resident, qrImageUrl } = qrData[i];
 
-			// Iterar sobre cada QR y añadirlo al PDF (4 por página en grid 2x2)
-			for (let i = 0; i < qrData.length; i++) {
-				const { resident, qrImageUrl } = qrData[i];
+					// Calcular posición en el grid 3x7
+					const col = pageQRCount % cols;
+					const row = Math.floor(pageQRCount / cols);
 
-				// Calcular posición en el grid 2x2
-				const col = pageQRCount % 2; // 0 o 1
-				const row = Math.floor(pageQRCount / 2); // 0 o 1
+					const x = margin + col * cellWidth;
+					const y = margin + row * cellHeight;
 
-				const x = margin + col * cellWidth;
-				const y = margin + headerHeight + row * cellHeight; // Ajustado para nuevo header
+					// Centrar QR en la celda
+					const qrX = x + (cellWidth - qrSize) / 2;
+					const qrY = y + 5;
 
-				// Centrar QR en la celda
-				const qrX = x + (cellWidth - qrSize) / 2;
-				const qrY = y + 10;
+					// Añadir imagen QR
+					pdf.addImage(qrImageUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
-				// Añadir imagen QR
-				pdf.addImage(qrImageUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+					// Añadir nombre de la unidad residencial (arriba del nombre)
+					pdf.setFontSize(7);
+					pdf.setFont('helvetica', 'normal');
+					pdf.setTextColor(100, 100, 100);
+					const unitY = qrY + qrSize + 3;
+					pdf.text(
+						residentialUnitName || 'Unidad Residencial',
+						x + cellWidth / 2,
+						unitY,
+						{ align: 'center', maxWidth: cellWidth - 4 }
+					);
 
-				// Añadir nombre del residente (centrado, debajo del QR)
-				pdf.setFontSize(12);
-				pdf.setFont('helvetica', 'bold');
-				const nameY = qrY + qrSize + 8;
-				pdf.text(
-					`${resident.firstname} ${resident.lastname}`,
-					x + cellWidth / 2,
-					nameY,
-					{ align: 'center', maxWidth: cellWidth - 10 }
-				);
+					// Añadir nombre del residente (centrado, debajo de unidad)
+					pdf.setFontSize(9);
+					pdf.setFont('helvetica', 'bold');
+					pdf.setTextColor(0, 0, 0);
+					const nameY = unitY + 4;
+					pdf.text(
+						`${resident.firstname} ${resident.lastname}`,
+						x + cellWidth / 2,
+						nameY,
+						{ align: 'center', maxWidth: cellWidth - 4 }
+					);
 
-				// Añadir apartamento (centrado, debajo del nombre)
-				pdf.setFontSize(10);
-				pdf.setFont('helvetica', 'normal');
-				pdf.setTextColor(100, 100, 100);
-				pdf.text(
-					`Apt. ${resident.apartment_number}`,
-					x + cellWidth / 2,
-					nameY + 6,
-					{ align: 'center' }
-				);
+					// Añadir apartamento (centrado, debajo del nombre)
+					pdf.setFontSize(8);
+					pdf.setFont('helvetica', 'normal');
+					pdf.setTextColor(80, 80, 80);
+					const aptY = nameY + 3.5;
+					pdf.text(
+						`Apt. ${resident.apartment_number}`,
+						x + cellWidth / 2,
+						aptY,
+						{ align: 'center' }
+					);
 
-				// Resetear color de texto
-				pdf.setTextColor(0, 0, 0);
+					// Resetear color de texto
+					pdf.setTextColor(0, 0, 0);
 
-				pageQRCount++;
+					pageQRCount++;
 
-				// Si completamos 4 QRs y hay más residentes, añadir nueva página
-				if (pageQRCount === 4 && i < qrData.length - 1) {
-					// Agregar footer a la página actual
-					addFooter(pdf, currentPage, totalPages);
-					
-					// Crear nueva página
-					pdf.addPage();
-					currentPage++;
-					
-					// Agregar header a la nueva página
-					addHeader(pdf, currentPage, totalPages, logoBase64, residentialUnitName);
-					
-					pageQRCount = 0;
+					// Si completamos 21 QRs y hay más residentes, añadir nueva página
+					if (pageQRCount === qrsPerPage && i < qrData.length - 1) {
+						pdf.addPage();
+						currentPage++;
+						pageQRCount = 0;
+					}
 				}
-			}
-
-			// Agregar footer a la última página
-			addFooter(pdf, currentPage, totalPages);
 
 				// Guardar PDF
 				const fileName = `QR_Residentes_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -542,45 +532,45 @@ const ResidentsList = ({
 				await Swal.fire({
 					icon: 'success',
 					title: '¡PDF generado exitosamente!',
-					html: `Se generaron <strong>${successCount}</strong> código(s) QR en el documento PDF.`,
-					confirmButtonColor: '#27ae60'
+					html: `Se generaron <strong>${successCount}</strong> código(s) QR correctamente.`,
+					confirmButtonColor: '#27ae60',
 				});
-				setSelectedResidents([]);
-				setSelectAll(false);
 			} else if (successCount > 0) {
 				await Swal.fire({
 					icon: 'warning',
-					title: 'PDF generado parcialmente',
+					title: 'PDF generado con advertencias',
 					html: `
-						<p>✅ QRs generados: <strong>${successCount}</strong></p>
-						<p>❌ Errores: <strong>${errorCount}</strong></p>
-						<div style="margin-top: 10px; max-height: 150px; overflow-y: auto; text-align: left; font-size: 12px;">
-							${errors.map(err => `<p>• ${err}</p>`).join('')}
-						</div>
-					`,
-					confirmButtonColor: '#f39c12'
+					<p>✅ <strong>${successCount}</strong> código(s) generado(s)</p>
+					<p>❌ <strong>${errorCount}</strong> error(es)</p>
+					<hr style="margin: 10px 0;">
+					<p style="text-align: left; font-size: 0.9em; max-height: 200px; overflow-y: auto;">
+						${errors.map(err => `• ${err}`).join('<br>')}
+					</p>
+				`,
+					confirmButtonColor: '#f39c12',
 				});
 			} else {
 				await Swal.fire({
 					icon: 'error',
-					title: 'Error al generar QRs',
+					title: 'Error al generar PDF',
 					html: `
-						<p>No se pudieron generar los códigos QR.</p>
-						<div style="margin-top: 10px; max-height: 150px; overflow-y: auto; text-align: left; font-size: 12px;">
-							${errors.map(err => `<p>• ${err}</p>`).join('')}
-						</div>
-					`,
-					confirmButtonColor: '#e74c3c'
+					<p>No se pudo generar ningún código QR.</p>
+					<hr style="margin: 10px 0;">
+					<p style="text-align: left; font-size: 0.9em; max-height: 200px; overflow-y: auto;">
+						${errors.map(err => `• ${err}`).join('<br>')}
+					</p>
+				`,
+					confirmButtonColor: '#e74c3c',
 				});
 			}
 
 		} catch (error) {
-			console.error('❌ Error generando PDF de QRs:', error);
-			Swal.fire({
+			console.error('❌ Error generando PDF:', error);
+			await Swal.fire({
 				icon: 'error',
-				title: 'Error',
-				text: 'Ocurrió un error al generar el PDF. Revisa la consola para más detalles.',
-				confirmButtonColor: '#e74c3c'
+				title: 'Error al generar PDF',
+				text: error.message || 'Ocurrió un error inesperado al intentar generar el documento PDF.',
+				confirmButtonColor: '#e74c3c',
 			});
 		} finally {
 			setIsSendingQRs(false);
@@ -602,18 +592,18 @@ const ResidentsList = ({
 
 			// Llamar a la API para generar el token de auto-login (endpoint simple)
 			const token = localStorage.getItem('access_token');
-			
+
 			if (!token) {
 				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
 			}
-			
+
 			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
 			const endpoint = `${apiUrl}/residents/generate-qr-simple`;
-			
+
 			console.log('🔄 Making request to:', endpoint);
 			console.log('🔄 Request data:', { userId: resident.id });
 			console.log('🔄 Auth token:', token.substring(0, 20) + '...');
-			
+
 			const response = await fetch(endpoint, {
 				method: 'POST',
 				headers: {
@@ -624,34 +614,34 @@ const ResidentsList = ({
 					userId: resident.id
 				})
 			});
-			
+
 			console.log('🔄 Response status:', response.status);
 			console.log('🔄 Response headers:', Object.fromEntries(response.headers.entries()));
 
 			if (response.ok) {
 				const data = await response.json();
 				console.log('✅ Response from backend:', data);
-				
+
 				if (!data.success) {
 					throw new Error(data.message || 'Error en la respuesta del servidor');
 				}
-				
+
 				if (!data.data || !data.data.auto_login_token) {
 					throw new Error('Respuesta inválida: falta token de acceso');
 				}
-				
+
 				const token = data.data.auto_login_token;
 				// ✅ Usar window.location.origin para obtener la URL del frontend
 				const frontendUrl = window.location.origin;
 				const url = `${frontendUrl}/auto-login/${token}`;
-				
+
 				console.log('✅ QR URL generated:', url);
 				console.log('✅ Frontend URL:', frontendUrl);
-				
+
 				setAutoLoginUrl(url);
 				setSelectedResidentForQR(resident);
 				setQrModalOpen(true);
-				
+
 				Swal.close();
 			} else {
 				const errorData = await response.json().catch(() => ({}));
@@ -665,10 +655,10 @@ const ResidentsList = ({
 				stack: error.stack,
 				resident: resident
 			});
-			
+
 			// Mostrar error más detallado
 			let errorMessage = 'No se pudo generar el código QR de acceso';
-			
+
 			if (error.message) {
 				if (error.message.includes('403')) {
 					errorMessage = 'No tienes permisos para generar códigos QR';
@@ -680,7 +670,7 @@ const ResidentsList = ({
 					errorMessage = `Error: ${error.message}`;
 				}
 			}
-			
+
 			Swal.fire({
 				icon: 'error',
 				title: 'Error al generar QR',
@@ -737,7 +727,7 @@ const ResidentsList = ({
 			className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col"
 			style={{ maxHeight: '700px' }}
 		>
-			<div className="p-6 border-b border-gray-200 flex-shrink-0">
+			<div className="p-6 border-b border-gray-200 shrink-0">
 				<div className="flex items-center justify-between mb-4">
 					<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
 						<UsersIcon size={24} />
@@ -755,7 +745,7 @@ const ResidentsList = ({
 							<button
 								onClick={handleSendBulkCredentials}
 								disabled={isSendingBulk}
-								className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50"
+								className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50"
 							>
 								{isSendingBulk ? (
 									<>
@@ -773,28 +763,28 @@ const ResidentsList = ({
 								)}
 							</button>
 
-						{/* Botón de generación masiva de PDF con QRs */}
-						<button
-							onClick={handleGenerateBulkQRsPDF}
-							disabled={isSendingQRs}
-							className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50"
-							title="Generar documento PDF con códigos QR (4 por página)"
-						>
-							{isSendingQRs ? (
-								<>
-									<svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-										<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-									</svg>
-									<span className="hidden sm:inline">Generando...</span>
-								</>
-							) : (
-								<>
-									<QrCode size={16} />
-									<span className="hidden sm:inline">Generar PDF QRs</span>
-								</>
-							)}
-						</button>
+							{/* Botón de generación masiva de PDF con QRs */}
+							<button
+								onClick={handleGenerateBulkQRsPDF}
+								disabled={isSendingQRs}
+								className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50"
+								title="Generar documento PDF con códigos QR (4 por página)"
+							>
+								{isSendingQRs ? (
+									<>
+										<svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+											<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+										</svg>
+										<span className="hidden sm:inline">Generando...</span>
+									</>
+								) : (
+									<>
+										<QrCode size={16} />
+										<span className="hidden sm:inline">Generar PDF QRs</span>
+									</>
+								)}
+							</button>
 
 							{/* Botón para habilitar acceso masivo - filtra solo residentes modificables */}
 							<button
@@ -815,7 +805,7 @@ const ResidentsList = ({
 										});
 									}
 								}}
-								className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
+								className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 								title="Habilitar acceso"
 							>
 								<Shield size={16} />
@@ -841,7 +831,7 @@ const ResidentsList = ({
 										});
 									}
 								}}
-								className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
+								className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
 								title="Deshabilitar acceso"
 							>
 								<ShieldOff size={16} />
@@ -947,11 +937,10 @@ const ResidentsList = ({
 
 										{/* Indicador de estado */}
 										<div className="flex-shrink-0 mr-2">
-											<span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-												resident.bln_allow_entry
+											<span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${resident.bln_allow_entry
 													? 'bg-green-100 text-green-700'
 													: 'bg-red-100 text-red-700'
-											}`}>
+												}`}>
 												{resident.bln_allow_entry ? 'Activo' : 'Inactivo'}
 											</span>
 										</div>
