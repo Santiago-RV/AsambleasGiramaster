@@ -1,481 +1,233 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { ArrowLeft, Settings, Video, Plus, Edit, Trash2 } from 'lucide-react';
-import Modal from '../common/Modal';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Settings, Mail, Lightbulb } from 'lucide-react';
+import ZoomCredentialCard from './components/ZoomCredentialCard';
+import ZoomConfigModal from './components/ZoomConfigModal';
+import SMTPCredentialCard from './components/SMTPCredentialCard';
+import SMTPConfigModal from './components/SMTPConfigModal';
+import SystemConfigService from '../../services/api/SystemConfigService';
 import Swal from 'sweetalert2';
 
 const ConfiguracionTab = ({ onBack }) => {
-	// Configuración por defecto con datos ficticios
-	const defaultConfig = {
-		id: 1,
-		zoom_account_id: 'abc123xyz789',
-		zoom_client_id: 'client_id_1234567890',
-		zoom_client_secret: 'client_secret_abcdefghijklmnop',
-	};
+    // Estado para Zoom
+    const [currentConfig, setCurrentConfig] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [showZoomModal, setShowZoomModal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
-	const [zoomConfigs, setZoomConfigs] = useState([defaultConfig]);
-	const [isZoomModalOpen, setIsZoomModalOpen] = useState(false);
-	const [editingZoomConfig, setEditingZoomConfig] = useState(null);
-	const [isSaving, setIsSaving] = useState(false);
+    // Estado para SMTP
+    const [smtpConfig, setSmtpConfig] = useState(null);
+    const [isLoadingSMTP, setIsLoadingSMTP] = useState(true);
+    const [showSMTPModal, setShowSMTPModal] = useState(false);
+    const [isSavingSMTP, setIsSavingSMTP] = useState(false);
 
-	// Formulario para configuración de Zoom
-	const {
-		register,
-		handleSubmit,
-		reset,
-		setValue,
-		formState: { errors },
-	} = useForm({
-		defaultValues: {
-			zoom_account_id: '',
-			zoom_client_id: '',
-			zoom_client_secret: '',
-		},
-	});
+    useEffect(() => {
+        loadCurrentConfig();
+        loadSMTPConfig();
+    }, []);
 
-	// Función para guardar configuración de Zoom
-	const handleSaveZoomConfig = async (data) => {
-		setIsSaving(true);
-		
-		try {
-			// Simular delay de red
-			await new Promise((resolve) => setTimeout(resolve, 500));
-			
-			if (editingZoomConfig) {
-				// Actualizar configuración existente
-				setZoomConfigs((prevConfigs) =>
-					prevConfigs.map((config) =>
-						config.id === editingZoomConfig.id
-							? { ...config, ...data }
-							: config
-					)
-				);
-				
-				Swal.fire({
-					icon: 'success',
-					title: '¡Éxito!',
-					text: 'Configuración de Zoom actualizada exitosamente',
-					toast: true,
-					position: 'top-end',
-					showConfirmButton: false,
-					timer: 3000,
-					backdrop: false,
-				});
-			} else {
-				// Crear nueva configuración
-				const newConfig = {
-					id: Date.now(),
-					...data,
-				};
-				setZoomConfigs((prevConfigs) => [...prevConfigs, newConfig]);
-				
-				Swal.fire({
-					icon: 'success',
-					title: '¡Éxito!',
-					text: 'Configuración de Zoom creada exitosamente',
-					toast: true,
-					position: 'top-end',
-					showConfirmButton: false,
-					timer: 3000,
-					backdrop: false,
-				});
-			}
-			
-			reset();
-			setIsZoomModalOpen(false);
-			setEditingZoomConfig(null);
-		} catch (error) {
-			Swal.fire({
-				icon: 'error',
-				title: 'Error',
-				text: error.message || 'Error al guardar la configuración de Zoom',
-			});
-		} finally {
-			setIsSaving(false);
-		}
-	};
+    const loadCurrentConfig = async () => {
+        setIsLoading(true);
+        try {
+            const response = await SystemConfigService.getZoomConfig();
+            if (response.success) {
+                setCurrentConfig(response.data);
+            }
+        } catch (error) {
+            console.error('Error al cargar configuración:', error);
+            setCurrentConfig(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-	// Función para eliminar configuración de Zoom
-	const handleDeleteZoomConfig = async (id) => {
-		try {
-			// Simular delay de red
-			await new Promise((resolve) => setTimeout(resolve, 300));
-			
-			setZoomConfigs((prevConfigs) =>
-				prevConfigs.filter((config) => config.id !== id)
-			);
-			
-			Swal.fire({
-				icon: 'success',
-				title: '¡Éxito!',
-				text: 'Configuración de Zoom eliminada exitosamente',
-				toast: true,
-				position: 'top-end',
-				showConfirmButton: false,
-				timer: 3000,
-				backdrop: false,
-			});
-		} catch (error) {
-			Swal.fire({
-				icon: 'error',
-				title: 'Error',
-				text: error.message || 'Error al eliminar la configuración de Zoom',
-			});
-		}
-	};
+    const loadSMTPConfig = async () => {
+        setIsLoadingSMTP(true);
+        try {
+            const [statusResponse, configResponse] = await Promise.all([
+                SystemConfigService.checkSMTPConfigStatus(),
+                SystemConfigService.getSMTPConfig()
+            ]);
+            
+            if (configResponse.success) {
+                setSmtpConfig({
+                    ...configResponse.data,
+                    isConfigured: statusResponse.data?.configured || false
+                });
+            }
+        } catch (error) {
+            console.error('Error al cargar configuración SMTP:', error);
+            setSmtpConfig({ isConfigured: false });
+        } finally {
+            setIsLoadingSMTP(false);
+        }
+    };
 
-	const onSubmit = (data) => {
-		handleSaveZoomConfig(data);
-	};
+    const handleSaveZoomConfig = async (credentials) => {
+        setIsSaving(true);
+        try {
+            const response = await SystemConfigService.updateZoomConfig(credentials);
+            
+            if (response.success) {
+                await Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: 'Configuración de Zoom actualizada exitosamente',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    backdrop: false
+                });
+                
+                setShowZoomModal(false);
+                await loadCurrentConfig();
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.response?.data?.detail || error.message || 'Error al guardar la configuración'
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
-	const handleEditZoomConfig = (config) => {
-		setEditingZoomConfig(config);
-		setValue('zoom_account_id', config.zoom_account_id || '');
-		setValue('zoom_client_id', config.zoom_client_id || '');
-		setValue('zoom_client_secret', config.zoom_client_secret || '');
-		setIsZoomModalOpen(true);
-	};
+    const handleSaveSMTPConfig = async (credentials) => {
+        setIsSavingSMTP(true);
+        try {
+            const response = await SystemConfigService.updateSMTPConfig(credentials);
+            
+            if (response.success) {
+                await Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: 'Configuración SMTP actualizada exitosamente',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    backdrop: false
+                });
+                
+                setShowSMTPModal(false);
+                await loadSMTPConfig();
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.response?.data?.detail || error.message || 'Error al guardar la configuración SMTP'
+            });
+        } finally {
+            setIsSavingSMTP(false);
+        }
+    };
 
-	const handleDeleteClick = (config) => {
-		Swal.fire({
-			title: '¿Estás seguro?',
-			text: 'Esta acción no se puede revertir',
-			icon: 'warning',
-			showCancelButton: true,
-			confirmButtonColor: '#e74c3c',
-			cancelButtonColor: '#3498db',
-			confirmButtonText: 'Sí, eliminar',
-			cancelButtonText: 'Cancelar',
-		}).then((result) => {
-			if (result.isConfirmed) {
-				handleDeleteZoomConfig(config.id);
-			}
-		});
-	};
+    const isZoomConfigured = currentConfig && 
+        currentConfig.sdk_key && 
+        currentConfig.account_id && 
+        currentConfig.client_id;
 
-	const handleCloseModal = () => {
-		setIsZoomModalOpen(false);
-		setEditingZoomConfig(null);
-		reset();
-	};
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-4">
+                    {onBack && (
+                        <button
+                            onClick={onBack}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Volver"
+                        >
+                            <ArrowLeft size={24} className="text-gray-600" />
+                        </button>
+                    )}
+                    <div className="flex items-center gap-3">
+                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shadow-lg">
+                            <Settings size={28} />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-800">
+                                Configuración
+                            </h1>
+                            <p className="text-gray-600 mt-1">
+                                Gestiona las integraciones y configuraciones del sistema
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-	const handleAddZoomConfig = () => {
-		setEditingZoomConfig(null);
-		reset();
-		setIsZoomModalOpen(true);
-	};
+            {/* Sección de Integraciones */}
+            <div>
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                        Integraciones
+                    </h2>
+                    <p className="text-gray-600">
+                        Configura las integraciones de terceros para extender la funcionalidad del sistema
+                    </p>
+                </div>
 
-	return (
-		<div className="space-y-6">
-			{/* Encabezado */}
-			<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-				<div className="flex items-center gap-4 mb-4">
-					{onBack && (
-						<button
-							onClick={onBack}
-							className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-						>
-							<ArrowLeft size={24} className="text-gray-600" />
-						</button>
-					)}
-					<div className="flex items-center gap-3">
-						<div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shadow-lg">
-							<Settings size={24} />
-						</div>
-						<div>
-							<h1 className="text-3xl font-bold text-gray-800">
-								Configuración
-							</h1>
-							<p className="text-gray-600 mt-1">
-								Gestiona las configuraciones del sistema
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
+                {/* Grid de Cards de Integraciones */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Tarjeta de Zoom */}
+                    <ZoomCredentialCard
+                        isConfigured={isZoomConfigured}
+                        lastUpdated={currentConfig?.last_updated}
+                        onConfigure={() => setShowZoomModal(true)}
+                        isLoading={isLoading}
+                    />
 
-			{/* Sección de Configuración de Zoom */}
-			<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-				<div className="p-6 border-b border-gray-200 flex justify-between items-center">
-					<div className="flex items-center gap-3">
-						<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white">
-							<Video size={20} />
-						</div>
-						<div>
-							<h2 className="text-xl font-bold text-gray-800">
-								Configuración de Zoom
-							</h2>
-							<p className="text-sm text-gray-600">
-								Administra las credenciales de Zoom para las reuniones
-							</p>
-						</div>
-					</div>
-					<button
-						onClick={handleAddZoomConfig}
-						className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
-					>
-						<Plus size={18} />
-						Agregar Configuración
-					</button>
-				</div>
+                    {/* Tarjeta de SMTP */}
+                    <SMTPCredentialCard
+                        isConfigured={smtpConfig?.isConfigured || false}
+                        lastUpdated={smtpConfig?.last_updated}
+                        onConfigure={() => setShowSMTPModal(true)}
+                        isLoading={isLoadingSMTP}
+                    />
+                </div>
+            </div>
 
-				<div className="p-6">
-					{!zoomConfigs || zoomConfigs.length === 0 ? (
-						<div className="text-center py-12">
-							<Video
-								className="mx-auto text-gray-400 mb-4"
-								size={48}
-							/>
-							<p className="text-gray-600 mb-4">
-								No hay configuraciones de Zoom registradas
-							</p>
-							<button
-								onClick={handleAddZoomConfig}
-								className="px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
-							>
-								Agregar Primera Configuración
-							</button>
-						</div>
-					) : (
-						<div className="space-y-4">
-							{zoomConfigs.map((config) => (
-								<div
-									key={config.id}
-									className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
-								>
-									<div className="flex items-center justify-between">
-										<div className="flex-1">
-											<div className="flex items-center gap-2 mb-2">
-												<h3 className="font-semibold text-gray-800">
-													Configuración de Zoom
-												</h3>
-												<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-													{config.zoom_account_id
-														? `Account ID: ${config.zoom_account_id.substring(0, 8)}...`
-														: 'Sin Account ID'}
-												</span>
-											</div>
-											<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-												<div>
-													<span className="text-gray-600">Account ID:</span>
-													<p className="font-mono text-gray-800">
-														{config.zoom_account_id || 'No configurado'}
-													</p>
-												</div>
-												<div>
-													<span className="text-gray-600">Client ID:</span>
-													<p className="font-mono text-gray-800">
-														{config.zoom_client_id
-															? `${config.zoom_client_id.substring(0, 10)}...`
-															: 'No configurado'}
-													</p>
-												</div>
-												<div>
-													<span className="text-gray-600">Client Secret:</span>
-													<p className="font-mono text-gray-800">
-														{config.zoom_client_secret
-															? '••••••••••••'
-															: 'No configurado'}
-													</p>
-												</div>
-											</div>
-										</div>
-										<div className="flex items-center gap-2 ml-4">
-											<button
-												onClick={() => handleEditZoomConfig(config)}
-												className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-												title="Editar"
-											>
-												<Edit size={18} />
-											</button>
-											<button
-												onClick={() => handleDeleteClick(config)}
-												className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-												title="Eliminar"
-											>
-												<Trash2 size={18} />
-											</button>
-										</div>
-									</div>
-								</div>
-							))}
-						</div>
-					)}
-				</div>
-			</div>
+            {/* Información adicional */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Settings size={20} className="text-white" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
+                            <Lightbulb size={18} className="flex-shrink-0" />
+                            Sobre las Integraciones
+                        </h3>
+                        <p className="text-sm text-blue-800">
+                            Las integraciones te permiten conectar GIRAMASTER con servicios externos para mejorar la funcionalidad del sistema. 
+                            <strong> Zoom</strong> es necesario para realizar reuniones virtuales y <strong>SMTP</strong> para enviar notificaciones por correo electrónico.
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-			{/* Modal para agregar/editar configuración de Zoom */}
-			<Modal
-				isOpen={isZoomModalOpen}
-				onClose={handleCloseModal}
-				title={
-					editingZoomConfig
-						? 'Editar Configuración de Zoom'
-						: 'Agregar Configuración de Zoom'
-				}
-				size="lg"
-			>
-				<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-					<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-						<h3 className="font-semibold text-blue-800 mb-2">
-							🔐 Credenciales de Zoom
-						</h3>
-						<p className="text-sm text-blue-700">
-							Ingresa las credenciales de tu aplicación Zoom para habilitar
-							las reuniones virtuales. Puedes obtener estas credenciales desde
-							el portal de desarrolladores de Zoom.
-						</p>
-					</div>
+            {/* Modal de Configuración de Zoom */}
+            <ZoomConfigModal
+                isOpen={showZoomModal}
+                onClose={() => setShowZoomModal(false)}
+                currentConfig={currentConfig}
+                onSave={handleSaveZoomConfig}
+                isSaving={isSaving}
+            />
 
-					<div className="grid gap-6 grid-cols-1">
-						{/* Zoom Account ID */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-700">
-								Zoom Account ID *
-							</label>
-							<input
-								type="text"
-								{...register('zoom_account_id', {
-									required: 'El Account ID es obligatorio',
-									minLength: {
-										value: 5,
-										message: 'Mínimo 5 caracteres',
-									},
-								})}
-								placeholder="Ej: abc123xyz"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db] font-mono"
-							/>
-							{errors.zoom_account_id && (
-								<span className="text-red-500 text-sm">
-									{errors.zoom_account_id.message}
-								</span>
-							)}
-							<p className="text-sm text-gray-500 mt-1">
-								Identificador único de tu cuenta de Zoom
-							</p>
-						</div>
-
-						{/* Zoom Client ID */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-700">
-								Zoom Client ID *
-							</label>
-							<input
-								type="text"
-								{...register('zoom_client_id', {
-									required: 'El Client ID es obligatorio',
-									minLength: {
-										value: 10,
-										message: 'Mínimo 10 caracteres',
-									},
-								})}
-								placeholder="Ej: abc123xyz456"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db] font-mono"
-							/>
-							{errors.zoom_client_id && (
-								<span className="text-red-500 text-sm">
-									{errors.zoom_client_id.message}
-								</span>
-							)}
-							<p className="text-sm text-gray-500 mt-1">
-								ID del cliente de tu aplicación OAuth de Zoom
-							</p>
-						</div>
-
-						{/* Zoom Client Secret */}
-						<div>
-							<label className="block mb-2 font-semibold text-gray-700">
-								Zoom Client Secret *
-							</label>
-							<input
-								type="password"
-								{...register('zoom_client_secret', {
-									required: 'El Client Secret es obligatorio',
-									minLength: {
-										value: 10,
-										message: 'Mínimo 10 caracteres',
-									},
-								})}
-								placeholder="Ej: ••••••••••••"
-								className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db] font-mono"
-							/>
-							{errors.zoom_client_secret && (
-								<span className="text-red-500 text-sm">
-									{errors.zoom_client_secret.message}
-								</span>
-							)}
-							<p className="text-sm text-gray-500 mt-1">
-								Secret del cliente de tu aplicación OAuth de Zoom (secreto y
-								sensible)
-							</p>
-						</div>
-					</div>
-
-					<div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
-						<button
-							type="submit"
-							disabled={isSaving}
-							className={`flex items-center gap-2 bg-gradient-to-br from-[#27ae60] to-[#229954] text-white font-semibold px-6 py-3 rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all ${
-								isSaving
-									? 'opacity-50 cursor-not-allowed'
-									: ''
-							}`}
-						>
-							{isSaving ? (
-								<>
-									<svg
-										className="animate-spin h-5 w-5"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											className="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											strokeWidth="4"
-										></circle>
-										<path
-											className="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									Guardando...
-								</>
-							) : (
-								<>
-									{editingZoomConfig ? (
-										<>
-											<Edit size={20} />
-											Actualizar Configuración
-										</>
-									) : (
-										<>
-											<Plus size={20} />
-											Guardar Configuración
-										</>
-									)}
-								</>
-							)}
-						</button>
-
-						<button
-							type="button"
-							onClick={handleCloseModal}
-							disabled={isSaving}
-							className="bg-gray-100 text-gray-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							Cancelar
-						</button>
-					</div>
-				</form>
-			</Modal>
-		</div>
-	);
+            {/* Modal de Configuración de SMTP */}
+            <SMTPConfigModal
+                isOpen={showSMTPModal}
+                onClose={() => setShowSMTPModal(false)}
+                currentConfig={smtpConfig}
+                onSave={handleSaveSMTPConfig}
+                isSaving={isSavingSMTP}
+            />
+        </div>
+    );
 };
 
 export default ConfiguracionTab;
-

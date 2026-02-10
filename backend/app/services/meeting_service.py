@@ -147,13 +147,13 @@ class MeetingService:
             zoom_start_url = None
 
             try:
-                zoom_service = ZoomAPIService()
+                zoom_service = ZoomAPIService(self.db)
 
                 # Determinar duración: si es 0, usar 60 min por defecto para Zoom
                 # 0 = duración indefinida en la aplicación
                 zoom_duration = estimated_duration if estimated_duration > 0 else 60
 
-                zoom_meeting = zoom_service.create_meeting(
+                zoom_meeting = await zoom_service.create_meeting(
                     topic=title,
                     start_time=schedule_date,
                     duration=zoom_duration,

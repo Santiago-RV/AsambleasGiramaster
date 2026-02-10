@@ -31,13 +31,13 @@ async def generate_zoom_signature(request: ZoomSignatureRequest):
     Retorna el signature JWT necesario para unirse a la reunión desde el frontend
     """
     try:
-        zoom_service = ZoomService()
+        zoom_service = ZoomService(db)
         
         # Validar y limpiar el número de reunión
         clean_meeting_number = zoom_service.validate_meeting_number(request.meeting_number)
         
         # Generar el signature
-        signature = zoom_service.generate_signature(
+        signature = await zoom_service.generate_signature(
             meeting_number=clean_meeting_number,
             role=request.role,
             expire_hours=2
@@ -89,7 +89,7 @@ async def extract_meeting_info(request: ZoomMeetingInfoRequest):
     Retorna el número de reunión y contraseña extraídos de la URL
     """
     try:
-        zoom_service = ZoomService()
+        zoom_service = ZoomService(db)
         
         # Extraer información de la URL
         meeting_number = zoom_service.extract_meeting_number_from_url(request.zoom_url)

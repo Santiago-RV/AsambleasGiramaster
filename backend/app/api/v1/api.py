@@ -15,7 +15,8 @@ from app.api.v1.endpoints import delegation_endpoint
 from app.auth.auth import get_current_user
 from app.api.v1.endpoints import guest_endpoint 
 from app.api.v1.endpoints import qr_endpoints
-from app.api.v1.endpoints import delegation_history_endpoint  
+from app.api.v1.endpoints import delegation_history_endpoint
+from app.api.v1.endpoints import system_config_endpoint  
 
 api_router = APIRouter()
 
@@ -119,4 +120,13 @@ api_router.include_router(
     prefix="/delegation-history",
     tags=["Delegation History"],
     dependencies=[Depends(get_current_user)]
+)
+
+# ============================================
+# System Configuration - Configuración del Sistema
+# ============================================
+api_router.include_router(
+    system_config_endpoint.router,
+    prefix="/system-config",
+    tags=["System Configuration"]
 )

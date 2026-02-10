@@ -58,13 +58,19 @@ class Settings(BaseSettings):
   LOG_FILE: str = "app.log"
 
   # Zoom SDK Configuration (para Meeting SDK - frontend)
+  # DEPRECADO: Estas variables se mantienen por compatibilidad hacia atrás
+  # Usa el panel de Super Admin para configurar credenciales en BD
   ZOOM_SDK_KEY: str = ""
   ZOOM_SDK_SECRET: str = ""
   
   # Zoom OAuth Server-to-Server (para API REST - crear reuniones)
+  # DEPRECADO: Estas variables se mantienen por compatibilidad hacia atrás
   ZOOM_ACCOUNT_ID: str = ""
   ZOOM_CLIENT_ID: str = ""
   ZOOM_CLIENT_SECRET: str = ""
+  
+  # Encriptación de Configuraciones Sensibles
+  ENCRYPTION_MASTER_KEY: str = ""
 
   # Configuración de Email (Gmail)
   SMTP_HOST: str = "smtp.gmail.com"

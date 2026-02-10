@@ -48,18 +48,20 @@ const Modal = ({ isOpen, onClose, title, children, size = 'lg' }) => {
 					className={`relative bg-white rounded-xl shadow-2xl ${sizeClasses[size]} w-full max-h-[90vh] flex flex-col`}
 					onClick={(e) => e.stopPropagation()}
 				>
-					{/* Header */}
-					<div className="flex items-center justify-between p-6 border-b border-gray-200">
-						<h2 className="text-2xl font-bold text-gray-800">
-							{title}
-						</h2>
-						<button
-							onClick={onClose}
-							className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-						>
-							<X size={24} className="text-gray-600" />
-						</button>
-					</div>
+					{/* Header - solo se muestra si se proporciona title */}
+					{title && (
+						<div className="flex items-center justify-between p-6 border-b border-gray-200">
+							<h2 className="text-2xl font-bold text-gray-800">
+								{title}
+							</h2>
+							<button
+								onClick={onClose}
+								className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+							>
+								<X size={24} className="text-gray-600" />
+							</button>
+						</div>
+					)}
 
 					{/* Content */}
 					<div className="flex-1 overflow-y-auto p-6">{children}</div>

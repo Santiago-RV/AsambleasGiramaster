@@ -9,6 +9,34 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-02-09 - Mejoras en Configuración SMTP, Iconografía de Modales y Limpieza de UI
+
+- **Corrección de almacenamiento SMTP (`smtp_from_email` vacío causaba error 422)**:
+  - **Problema**: El frontend enviaba `smtp_from_email: ''` (cadena vacía) cuando el campo se dejaba vacío, pero el backend esperaba `null`/`None` ya que el campo es `Optional[EmailStr]`. Pydantic rechazaba la cadena vacía con error de validación.
+  - **Solución Backend** (`backend/app/schemas/system_config_schema.py`):
+    - Se agregaron validadores `@validator` con `pre=True` en `SMTPCredentialsUpdateRequest` para `smtp_from_email` y `smtp_from_name` que convierten cadenas vacías a `None` antes de la validación de `EmailStr`.
+  - **Solución Frontend** (`frontend/src/components/saDashboard/components/SMTPConfigModal.jsx`):
+    - Se agregó función `sanitizeData()` que convierte cadenas vacías a `null` en campos opcionales antes de enviar al backend.
+    - Se aplica tanto en `onSubmit()` (guardar) como en `handleTestConnection()` (probar conexión).
+
+- **Reemplazo de emojis por iconos de lucide-react en modales de configuración**:
+  - **ZoomConfigModal.jsx**: Reemplazados emojis por iconos `Smartphone` (Meeting SDK), `Lock` (Server-to-Server OAuth) y `ShieldCheck` (Seguridad). Reemplazados SVG spinners inline por `Loader2` de lucide-react.
+  - **SMTPConfigModal.jsx**: Reemplazados emojis por iconos `Monitor` (Servidor SMTP), `Key` (Credenciales), `AlertTriangle` (Importante para Gmail) y `SettingsIcon` (Configuración Avanzada).
+  - **ConfiguracionTab.jsx**: Reemplazado emoji por icono `Lightbulb` (Sobre las Integraciones).
+
+- **Eliminación de botón de cierre (X) duplicado en modales**:
+  - **Problema**: El componente `Modal.jsx` siempre renderizaba su propio header con botón X. Los modales de Zoom y SMTP tenían su propio header personalizado con otro botón X, resultando en dos botones X visibles.
+  - **Solución** (`frontend/src/components/common/Modal.jsx`): El header del Modal común ahora solo se renderiza cuando se pasa la prop `title`. Los modales que no pasan `title` (Zoom, SMTP) solo muestran su propio botón X personalizado. Los que sí pasan `title` (`DelegationModal`, `MeetingModal`) no se ven afectados.
+
+### Eliminado
+
+#### 2026-02-09 - Eliminación de tarjeta placeholder Twilio SMS
+
+- **Eliminada tarjeta placeholder "Twilio SMS"** de la vista de Configuración:
+  - Removida la referencia en `ConfiguracionTab.jsx` junto con los imports de `IntegrationPlaceholderCard` y `MessageSquare`.
+  - Eliminado el componente `IntegrationPlaceholderCard.jsx` ya que no tiene más consumidores.
+  - Eliminado texto "Más integraciones estarán disponibles próximamente" del banner informativo.
+
 #### 2026-01-26 - FIX CRÍTICO FINAL: Frontend Construía URL de QR Incorrectamente
 
 - **🔧 Problema Real Encontrado: Frontend Ignoraba URL del Backend**:

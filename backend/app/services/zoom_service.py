@@ -1,6 +1,7 @@
 import jwt
 import time
 from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logging_config import get_logger
 
@@ -13,11 +14,53 @@ class ZoomService:
     y generar tokens de autenticación para el Meeting SDK
     """
 
-    def __init__(self):
+    def __init__(self, db: Optional[AsyncSession] = None):
+        self.db = db
+        self._credentials_loaded = False
+        self.sdk_key = None
+        self.sdk_secret = None
+    
+    async def _ensure_credentials_loaded(self):
+        """Carga credenciales de BD si aún no están cargadas"""
+        if self._credentials_loaded:
+            return
+        
+        if self.db:
+            await self._load_credentials_from_db()
+        else:
+            self._load_credentials_from_env()
+        
+        self._credentials_loaded = True
+    
+    def _load_credentials_from_env(self):
+        """Carga credenciales desde .env (fallback)"""
         self.sdk_key = settings.ZOOM_SDK_KEY
         self.sdk_secret = settings.ZOOM_SDK_SECRET
+        logger.warning("⚠️ Cargando credenciales SDK de Zoom desde .env (fallback)")
+    
+    async def _load_credentials_from_db(self):
+        """Carga credenciales desde base de datos"""
+        try:
+            from app.services.system_config_service import SystemConfigService
+            config_service = SystemConfigService(self.db)
+            
+            credentials = await config_service.get_zoom_credentials()
+            
+            self.sdk_key = credentials.get("ZOOM_SDK_KEY")
+            self.sdk_secret = credentials.get("ZOOM_SDK_SECRET")
+            
+            if not all([self.sdk_key, self.sdk_secret]):
+                logger.warning("⚠️ Credenciales SDK de Zoom incompletas en BD, usando fallback a .env")
+                self._load_credentials_from_env()
+            else:
+                logger.info("✅ Credenciales SDK de Zoom cargadas desde base de datos")
+                
+        except Exception as e:
+            logger.error(f"❌ Error al cargar credenciales SDK de Zoom desde BD: {str(e)}")
+            logger.info("↩️ Usando fallback a .env")
+            self._load_credentials_from_env()
 
-    def generate_signature(
+    async def generate_signature(
         self, 
         meeting_number: str, 
         role: int = 0,
@@ -37,6 +80,9 @@ class ZoomService:
         Raises:
             ValueError: Si las credenciales de Zoom no están configuradas
         """
+        # Asegurar que las credenciales estén cargadas
+        await self._ensure_credentials_loaded()
+        
         if not self.sdk_key or not self.sdk_secret:
             logger.error("Credenciales de Zoom no configuradas")
             raise ValueError(

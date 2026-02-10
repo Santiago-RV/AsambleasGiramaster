@@ -3,6 +3,7 @@ import base64
 import time
 from typing import Dict, Any, Optional
 from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logging_config import get_logger
 
@@ -18,14 +19,58 @@ class ZoomAPIService:
     BASE_URL = "https://api.zoom.us/v2"
     OAUTH_URL = "https://zoom.us/oauth/token"
     
-    def __init__(self):
+    def __init__(self, db: Optional[AsyncSession] = None):
+        self.db = db
+        self._access_token = None
+        self._token_expiry = 0
+        self._credentials_loaded = False
+        self.account_id = None
+        self.client_id = None
+        self.client_secret = None
+    
+    async def _ensure_credentials_loaded(self):
+        """Carga credenciales de BD si aún no están cargadas"""
+        if self._credentials_loaded:
+            return
+        
+        if self.db:
+            await self._load_credentials_from_db()
+        else:
+            self._load_credentials_from_env()
+        
+        self._credentials_loaded = True
+    
+    def _load_credentials_from_env(self):
+        """Carga credenciales desde .env (fallback)"""
         self.account_id = settings.ZOOM_ACCOUNT_ID
         self.client_id = settings.ZOOM_CLIENT_ID
         self.client_secret = settings.ZOOM_CLIENT_SECRET
-        self._access_token = None
-        self._token_expiry = 0
+        logger.warning("⚠️ Cargando credenciales de Zoom desde .env (fallback)")
     
-    def _get_access_token(self) -> str:
+    async def _load_credentials_from_db(self):
+        """Carga credenciales desde base de datos"""
+        try:
+            from app.services.system_config_service import SystemConfigService
+            config_service = SystemConfigService(self.db)
+            
+            credentials = await config_service.get_zoom_credentials()
+            
+            self.account_id = credentials.get("ZOOM_ACCOUNT_ID")
+            self.client_id = credentials.get("ZOOM_CLIENT_ID")
+            self.client_secret = credentials.get("ZOOM_CLIENT_SECRET")
+            
+            if not all([self.account_id, self.client_id, self.client_secret]):
+                logger.warning("⚠️ Credenciales de Zoom incompletas en BD, usando fallback a .env")
+                self._load_credentials_from_env()
+            else:
+                logger.info("✅ Credenciales de Zoom cargadas desde base de datos")
+                
+        except Exception as e:
+            logger.error(f"❌ Error al cargar credenciales de Zoom desde BD: {str(e)}")
+            logger.info("↩️ Usando fallback a .env")
+            self._load_credentials_from_env()
+    
+    async def _get_access_token(self) -> str:
         """
         Obtiene un access token usando OAuth Server-to-Server
         Cachea el token hasta que expire
@@ -37,6 +82,9 @@ class ZoomAPIService:
             ValueError: Si las credenciales no están configuradas
             Exception: Si hay error al obtener el token
         """
+        # Asegurar que las credenciales estén cargadas
+        await self._ensure_credentials_loaded()
+        
         # Si tenemos un token válido, retornarlo
         if self._access_token and time.time() < self._token_expiry:
             logger.debug("Usando token de acceso cacheado")
@@ -91,7 +139,7 @@ class ZoomAPIService:
             logger.error(f"Error de conexión al obtener token: {str(e)}")
             raise Exception(f"Error de conexión con Zoom OAuth: {str(e)}")
     
-    def create_meeting(
+    async def create_meeting(
         self,
         topic: str,
         start_time: datetime,
@@ -132,8 +180,11 @@ class ZoomAPIService:
             Exception: Si hay error al crear la reunión
         """
         try:
+            # Asegurar que las credenciales estén cargadas
+            await self._ensure_credentials_loaded()
+            
             # Obtener access token OAuth
-            token = self._get_access_token()
+            token = await self._get_access_token()
             
             # Headers para la petición
             headers = {
