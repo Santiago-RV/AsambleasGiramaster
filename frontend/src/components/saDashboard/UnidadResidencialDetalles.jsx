@@ -25,7 +25,7 @@ import CreateManualAdminModal from './components/modals/CreateManualAdminModal';
 // ========================================
 const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuestModal }) => {
 	const queryClient = useQueryClient();
-
+	const [showMeetings, setShowMeetings] = useState(false);
 	// Estados locales
 	const [currentAdmin, setCurrentAdmin] = useState(null);
 	const [selectedResident, setSelectedResident] = useState(null);
@@ -326,7 +326,6 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 			</div>
 		);
 	}
-
 	return (
 		<div className="space-y-6">
 			{/* Encabezado */}
@@ -346,30 +345,49 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 
 			{/* Grid de listas */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
 				{/* Lista de Residentes */}
-				<ResidentsList
-					residents={residentsData}
-					isLoading={isLoadingResidents}
-					onResendCredentials={handleResendCredentials}
-					onEditResident={handleEditResident}
-					onDeleteResident={handleDeleteResident}
-					onSendBulkCredentials={handleSendBulkCredentials}
-					isSendingBulk={sendBulkCredentialsMutation.isPending}
-					onToggleAccess={handleToggleAccess}
-					onBulkToggleAccess={handleBulkToggleAccess}
-					showSearch={true}
-					isSuperAdmin={true}
-				/>
+				<div className="order-1">
+					<ResidentsList
+						residents={residentsData}
+						isLoading={isLoadingResidents}
+						onResendCredentials={handleResendCredentials}
+						onEditResident={handleEditResident}
+						onDeleteResident={handleDeleteResident}
+						onSendBulkCredentials={handleSendBulkCredentials}
+						isSendingBulk={sendBulkCredentialsMutation.isPending}
+						onToggleAccess={handleToggleAccess}
+						onBulkToggleAccess={handleBulkToggleAccess}
+						showSearch={true}
+						isSuperAdmin={true}
+					/>
+				</div>
 
 				{/* Lista de Reuniones */}
-				<MeetingsList
-					meetings={meetingsData}
-					isLoading={isLoadingMeetings}
-					onCreateMeeting={() => setIsMeetingModalOpen(true)}
-					onStartMeeting={onStartMeeting}
-					onEndMeeting={handleEndMeeting}
-				/>
+				<div className="order-2">
+
+					{/* Botón SOLO mobile */}
+					<button
+						onClick={() => setShowMeetings(!showMeetings)}
+						className="mb-4 w-full lg:hidden px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold"
+					>
+						{showMeetings ? 'Ocultar reuniones' : 'Ver reuniones'}
+					</button>
+
+					{/* Contenido */}
+					<div className={`${showMeetings ? 'block' : 'hidden'} lg:block`}>
+						<MeetingsList
+							meetings={meetingsData}
+							isLoading={isLoadingMeetings}
+							onCreateMeeting={() => setIsMeetingModalOpen(true)}
+							onStartMeeting={onStartMeeting}
+							onEndMeeting={handleEndMeeting}
+						/>
+					</div>
+				</div>
+
 			</div>
+
 
 			{/* Modales */}
 			<MeetingModal

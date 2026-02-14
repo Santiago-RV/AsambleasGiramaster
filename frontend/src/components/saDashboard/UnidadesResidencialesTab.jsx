@@ -104,28 +104,28 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 	});
 
 	const handleAdminSelect = (e) => {
-    const selectedId = e.target.value;
+		const selectedId = e.target.value;
 
-    if (!selectedId) {
-      // Limpiar campos si no hay selección
-      setValue('admin_str_firstname', '');
-      setValue('admin_str_lastname', '');
-      setValue('admin_str_email', '');
-      setValue('admin_str_phone', '');
-      return;
-    }
+		if (!selectedId) {
+			// Limpiar campos si no hay selección
+			setValue('admin_str_firstname', '');
+			setValue('admin_str_lastname', '');
+			setValue('admin_str_email', '');
+			setValue('admin_str_phone', '');
+			return;
+		}
 
-    // Buscar el administrador seleccionado (convertir id a número para comparar)
-    const selectedAdmin = administrativeStaff.find(admin => admin.id === parseInt(selectedId));
+		// Buscar el administrador seleccionado (convertir id a número para comparar)
+		const selectedAdmin = administrativeStaff.find(admin => admin.id === parseInt(selectedId));
 
-    if (selectedAdmin) {
-      // Los campos del backend son: firstname, lastname, email, phone
-      setValue('admin_str_firstname', selectedAdmin.firstname || '');
-      setValue('admin_str_lastname', selectedAdmin.lastname || '');
-      setValue('admin_str_email', selectedAdmin.email || '');
-      setValue('admin_str_phone', selectedAdmin.phone || '');
-    }
-  };
+		if (selectedAdmin) {
+			// Los campos del backend son: firstname, lastname, email, phone
+			setValue('admin_str_firstname', selectedAdmin.firstname || '');
+			setValue('admin_str_lastname', selectedAdmin.lastname || '');
+			setValue('admin_str_email', selectedAdmin.email || '');
+			setValue('admin_str_phone', selectedAdmin.phone || '');
+		}
+	};
 
 	// Estado de envío del formulario
 	const isSubmitting = createResidentialUnitMutation.isPending;
@@ -151,11 +151,11 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			str_contact_phone: data.str_contact_phone || null,
 
 			administrator: {
-        str_firstname: data.admin_str_firstname,
-        str_lastname: data.admin_str_lastname,
-        str_email: data.admin_str_email,
-        str_phone: data.admin_str_phone
-      }
+				str_firstname: data.admin_str_firstname,
+				str_lastname: data.admin_str_lastname,
+				str_email: data.admin_str_email,
+				str_phone: data.admin_str_phone
+			}
 		};
 
 		createResidentialUnitMutation.mutate(unitData);
@@ -245,46 +245,64 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 	return (
 		<div className="space-y-8">
 			{/* Encabezado */}
-			<div className="flex justify-between items-center">
-				<div>
-					<h1 className="text-3xl font-bold text-gray-800">
+			<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
+				{/* Título */}
+				<div className="text-left">
+					<h1 className="text-2xl md:text-3xl font-bold text-gray-800 whitespace-nowrap">
 						Unidades Residenciales
 					</h1>
-					<p className="text-gray-600 mt-2">
+					<p className="text-sm md:text-base text-gray-600 mt-1">
 						Gestión de edificios y conjuntos residenciales
 					</p>
 				</div>
-				<div className="flex items-center gap-3">
+
+
+				{/* Acciones */}
+				<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+
 					{/* Toggle de vista */}
 					{unidadesData && unidadesData.length > 0 && (
-						<div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+						<div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
 							<button
 								onClick={() => setViewMode('grid')}
-								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
-									viewMode === 'grid'
+								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${viewMode === 'grid'
 										? 'bg-white text-blue-600 shadow-sm'
 										: 'text-gray-600 hover:text-gray-800'
-								}`}
+									}`}
 							>
 								<LayoutGrid size={18} />
 								<span className="text-sm font-medium">Tarjetas</span>
 							</button>
+
 							<button
 								onClick={() => setViewMode('list')}
-								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
-									viewMode === 'list'
+								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${viewMode === 'list'
 										? 'bg-white text-blue-600 shadow-sm'
 										: 'text-gray-600 hover:text-gray-800'
-								}`}
+									}`}
 							>
 								<List size={18} />
 								<span className="text-sm font-medium">Lista</span>
 							</button>
 						</div>
 					)}
+
+					{/* Botón Nueva Unidad */}
 					<button
 						onClick={() => setIsModalOpen(true)}
-						className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+						className="
+					w-full
+					md:w-auto
+					flex items-center justify-center gap-2
+					px-6 py-3
+					bg-gradient-to-r from-[#3498db] to-[#2980b9]
+					text-white
+					rounded-lg
+					hover:shadow-lg
+					transition-all
+					font-semibold
+				"
 					>
 						<Plus size={20} />
 						Nueva Unidad
@@ -375,11 +393,10 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 								</div>
 								<div className="flex items-center gap-2">
 									<span
-										className={`px-3 py-1 rounded-full text-xs font-semibold ${
-											unidad.bln_is_active
+										className={`px-3 py-1 rounded-full text-xs font-semibold ${unidad.bln_is_active
 												? 'bg-green-100 text-green-700'
 												: 'bg-red-100 text-red-700'
-										}`}
+											}`}
 									>
 										{unidad.bln_is_active
 											? 'Activa'
@@ -458,400 +475,399 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 					))}
 				</div>
 			) : (
-				<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-					<table className="w-full">
-						<thead className="bg-gray-50 border-b border-gray-200">
-							<tr>
-								<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-									Unidad Residencial
-								</th>
-								<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-									Ubicación
-								</th>
-								<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-									Tipo
-								</th>
-								<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-									Unidades
-								</th>
-								<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-									Estado
-								</th>
-								<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-									Acciones
-								</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-gray-200">
-							{unidadesData.map((unidad) => (
-								<tr
-									key={unidad.id}
-									onClick={() => onViewDetails && onViewDetails(unidad.id)}
-									className="hover:bg-gray-50 transition-colors cursor-pointer"
-								>
-									<td className="px-6 py-4">
-										<div className="flex items-center gap-3">
-											<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white flex-shrink-0">
-												<Building2 size={20} />
-											</div>
-											<div>
-												<div className="font-semibold text-gray-800">
-													{unidad.str_name}
-												</div>
-												<div className="text-xs font-mono text-gray-500">
-													{unidad.str_residential_code}
-												</div>
-											</div>
-										</div>
-									</td>
-									<td className="px-6 py-4">
-										<div className="text-sm text-gray-800">
-											{unidad.str_city}, {unidad.str_state}
-										</div>
-										<div className="text-xs text-gray-500">
-											{unidad.str_address || 'Sin dirección'}
-										</div>
-									</td>
-									<td className="px-6 py-4">
-										<div className="text-sm text-gray-700">
-											{unidad.str_unit_type || 'N/A'}
-										</div>
-									</td>
-									<td className="px-6 py-4 text-center">
-										<div className="flex items-center justify-center gap-2">
-											<Users size={16} className="text-gray-500" />
-											<span className="text-sm font-medium text-gray-700">
-												{unidad.int_total_apartments}
-											</span>
-										</div>
-									</td>
-									<td className="px-6 py-4 text-center">
-										<span
-											className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-												unidad.bln_is_active
-													? 'bg-green-100 text-green-700'
-													: 'bg-red-100 text-red-700'
-											}`}
-										>
-											{unidad.bln_is_active ? 'Activa' : 'Inactiva'}
-										</span>
-									</td>
-									<td className="px-6 py-4 text-center">
-										<div className="relative inline-block">
-											<button
-												onClick={(e) => toggleDropdown(unidad.id, e)}
-												className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-											>
-												<MoreVertical size={18} className="text-gray-600" />
-											</button>
-											{openDropdownId === unidad.id && (
-												<div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-													<button
-														onClick={(e) => handleEdit(unidad, e)}
-														className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-													>
-														<Edit2 size={16} />
-														Editar
-													</button>
-													<button
-														onClick={(e) => handleDelete(unidad, e)}
-														className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
-													>
-														<Trash2 size={16} />
-														Eliminar
-													</button>
-												</div>
-											)}
-										</div>
-									</td>
+				<div className="bg-white rounded-xl shadow-sm border border-gray-200">
+
+					{/* Contenedor scroll horizontal */}
+					<div className="overflow-x-auto">
+						<table className="min-w-[900px] w-full">
+							<thead className="bg-gray-50 border-b border-gray-200">
+								<tr>
+									<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+										Unidad Residencial
+									</th>
+									<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+										Ubicación
+									</th>
+									<th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+										Tipo
+									</th>
+									<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+										Unidades
+									</th>
+									<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+										Estado
+									</th>
+									<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+										Acciones
+									</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody className="divide-y divide-gray-200">
+								{unidadesData.map((unidad) => (
+									<tr
+										key={unidad.id}
+										onClick={() => onViewDetails && onViewDetails(unidad.id)}
+										className="hover:bg-gray-50 transition-colors cursor-pointer"
+									>
+										<td className="px-6 py-4">
+											<div className="flex items-center gap-3">
+												<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white flex-shrink-0">
+													<Building2 size={20} />
+												</div>
+												<div>
+													<div className="font-semibold text-gray-800">
+														{unidad.str_name}
+													</div>
+													<div className="text-xs font-mono text-gray-500">
+														{unidad.str_residential_code}
+													</div>
+												</div>
+											</div>
+										</td>
+										<td className="px-6 py-4">
+											<div className="text-sm text-gray-800">
+												{unidad.str_city}, {unidad.str_state}
+											</div>
+											<div className="text-xs text-gray-500">
+												{unidad.str_address || 'Sin dirección'}
+											</div>
+										</td>
+										<td className="px-6 py-4">
+											<div className="text-sm text-gray-700">
+												{unidad.str_unit_type || 'N/A'}
+											</div>
+										</td>
+										<td className="px-6 py-4 text-center">
+											<div className="flex items-center justify-center gap-2">
+												<Users size={16} className="text-gray-500" />
+												<span className="text-sm font-medium text-gray-700">
+													{unidad.int_total_apartments}
+												</span>
+											</div>
+										</td>
+										<td className="px-6 py-4 text-center">
+											<span
+												className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${unidad.bln_is_active
+														? 'bg-green-100 text-green-700'
+														: 'bg-red-100 text-red-700'
+													}`}
+											>
+												{unidad.bln_is_active ? 'Activa' : 'Inactiva'}
+											</span>
+										</td>
+										<td className="px-6 py-4 text-center">
+											<div className="relative inline-block">
+												<button
+													onClick={(e) => toggleDropdown(unidad.id, e)}
+													className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+												>
+													<MoreVertical size={18} className="text-gray-600" />
+												</button>
+												{openDropdownId === unidad.id && (
+													<div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+														<button
+															onClick={(e) => handleEdit(unidad, e)}
+															className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+														>
+															<Edit2 size={16} />
+															Editar
+														</button>
+														<button
+															onClick={(e) => handleDelete(unidad, e)}
+															className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+														>
+															<Trash2 size={16} />
+															Eliminar
+														</button>
+													</div>
+												)}
+											</div>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+						</div>
+					</div>
 			)}
 
-			{/* Modal de creación/edición */}
-			<Modal
-				isOpen={isModalOpen}
-				onClose={handleCloseModal}
-				title={isEditMode ? "Editar Unidad Residencial" : "Crear Nueva Unidad Residencial"}
-				size="xl"
-			>
-				<form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        
-        {/* SECCIÓN: Código Automático */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200 shadow-sm">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full -mr-16 -mt-16 opacity-50"></div>
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <Hash className="w-5 h-5 text-white" />
-              </div>
-              <label className="text-sm font-semibold text-gray-700">
-                Código de Unidad Residencial
-              </label>
-              <span className="ml-auto px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
-                Auto-generado
-              </span>
-            </div>
-            <input
-              type="text"
-              value={residentialCode}
-              readOnly
-              className="w-full p-4 bg-white border-2 border-blue-200 rounded-xl text-lg font-mono text-blue-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
-              placeholder="Se genera automáticamente"
-            />
-            <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
-              <span className="w-1 h-1 bg-blue-500 rounded-full"></span>
-              Generado automáticamente desde nombre, NIT y apartamentos
-            </p>
-          </div>
-        </div>
+					{/* Modal de creación/edición */}
+					<Modal
+						isOpen={isModalOpen}
+						onClose={handleCloseModal}
+						title={isEditMode ? "Editar Unidad Residencial" : "Crear Nueva Unidad Residencial"}
+						size="xl"
+					>
+						<form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
 
-        {/* SECCIÓN: Información Básica */}
-        <div className="space-y-5">
-          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
-            <Building2 className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-lg font-bold text-gray-800">Información Básica</h3>
-          </div>
+							{/* SECCIÓN: Código Automático */}
+							<div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200 shadow-sm">
+								<div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full -mr-16 -mt-16 opacity-50"></div>
+								<div className="relative">
+									<div className="flex items-center gap-2 mb-3">
+										<div className="p-2 bg-blue-500 rounded-lg">
+											<Hash className="w-5 h-5 text-white" />
+										</div>
+										<label className="text-sm font-semibold text-gray-700">
+											Código de Unidad Residencial
+										</label>
+										<span className="ml-auto px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
+											Auto-generado
+										</span>
+									</div>
+									<input
+										type="text"
+										value={residentialCode}
+										readOnly
+										className="w-full p-4 bg-white border-2 border-blue-200 rounded-xl text-lg font-mono text-blue-700 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
+										placeholder="Se genera automáticamente"
+									/>
+									<p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
+										<span className="w-1 h-1 bg-blue-500 rounded-full"></span>
+										Generado automáticamente desde nombre, NIT y apartamentos
+									</p>
+								</div>
+							</div>
 
-          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
-            
-            {/* Nombre */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <Building2 className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                Nombre de la Unidad Residencial
-              </label>
-              <input
-                type="text"
-                {...register('str_name', {
-                  minLength: {
-                    value: 3,
-                    message: 'El nombre debe tener al menos 3 caracteres'
-                  }
-                })}
-                placeholder="Ej: Torres del Parque"
-                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.str_name 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                    : 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
-                }`}
-              />
-              {errors.str_name && (
-                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.str_name.message}
-                </p>
-              )}
-            </div>
+							{/* SECCIÓN: Información Básica */}
+							<div className="space-y-5">
+								<div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+									<Building2 className="w-5 h-5 text-indigo-600" />
+									<h3 className="text-lg font-bold text-gray-800">Información Básica</h3>
+								</div>
 
-            {/* NIT */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <FileText className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                NIT
-              </label>
-              <input
-                type="text"
-                {...register('str_nit', {
-                  pattern: {
-                    value: /^[0-9-]+$/,
-                    message: 'NIT inválido (solo números y guiones)'
-                  }
-                })}
-                placeholder="Ej: 900123456-7"
-                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.str_nit 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                    : 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
-                }`}
-              />
-              {errors.str_nit && (
-                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.str_nit.message}
-                </p>
-              )}
-            </div>
+								<div className="grid gap-5 grid-cols-1 md:grid-cols-2">
 
-            {/* Tipo de Unidad */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <Home className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                Tipo de Unidad
-              </label>
-              <select 
-                {...register('str_unit_type')}
-                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all hover:border-gray-300 cursor-pointer"
-              >
-                <option value="">Selecciona un tipo</option>
-                <option value="Conjunto Residencial">Conjunto Residencial</option>
-                <option value="Edificio">Edificio</option>
-                <option value="Condominio">Condominio</option>
-                <option value="Urbanización">Urbanización</option>
-              </select>
-            </div>
+									{/* Nombre */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<Building2 className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+											Nombre de la Unidad Residencial
+										</label>
+										<input
+											type="text"
+											{...register('str_name', {
+												minLength: {
+													value: 3,
+													message: 'El nombre debe tener al menos 3 caracteres'
+												}
+											})}
+											placeholder="Ej: Torres del Parque"
+											className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errors.str_name
+													? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+													: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+												}`}
+										/>
+										{errors.str_name && (
+											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+												<span className="font-medium">⚠</span> {errors.str_name.message}
+											</p>
+										)}
+									</div>
 
-            {/* Número de Apartamentos */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <Users className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                Número de Apartamentos
-              </label>
-              <input
-                type="number"
-                {...register('int_total_apartments', {
-                  min: {
-                    value: 1,
-                    message: 'Debe haber al menos 1 apartamento'
-                  },
-                  valueAsNumber: true
-                })}
-                placeholder="Ej: 120"
-                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.int_total_apartments 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                    : 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
-                }`}
-              />
-              {errors.int_total_apartments && (
-                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.int_total_apartments.message}
-                </p>
-              )}
-            </div>
+									{/* NIT */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<FileText className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+											NIT
+										</label>
+										<input
+											type="text"
+											{...register('str_nit', {
+												pattern: {
+													value: /^[0-9-]+$/,
+													message: 'NIT inválido (solo números y guiones)'
+												}
+											})}
+											placeholder="Ej: 900123456-7"
+											className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errors.str_nit
+													? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+													: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+												}`}
+										/>
+										{errors.str_nit && (
+											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+												<span className="font-medium">⚠</span> {errors.str_nit.message}
+											</p>
+										)}
+									</div>
 
-          </div>
-        </div>
+									{/* Tipo de Unidad */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<Home className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+											Tipo de Unidad
+										</label>
+										<select
+											{...register('str_unit_type')}
+											className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all hover:border-gray-300 cursor-pointer"
+										>
+											<option value="">Selecciona un tipo</option>
+											<option value="Conjunto Residencial">Conjunto Residencial</option>
+											<option value="Edificio">Edificio</option>
+											<option value="Condominio">Condominio</option>
+											<option value="Urbanización">Urbanización</option>
+										</select>
+									</div>
 
-        {/* SECCIÓN: Ubicación */}
-        <div className="space-y-5">
-          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
-            <MapPin className="w-5 h-5 text-emerald-600" />
-            <h3 className="text-lg font-bold text-gray-800">Ubicación</h3>
-          </div>
+									{/* Número de Apartamentos */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<Users className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+											Número de Apartamentos
+										</label>
+										<input
+											type="number"
+											{...register('int_total_apartments', {
+												min: {
+													value: 1,
+													message: 'Debe haber al menos 1 apartamento'
+												},
+												valueAsNumber: true
+											})}
+											placeholder="Ej: 120"
+											className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errors.int_total_apartments
+													? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+													: 'border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+												}`}
+										/>
+										{errors.int_total_apartments && (
+											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+												<span className="font-medium">⚠</span> {errors.int_total_apartments.message}
+											</p>
+										)}
+									</div>
 
-          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
-            
-            {/* Ciudad */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <MapPin className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                Ciudad
-              </label>
-              <input
-                type="text"
-                {...register('str_city')}
-                placeholder="Ej: Medellín"
-                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
-              />
-            </div>
+								</div>
+							</div>
 
-            {/* Departamento */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <Map className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                Departamento/Estado
-              </label>
-              <input
-                type="text"
-                {...register('str_state')}
-                placeholder="Ej: Antioquia"
-                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
-              />
-            </div>
+							{/* SECCIÓN: Ubicación */}
+							<div className="space-y-5">
+								<div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+									<MapPin className="w-5 h-5 text-emerald-600" />
+									<h3 className="text-lg font-bold text-gray-800">Ubicación</h3>
+								</div>
 
-            {/* Dirección - Ocupa todo el ancho */}
-            <div className="group md:col-span-2">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <Map className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                Dirección Completa
-              </label>
-              <input
-                type="text"
-                {...register('str_address')}
-                placeholder="Ej: Carrera 15 # 25-30"
-                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
-              />
-            </div>
+								<div className="grid gap-5 grid-cols-1 md:grid-cols-2">
 
-          </div>
-        </div>
+									{/* Ciudad */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<MapPin className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+											Ciudad
+										</label>
+										<input
+											type="text"
+											{...register('str_city')}
+											placeholder="Ej: Medellín"
+											className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
+										/>
+									</div>
 
-        {/* SECCIÓN: Empresa Administradora */}
-        <div className="space-y-5">
-          <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
-            <Briefcase className="w-5 h-5 text-teal-600" />
-            <h3 className="text-lg font-bold text-gray-800">Empresa Administradora</h3>
-            <span className="ml-auto text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Opcional</span>
-          </div>
+									{/* Departamento */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<Map className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+											Departamento/Estado
+										</label>
+										<input
+											type="text"
+											{...register('str_state')}
+											placeholder="Ej: Antioquia"
+											className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
+										/>
+									</div>
 
-          <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+									{/* Dirección - Ocupa todo el ancho */}
+									<div className="group md:col-span-2">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<Map className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+											Dirección Completa
+										</label>
+										<input
+											type="text"
+											{...register('str_address')}
+											placeholder="Ej: Carrera 15 # 25-30"
+											className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all hover:border-gray-300"
+										/>
+									</div>
 
-            {/* Nombre de la Empresa */}
-            <div className="group md:col-span-2">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <Briefcase className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
-                Nombre de la Empresa
-              </label>
-              <input
-                type="text"
-                {...register('str_management_company')}
-                placeholder="Ej: Administración Integral S.A.S."
-                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all hover:border-gray-300"
-              />
-              <p className="text-xs text-gray-500 mt-1.5">
-                Nombre de la empresa que administra la unidad residencial
-              </p>
-            </div>
+								</div>
+							</div>
 
-            {/* Persona de Contacto */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <User className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
-                Persona de Contacto
-              </label>
-              <input
-                type="text"
-                {...register('str_contact_person')}
-                placeholder="Ej: María Rodríguez"
-                className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all hover:border-gray-300"
-              />
-            </div>
+							{/* SECCIÓN: Empresa Administradora */}
+							<div className="space-y-5">
+								<div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
+									<Briefcase className="w-5 h-5 text-teal-600" />
+									<h3 className="text-lg font-bold text-gray-800">Empresa Administradora</h3>
+									<span className="ml-auto text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Opcional</span>
+								</div>
 
-            {/* Teléfono de Contacto */}
-            <div className="group">
-              <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                <Phone className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
-                Teléfono de Contacto
-              </label>
-              <input
-                type="tel"
-                {...register('str_contact_phone', {
-                  pattern: {
-                    value: /^[0-9]{10}$/,
-                    message: 'Teléfono inválido (10 dígitos sin espacios)'
-                  }
-                })}
-                placeholder="Ej: 3102456987"
-                className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.str_contact_phone
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-                    : 'border-gray-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-100'
-                }`}
-              />
-              {errors.str_contact_phone && (
-                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.str_contact_phone.message}
-                </p>
-              )}
-            </div>
+								<div className="grid gap-5 grid-cols-1 md:grid-cols-2">
 
-          </div>
-        </div>
+									{/* Nombre de la Empresa */}
+									<div className="group md:col-span-2">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<Briefcase className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
+											Nombre de la Empresa
+										</label>
+										<input
+											type="text"
+											{...register('str_management_company')}
+											placeholder="Ej: Administración Integral S.A.S."
+											className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all hover:border-gray-300"
+										/>
+										<p className="text-xs text-gray-500 mt-1.5">
+											Nombre de la empresa que administra la unidad residencial
+										</p>
+									</div>
 
-        {/* SECCIÓN: Configuración */}
-        {/* <div className="space-y-5">
+									{/* Persona de Contacto */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<User className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
+											Persona de Contacto
+										</label>
+										<input
+											type="text"
+											{...register('str_contact_person')}
+											placeholder="Ej: María Rodríguez"
+											className="w-full p-3.5 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all hover:border-gray-300"
+										/>
+									</div>
+
+									{/* Teléfono de Contacto */}
+									<div className="group">
+										<label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+											<Phone className="w-4 h-4 text-gray-400 group-hover:text-teal-500 transition-colors" />
+											Teléfono de Contacto
+										</label>
+										<input
+											type="tel"
+											{...register('str_contact_phone', {
+												pattern: {
+													value: /^[0-9]{10}$/,
+													message: 'Teléfono inválido (10 dígitos sin espacios)'
+												}
+											})}
+											placeholder="Ej: 3102456987"
+											className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${errors.str_contact_phone
+													? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
+													: 'border-gray-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-100'
+												}`}
+										/>
+										{errors.str_contact_phone && (
+											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+												<span className="font-medium">⚠</span> {errors.str_contact_phone.message}
+											</p>
+										)}
+									</div>
+
+								</div>
+							</div>
+
+							{/* SECCIÓN: Configuración */}
+							{/* <div className="space-y-5">
           <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
             <Calendar className="w-5 h-5 text-purple-600" />
             <h3 className="text-lg font-bold text-gray-800">Configuración</h3>
@@ -893,8 +909,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
           </div>
         </div> */}
 
-				{/* SECCIÓN: Administrador de la Unidad */}
-        {/* <div className="space-y-5">
+							{/* SECCIÓN: Administrador de la Unidad */}
+							{/* <div className="space-y-5">
           <div className="flex items-center gap-2 pb-3 border-b-2 border-gray-100">
             <UserCog className="w-5 h-5 text-amber-600" />
             <h3 className="text-lg font-bold text-gray-800">Administrador de la Unidad</h3>
@@ -1066,47 +1082,46 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
           </div>
         </div> */}
 
-        {/* BOTONES */}
-        <div className="flex flex-wrap gap-3 pt-6 border-t-2 border-gray-100">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all duration-200 ${
-              isSubmitting
-                ? 'opacity-50 cursor-not-allowed'
-                : 'hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
-            }`}
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Guardando...
-              </>
-            ) : (
-              <>
-                {isEditMode ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                {isEditMode ? 'Actualizar Unidad Residencial' : 'Guardar Unidad Residencial'}
-              </>
-            )}
-          </button>
+							{/* BOTONES */}
+							<div className="flex flex-wrap gap-3 pt-6 border-t-2 border-gray-100">
+								<button
+									type="submit"
+									disabled={isSubmitting}
+									className={`flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all duration-200 ${isSubmitting
+											? 'opacity-50 cursor-not-allowed'
+											: 'hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+										}`}
+								>
+									{isSubmitting ? (
+										<>
+											<svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+												<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+												<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+											</svg>
+											Guardando...
+										</>
+									) : (
+										<>
+											{isEditMode ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+											{isEditMode ? 'Actualizar Unidad Residencial' : 'Guardar Unidad Residencial'}
+										</>
+									)}
+								</button>
 
-          <button
-            type="button"
-            onClick={handleCloseModal}
-            disabled={isSubmitting}
-            className="bg-gray-100 text-gray-700 font-semibold px-8 py-3.5 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancelar
-          </button>
-        </div>
+								<button
+									type="button"
+									onClick={handleCloseModal}
+									disabled={isSubmitting}
+									className="bg-gray-100 text-gray-700 font-semibold px-8 py-3.5 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									Cancelar
+								</button>
+							</div>
 
-      </form>
-			</Modal>
-		</div>
-	);
+						</form>
+					</Modal>
+				</div>
+			);
 };
 
-export default UnidadesResidencialesTab;
+			export default UnidadesResidencialesTab;

@@ -200,10 +200,12 @@ const ResidentsList = ({
 		const pageWidth = pdf.internal.pageSize.getWidth();
 		const margin = 20;
 
+
 		// Agregar logo (esquina superior izquierda)
 		const logoWidth = 40;
 		const logoHeight = 15.6; // Mantiene proporción 2.56:1 del logo 948x370
 		pdf.addImage(logoBase64, 'JPEG', margin, margin - 5, logoWidth, logoHeight);
+
 
 		// Título principal (centrado)
 		pdf.setFontSize(16);
@@ -211,16 +213,21 @@ const ResidentsList = ({
 		pdf.setTextColor(41, 128, 185); // Azul corporativo
 		pdf.text('CÓDIGOS QR DE ACCESO', pageWidth / 2, margin + 2, { align: 'center' });
 
+
 		// Nombre de la unidad residencial (centrado, debajo del título)
 		pdf.setFontSize(14);
 		pdf.setFont('helvetica', 'bold');
 		pdf.setTextColor(52, 73, 94); // Gris oscuro
 		pdf.text(unitName, pageWidth / 2, margin + 10, { align: 'center' });
 
+
 		// Fecha de generación (centrado, debajo de unidad)
 		pdf.setFontSize(9);
 		pdf.setFont('helvetica', 'normal');
 		pdf.setTextColor(127, 140, 141); // Gris claro
+		const currentDate = new Date().toLocaleDateString('es-ES', {
+			year: 'numeric',
+			month: 'long',
 		const currentDate = new Date().toLocaleDateString('es-ES', {
 			year: 'numeric',
 			month: 'long',
@@ -230,10 +237,12 @@ const ResidentsList = ({
 		});
 		pdf.text(`Generado el ${currentDate}`, pageWidth / 2, margin + 16, { align: 'center' });
 
+
 		// Línea separadora
 		pdf.setDrawColor(189, 195, 199);
 		pdf.setLineWidth(0.5);
 		pdf.line(margin, margin + 20, pageWidth - margin, margin + 20);
+
 
 		// Resetear colores
 		pdf.setTextColor(0, 0, 0);
@@ -245,10 +254,12 @@ const ResidentsList = ({
 		const pageHeight = pdf.internal.pageSize.getHeight();
 		const margin = 20;
 
+
 		// Línea separadora superior
 		pdf.setDrawColor(189, 195, 199);
 		pdf.setLineWidth(0.5);
 		pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+
 
 		// Número de página
 		pdf.setFontSize(9);
@@ -261,6 +272,7 @@ const ResidentsList = ({
 			{ align: 'center' }
 		);
 
+
 		// Marca de agua
 		pdf.setFontSize(8);
 		pdf.text(
@@ -269,6 +281,7 @@ const ResidentsList = ({
 			pageHeight - 4,
 			{ align: 'center' }
 		);
+
 
 		// Resetear colores
 		pdf.setTextColor(0, 0, 0);
@@ -304,12 +317,24 @@ const ResidentsList = ({
 		try {
 			const token = localStorage.getItem('access_token');
 
+
 			if (!token) {
 				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
 			}
 
 			console.log('🔄 Generando PDF con QRs para:', selectedResidents.length, 'residentes');
+			console.log('🔄 Generando PDF con QRs para:', selectedResidents.length, 'residentes');
 
+			// Mostrar progreso
+			Swal.fire({
+				title: 'Generando códigos QR...',
+				html: 'Generando tokens de acceso para todos los residentes...',
+				allowOutsideClick: false,
+				allowEscapeKey: false,
+				didOpen: () => {
+					Swal.showLoading();
+				},
+			});
 			// Mostrar progreso
 			Swal.fire({
 				title: 'Generando códigos QR...',
@@ -325,12 +350,27 @@ const ResidentsList = ({
 			let successCount = 0;
 			let errorCount = 0;
 			const errors = [];
+			const qrData = [];
+			let successCount = 0;
+			let errorCount = 0;
+			const errors = [];
 
 			try {
 				// Petición al endpoint bulk
 				const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
 				const endpoint = `${apiUrl}/residents/generate-qr-bulk-simple`;
 
+				const response = await fetch(endpoint, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${token}`
+					},
+					body: JSON.stringify({
+						user_ids: selectedResidents,
+						expiration_hours: 48
+					})
+				});
 				const response = await fetch(endpoint, {
 					method: 'POST',
 					headers: {
@@ -394,7 +434,19 @@ const ResidentsList = ({
 						errors.push(`${tokenData.firstname} ${tokenData.lastname}: Error generando imagen QR`);
 						console.error(`❌ Error generando imagen QR:`, qrError);
 					}
+						successCount++;
+						console.log(`✅ QR generado para: ${tokenData.firstname} ${tokenData.lastname}`);
+					} catch (qrError) {
+						errorCount++;
+						errors.push(`${tokenData.firstname} ${tokenData.lastname}: Error generando imagen QR`);
+						console.error(`❌ Error generando imagen QR:`, qrError);
+					}
 
+					// Actualizar progreso
+					Swal.update({
+						html: `Generando imágenes QR: ${i + 1} de ${data.data.qr_tokens.length}`
+					});
+				}
 					// Actualizar progreso
 					Swal.update({
 						html: `Generando imágenes QR: ${i + 1} de ${data.data.qr_tokens.length}`
@@ -408,7 +460,18 @@ const ResidentsList = ({
 						errors.push(`Usuario ID ${failed.user_id}: ${failed.error}`);
 					});
 				}
+				// Reportar errores del backend si los hay
+				if (data.data.failed_users && data.data.failed_users.length > 0) {
+					data.data.failed_users.forEach(failed => {
+						errorCount++;
+						errors.push(`Usuario ID ${failed.user_id}: ${failed.error}`);
+					});
+				}
 
+			} catch (fetchError) {
+				console.error('❌ Error en petición bulk:', fetchError);
+				throw fetchError;
+			}
 			} catch (fetchError) {
 				console.error('❌ Error en petición bulk:', fetchError);
 				throw fetchError;
@@ -421,6 +484,12 @@ const ResidentsList = ({
 					html: 'Preparando documento con códigos QR...'
 				});
 
+				// Crear PDF con jsPDF
+				const pdf = new jsPDF({
+					orientation: 'portrait',
+					unit: 'mm',
+					format: 'a4'
+				});
 				// Crear PDF con jsPDF
 				const pdf = new jsPDF({
 					orientation: 'portrait',
@@ -452,6 +521,9 @@ const ResidentsList = ({
 				Swal.update({
 					html: 'Generando documento con los códigos QR...'
 				});
+				Swal.update({
+					html: 'Generando documento con los códigos QR...'
+				});
 
 				// Iterar sobre cada QR y añadirlo al PDF
 				for (let i = 0; i < qrData.length; i++) {
@@ -468,6 +540,8 @@ const ResidentsList = ({
 					const qrX = x + (cellWidth - qrSize) / 2;
 					const qrY = y + 5;
 
+					// Añadir imagen QR
+					pdf.addImage(qrImageUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 					// Añadir imagen QR
 					pdf.addImage(qrImageUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
@@ -509,7 +583,10 @@ const ResidentsList = ({
 
 					// Resetear color de texto
 					pdf.setTextColor(0, 0, 0);
+					// Resetear color de texto
+					pdf.setTextColor(0, 0, 0);
 
+					pageQRCount++;
 					pageQRCount++;
 
 					// Si completamos 21 QRs y hay más residentes, añadir nueva página
@@ -593,16 +670,20 @@ const ResidentsList = ({
 			// Llamar a la API para generar el token de auto-login (endpoint simple)
 			const token = localStorage.getItem('access_token');
 
+
 			if (!token) {
 				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
 			}
 
+
 			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
 			const endpoint = `${apiUrl}/residents/generate-qr-simple`;
+
 
 			console.log('🔄 Making request to:', endpoint);
 			console.log('🔄 Request data:', { userId: resident.id });
 			console.log('🔄 Auth token:', token.substring(0, 20) + '...');
+
 
 			const response = await fetch(endpoint, {
 				method: 'POST',
@@ -615,6 +696,7 @@ const ResidentsList = ({
 				})
 			});
 
+
 			console.log('🔄 Response status:', response.status);
 			console.log('🔄 Response headers:', Object.fromEntries(response.headers.entries()));
 
@@ -622,25 +704,31 @@ const ResidentsList = ({
 				const data = await response.json();
 				console.log('✅ Response from backend:', data);
 
+
 				if (!data.success) {
 					throw new Error(data.message || 'Error en la respuesta del servidor');
 				}
 
+
 				if (!data.data || !data.data.auto_login_token) {
 					throw new Error('Respuesta inválida: falta token de acceso');
 				}
+
 
 				const token = data.data.auto_login_token;
 				// ✅ Usar window.location.origin para obtener la URL del frontend
 				const frontendUrl = window.location.origin;
 				const url = `${frontendUrl}/auto-login/${token}`;
 
+
 				console.log('✅ QR URL generated:', url);
 				console.log('✅ Frontend URL:', frontendUrl);
+
 
 				setAutoLoginUrl(url);
 				setSelectedResidentForQR(resident);
 				setQrModalOpen(true);
+
 
 				Swal.close();
 			} else {
@@ -656,8 +744,10 @@ const ResidentsList = ({
 				resident: resident
 			});
 
+
 			// Mostrar error más detallado
 			let errorMessage = 'No se pudo generar el código QR de acceso';
+
 
 			if (error.message) {
 				if (error.message.includes('403')) {
@@ -670,6 +760,7 @@ const ResidentsList = ({
 					errorMessage = `Error: ${error.message}`;
 				}
 			}
+
 
 			Swal.fire({
 				icon: 'error',
@@ -736,10 +827,20 @@ const ResidentsList = ({
 
 					{/* Botones de acción masiva */}
 					{selectedResidents.length > 0 && (
-						<div className="flex items-center gap-2">
-							<span className="text-sm font-semibold text-gray-700">
+						<div className="flex flex-col gap-2">
+
+							{/* Contador mobile */}
+							<span className="md:hidden text-sm font-semibold text-gray-700">
 								({selectedResidents.length} seleccionados)
 							</span>
+
+							{/* Acciones */}
+							<div className="grid grid-cols-2 gap-3 md:flex md:flex-row md:items-center md:gap-2">
+
+								{/* Contador desktop */}
+								<span className="hidden md:inline text-sm font-semibold text-gray-700 mr-2">
+									({selectedResidents.length} seleccionados)
+								</span>
 
 							{/* Botón de envío masivo de credenciales */}
 							<button
@@ -839,101 +940,102 @@ const ResidentsList = ({
 							</button>
 						</div>
 					)}
-				</div>
-
-				{/* Barra de búsqueda (opcional) */}
-				{showSearch && (
-					<div className="relative">
-						<Search
-							className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-							size={20}
-						/>
-						<input
-							type="text"
-							placeholder="Buscar por nombre, usuario, email, teléfono o apartamento..."
-							value={searchTerm}
-							onChange={(e) => setSearchTerm(e.target.value)}
-							className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent"
-						/>
-					</div>
-				)}
-			</div>
-
-			<div
-				className="flex-1 overflow-y-auto overflow-x-hidden"
-				style={{ minHeight: 0 }}
-			>
-				{isLoading ? (
-					<div className="flex items-center justify-center py-12">
-						<svg
-							className="animate-spin h-8 w-8 text-[#3498db]"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-						>
-							<circle
-								className="opacity-25"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								strokeWidth="4"
-							></circle>
-							<path
-								className="opacity-75"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							></path>
-						</svg>
-					</div>
-				) : filteredResidents && filteredResidents.length > 0 ? (
-					<>
-						{/* Checkbox para seleccionar todos */}
-						<div className="px-4 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
-							<label className="flex items-center gap-3 cursor-pointer">
-								<input
-									type="checkbox"
-									checked={selectAll}
-									onChange={handleSelectAll}
-									className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-								/>
-								<span className="text-sm font-semibold text-gray-700">
-									Seleccionar todos ({filteredResidents.length})
-								</span>
-							</label>
 						</div>
 
-						{/* Lista de residentes */}
-						<div className="divide-y divide-gray-200">
-							{filteredResidents.map((resident) => (
-								<div
-									key={resident.id}
-									className="p-4 hover:bg-gray-50 transition-colors relative"
-								>
-									<div className="flex items-center gap-3">
-										{/* Checkbox individual */}
-										<input
-											type="checkbox"
-											checked={selectedResidents.includes(resident.id)}
-											onChange={() => handleSelectResident(resident.id)}
-											onClick={(e) => e.stopPropagation()}
-											className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
-										/>
+				{/* Barra de búsqueda (opcional) */}
+					{showSearch && (
+						<div className="relative">
+							<Search
+								className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+								size={20}
+							/>
+							<input
+								type="text"
+								placeholder="Buscar por nombre, usuario, email, teléfono o apartamento..."
+								value={searchTerm}
+								onChange={(e) => setSearchTerm(e.target.value)}
+								className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent"
+							/>
+						</div>
+					)}
+				</div>
 
-										{/* Información del residente */}
-										<div className="flex-1 min-w-0">
-											<p className="font-semibold text-gray-800 truncate">
-												{resident.firstname} {resident.lastname}
-											</p>
-											<p className="text-sm text-gray-600 mt-1">
-												Apt. {resident.apartment_number}
-											</p>
-											{resident.email && (
-												<p className="text-xs text-gray-500 truncate">
-													{resident.email}
+				<div
+					className="flex-1 overflow-y-auto overflow-x-hidden"
+					style={{ minHeight: 0 }}
+				>
+					{isLoading ? (
+						<div className="flex items-center justify-center py-12">
+							<svg
+								className="animate-spin h-8 w-8 text-[#3498db]"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+							>
+								<circle
+									className="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									strokeWidth="4"
+								></circle>
+								<path
+									className="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+								></path>
+							</svg>
+						</div>
+					) : filteredResidents && filteredResidents.length > 0 ? (
+						<>
+							{/* Checkbox para seleccionar todos */}
+							<div className="px-4 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+								<label className="flex items-center gap-3 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={selectAll}
+										onChange={handleSelectAll}
+										className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+									/>
+									<span className="text-sm font-semibold text-gray-700">
+										Seleccionar todos ({filteredResidents.length})
+									</span>
+								</label>
+							</div>
+
+							{/* Lista de residentes */}
+							<div className="divide-y divide-gray-200">
+								{filteredResidents.map((resident) => (
+									<div
+										key={resident.id}
+										className="p-4 hover:bg-gray-50 transition-colors relative"
+									>
+										<div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
+
+											{/* Checkbox individual */}
+											<input
+												type="checkbox"
+												checked={selectedResidents.includes(resident.id)}
+												onChange={() => handleSelectResident(resident.id)}
+												onClick={(e) => e.stopPropagation()}
+												className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+											/>
+
+											{/* Información del residente */}
+											<div className="flex-1 min-w-0">
+												<p className="font-semibold text-gray-800 truncate">
+													{resident.firstname} {resident.lastname}
 												</p>
-											)}
-										</div>
+												<p className="text-sm text-gray-600 mt-1">
+													Apt. {resident.apartment_number}
+												</p>
+												{resident.email && (
+													<p className="text-xs text-gray-500 truncate">
+														{resident.email}
+													</p>
+												)}
+											</div>
 
 										{/* Indicador de estado */}
 										<div className="flex-shrink-0 mr-2">
@@ -945,135 +1047,135 @@ const ResidentsList = ({
 											</span>
 										</div>
 
-										{/* Botones de acción */}
-										<div className="flex items-center gap-2 flex-shrink-0">
+											{/* Botones de acción */}
+											<div className="flex items-center gap-2 flex-shrink-0">
 
-											{/* Botón para enviar WhatsApp */}
-											<button
-												onClick={(e) => {
-													e.stopPropagation();
-
-													if (!resident?.phone) {
-														Swal.fire({
-															icon: 'error',
-															title: 'Sin número de WhatsApp',
-															text: 'Este usuario no posee un número de WhatsApp registrado.',
-															confirmButtonText: 'Cerrar',
-															confirmButtonColor: '#25D366',
-														});
-														return;
-													}
-
-													const phone = resident.phone.replace(/\D/g, "");
-													window.open(`https://wa.me/${phone}`, "_blank");
-												}}
-												className="p-2 hover:bg-green-100 rounded-lg transition-colors"
-												title="Enviar WhatsApp"
-											>
-												<img src="/Wpp.png" alt="WhatsApp" className="w-5 h-5" />
-											</button>
-
-											{/* Botón para generar QR */}
-											<button
-												onClick={(e) => {
-													e.stopPropagation();
-													handleGenerateQR(resident);
-												}}
-												className="p-2 hover:bg-purple-100 rounded-lg transition-colors group"
-												title="Generar código QR de acceso"
-											>
-												<QrCode size={20} className="text-purple-600 group-hover:text-purple-700" />
-											</button>
-
-											{/* Botón para enviar credenciales individual */}
-											<button
-												onClick={(e) => {
-													e.stopPropagation();
-													onResendCredentials(resident);
-												}}
-												className="p-2 hover:bg-blue-100 rounded-lg transition-colors group"
-												title="Enviar credenciales por correo"
-											>
-												<Mail size={20} className="text-blue-600 group-hover:text-blue-700" />
-											</button>
-
-											{/* Botón de toggle access - solo visible si puede modificar el acceso */}
-											{canToggleAccess(resident) && (
+												{/* Botón para enviar WhatsApp */}
 												<button
 													onClick={(e) => {
 														e.stopPropagation();
-														onToggleAccess(resident);
-													}}
-													className={`p-2 rounded-lg transition-colors group ${resident.bln_allow_entry ? 'hover:bg-red-100' : 'hover:bg-green-100'
-														}`}
-													title={resident.bln_allow_entry ? 'Deshabilitar acceso' : 'Habilitar acceso'}
-												>
-													{resident.bln_allow_entry ? (
-														<UserX size={20} className="text-red-600 group-hover:text-red-700" />
-													) : (
-														<UserCheck size={20} className="text-green-600 group-hover:text-green-700" />
-													)}
-												</button>
-											)}
 
-											{/* Botón del menú de 3 puntos */}
-											<button
-												ref={(el) => {
-													if (el) {
-														menuButtonRefs.current[resident.id] = el;
-													}
-												}}
-												onClick={(e) => handleMenuOpen(resident.id, e)}
-												className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-											>
-												<MoreVertical size={20} className="text-gray-600" />
-											</button>
+														if (!resident?.phone) {
+															Swal.fire({
+																icon: 'error',
+																title: 'Sin número de WhatsApp',
+																text: 'Este usuario no posee un número de WhatsApp registrado.',
+																confirmButtonText: 'Cerrar',
+																confirmButtonColor: '#25D366',
+															});
+															return;
+														}
+
+														const phone = resident.phone.replace(/\D/g, "");
+														window.open(`https://wa.me/${phone}`, "_blank");
+													}}
+													className="p-2 hover:bg-green-100 rounded-lg transition-colors"
+													title="Enviar WhatsApp"
+												>
+													<img src="/Wpp.png" alt="WhatsApp" className="w-5 h-5" />
+												</button>
+
+												{/* Botón para generar QR */}
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														handleGenerateQR(resident);
+													}}
+													className="p-2 hover:bg-purple-100 rounded-lg transition-colors group"
+													title="Generar código QR de acceso"
+												>
+													<QrCode size={20} className="text-purple-600 group-hover:text-purple-700" />
+												</button>
+
+												{/* Botón para enviar credenciales individual */}
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														onResendCredentials(resident);
+													}}
+													className="p-2 hover:bg-blue-100 rounded-lg transition-colors group"
+													title="Enviar credenciales por correo"
+												>
+													<Mail size={20} className="text-blue-600 group-hover:text-blue-700" />
+												</button>
+
+												{/* Botón de toggle access - solo visible si puede modificar el acceso */}
+												{canToggleAccess(resident) && (
+													<button
+														onClick={(e) => {
+															e.stopPropagation();
+															onToggleAccess(resident);
+														}}
+														className={`p-2 rounded-lg transition-colors group ${resident.bln_allow_entry ? 'hover:bg-red-100' : 'hover:bg-green-100'
+															}`}
+														title={resident.bln_allow_entry ? 'Deshabilitar acceso' : 'Habilitar acceso'}
+													>
+														{resident.bln_allow_entry ? (
+															<UserX size={20} className="text-red-600 group-hover:text-red-700" />
+														) : (
+															<UserCheck size={20} className="text-green-600 group-hover:text-green-700" />
+														)}
+													</button>
+												)}
+
+												{/* Botón del menú de 3 puntos */}
+												<button
+													ref={(el) => {
+														if (el) {
+															menuButtonRefs.current[resident.id] = el;
+														}
+													}}
+													onClick={(e) => handleMenuOpen(resident.id, e)}
+													className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+												>
+													<MoreVertical size={20} className="text-gray-600" />
+												</button>
+											</div>
 										</div>
 									</div>
-								</div>
-							))}
+								))}
+							</div>
+						</>
+					) : (
+						<div className="text-center py-12">
+							<UsersIcon className="mx-auto text-gray-400 mb-4" size={48} />
+							<p className="text-gray-600">
+								{searchTerm
+									? 'No se encontraron residentes con esa búsqueda'
+									: 'No hay residentes registrados'}
+							</p>
 						</div>
-					</>
-				) : (
-					<div className="text-center py-12">
-						<UsersIcon className="mx-auto text-gray-400 mb-4" size={48} />
-						<p className="text-gray-600">
-							{searchTerm
-								? 'No se encontraron residentes con esa búsqueda'
-								: 'No hay residentes registrados'}
-						</p>
-					</div>
+					)}
+				</div>
+
+				{/* Menú de acciones */}
+				{selectedResidentMenu && (
+					<ResidentActionsMenu
+						resident={filteredResidents.find((r) => r.id === selectedResidentMenu)}
+						position={menuPosition}
+						onView={() => { }}
+						onEdit={onEditResident}
+						onDelete={onDeleteResident}
+						onGenerateQR={handleGenerateQR}
+						onClose={() => setSelectedResidentMenu(null)}
+					/>
+				)}
+
+				{/* Modal de QR Code */}
+				{selectedResidentForQR && (
+					<QRCodeModal
+						resident={selectedResidentForQR}
+						isOpen={qrModalOpen}
+						onClose={() => {
+							setQrModalOpen(false);
+							setSelectedResidentForQR(null);
+							setAutoLoginUrl('');
+						}}
+						autoLoginUrl={autoLoginUrl}
+					/>
 				)}
 			</div>
-
-			{/* Menú de acciones */}
-			{selectedResidentMenu && (
-				<ResidentActionsMenu
-					resident={filteredResidents.find((r) => r.id === selectedResidentMenu)}
-					position={menuPosition}
-					onView={() => { }}
-					onEdit={onEditResident}
-					onDelete={onDeleteResident}
-					onGenerateQR={handleGenerateQR}
-					onClose={() => setSelectedResidentMenu(null)}
-				/>
-			)}
-
-			{/* Modal de QR Code */}
-			{selectedResidentForQR && (
-				<QRCodeModal
-					resident={selectedResidentForQR}
-					isOpen={qrModalOpen}
-					onClose={() => {
-						setQrModalOpen(false);
-						setSelectedResidentForQR(null);
-						setAutoLoginUrl('');
-					}}
-					autoLoginUrl={autoLoginUrl}
-				/>
-			)}
-		</div>
-	);
+			);
 };
 
-export default ResidentsList;
+			export default ResidentsList;

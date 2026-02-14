@@ -147,17 +147,17 @@ export default function AppCopropietario() {
     <div className="bg-white border-b border-gray-200 shadow-sm">
       <div className="px-6 py-4">
         {/* Título de la sección */}
-        <div className="mb-4">
-          <h1 className="text-2xl font-semibold text-gray-800">
+        <div className="mb-4 min-w-0">
+          <h1 className=" text-2xl font-semibold text-gray-800 truncate max-w-full"title={titles[section]}>
             {titles[section]}
           </h1>
         </div>
 
         {/* Información del copropietario y unidad CON BOTÓN DE LOGOUT */}
         {!isGuest && !isLoadingUser && (
-          <div className="flex items-center justify-between gap-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
             {/* Contenedor izquierdo: Info del usuario y unidad */}
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
               {/* Información del Usuario */}
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md">
@@ -178,7 +178,7 @@ export default function AppCopropietario() {
               </div>
 
               {/* Separador vertical */}
-              <div className="h-12 w-px bg-blue-300"></div>
+              <div className="hidden md:block h-12 w-px bg-blue-300"></div>
 
               {/* Información de la Unidad Residencial */}
               <div className="flex items-center gap-2">
@@ -191,11 +191,9 @@ export default function AppCopropietario() {
             </div>
 
             {/* BOTÓN DE LOGOUT SOLO ICONO A LA DERECHA */}
-            <button
-              onClick={handleLogout}
-              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm"
-              title="Cerrar Sesión"
-            >
+<button
+  onClick={handleLogout}
+  className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm self-end md:self-auto"title="Cerrar Sesión">
               <LogOut size={20} />
             </button>
           </div>

@@ -100,7 +100,7 @@ export default function AppAdmin() {
 
   // Títulos para cada sección
   const sectionTitles = {
-    users: "Gestión de Copropietarios",
+    users: "Gestión de Co - propietarios",
     // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
     powers: "Gestión de Poderes",
@@ -491,13 +491,17 @@ export default function AppAdmin() {
 
         {/* Perfil de usuario */}
         <div className="flex items-center gap-3">
+
+          {/* Avatar (siempre visible) */}
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#059669] to-[#10b981] flex items-center justify-center text-white font-bold shadow-md">
             {user?.name
               ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
               : user?.role?.charAt(0).toUpperCase() || 'A'
             }
           </div>
-          <div className="flex flex-col">
+
+          {/* Nombre + correo (solo desktop) */}
+          <div className="hidden md:flex flex-col">
             <span className="text-sm font-semibold text-gray-800">
               {user?.name || user?.role || 'Administrador'}
             </span>
@@ -505,6 +509,7 @@ export default function AppAdmin() {
               {user?.email || ''}
             </span>
           </div>
+
         </div>
 
         {/* Cerrar sesión con menú desplegable */}

@@ -14,16 +14,18 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
  * @param {React.ReactNode} footer - Contenido personalizado para el footer
  */
 const Sidebar = ({
-	title = 'Giramaster',
-	subtitle = 'Panel de Control',
-	menuItems = [],
-	activeTab,
-	onTabChange,
-	gradientFrom = '#2c3e50',
-	gradientTo = '#34495e',
-	accentColor = '#3498db',
-	footer,
+  title = 'Giramaster',
+  subtitle = 'Panel de Control',
+  menuItems = [],
+  activeTab,
+  onTabChange,
+  gradientFrom = '#2c3e50',
+  gradientTo = '#34495e',
+  accentColor = '#3498db',
+  footer,
+  sidebarOpen = false, 
 }) => {
+
 	const [expandedItems, setExpandedItems] = useState({});
 
 	const handleClick = (itemId) => {
@@ -45,12 +47,22 @@ const Sidebar = ({
 	};
 
 	return (
-		<aside
-			className="fixed left-0 top-0 w-[280px] h-screen bg-gradient-to-br text-white shadow-2xl z-50 overflow-y-auto"
-			style={{
-				backgroundImage: `linear-gradient(to bottom right, ${gradientFrom}, ${gradientTo})`
-			}}
-		>
+			<aside
+				className={`
+					fixed inset-y-0 left-0
+					w-[280px]
+					bg-gradient-to-br text-white shadow-2xl z-50
+					transform transition-transform duration-300 ease-in-out
+					${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+					md:translate-x-0
+					overflow-y-auto
+				`}
+				style={{
+					backgroundImage: `linear-gradient(to bottom right, ${gradientFrom}, ${gradientTo})`
+				}}
+			>
+			<div className="min-h-full flex flex-col">
+
 			{/* Logo y título */}
 			<div className="px-6 py-8 border-b border-white/10">
 				<div className="flex items-center gap-3 mb-2">
@@ -70,7 +82,8 @@ const Sidebar = ({
 			</div>
 
 			{/* Menú de navegación */}
-			<nav className="py-4">
+			<nav className="py-4 flex-1 overflow-y-auto">
+
 				{menuItems.map((item) => {
 					const Icon = item.icon;
 					const active = activeTab === item.id || isParentActive(item);
@@ -153,17 +166,18 @@ const Sidebar = ({
 
 			{/* Footer del sidebar */}
 			{footer ? (
-				<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/10 bg-black/20">
+				<div className="p-6 border-t border-white/10 bg-black/20">
 					{footer}
 				</div>
 			) : (
-				<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/10 bg-black/20">
+				<div className="p-6 border-t border-white/10 bg-black/20">
 					<div className="text-xs text-gray-400 text-center">
 						<p>© 2025 Giramaster</p>
 						<p className="mt-1">v1.0.0</p>
 					</div>
 				</div>
 			)}
+			</div>
 		</aside>
 	);
 };
