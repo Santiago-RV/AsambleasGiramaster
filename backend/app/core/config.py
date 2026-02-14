@@ -80,6 +80,9 @@ class Settings(BaseSettings):
   SMTP_FROM_EMAIL: str = ""  # Email del remitente
   SMTP_FROM_NAME: str = "GIRAMASTER - Sistema de Asambleas"
   EMAIL_ENABLED: bool = True  # Activar/desactivar envío de emails
+  
+  # Generar Qrs
+  FRONTEND_URL: str
 
   class Config:
     env_file = ".env"
