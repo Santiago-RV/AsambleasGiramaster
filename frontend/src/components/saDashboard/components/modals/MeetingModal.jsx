@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../../../common/Modal';
 import {
@@ -11,8 +11,12 @@ import {
 	Clock,
 	Plus,
 } from 'lucide-react';
+import SystemConfigService from '../../../../services/api/SystemConfigService';
 
 const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
+	const [zoomAccounts, setZoomAccounts] = useState([]);
+	const [loadingAccounts, setLoadingAccounts] = useState(false);
+
 	const {
 		register,
 		handleSubmit,
@@ -26,10 +30,34 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 			str_meeting_type: 'Ordinaria',
 			dat_schedule_start: '',
 			bln_allow_delegates: true,
+			int_zoom_account_id: '',
 		},
 	});
 
 	const watchStart = watch('dat_schedule_start');
+
+	// Cargar cuentas Zoom al abrir el modal
+	useEffect(() => {
+		if (isOpen) {
+			loadZoomAccounts();
+		}
+	}, [isOpen]);
+
+	const loadZoomAccounts = async () => {
+		setLoadingAccounts(true);
+		try {
+			const response = await SystemConfigService.getZoomAccounts();
+			if (response.success) {
+				const accounts = response.data.accounts || [];
+				setZoomAccounts(accounts);
+			}
+		} catch (error) {
+			console.error('Error al cargar cuentas Zoom:', error);
+			setZoomAccounts([]);
+		} finally {
+			setLoadingAccounts(false);
+		}
+	};
 
 	const handleClose = () => {
 		reset();
@@ -42,8 +70,10 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 		});
 	};
 
+	const showZoomAccountSelector = zoomAccounts.length > 1;
+
 	return (
-		<Modal isOpen={isOpen} onClose={handleClose} title="Crear Nueva Reunión" size="2xl">
+		<Modal isOpen={isOpen} onClose={handleClose} title="Crear Nueva Reunion" size="2xl">
 			<form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
 				{/* BANNER INFORMATIVO ZOOM - Mejorado */}
 				<div className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-indigo-600 p-5 rounded-xl shadow-lg">
@@ -54,40 +84,40 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 						</div>
 						<div className="flex-1">
 							<h3 className="font-bold text-white mb-1 text-base">
-								Reunión Virtual con Zoom
+								Reunion Virtual con Zoom
 							</h3>
 							<p className="text-sm text-blue-50 leading-relaxed">
-								Se creará automáticamente una reunión en Zoom. Los datos de acceso se enviarán por correo electrónico a todos los copropietarios.
+								Se creara automaticamente una reunion en Zoom. Los datos de acceso se enviaran por correo electronico a todos los copropietarios.
 							</p>
 						</div>
 					</div>
 				</div>
 
-				{/* SECCIÓN: Información General */}
+				{/* SECCION: Informacion General */}
 				<div className="space-y-4">
 					<div className="flex items-center gap-2 pb-2 border-b border-gray-200">
 						<FileText className="w-5 h-5 text-indigo-600" />
-						<h3 className="text-base font-bold text-gray-800">Información General</h3>
+						<h3 className="text-base font-bold text-gray-800">Informacion General</h3>
 					</div>
 
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						{/* Título - Ocupa 2 columnas */}
+						{/* Titulo - Ocupa 2 columnas */}
 						<div className="md:col-span-2 group">
 							<label className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700">
 								<FileText className="w-4 h-4 text-indigo-500" />
-								Título de la Reunión *
+								Titulo de la Reunion *
 							</label>
 							<input
 								type="text"
 								{...register('str_title', {
-									required: 'El título es obligatorio',
+									required: 'El titulo es obligatorio',
 									minLength: {
 										value: 5,
-										message: 'El título debe tener al menos 5 caracteres',
+										message: 'El titulo debe tener al menos 5 caracteres',
 									},
 									maxLength: {
 										value: 200,
-										message: 'El título no puede exceder 200 caracteres',
+										message: 'El titulo no puede exceder 200 caracteres',
 									},
 								})}
 								placeholder="Ej: Asamblea Ordinaria Anual 2025"
@@ -105,15 +135,15 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 							)}
 						</div>
 
-						{/* Tipo de Reunión */}
+						{/* Tipo de Reunion */}
 						<div className="group">
 							<label className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700">
 								<UsersIcon className="w-4 h-4 text-indigo-500" />
-								Tipo de Reunión *
+								Tipo de Reunion *
 							</label>
 							<select
 								{...register('str_meeting_type', {
-									required: 'El tipo de reunión es obligatorio',
+									required: 'El tipo de reunion es obligatorio',
 								})}
 								className={`w-full px-4 py-2.5 bg-white border-2 rounded-lg text-sm focus:outline-none transition-all cursor-pointer ${
 									errors.str_meeting_type
@@ -123,8 +153,8 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 							>
 								<option value="Ordinaria">Asamblea Ordinaria</option>
 								<option value="Extraordinaria">Asamblea Extraordinaria</option>
-								<option value="Comite">Reunión de Comité</option>
-								<option value="Informativa">Reunión Informativa</option>
+								<option value="Comite">Reunion de Comite</option>
+								<option value="Informativa">Reunion Informativa</option>
 							</select>
 							{errors.str_meeting_type && (
 								<p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -167,20 +197,20 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 							)}
 						</div>
 
-						{/* Descripción - Ocupa 2 columnas */}
+						{/* Descripcion - Ocupa 2 columnas */}
 						<div className="md:col-span-2 group">
 							<label className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700">
 								<FileText className="w-4 h-4 text-indigo-500" />
-								Descripción / Agenda
+								Descripcion / Agenda
 							</label>
 							<textarea
 								{...register('str_description', {
 									maxLength: {
 										value: 1000,
-										message: 'La descripción no puede exceder 1000 caracteres',
+										message: 'La descripcion no puede exceder 1000 caracteres',
 									},
 								})}
-								placeholder="Agenda, orden del día, temas a tratar..."
+								placeholder="Agenda, orden del dia, temas a tratar..."
 								rows={3}
 								className={`w-full px-4 py-2.5 bg-white border-2 rounded-lg text-sm focus:outline-none transition-all resize-none ${
 									errors.str_description
@@ -195,21 +225,57 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 								</p>
 							)}
 							<p className="text-xs text-gray-500 mt-1">
-								Opcional - Máximo 1000 caracteres
+								Opcional - Maximo 1000 caracteres
 							</p>
 						</div>
 					</div>
 				</div>
 
-				{/* SECCIÓN: Configuración */}
+				{/* SECCION: Configuracion */}
 				<div className="space-y-4">
 					<div className="flex items-center gap-2 pb-2 border-b border-gray-200">
 						<UserCheck className="w-5 h-5 text-purple-600" />
-						<h3 className="text-base font-bold text-gray-800">Configuración</h3>
+						<h3 className="text-base font-bold text-gray-800">Configuracion</h3>
 					</div>
 
 					<div className="grid grid-cols-1 gap-4">
-						{/* Info del líder */}
+						{/* Selector de Cuenta Zoom (solo si hay mas de 1) */}
+						{showZoomAccountSelector && (
+							<div className="group">
+								<label className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700">
+									<Video className="w-4 h-4 text-blue-500" />
+									Cuenta Zoom *
+								</label>
+								<select
+									{...register('int_zoom_account_id', {
+										required: showZoomAccountSelector ? 'Selecciona una cuenta Zoom' : false,
+									})}
+									className={`w-full px-4 py-2.5 bg-white border-2 rounded-lg text-sm focus:outline-none transition-all cursor-pointer ${
+										errors.int_zoom_account_id
+											? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+											: 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+									}`}
+								>
+									<option value="">-- Seleccionar cuenta Zoom --</option>
+									{zoomAccounts.map((account) => (
+										<option key={account.id} value={account.id}>
+											{account.name} (Cuenta #{account.id})
+										</option>
+									))}
+								</select>
+								{errors.int_zoom_account_id && (
+									<p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+										<AlertCircle className="w-3 h-3" />
+										{errors.int_zoom_account_id.message}
+									</p>
+								)}
+								<p className="text-xs text-gray-500 mt-1">
+									Selecciona la cuenta de Zoom donde se creara la reunion
+								</p>
+							</div>
+						)}
+
+						{/* Info del lider */}
 						<div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
 							<div className="flex items-start gap-3">
 								<div className="p-2 bg-indigo-500 rounded-lg shrink-0">
@@ -217,10 +283,10 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 								</div>
 								<div className="flex-1">
 									<h4 className="font-semibold text-gray-800 text-sm mb-1">
-										Líder de la Reunión
+										Lider de la Reunion
 									</h4>
 									<p className="text-xs text-gray-600 leading-relaxed">
-										El líder se asignará automáticamente al administrador de la unidad residencial
+										El lider se asignara automaticamente al administrador de la unidad residencial
 									</p>
 								</div>
 							</div>
@@ -238,17 +304,17 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 									Permitir delegados
 								</span>
 								<span className="text-xs text-gray-600">
-									Los copropietarios podrán delegar su voto a otras personas autorizadas
+									Los copropietarios podran delegar su voto a otras personas autorizadas
 								</span>
 							</div>
 						</label>
 
-						{/* Info de duración */}
+						{/* Info de duracion */}
 						<div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
 							<div className="flex items-start gap-2">
 								<Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
 								<p className="text-xs text-amber-800 leading-relaxed">
-									<strong>Duración:</strong> La reunión tendrá una duración indefinida. El administrador podrá cerrar el acceso manualmente cuando finalice.
+									<strong>Duracion:</strong> La reunion tendra una duracion indefinida. El administrador podra cerrar el acceso manualmente cuando finalice.
 								</p>
 							</div>
 						</div>
@@ -278,12 +344,12 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 						{isSubmitting ? (
 							<>
 								<Clock className="animate-spin h-5 w-5" />
-								<span>Creando reunión...</span>
+								<span>Creando reunion...</span>
 							</>
 						) : (
 							<>
 								<Plus className="w-5 h-5" />
-								<span>Crear Reunión</span>
+								<span>Crear Reunion</span>
 							</>
 						)}
 					</button>

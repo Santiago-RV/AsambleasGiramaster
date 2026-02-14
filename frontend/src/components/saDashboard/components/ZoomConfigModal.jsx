@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Save, TestTube, Eye, EyeOff, HelpCircle, Smartphone, Server, Video, Lock, ShieldCheck, X, Loader2 } from 'lucide-react';
+import { Save, TestTube, Eye, EyeOff, HelpCircle, Smartphone, Server, Video, Lock, ShieldCheck, X, Loader2, Tag } from 'lucide-react';
 import Modal from '../../common/Modal';
 import Swal from 'sweetalert2';
 import SystemConfigService from '../../../services/api/SystemConfigService';
 
-const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) => {
+const ZoomConfigModal = ({ isOpen, onClose, editingAccount, onSave, isSaving }) => {
     const [activeTab, setActiveTab] = useState('sdk');
     const [showSecrets, setShowSecrets] = useState({
         sdk_secret: false,
@@ -13,20 +13,51 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
     });
     const [isTesting, setIsTesting] = useState(false);
 
+    const isEditMode = !!editingAccount;
+
     const {
         register,
         handleSubmit,
         getValues,
+        reset,
         formState: { errors }
     } = useForm({
         defaultValues: {
-            sdk_key: currentConfig?.sdk_key || '',
-            sdk_secret: currentConfig?.sdk_secret || '',
-            account_id: currentConfig?.account_id || '',
-            client_id: currentConfig?.client_id || '',
-            client_secret: currentConfig?.client_secret || ''
+            name: '',
+            sdk_key: '',
+            sdk_secret: '',
+            account_id: '',
+            client_id: '',
+            client_secret: ''
         }
     });
+
+    // Reset form when modal opens/closes or editingAccount changes
+    useEffect(() => {
+        if (isOpen) {
+            if (editingAccount) {
+                reset({
+                    name: editingAccount.name || '',
+                    sdk_key: editingAccount.sdk_key || '',
+                    sdk_secret: editingAccount.sdk_secret || '',
+                    account_id: editingAccount.account_id || '',
+                    client_id: editingAccount.client_id || '',
+                    client_secret: editingAccount.client_secret || ''
+                });
+            } else {
+                reset({
+                    name: '',
+                    sdk_key: '',
+                    sdk_secret: '',
+                    account_id: '',
+                    client_id: '',
+                    client_secret: ''
+                });
+            }
+            setActiveTab('sdk');
+            setShowSecrets({ sdk_secret: false, client_secret: false });
+        }
+    }, [isOpen, editingAccount, reset]);
 
     const toggleShowSecret = (field) => {
         setShowSecrets(prev => ({
@@ -36,21 +67,30 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
     };
 
     const handleTestConnection = async () => {
+        if (!isEditMode || !editingAccount?.id) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Guarda primero',
+                text: 'Debes guardar la cuenta antes de probar la conexion'
+            });
+            return;
+        }
+
         const values = getValues();
-        
-        const allFilled = Object.values(values).every(v => v && v.trim());
+        const credentialFields = ['sdk_key', 'sdk_secret', 'account_id', 'client_id', 'client_secret'];
+        const allFilled = credentialFields.every(f => values[f] && values[f].trim());
         if (!allFilled) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Campos Incompletos',
-                text: 'Por favor completa todos los campos antes de probar la conexión'
+                text: 'Por favor completa todos los campos antes de probar la conexion'
             });
             return;
         }
 
         setIsTesting(true);
         Swal.fire({
-            title: 'Probando Conexión...',
+            title: 'Probando Conexion...',
             text: 'Por favor espera mientras verificamos las credenciales',
             allowOutsideClick: false,
             didOpen: () => {
@@ -59,22 +99,23 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
         });
 
         try {
+            // Save first, then test
             await onSave(values);
-            const response = await SystemConfigService.testZoomConnection();
+            const response = await SystemConfigService.testZoomAccount(editingAccount.id);
             
             Swal.close();
             
             if (response.success && response.data.token_obtained) {
                 Swal.fire({
                     icon: 'success',
-                    title: '¡Conexión Exitosa!',
-                    text: 'Las credenciales de Zoom son válidas',
+                    title: 'Conexion Exitosa!',
+                    text: 'Las credenciales de Zoom son validas',
                     confirmButtonColor: '#27ae60'
                 });
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Conexión Fallida',
+                    title: 'Conexion Fallida',
                     text: response.data?.error || 'No se pudo conectar con Zoom'
                 });
             }
@@ -83,7 +124,7 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: error.response?.data?.detail || error.message || 'Error al probar conexión'
+                text: error.response?.data?.detail || error.message || 'Error al probar conexion'
             });
         } finally {
             setIsTesting(false);
@@ -120,10 +161,13 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                         </div>
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">
-                                Configurar Credenciales de Zoom
+                                {isEditMode ? 'Editar Cuenta Zoom' : 'Nueva Cuenta Zoom'}
                             </h2>
                             <p className="text-sm text-gray-600">
-                                Ingresa las credenciales de tu aplicación Zoom
+                                {isEditMode
+                                    ? `Editando: ${editingAccount.name || `Cuenta #${editingAccount.id}`}`
+                                    : 'Configura las credenciales de tu cuenta Zoom'
+                                }
                             </p>
                         </div>
                     </div>
@@ -135,29 +179,56 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                     </button>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex gap-2 mb-6 border-b border-gray-200">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all border-b-2 ${
-                                    activeTab === tab.id
-                                        ? 'text-blue-600 border-blue-600'
-                                        : 'text-gray-600 border-transparent hover:text-blue-500'
-                                }`}
-                            >
-                                <Icon size={20} />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
-
                 {/* Form */}
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    {/* Nombre de la cuenta */}
+                    <div>
+                        <label className="block mb-2 font-semibold text-gray-700 flex items-center gap-2">
+                            <Tag size={16} className="text-blue-500" />
+                            Nombre de la Cuenta *
+                            <Tooltip text="Un nombre identificativo para esta cuenta Zoom. Ej: 'Zoom Principal', 'Zoom Backup'" />
+                        </label>
+                        <input
+                            type="text"
+                            {...register('name', {
+                                required: 'El nombre de la cuenta es obligatorio',
+                                minLength: { value: 1, message: 'Minimo 1 caracter' },
+                                maxLength: { value: 50, message: 'Maximo 50 caracteres' }
+                            })}
+                            placeholder="Ej: Zoom Principal"
+                            className={`w-full p-3 border-2 rounded-lg text-sm focus:outline-none focus:border-blue-500 ${
+                                errors.name ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                        />
+                        {errors.name && (
+                            <span className="text-red-500 text-sm flex items-center gap-1 mt-1">
+                                {errors.name.message}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex gap-2 border-b border-gray-200">
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all border-b-2 ${
+                                        activeTab === tab.id
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-gray-600 border-transparent hover:text-blue-500'
+                                    }`}
+                                >
+                                    <Icon size={20} />
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
                     {/* Tab Content: Meeting SDK */}
                     {activeTab === 'sdk' && (
                         <div className="space-y-6">
@@ -172,13 +243,13 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                             <div>
                                 <label className="block mb-2 font-semibold text-gray-700 flex items-center gap-2">
                                     SDK Key *
-                                    <Tooltip text="Clave pública para inicializar el Zoom Meeting SDK. Es seguro exponerla al frontend." />
+                                    <Tooltip text="Clave publica para inicializar el Zoom Meeting SDK. Es seguro exponerla al frontend." />
                                 </label>
                                 <input
                                     type="text"
                                     {...register('sdk_key', {
                                         required: 'El SDK Key es obligatorio',
-                                        minLength: { value: 10, message: 'Mínimo 10 caracteres' }
+                                        minLength: { value: 10, message: 'Minimo 10 caracteres' }
                                     })}
                                     placeholder="Ej: v3RL9_2sSWK0HtBUXsKjtg"
                                     className={`w-full p-3 border-2 rounded-lg font-mono text-sm focus:outline-none focus:border-blue-500 ${
@@ -203,7 +274,7 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                                         type={showSecrets.sdk_secret ? 'text' : 'password'}
                                         {...register('sdk_secret', {
                                             required: 'El SDK Secret es obligatorio',
-                                            minLength: { value: 15, message: 'Mínimo 15 caracteres' }
+                                            minLength: { value: 15, message: 'Minimo 15 caracteres' }
                                         })}
                                         placeholder="Ej: 1ZdWaM2lbEG0DOMk3LUj6J7rjGcSbXk1"
                                         className={`w-full p-3 pr-12 border-2 rounded-lg font-mono text-sm focus:outline-none focus:border-blue-500 ${
@@ -241,13 +312,13 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                             <div>
                                 <label className="block mb-2 font-semibold text-gray-700 flex items-center gap-2">
                                     Account ID *
-                                    <Tooltip text="Identificador único de tu cuenta de Zoom" />
+                                    <Tooltip text="Identificador unico de tu cuenta de Zoom" />
                                 </label>
                                 <input
                                     type="text"
                                     {...register('account_id', {
                                         required: 'El Account ID es obligatorio',
-                                        minLength: { value: 10, message: 'Mínimo 10 caracteres' }
+                                        minLength: { value: 10, message: 'Minimo 10 caracteres' }
                                     })}
                                     placeholder="Ej: 4nFl7Xj5Qu68SC0gocai9A"
                                     className={`w-full p-3 border-2 rounded-lg font-mono text-sm focus:outline-none focus:border-green-500 ${
@@ -265,13 +336,13 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                             <div>
                                 <label className="block mb-2 font-semibold text-gray-700 flex items-center gap-2">
                                     Client ID *
-                                    <Tooltip text="ID del cliente OAuth de tu aplicación Server-to-Server" />
+                                    <Tooltip text="ID del cliente OAuth de tu aplicacion Server-to-Server" />
                                 </label>
                                 <input
                                     type="text"
                                     {...register('client_id', {
                                         required: 'El Client ID es obligatorio',
-                                        minLength: { value: 10, message: 'Mínimo 10 caracteres' }
+                                        minLength: { value: 10, message: 'Minimo 10 caracteres' }
                                     })}
                                     placeholder="Ej: NTVgxiKKQrCgJ72VHbtKw"
                                     className={`w-full p-3 border-2 rounded-lg font-mono text-sm focus:outline-none focus:border-green-500 ${
@@ -296,7 +367,7 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                                         type={showSecrets.client_secret ? 'text' : 'password'}
                                         {...register('client_secret', {
                                             required: 'El Client Secret es obligatorio',
-                                            minLength: { value: 15, message: 'Mínimo 15 caracteres' }
+                                            minLength: { value: 15, message: 'Minimo 15 caracteres' }
                                         })}
                                         placeholder="Ej: 1GXpJbSZ9HMQvQQuS5XH6rYJ7IZw1dmC"
                                         className={`w-full p-3 pr-12 border-2 rounded-lg font-mono text-sm focus:outline-none focus:border-green-500 ${
@@ -320,7 +391,7 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                         </div>
                     )}
 
-                    {/* Botones de acción */}
+                    {/* Botones de accion */}
                     <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
                         <button
                             type="submit"
@@ -337,31 +408,33 @@ const ZoomConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                             ) : (
                                 <>
                                     <Save size={20} />
-                                    Guardar Configuración
+                                    {isEditMode ? 'Guardar Cambios' : 'Crear Cuenta'}
                                 </>
                             )}
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={handleTestConnection}
-                            disabled={isSaving || isTesting}
-                            className={`flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:shadow-lg transition-all ${
-                                (isSaving || isTesting) ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
-                        >
-                            {isTesting ? (
-                                <>
-                                    <Loader2 size={20} className="animate-spin" />
-                                    Probando...
-                                </>
-                            ) : (
-                                <>
-                                    <TestTube size={20} />
-                                    Probar Conexión
-                                </>
-                            )}
-                        </button>
+                        {isEditMode && (
+                            <button
+                                type="button"
+                                onClick={handleTestConnection}
+                                disabled={isSaving || isTesting}
+                                className={`flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:shadow-lg transition-all ${
+                                    (isSaving || isTesting) ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                            >
+                                {isTesting ? (
+                                    <>
+                                        <Loader2 size={20} className="animate-spin" />
+                                        Probando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <TestTube size={20} />
+                                        Probar Conexion
+                                    </>
+                                )}
+                            </button>
+                        )}
 
                         <button
                             type="button"

@@ -38,6 +38,7 @@ class MeetingModel(Base):
     str_zoom_join_url = Column(String(500), nullable=True)  # Se completa al crear en Zoom
     str_zoom_start_url = Column(String(500), nullable=True)  # Se completa al crear en Zoom
     str_zoom_password = Column(String(50), nullable=True)
+    int_zoom_account_id = Column(Integer, nullable=True)  # ID de la cuenta Zoom usada (1-3)
     bln_allow_delegates = Column(Boolean, default=True)
     str_status = Column(String(50), index=True, nullable=False, default="Programada")
     bln_quorum_reached = Column(Boolean, default=False)

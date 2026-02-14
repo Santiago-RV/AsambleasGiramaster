@@ -9,6 +9,45 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-02-09 - Soporte para múltiples cuentas Zoom (máx. 3)
+
+- **Soporte multi-cuenta Zoom**: Permite configurar hasta 3 cuentas Zoom independientes para agendar reuniones simultáneas sin conflictos de licencia.
+  - **Backend - Nuevos endpoints** (`backend/app/api/v1/endpoints/system_config_endpoint.py`):
+    - `GET /system-config/zoom/accounts` - Lista cuentas Zoom configuradas.
+    - `GET /system-config/zoom/accounts/{id}` - Detalle de cuenta (valores enmascarados).
+    - `POST /system-config/zoom/accounts` - Crear nueva cuenta Zoom.
+    - `PUT /system-config/zoom/accounts/{id}` - Actualizar cuenta existente.
+    - `DELETE /system-config/zoom/accounts/{id}` - Eliminar cuenta.
+    - `POST /system-config/zoom/accounts/{id}/test` - Probar conexión OAuth de una cuenta.
+  - **Backend - Servicio** (`backend/app/services/system_config_service.py`):
+    - Auto-migración de credenciales legacy (`ZOOM_SDK_KEY`, etc.) a formato multi-cuenta (`ZOOM_1_SDK_KEY`, etc.).
+    - Constante `MAX_ZOOM_ACCOUNTS = 3`.
+    - Métodos CRUD: `get_zoom_accounts()`, `get_zoom_account_credentials()`, `update_zoom_account_credentials()`, `delete_zoom_account()`, `get_next_zoom_account_id()`.
+  - **Backend - Schemas** (`backend/app/schemas/system_config_schema.py`):
+    - Nuevos schemas: `ZoomAccountSummary`, `ZoomAccountsListResponse`, `ZoomAccountCreateRequest`, `ZoomAccountUpdateRequest`, `ZoomAccountDetailResponse`.
+  - **Backend - Modelo de reunión** (`backend/app/models/meeting_model.py`):
+    - Nueva columna `int_zoom_account_id` (nullable) para registrar qué cuenta Zoom se usó.
+  - **Backend - Servicio de reuniones** (`backend/app/services/meeting_service.py`):
+    - `create_meeting()` acepta `zoom_account_id` opcional. Si se especifica, carga credenciales de esa cuenta; si no, usa la primera disponible.
+  - **Backend - Endpoint de reuniones** (`backend/app/api/v1/endpoints/meeting_endpoint.py`):
+    - Pasa `zoom_account_id` del schema al servicio al crear reuniones.
+  - **Backend - Servicios Zoom** (`backend/app/services/zoom_api_service.py`, `zoom_service.py`):
+    - Aceptan `credentials` como parámetro directo para usar credenciales de una cuenta específica.
+  - **Frontend - API Service** (`frontend/src/services/api/SystemConfigService.js`):
+    - Nuevos métodos: `getZoomAccounts()`, `getZoomAccount()`, `createZoomAccount()`, `updateZoomAccount()`, `deleteZoomAccount()`, `testZoomAccount()`.
+  - **Frontend - Configuración** (`frontend/src/components/saDashboard/ConfiguracionTab.jsx`):
+    - Grid dinámico de tarjetas Zoom (1 por cuenta configurada) + tarjeta "Agregar Cuenta Zoom" con contador.
+  - **Frontend - Tarjeta Zoom** (`frontend/src/components/saDashboard/components/ZoomCredentialCard.jsx`):
+    - Soporta props `accountId`, `accountName`, `onDelete`. Muestra botón de eliminar en hover.
+  - **Frontend - Modal Zoom** (`frontend/src/components/saDashboard/components/ZoomConfigModal.jsx`):
+    - Nuevo campo "Nombre de la Cuenta" como primer campo. Soporta modo crear (POST) y editar (PUT). Botón "Probar Conexión" solo en modo editar.
+  - **Frontend - Modal de reunión** (`frontend/src/components/saDashboard/components/modals/MeetingModal.jsx`):
+    - Selector de cuenta Zoom (solo visible si hay 2+ cuentas). Si solo hay 1, se auto-selecciona sin mostrar selector.
+  - **Frontend - Dashboards** (`AdDashboard.jsx`, `UnidadResidencialDetalles.jsx`):
+    - `handleSubmitMeeting` incluye `int_zoom_account_id` en el payload de creación de reuniones.
+  - **SQL**: `ALTER TABLE tbl_meetings ADD COLUMN int_zoom_account_id INT NULL AFTER str_zoom_password`.
+  - Los endpoints legacy de Zoom (`GET/PUT /system-config/zoom`, `POST /system-config/zoom/test`) se mantienen intactos para compatibilidad.
+
 #### 2026-02-09 - Mejoras en Configuración SMTP, Iconografía de Modales y Limpieza de UI
 
 - **Corrección de almacenamiento SMTP (`smtp_from_email` vacío causaba error 422)**:
@@ -1856,6 +1895,45 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - **Funcionalidad de administrador**: Endpoint y servicio de invitación a reuniones
 
 ### Corregido
+
+#### 2026-02-10
+
+- **Corrección de warnings falsos por configuración de Zoom no encontrada (ZOOM_2_NAME, ZOOM_3_NAME)**:
+  - **Problema**: Al consultar `GET /api/v1/system-config/zoom/accounts`, se generaban warnings `Configuración no encontrada: ZOOM_2_NAME` y `ZOOM_3_NAME` porque `get_zoom_accounts()` itera sobre los 3 slots posibles y cada slot inexistente generaba un warning.
+  - **Causa**: `get_config()` usaba `logger.warning()` para todas las configuraciones no encontradas, sin distinguir entre búsquedas esperadas (exploratorias) y búsquedas que realmente indican un problema.
+  - **Solución**: Añadido parámetro `silent: bool = False` a `get_config()`. Cuando `silent=True`, usa `logger.debug()` en vez de `logger.warning()`.
+  - **Archivos modificados**:
+    - `backend/app/services/system_config_service.py`:
+      - Método `get_config()`: Nuevo parámetro `silent` que controla nivel de log.
+      - Método `get_zoom_accounts()`: Pasa `silent=True` al buscar nombres de cuentas.
+
+- **Corrección de error 429 Too Many Requests al crear reuniones**:
+  - **Problema**: `POST /api/v1/meetings` retornaba 429 Too Many Requests incluso con pocas peticiones POST, porque los requests GET incrementaban el mismo contador de rate limiting.
+  - **Causa**: El rate limiter usaba un bucket compartido `general_{client_ip}` para GET y POST. Si se realizaban 30+ requests de cualquier tipo (incluyendo GETs de lectura), el POST a meetings era rechazado al evaluarse contra un límite de 30/hr.
+  - **Solución**:
+    - Bucket key cambiado a `general_{method}_{client_ip}` para separar contadores por método HTTP.
+    - Añadido `/api/v1/meetings` a `endpoint_limits` con 50 requests/hora.
+  - **Archivos modificados**:
+    - `backend/app/middleware/rate_limit.py`: Bucket key incluye método HTTP.
+    - `backend/app/core/security.py`: Nuevo límite específico para `/api/v1/meetings`.
+
+- **Corrección de error 500 en configuración de Zoom SDK (`GET /api/v1/zoom/config`)**:
+  - **Problema**: Al intentar entrar a una reunión, el endpoint `GET /api/v1/zoom/config` retornaba `500 - Configuración de Zoom SDK no disponible`, impidiendo inicializar el Zoom Meeting SDK en el frontend.
+  - **Causa**: El endpoint leía `settings.ZOOM_SDK_KEY` directamente de variables de entorno (`.env`), pero las credenciales fueron migradas a la base de datos (panel Super Admin) y las variables `.env` estaban comentadas/vacías. El resto de la arquitectura (creación de reuniones, etc.) ya usaba BD, pero este endpoint nunca fue actualizado.
+  - **Solución**: Refactorización completa de `zoom_endpoint.py` para leer credenciales desde BD con fallback a `.env`:
+    - Nueva función helper `_get_sdk_key_from_db()` que busca credenciales multi-cuenta (`ZOOM_1_SDK_KEY`) primero, luego legacy (`ZOOM_SDK_KEY`).
+    - `get_zoom_config()`: Inyecta sesión de BD, busca SDK Key desde BD con fallback a `.env`.
+    - `generate_zoom_signature()`: Corregido bug donde `db` no estaba definido como parámetro (causaría `NameError`). Ahora inyecta `db: AsyncSession = Depends(get_db)` y obtiene `sdk_key` desde BD.
+    - `extract_meeting_info()`: Corregido bug similar con `db` no definido. Cambiado a `ZoomService()` sin DB ya que solo usa métodos de parseo de URL.
+  - **Archivos modificados**:
+    - `backend/app/api/v1/endpoints/zoom_endpoint.py`: Refactorización completa de los 3 endpoints.
+
+- **Corrección de carga de credenciales SDK en ZoomService (generate-signature)**:
+  - **Problema**: `POST /api/v1/zoom/generate-signature` fallaba con `400 - Las credenciales de Zoom SDK no están configuradas` porque `ZoomService` no encontraba las credenciales en BD.
+  - **Causa**: `ZoomService._load_credentials_from_db()` solo buscaba keys legacy (`ZOOM_SDK_KEY`, `ZOOM_SDK_SECRET`) en BD, pero las credenciales están almacenadas con formato multi-cuenta (`ZOOM_1_SDK_KEY`, `ZOOM_1_SDK_SECRET`). Al no encontrar las legacy, caía al fallback `.env` que estaba vacío.
+  - **Solución**: `_load_credentials_from_db()` ahora busca primero credenciales multi-cuenta via `get_zoom_accounts()` + `get_zoom_account_credentials()`, luego intenta keys legacy, y finalmente fallback a `.env`.
+  - **Archivos modificados**:
+    - `backend/app/services/zoom_service.py`: Método `_load_credentials_from_db()` actualizado con búsqueda multi-cuenta.
 
 #### 2025-12-15
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr, validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class SystemConfigBase(BaseModel):
@@ -34,6 +34,51 @@ class ZoomTestConnectionResponse(BaseModel):
     success: bool
     message: str
     details: Optional[dict] = None
+
+# ============================================
+# Zoom Multi-Account Schemas
+# ============================================
+
+class ZoomAccountSummary(BaseModel):
+    """Resumen de una cuenta Zoom configurada"""
+    id: int = Field(..., ge=1, le=3, description="ID de la cuenta Zoom (1-3)")
+    name: str = Field(..., description="Nombre amigable de la cuenta")
+    is_configured: bool = Field(..., description="Si tiene todas las credenciales configuradas")
+    last_updated: Optional[str] = None
+
+class ZoomAccountsListResponse(BaseModel):
+    """Respuesta con la lista de cuentas Zoom"""
+    accounts: List[ZoomAccountSummary] = []
+    max_accounts: int = 3
+
+class ZoomAccountCreateRequest(BaseModel):
+    """Request para crear/actualizar una cuenta Zoom"""
+    name: str = Field(..., min_length=1, max_length=50, description="Nombre amigable de la cuenta")
+    sdk_key: str = Field(..., min_length=10, description="Zoom SDK Key")
+    sdk_secret: str = Field(..., min_length=15, description="Zoom SDK Secret")
+    account_id: str = Field(..., min_length=10, description="Zoom Account ID")
+    client_id: str = Field(..., min_length=10, description="Zoom Client ID")
+    client_secret: str = Field(..., min_length=15, description="Zoom Client Secret")
+
+class ZoomAccountUpdateRequest(BaseModel):
+    """Request para actualizar una cuenta Zoom (campos opcionales)"""
+    name: Optional[str] = Field(None, min_length=1, max_length=50, description="Nombre amigable de la cuenta")
+    sdk_key: Optional[str] = Field(None, min_length=10, description="Zoom SDK Key")
+    sdk_secret: Optional[str] = Field(None, min_length=15, description="Zoom SDK Secret")
+    account_id: Optional[str] = Field(None, min_length=10, description="Zoom Account ID")
+    client_id: Optional[str] = Field(None, min_length=10, description="Zoom Client ID")
+    client_secret: Optional[str] = Field(None, min_length=15, description="Zoom Client Secret")
+
+class ZoomAccountDetailResponse(BaseModel):
+    """Respuesta con los detalles de una cuenta Zoom (valores enmascarados)"""
+    id: int
+    name: str
+    sdk_key: Optional[str] = None
+    sdk_secret: Optional[str] = Field(None, description="Valor enmascarado")
+    account_id: Optional[str] = Field(None, description="Valor enmascarado")
+    client_id: Optional[str] = Field(None, description="Valor enmascarado")
+    client_secret: Optional[str] = Field(None, description="Valor enmascarado")
+    last_updated: Optional[str] = None
 
 class SMTPCredentialsResponse(BaseModel):
     smtp_host: Optional[str] = None

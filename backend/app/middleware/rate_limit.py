@@ -26,7 +26,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         elif "/qr/" in path or "generate-auto-login" in path:
             rate_key = f"qr_{client_ip}"
         else:
-            rate_key = f"general_{client_ip}"
+            rate_key = f"general_{method}_{client_ip}"
         
         # Verificar rate limiting
         is_allowed, info = rate_limiter.is_allowed(

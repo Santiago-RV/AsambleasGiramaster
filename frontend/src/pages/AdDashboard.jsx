@@ -301,7 +301,8 @@ export default function AppAdmin() {
       bln_allow_delegates: data.bln_allow_delegates,
       int_estimated_duration: 0,
       dat_schedule_date: data.dat_schedule_start,
-      // El int_meeting_leader_id se asigna automáticamente en el backend
+      int_zoom_account_id: data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
+      // El int_meeting_leader_id se asigna automaticamente en el backend
     };
 
     createMeetingMutation.mutate(meetingData, {

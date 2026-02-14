@@ -214,6 +214,7 @@ class RateLimiter:
       "/api/v1/residents/send-qr-email": {"max_requests": 10, "window_minutes": 60},  # Email QR
       "/api/v1/residents/generate-qr-bulk-simple": {"max_requests": 50, "window_minutes": 60},  # Bulk QR tokens
       "/api/v1/delegations/": {"max_requests": 100, "window_minutes": 60},
+      "/api/v1/meetings": {"max_requests": 300, "window_minutes": 60},  # Reuniones (GET y escritura)
     }
     
     # Buscar límite específico para el endpoint
@@ -225,6 +226,6 @@ class RateLimiter:
     if "POST" in endpoint_path or "PUT" in endpoint_path or "DELETE" in endpoint_path:
       return {"max_requests": 30, "window_minutes": 60}  # Operaciones de escritura más restrictivas
     else:
-      return {"max_requests": 100, "window_minutes": 60}  # Operaciones de lectura más permisivas
+      return {"max_requests": 300, "window_minutes": 60}  # Operaciones de lectura más permisivas
 
 rate_limiter = RateLimiter()

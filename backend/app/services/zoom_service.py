@@ -1,6 +1,6 @@
 import jwt
 import time
-from typing import Optional
+from typing import Optional, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logging_config import get_logger
@@ -14,11 +14,25 @@ class ZoomService:
     y generar tokens de autenticación para el Meeting SDK
     """
 
-    def __init__(self, db: Optional[AsyncSession] = None):
+    def __init__(self, db: Optional[AsyncSession] = None, credentials: Optional[Dict[str, str]] = None):
+        """
+        Args:
+            db: Sesión de base de datos para cargar credenciales
+            credentials: Credenciales explícitas (dict con ZOOM_SDK_KEY, ZOOM_SDK_SECRET).
+                         Si se proveen, se usan directamente sin consultar DB ni .env.
+        """
         self.db = db
         self._credentials_loaded = False
         self.sdk_key = None
         self.sdk_secret = None
+        
+        # Si se pasan credenciales explícitas, usarlas directamente
+        if credentials:
+            self.sdk_key = credentials.get("ZOOM_SDK_KEY")
+            self.sdk_secret = credentials.get("ZOOM_SDK_SECRET")
+            if all([self.sdk_key, self.sdk_secret]):
+                self._credentials_loaded = True
+                logger.info("Credenciales SDK de Zoom cargadas desde parámetro explícito")
     
     async def _ensure_credentials_loaded(self):
         """Carga credenciales de BD si aún no están cargadas"""
@@ -39,25 +53,34 @@ class ZoomService:
         logger.warning("⚠️ Cargando credenciales SDK de Zoom desde .env (fallback)")
     
     async def _load_credentials_from_db(self):
-        """Carga credenciales desde base de datos"""
+        """Carga credenciales desde base de datos (multi-cuenta primero, luego legacy)"""
         try:
             from app.services.system_config_service import SystemConfigService
             config_service = SystemConfigService(self.db)
             
-            credentials = await config_service.get_zoom_credentials()
+            # 1. Intentar multi-cuenta primero (ZOOM_1_SDK_KEY, ZOOM_1_SDK_SECRET, etc.)
+            accounts = await config_service.get_zoom_accounts()
+            if accounts:
+                credentials = await config_service.get_zoom_account_credentials(accounts[0]["id"])
+                if credentials.get("ZOOM_SDK_KEY") and credentials.get("ZOOM_SDK_SECRET"):
+                    self.sdk_key = credentials["ZOOM_SDK_KEY"]
+                    self.sdk_secret = credentials["ZOOM_SDK_SECRET"]
+                    logger.info(f"Credenciales SDK de Zoom cargadas desde BD (multi-cuenta: {accounts[0]['name']})")
+                    return
             
+            # 2. Fallback a keys legacy (ZOOM_SDK_KEY, ZOOM_SDK_SECRET)
+            credentials = await config_service.get_zoom_credentials()
             self.sdk_key = credentials.get("ZOOM_SDK_KEY")
             self.sdk_secret = credentials.get("ZOOM_SDK_SECRET")
             
             if not all([self.sdk_key, self.sdk_secret]):
-                logger.warning("⚠️ Credenciales SDK de Zoom incompletas en BD, usando fallback a .env")
+                logger.warning("Credenciales SDK de Zoom incompletas en BD, usando fallback a .env")
                 self._load_credentials_from_env()
             else:
-                logger.info("✅ Credenciales SDK de Zoom cargadas desde base de datos")
+                logger.info("Credenciales SDK de Zoom cargadas desde BD (legacy)")
                 
         except Exception as e:
-            logger.error(f"❌ Error al cargar credenciales SDK de Zoom desde BD: {str(e)}")
-            logger.info("↩️ Usando fallback a .env")
+            logger.error(f"Error al cargar credenciales SDK de Zoom desde BD: {str(e)}")
             self._load_credentials_from_env()
 
     async def generate_signature(

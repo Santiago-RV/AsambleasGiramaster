@@ -6,6 +6,8 @@ from app.schemas.system_config_schema import (
     ZoomCredentialsResponse,
     ZoomCredentialsUpdateRequest,
     ZoomTestConnectionResponse,
+    ZoomAccountCreateRequest,
+    ZoomAccountUpdateRequest,
     SMTPCredentialsResponse,
     SMTPCredentialsUpdateRequest,
     SMTPTestConnectionResponse,
@@ -212,6 +214,290 @@ async def test_zoom_connection(
             success=False,
             status_code=status.HTTP_400_BAD_REQUEST,
             message=f"Error al conectar con Zoom: {str(e)}",
+            data={"error": str(e)}
+        )
+
+# ============================================
+# Zoom Multi-Account Endpoints
+# ============================================
+
+@router.get(
+    "/zoom/accounts",
+    response_model=SuccessResponse,
+    summary="Listar cuentas Zoom",
+    description="Obtiene la lista de cuentas Zoom configuradas (máximo 3)"
+)
+async def list_zoom_accounts(
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Lista todas las cuentas Zoom configuradas con su estado"""
+    try:
+        config_service = SystemConfigService(db)
+        accounts = await config_service.get_zoom_accounts()
+        next_id = await config_service.get_next_zoom_account_id()
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"{len(accounts)} cuenta(s) Zoom configurada(s)",
+            data={
+                "accounts": accounts,
+                "max_accounts": config_service.MAX_ZOOM_ACCOUNTS,
+                "can_add_more": next_id is not None,
+                "next_available_id": next_id
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error al listar cuentas Zoom: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al listar cuentas Zoom: {str(e)}"
+        )
+
+@router.get(
+    "/zoom/accounts/{account_id}",
+    response_model=SuccessResponse,
+    summary="Obtener detalle de cuenta Zoom",
+    description="Obtiene las credenciales (enmascaradas) de una cuenta Zoom específica"
+)
+async def get_zoom_account(
+    account_id: int,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene credenciales enmascaradas de una cuenta Zoom"""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_zoom_account_name(account_id)
+        
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta Zoom {account_id} no encontrada"
+            )
+        
+        credentials = await config_service.get_zoom_account_credentials(account_id)
+        
+        response_data = {
+            "id": account_id,
+            "name": name,
+            "sdk_key": credentials.get("ZOOM_SDK_KEY"),
+            "sdk_secret": "***" + credentials.get("ZOOM_SDK_SECRET", "")[-4:] if credentials.get("ZOOM_SDK_SECRET") else None,
+            "account_id": "***" + credentials.get("ZOOM_ACCOUNT_ID", "")[-4:] if credentials.get("ZOOM_ACCOUNT_ID") else None,
+            "client_id": "***" + credentials.get("ZOOM_CLIENT_ID", "")[-4:] if credentials.get("ZOOM_CLIENT_ID") else None,
+            "client_secret": "***" + credentials.get("ZOOM_CLIENT_SECRET", "")[-4:] if credentials.get("ZOOM_CLIENT_SECRET") else None,
+        }
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Cuenta Zoom '{name}' obtenida",
+            data=response_data
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al obtener cuenta Zoom {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener cuenta Zoom: {str(e)}"
+        )
+
+@router.post(
+    "/zoom/accounts",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear cuenta Zoom",
+    description="Crea una nueva cuenta Zoom (máximo 3)"
+)
+async def create_zoom_account(
+    data: ZoomAccountCreateRequest,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Crea una nueva cuenta Zoom con todas las credenciales"""
+    try:
+        config_service = SystemConfigService(db)
+        next_id = await config_service.get_next_zoom_account_id()
+        
+        if next_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Ya se alcanzó el máximo de {config_service.MAX_ZOOM_ACCOUNTS} cuentas Zoom"
+            )
+        
+        results = await config_service.update_zoom_account_credentials(
+            account_id=next_id,
+            name=data.name,
+            sdk_key=data.sdk_key,
+            sdk_secret=data.sdk_secret,
+            account_id_zoom=data.account_id,
+            client_id=data.client_id,
+            client_secret=data.client_secret,
+            updated_by=user.id
+        )
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_201_CREATED,
+            message=f"Cuenta Zoom '{data.name}' creada con ID {next_id}",
+            data={"account_id": next_id, "name": data.name, "updated_fields": list(results.keys())}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al crear cuenta Zoom: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al crear cuenta Zoom: {str(e)}"
+        )
+
+@router.put(
+    "/zoom/accounts/{account_id}",
+    response_model=SuccessResponse,
+    summary="Actualizar cuenta Zoom",
+    description="Actualiza las credenciales de una cuenta Zoom existente"
+)
+async def update_zoom_account(
+    account_id: int,
+    data: ZoomAccountUpdateRequest,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Actualiza credenciales de una cuenta Zoom existente"""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_zoom_account_name(account_id)
+        
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta Zoom {account_id} no encontrada"
+            )
+        
+        results = await config_service.update_zoom_account_credentials(
+            account_id=account_id,
+            name=data.name or name,
+            sdk_key=data.sdk_key,
+            sdk_secret=data.sdk_secret,
+            account_id_zoom=data.account_id,
+            client_id=data.client_id,
+            client_secret=data.client_secret,
+            updated_by=user.id
+        )
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Cuenta Zoom {account_id} actualizada",
+            data={"account_id": account_id, "updated_fields": list(results.keys())}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al actualizar cuenta Zoom {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al actualizar cuenta Zoom: {str(e)}"
+        )
+
+@router.delete(
+    "/zoom/accounts/{account_id}",
+    response_model=SuccessResponse,
+    summary="Eliminar cuenta Zoom",
+    description="Elimina una cuenta Zoom y todas sus credenciales"
+)
+async def delete_zoom_account(
+    account_id: int,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Elimina una cuenta Zoom"""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_zoom_account_name(account_id)
+        
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta Zoom {account_id} no encontrada"
+            )
+        
+        await config_service.delete_zoom_account(account_id)
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Cuenta Zoom '{name}' eliminada",
+            data={"account_id": account_id, "name": name}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al eliminar cuenta Zoom {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar cuenta Zoom: {str(e)}"
+        )
+
+@router.post(
+    "/zoom/accounts/{account_id}/test",
+    response_model=SuccessResponse,
+    summary="Probar conexión de cuenta Zoom",
+    description="Prueba la conexión OAuth de una cuenta Zoom específica"
+)
+async def test_zoom_account_connection(
+    account_id: int,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Prueba la conexión OAuth de una cuenta Zoom específica"""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_zoom_account_name(account_id)
+        
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta Zoom {account_id} no encontrada"
+            )
+        
+        credentials = await config_service.get_zoom_account_credentials(account_id)
+        
+        if not all([credentials.get("ZOOM_ACCOUNT_ID"), credentials.get("ZOOM_CLIENT_ID"), credentials.get("ZOOM_CLIENT_SECRET")]):
+            return SuccessResponse(
+                success=False,
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Credenciales OAuth incompletas para esta cuenta",
+                data={"token_obtained": False}
+            )
+        
+        zoom_service = ZoomAPIService(credentials=credentials)
+        token = await zoom_service._get_access_token()
+        
+        if token:
+            return SuccessResponse(
+                success=True,
+                status_code=status.HTTP_200_OK,
+                message=f"Conexión exitosa con cuenta '{name}'",
+                data={"token_obtained": True, "token_preview": token[:20] + "...", "account_name": name}
+            )
+        else:
+            return SuccessResponse(
+                success=False,
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"No se pudo obtener token para cuenta '{name}'",
+                data={"token_obtained": False}
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al probar cuenta Zoom {account_id}: {str(e)}")
+        return SuccessResponse(
+            success=False,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Error al conectar: {str(e)}",
             data={"error": str(e)}
         )
 

@@ -19,7 +19,13 @@ class ZoomAPIService:
     BASE_URL = "https://api.zoom.us/v2"
     OAUTH_URL = "https://zoom.us/oauth/token"
     
-    def __init__(self, db: Optional[AsyncSession] = None):
+    def __init__(self, db: Optional[AsyncSession] = None, credentials: Optional[Dict[str, str]] = None):
+        """
+        Args:
+            db: Sesión de base de datos para cargar credenciales
+            credentials: Credenciales explícitas (dict con ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET).
+                         Si se proveen, se usan directamente sin consultar DB ni .env.
+        """
         self.db = db
         self._access_token = None
         self._token_expiry = 0
@@ -27,6 +33,15 @@ class ZoomAPIService:
         self.account_id = None
         self.client_id = None
         self.client_secret = None
+        
+        # Si se pasan credenciales explícitas, usarlas directamente
+        if credentials:
+            self.account_id = credentials.get("ZOOM_ACCOUNT_ID")
+            self.client_id = credentials.get("ZOOM_CLIENT_ID")
+            self.client_secret = credentials.get("ZOOM_CLIENT_SECRET")
+            if all([self.account_id, self.client_id, self.client_secret]):
+                self._credentials_loaded = True
+                logger.info("Credenciales de Zoom cargadas desde parámetro explícito")
     
     async def _ensure_credentials_loaded(self):
         """Carga credenciales de BD si aún no están cargadas"""

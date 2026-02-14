@@ -137,7 +137,8 @@ async def create_meeting(
             schedule_date=meeting_data.dat_schedule_date,
             estimated_duration=meeting_data.int_estimated_duration,
             allow_delegates=meeting_data.bln_allow_delegates,
-            user_id=1  # TODO: Obtener el ID del usuario actual
+            user_id=1,  # TODO: Obtener el ID del usuario actual
+            zoom_account_id=meeting_data.int_zoom_account_id
         )
 
         return SuccessResponse(

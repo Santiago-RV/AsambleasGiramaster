@@ -150,6 +150,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 			int_estimated_duration: 0,
 			int_meeting_leader_id: parseInt(data.int_meeting_leader_id),
 			dat_schedule_date: data.dat_schedule_start,
+			int_zoom_account_id: data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
 		};
 
 		createMeetingMutation.mutate(meetingData, {

@@ -19,7 +19,8 @@ class SystemConfigService:
     async def get_config(
         self, 
         config_key: str, 
-        decrypt: bool = True
+        decrypt: bool = True,
+        silent: bool = False
     ) -> Optional[str]:
         """
         Obtiene un valor de configuración
@@ -40,7 +41,10 @@ class SystemConfigService:
             config = result.scalar_one_or_none()
             
             if not config:
-                logger.warning(f"Configuración no encontrada: {config_key}")
+                if silent:
+                    logger.debug(f"Configuración no encontrada: {config_key}")
+                else:
+                    logger.warning(f"Configuración no encontrada: {config_key}")
                 return None
             
             # Si está encriptado y se solicita desencriptar
@@ -217,6 +221,255 @@ class SystemConfigService:
         logger.info(f"Credenciales de Zoom actualizadas: {list(results.keys())}")
         return results
     
+    # ============================================
+    # Zoom Multi-Account Methods
+    # ============================================
+
+    MAX_ZOOM_ACCOUNTS = 3
+
+    async def _migrate_legacy_zoom_keys(self, updated_by: Optional[int] = None):
+        """
+        Migra las keys antiguas (ZOOM_SDK_KEY, etc.) al formato multi-cuenta (ZOOM_1_SDK_KEY, etc.)
+        Solo se ejecuta si existen keys antiguas y no existen las nuevas.
+        """
+        legacy_keys = ["ZOOM_SDK_KEY", "ZOOM_SDK_SECRET", "ZOOM_ACCOUNT_ID", "ZOOM_CLIENT_ID", "ZOOM_CLIENT_SECRET"]
+        new_key_prefix = "ZOOM_1_"
+        
+        # Verificar si ya hay cuentas nuevas
+        existing_name = await self.get_config(f"{new_key_prefix}NAME", decrypt=False)
+        if existing_name:
+            return  # Ya migrado
+        
+        # Verificar si existen keys antiguas
+        legacy_credentials = await self.get_zoom_credentials()
+        if not legacy_credentials:
+            return  # Nada que migrar
+        
+        logger.info("Migrando credenciales Zoom legacy al formato multi-cuenta...")
+        
+        # Copiar keys antiguas al formato nuevo
+        key_mapping = {
+            "ZOOM_SDK_KEY": ("SDK_KEY", False),
+            "ZOOM_SDK_SECRET": ("SDK_SECRET", True),
+            "ZOOM_ACCOUNT_ID": ("ACCOUNT_ID", True),
+            "ZOOM_CLIENT_ID": ("CLIENT_ID", True),
+            "ZOOM_CLIENT_SECRET": ("CLIENT_SECRET", True),
+        }
+        
+        for old_key, (suffix, encrypt) in key_mapping.items():
+            value = legacy_credentials.get(old_key)
+            if value:
+                new_key = f"ZOOM_1_{suffix}"
+                await self.set_config(
+                    new_key, value, encrypt=encrypt,
+                    description=f"Cuenta Zoom 1 - {suffix}",
+                    updated_by=updated_by
+                )
+        
+        # Crear nombre para la cuenta
+        await self.set_config(
+            "ZOOM_1_NAME", "Cuenta Principal", encrypt=False,
+            description="Nombre de la cuenta Zoom 1",
+            updated_by=updated_by
+        )
+        
+        logger.info("Migración de credenciales Zoom completada: cuenta 1 = 'Cuenta Principal'")
+
+    async def get_zoom_accounts(self) -> List[Dict]:
+        """
+        Obtiene la lista de cuentas Zoom configuradas.
+        Auto-migra keys legacy si es necesario.
+        
+        Returns:
+            Lista de diccionarios con {id, name, is_configured, last_updated}
+        """
+        await self._migrate_legacy_zoom_keys()
+        
+        accounts = []
+        for account_id in range(1, self.MAX_ZOOM_ACCOUNTS + 1):
+            prefix = f"ZOOM_{account_id}_"
+            name = await self.get_config(f"{prefix}NAME", decrypt=False, silent=True)
+            
+            if not name:
+                continue  # No existe esta cuenta
+            
+            # Verificar si tiene todas las credenciales
+            required_keys = ["SDK_KEY", "SDK_SECRET", "ACCOUNT_ID", "CLIENT_ID", "CLIENT_SECRET"]
+            has_all = True
+            last_updated = None
+            
+            for key_suffix in required_keys:
+                full_key = f"{prefix}{key_suffix}"
+                # Buscar el registro directamente para obtener updated_at
+                stmt = select(SystemConfigModel).where(
+                    SystemConfigModel.str_config_key == full_key,
+                    SystemConfigModel.bln_is_active == True
+                )
+                result = await self.db.execute(stmt)
+                config = result.scalar_one_or_none()
+                
+                if not config:
+                    has_all = False
+                else:
+                    if config.updated_at:
+                        ts = config.updated_at.isoformat()
+                        if not last_updated or ts > last_updated:
+                            last_updated = ts
+            
+            accounts.append({
+                "id": account_id,
+                "name": name,
+                "is_configured": has_all,
+                "last_updated": last_updated
+            })
+        
+        return accounts
+
+    async def get_zoom_account_credentials(self, account_id: int) -> Dict[str, str]:
+        """
+        Obtiene credenciales desencriptadas de una cuenta Zoom específica.
+        
+        Args:
+            account_id: ID de la cuenta (1-3)
+            
+        Returns:
+            Diccionario con credenciales {ZOOM_SDK_KEY, ZOOM_SDK_SECRET, ...}
+        """
+        if account_id < 1 or account_id > self.MAX_ZOOM_ACCOUNTS:
+            raise ServiceException(f"ID de cuenta Zoom inválido: {account_id}. Debe ser entre 1 y {self.MAX_ZOOM_ACCOUNTS}")
+        
+        prefix = f"ZOOM_{account_id}_"
+        key_mapping = {
+            f"ZOOM_SDK_KEY": f"{prefix}SDK_KEY",
+            f"ZOOM_SDK_SECRET": f"{prefix}SDK_SECRET",
+            f"ZOOM_ACCOUNT_ID": f"{prefix}ACCOUNT_ID",
+            f"ZOOM_CLIENT_ID": f"{prefix}CLIENT_ID",
+            f"ZOOM_CLIENT_SECRET": f"{prefix}CLIENT_SECRET",
+        }
+        
+        credentials = {}
+        for standard_key, config_key in key_mapping.items():
+            value = await self.get_config(config_key, decrypt=True)
+            if value:
+                credentials[standard_key] = value
+        
+        return credentials
+
+    async def get_zoom_account_name(self, account_id: int) -> Optional[str]:
+        """Obtiene el nombre de una cuenta Zoom"""
+        return await self.get_config(f"ZOOM_{account_id}_NAME", decrypt=False)
+
+    async def get_next_zoom_account_id(self) -> Optional[int]:
+        """
+        Determina el próximo ID disponible para una nueva cuenta Zoom.
+        
+        Returns:
+            ID disponible (1-3) o None si ya hay 3 cuentas
+        """
+        for account_id in range(1, self.MAX_ZOOM_ACCOUNTS + 1):
+            name = await self.get_config(f"ZOOM_{account_id}_NAME", decrypt=False)
+            if not name:
+                return account_id
+        return None
+
+    async def update_zoom_account_credentials(
+        self,
+        account_id: int,
+        name: str,
+        sdk_key: Optional[str] = None,
+        sdk_secret: Optional[str] = None,
+        account_id_zoom: Optional[str] = None,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
+        updated_by: Optional[int] = None
+    ) -> Dict[str, bool]:
+        """
+        Crea o actualiza credenciales de una cuenta Zoom específica.
+        
+        Args:
+            account_id: ID de la cuenta (1-3)
+            name: Nombre amigable de la cuenta
+            sdk_key, sdk_secret, etc.: Credenciales de Zoom
+            updated_by: ID del usuario que actualiza
+        """
+        if account_id < 1 or account_id > self.MAX_ZOOM_ACCOUNTS:
+            raise ServiceException(f"ID de cuenta Zoom inválido: {account_id}")
+        
+        prefix = f"ZOOM_{account_id}_"
+        results = {}
+        
+        # Nombre de la cuenta (siempre requerido)
+        await self.set_config(
+            f"{prefix}NAME", name, encrypt=False,
+            description=f"Nombre de la cuenta Zoom {account_id}",
+            updated_by=updated_by
+        )
+        results["NAME"] = True
+        
+        fields = [
+            ("SDK_KEY", sdk_key, False, "Zoom SDK Key"),
+            ("SDK_SECRET", sdk_secret, True, "Zoom SDK Secret"),
+            ("ACCOUNT_ID", account_id_zoom, True, "Zoom Account ID"),
+            ("CLIENT_ID", client_id, True, "Zoom Client ID"),
+            ("CLIENT_SECRET", client_secret, True, "Zoom Client Secret"),
+        ]
+        
+        for suffix, value, encrypt, desc in fields:
+            if value is not None:
+                await self.set_config(
+                    f"{prefix}{suffix}", value, encrypt=encrypt,
+                    description=f"Cuenta Zoom {account_id} - {desc}",
+                    updated_by=updated_by
+                )
+                results[suffix] = True
+        
+        # Mantener compatibilidad: si es la cuenta 1, actualizar también las keys legacy
+        if account_id == 1:
+            legacy_mapping = [
+                ("ZOOM_SDK_KEY", sdk_key, False),
+                ("ZOOM_SDK_SECRET", sdk_secret, True),
+                ("ZOOM_ACCOUNT_ID", account_id_zoom, True),
+                ("ZOOM_CLIENT_ID", client_id, True),
+                ("ZOOM_CLIENT_SECRET", client_secret, True),
+            ]
+            for legacy_key, value, encrypt in legacy_mapping:
+                if value is not None:
+                    await self.set_config(
+                        legacy_key, value, encrypt=encrypt,
+                        description=f"Zoom credential (legacy, synced from account 1)",
+                        updated_by=updated_by
+                    )
+        
+        logger.info(f"Cuenta Zoom {account_id} ('{name}') actualizada: {list(results.keys())}")
+        return results
+
+    async def delete_zoom_account(self, account_id: int) -> bool:
+        """
+        Elimina una cuenta Zoom (desactiva todas sus keys).
+        
+        Args:
+            account_id: ID de la cuenta (1-3)
+        """
+        if account_id < 1 or account_id > self.MAX_ZOOM_ACCOUNTS:
+            raise ServiceException(f"ID de cuenta Zoom inválido: {account_id}")
+        
+        prefix = f"ZOOM_{account_id}_"
+        suffixes = ["NAME", "SDK_KEY", "SDK_SECRET", "ACCOUNT_ID", "CLIENT_ID", "CLIENT_SECRET"]
+        
+        for suffix in suffixes:
+            full_key = f"{prefix}{suffix}"
+            stmt = select(SystemConfigModel).where(
+                SystemConfigModel.str_config_key == full_key
+            )
+            result = await self.db.execute(stmt)
+            config = result.scalar_one_or_none()
+            if config:
+                config.bln_is_active = False
+                
+        await self.db.commit()
+        logger.info(f"Cuenta Zoom {account_id} eliminada")
+        return True
+
     async def get_all_configs(
         self,
         include_encrypted_values: bool = False

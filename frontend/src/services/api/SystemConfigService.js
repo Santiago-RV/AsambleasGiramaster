@@ -62,6 +62,102 @@ class SystemConfigService {
     }
 
     // ============================================
+    // Zoom Multi-Account Methods
+    // ============================================
+
+    /**
+     * Obtiene la lista de cuentas Zoom configuradas
+     */
+    static async getZoomAccounts() {
+        try {
+            const response = await axiosInstance.get('/system-config/zoom/accounts');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener cuentas Zoom:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtiene el detalle de una cuenta Zoom específica (valores enmascarados)
+     * @param {number} accountId - ID de la cuenta (1-3)
+     */
+    static async getZoomAccount(accountId) {
+        try {
+            const response = await axiosInstance.get(`/system-config/zoom/accounts/${accountId}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error al obtener cuenta Zoom ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Crea una nueva cuenta Zoom
+     * @param {Object} data
+     * @param {string} data.name - Nombre amigable de la cuenta
+     * @param {string} data.sdk_key
+     * @param {string} data.sdk_secret
+     * @param {string} data.account_id
+     * @param {string} data.client_id
+     * @param {string} data.client_secret
+     */
+    static async createZoomAccount(data) {
+        try {
+            const response = await axiosInstance.post('/system-config/zoom/accounts', data);
+            return response.data;
+        } catch (error) {
+            console.error('Error al crear cuenta Zoom:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Actualiza una cuenta Zoom existente
+     * @param {number} accountId - ID de la cuenta (1-3)
+     * @param {Object} data - Credenciales a actualizar
+     */
+    static async updateZoomAccount(accountId, data) {
+        try {
+            const response = await axiosInstance.put(`/system-config/zoom/accounts/${accountId}`, data);
+            return response.data;
+        } catch (error) {
+            console.error(`Error al actualizar cuenta Zoom ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Elimina una cuenta Zoom
+     * @param {number} accountId - ID de la cuenta (1-3)
+     */
+    static async deleteZoomAccount(accountId) {
+        try {
+            const response = await axiosInstance.delete(`/system-config/zoom/accounts/${accountId}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error al eliminar cuenta Zoom ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Prueba la conexión de una cuenta Zoom específica
+     * @param {number} accountId - ID de la cuenta (1-3)
+     */
+    static async testZoomAccount(accountId) {
+        try {
+            const response = await axiosInstance.post(`/system-config/zoom/accounts/${accountId}/test`, {}, {
+                timeout: 15000
+            });
+            return response.data;
+        } catch (error) {
+            console.error(`Error al probar cuenta Zoom ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    // ============================================
     // SMTP Configuration Methods
     // ============================================
 

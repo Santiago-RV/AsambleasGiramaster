@@ -1,15 +1,29 @@
 import React from 'react';
-import { Video, CheckCircle, AlertCircle, Settings, Edit } from 'lucide-react';
+import { Video, CheckCircle, AlertCircle, Settings, Edit, Trash2 } from 'lucide-react';
 
-const ZoomCredentialCard = ({ isConfigured, lastUpdated, onConfigure, isLoading }) => {
+const ZoomCredentialCard = ({ isConfigured, lastUpdated, onConfigure, onDelete, isLoading, accountId, accountName }) => {
     return (
         <div 
             className="relative bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-8 hover:shadow-2xl hover:border-blue-300 transition-all duration-300 cursor-pointer group"
             onClick={onConfigure}
         >
-            {/* Ícono principal */}
+            {/* Botón de eliminar (solo si tiene accountId y onDelete) */}
+            {accountId && onDelete && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(accountId);
+                    }}
+                    className="absolute top-4 right-4 p-2 bg-white/80 hover:bg-red-50 border border-gray-200 hover:border-red-300 rounded-lg transition-all opacity-0 group-hover:opacity-100 z-10"
+                    title="Eliminar cuenta"
+                >
+                    <Trash2 size={16} className="text-gray-400 hover:text-red-500" />
+                </button>
+            )}
+
+            {/* Icono principal */}
             <div className="flex flex-col items-center text-center space-y-6">
-                {/* Ícono grande con animación */}
+                {/* Icono grande con animacion */}
                 <div className="relative">
                     <div className="absolute inset-0 bg-blue-400 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
                     <div className="relative w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
@@ -17,13 +31,13 @@ const ZoomCredentialCard = ({ isConfigured, lastUpdated, onConfigure, isLoading 
                     </div>
                 </div>
 
-                {/* Título */}
+                {/* Titulo */}
                 <div className="space-y-2">
                     <h3 className="text-2xl font-bold text-gray-800">
-                        Zoom Credentials
+                        {accountName || 'Zoom Credentials'}
                     </h3>
                     <p className="text-sm text-gray-600">
-                        Configuración de reuniones virtuales
+                        {accountId ? `Cuenta #${accountId}` : 'Configuracion de reuniones virtuales'}
                     </p>
                 </div>
 
@@ -50,14 +64,14 @@ const ZoomCredentialCard = ({ isConfigured, lastUpdated, onConfigure, isLoading 
                     )}
                 </div>
 
-                {/* Información adicional */}
+                {/* Informacion adicional */}
                 {lastUpdated && (
                     <p className="text-xs text-gray-500">
-                        Última actualización: {new Date(lastUpdated).toLocaleDateString('es-ES')}
+                        Ultima actualizacion: {new Date(lastUpdated).toLocaleDateString('es-ES')}
                     </p>
                 )}
 
-                {/* Botón de acción */}
+                {/* Boton de accion */}
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
@@ -69,7 +83,7 @@ const ZoomCredentialCard = ({ isConfigured, lastUpdated, onConfigure, isLoading 
                     {isConfigured ? (
                         <>
                             <Edit size={18} />
-                            Editar Configuración
+                            Editar Configuracion
                         </>
                     ) : (
                         <>

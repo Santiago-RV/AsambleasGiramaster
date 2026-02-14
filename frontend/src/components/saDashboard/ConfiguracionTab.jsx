@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Settings, Mail, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Settings, Mail, Lightbulb, Plus } from 'lucide-react';
 import ZoomCredentialCard from './components/ZoomCredentialCard';
 import ZoomConfigModal from './components/ZoomConfigModal';
 import SMTPCredentialCard from './components/SMTPCredentialCard';
@@ -7,12 +7,15 @@ import SMTPConfigModal from './components/SMTPConfigModal';
 import SystemConfigService from '../../services/api/SystemConfigService';
 import Swal from 'sweetalert2';
 
+const MAX_ZOOM_ACCOUNTS = 3;
+
 const ConfiguracionTab = ({ onBack }) => {
-    // Estado para Zoom
-    const [currentConfig, setCurrentConfig] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    // Estado para Zoom (multi-cuenta)
+    const [zoomAccounts, setZoomAccounts] = useState([]);
+    const [isLoadingZoom, setIsLoadingZoom] = useState(true);
     const [showZoomModal, setShowZoomModal] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+    const [editingAccount, setEditingAccount] = useState(null); // null = crear nueva, {id, ...} = editar
+    const [isSavingZoom, setIsSavingZoom] = useState(false);
 
     // Estado para SMTP
     const [smtpConfig, setSmtpConfig] = useState(null);
@@ -21,22 +24,22 @@ const ConfiguracionTab = ({ onBack }) => {
     const [isSavingSMTP, setIsSavingSMTP] = useState(false);
 
     useEffect(() => {
-        loadCurrentConfig();
+        loadZoomAccounts();
         loadSMTPConfig();
     }, []);
 
-    const loadCurrentConfig = async () => {
-        setIsLoading(true);
+    const loadZoomAccounts = async () => {
+        setIsLoadingZoom(true);
         try {
-            const response = await SystemConfigService.getZoomConfig();
+            const response = await SystemConfigService.getZoomAccounts();
             if (response.success) {
-                setCurrentConfig(response.data);
+                setZoomAccounts(response.data.accounts || []);
             }
         } catch (error) {
-            console.error('Error al cargar configuración:', error);
-            setCurrentConfig(null);
+            console.error('Error al cargar cuentas Zoom:', error);
+            setZoomAccounts([]);
         } finally {
-            setIsLoading(false);
+            setIsLoadingZoom(false);
         }
     };
 
@@ -55,43 +58,119 @@ const ConfiguracionTab = ({ onBack }) => {
                 });
             }
         } catch (error) {
-            console.error('Error al cargar configuración SMTP:', error);
+            console.error('Error al cargar configuracion SMTP:', error);
             setSmtpConfig({ isConfigured: false });
         } finally {
             setIsLoadingSMTP(false);
         }
     };
 
-    const handleSaveZoomConfig = async (credentials) => {
-        setIsSaving(true);
+    // === Zoom handlers ===
+
+    const handleOpenZoomCreate = () => {
+        setEditingAccount(null);
+        setShowZoomModal(true);
+    };
+
+    const handleOpenZoomEdit = async (accountId) => {
         try {
-            const response = await SystemConfigService.updateZoomConfig(credentials);
-            
+            const response = await SystemConfigService.getZoomAccount(accountId);
+            if (response.success) {
+                setEditingAccount({ id: accountId, ...response.data });
+                setShowZoomModal(true);
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'No se pudo cargar la cuenta Zoom'
+            });
+        }
+    };
+
+    const handleSaveZoomAccount = async (data) => {
+        setIsSavingZoom(true);
+        try {
+            let response;
+            if (editingAccount) {
+                // Modo editar
+                response = await SystemConfigService.updateZoomAccount(editingAccount.id, data);
+            } else {
+                // Modo crear
+                response = await SystemConfigService.createZoomAccount(data);
+            }
+
             if (response.success) {
                 await Swal.fire({
                     icon: 'success',
-                    title: '¡Éxito!',
-                    text: 'Configuración de Zoom actualizada exitosamente',
+                    title: 'Exito',
+                    text: editingAccount
+                        ? 'Cuenta Zoom actualizada exitosamente'
+                        : 'Cuenta Zoom creada exitosamente',
                     toast: true,
                     position: 'top-end',
                     showConfirmButton: false,
                     timer: 3000,
                     backdrop: false
                 });
-                
+
                 setShowZoomModal(false);
-                await loadCurrentConfig();
+                setEditingAccount(null);
+                await loadZoomAccounts();
             }
         } catch (error) {
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: error.response?.data?.detail || error.message || 'Error al guardar la configuración'
+                text: error.response?.data?.detail || error.message || 'Error al guardar la cuenta Zoom'
             });
         } finally {
-            setIsSaving(false);
+            setIsSavingZoom(false);
         }
     };
+
+    const handleDeleteZoomAccount = async (accountId) => {
+        const account = zoomAccounts.find(a => a.id === accountId);
+        const accountName = account?.name || `Cuenta #${accountId}`;
+
+        const result = await Swal.fire({
+            icon: 'warning',
+            title: 'Eliminar Cuenta Zoom',
+            html: `<p>Estas seguro de eliminar <strong>${accountName}</strong>?</p><p class="text-sm text-gray-500 mt-2">Se eliminaran todas las credenciales asociadas. Las reuniones ya creadas con esta cuenta no se veran afectadas.</p>`,
+            showCancelButton: true,
+            confirmButtonColor: '#e74c3c',
+            cancelButtonColor: '#95a5a6',
+            confirmButtonText: 'Eliminar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const response = await SystemConfigService.deleteZoomAccount(accountId);
+                if (response.success) {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Eliminado',
+                        text: 'La cuenta Zoom ha sido eliminada',
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 3000,
+                        backdrop: false
+                    });
+                    await loadZoomAccounts();
+                }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.response?.data?.detail || 'Error al eliminar la cuenta Zoom'
+                });
+            }
+        }
+    };
+
+    // === SMTP handlers ===
 
     const handleSaveSMTPConfig = async (credentials) => {
         setIsSavingSMTP(true);
@@ -101,8 +180,8 @@ const ConfiguracionTab = ({ onBack }) => {
             if (response.success) {
                 await Swal.fire({
                     icon: 'success',
-                    title: '¡Éxito!',
-                    text: 'Configuración SMTP actualizada exitosamente',
+                    title: 'Exito',
+                    text: 'Configuracion SMTP actualizada exitosamente',
                     toast: true,
                     position: 'top-end',
                     showConfirmButton: false,
@@ -117,17 +196,14 @@ const ConfiguracionTab = ({ onBack }) => {
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: error.response?.data?.detail || error.message || 'Error al guardar la configuración SMTP'
+                text: error.response?.data?.detail || error.message || 'Error al guardar la configuracion SMTP'
             });
         } finally {
             setIsSavingSMTP(false);
         }
     };
 
-    const isZoomConfigured = currentConfig && 
-        currentConfig.sdk_key && 
-        currentConfig.account_id && 
-        currentConfig.client_id;
+    const canAddMoreZoomAccounts = zoomAccounts.length < MAX_ZOOM_ACCOUNTS;
 
     return (
         <div className="space-y-8">
@@ -149,7 +225,7 @@ const ConfiguracionTab = ({ onBack }) => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-800">
-                                Configuración
+                                Configuracion
                             </h1>
                             <p className="text-gray-600 mt-1">
                                 Gestiona las integraciones y configuraciones del sistema
@@ -159,7 +235,7 @@ const ConfiguracionTab = ({ onBack }) => {
                 </div>
             </div>
 
-            {/* Sección de Integraciones */}
+            {/* Seccion de Integraciones */}
             <div>
                 <div className="mb-6">
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">
@@ -172,13 +248,47 @@ const ConfiguracionTab = ({ onBack }) => {
 
                 {/* Grid de Cards de Integraciones */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Tarjeta de Zoom */}
-                    <ZoomCredentialCard
-                        isConfigured={isZoomConfigured}
-                        lastUpdated={currentConfig?.last_updated}
-                        onConfigure={() => setShowZoomModal(true)}
-                        isLoading={isLoading}
-                    />
+                    {/* Tarjetas de Zoom (dinámicas) */}
+                    {zoomAccounts.map((account) => (
+                        <ZoomCredentialCard
+                            key={account.id}
+                            accountId={account.id}
+                            accountName={account.name}
+                            isConfigured={account.is_configured}
+                            lastUpdated={account.last_updated}
+                            onConfigure={() => handleOpenZoomEdit(account.id)}
+                            onDelete={handleDeleteZoomAccount}
+                            isLoading={isLoadingZoom}
+                        />
+                    ))}
+
+                    {/* Tarjeta para agregar nueva cuenta Zoom */}
+                    {canAddMoreZoomAccounts && (
+                        <div
+                            onClick={handleOpenZoomCreate}
+                            className="relative bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-2xl p-8 hover:shadow-lg hover:border-blue-400 hover:from-blue-50 hover:to-blue-100 transition-all duration-300 cursor-pointer group flex flex-col items-center justify-center text-center min-h-[320px]"
+                        >
+                            <div className="relative w-20 h-20 bg-gray-200 group-hover:bg-blue-200 rounded-full flex items-center justify-center transition-colors mb-6">
+                                <Plus size={40} className="text-gray-400 group-hover:text-blue-600 transition-colors" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-500 group-hover:text-blue-700 transition-colors">
+                                Agregar Cuenta Zoom
+                            </h3>
+                            <p className="text-sm text-gray-400 group-hover:text-blue-600 mt-2 transition-colors">
+                                {zoomAccounts.length === 0
+                                    ? 'Configura tu primera cuenta de Zoom'
+                                    : `${zoomAccounts.length} de ${MAX_ZOOM_ACCOUNTS} cuentas configuradas`
+                                }
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Si no hay cuentas y no se pueden agregar (no deberia pasar, pero por seguridad) */}
+                    {zoomAccounts.length === 0 && !canAddMoreZoomAccounts && !isLoadingZoom && (
+                        <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-8 text-center">
+                            <p className="text-yellow-700">No hay cuentas Zoom configuradas</p>
+                        </div>
+                    )}
 
                     {/* Tarjeta de SMTP */}
                     <SMTPCredentialCard
@@ -190,7 +300,7 @@ const ConfiguracionTab = ({ onBack }) => {
                 </div>
             </div>
 
-            {/* Información adicional */}
+            {/* Informacion adicional */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
                 <div className="flex items-start gap-3">
                     <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -203,22 +313,25 @@ const ConfiguracionTab = ({ onBack }) => {
                         </h3>
                         <p className="text-sm text-blue-800">
                             Las integraciones te permiten conectar GIRAMASTER con servicios externos para mejorar la funcionalidad del sistema. 
-                            <strong> Zoom</strong> es necesario para realizar reuniones virtuales y <strong>SMTP</strong> para enviar notificaciones por correo electrónico.
+                            <strong> Zoom</strong> es necesario para realizar reuniones virtuales (puedes configurar hasta {MAX_ZOOM_ACCOUNTS} cuentas para reuniones simultaneas) y <strong>SMTP</strong> para enviar notificaciones por correo electronico.
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Modal de Configuración de Zoom */}
+            {/* Modal de Configuracion de Zoom (crear/editar) */}
             <ZoomConfigModal
                 isOpen={showZoomModal}
-                onClose={() => setShowZoomModal(false)}
-                currentConfig={currentConfig}
-                onSave={handleSaveZoomConfig}
-                isSaving={isSaving}
+                onClose={() => {
+                    setShowZoomModal(false);
+                    setEditingAccount(null);
+                }}
+                editingAccount={editingAccount}
+                onSave={handleSaveZoomAccount}
+                isSaving={isSavingZoom}
             />
 
-            {/* Modal de Configuración de SMTP */}
+            {/* Modal de Configuracion de SMTP */}
             <SMTPConfigModal
                 isOpen={showSMTPModal}
                 onClose={() => setShowSMTPModal(false)}

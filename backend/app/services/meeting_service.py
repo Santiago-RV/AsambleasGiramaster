@@ -101,7 +101,8 @@ class MeetingService:
         schedule_date: datetime,
         estimated_duration: int,
         allow_delegates: bool,
-        user_id: int
+        user_id: int,
+        zoom_account_id: Optional[int] = None
     ) -> MeetingModel:
         """
         Crea una nueva reunión y genera la reunión en Zoom usando la API real.
@@ -145,9 +146,30 @@ class MeetingService:
             zoom_meeting_id = None
             zoom_join_url = None
             zoom_start_url = None
+            resolved_zoom_account_id = zoom_account_id
 
             try:
-                zoom_service = ZoomAPIService(self.db)
+                # Si se especifica una cuenta Zoom, cargar sus credenciales
+                zoom_credentials = None
+                if zoom_account_id:
+                    from app.services.system_config_service import SystemConfigService
+                    config_service = SystemConfigService(self.db)
+                    zoom_credentials = await config_service.get_zoom_account_credentials(zoom_account_id)
+                    if not zoom_credentials:
+                        logger.warning(f"Cuenta Zoom {zoom_account_id} sin credenciales, usando cuenta por defecto")
+                        zoom_credentials = None
+                        resolved_zoom_account_id = None
+                else:
+                    # Si no se especifica, intentar usar la cuenta 1
+                    from app.services.system_config_service import SystemConfigService
+                    config_service = SystemConfigService(self.db)
+                    accounts = await config_service.get_zoom_accounts()
+                    if accounts:
+                        first_account = accounts[0]
+                        resolved_zoom_account_id = first_account["id"]
+                        zoom_credentials = await config_service.get_zoom_account_credentials(resolved_zoom_account_id)
+                
+                zoom_service = ZoomAPIService(self.db, credentials=zoom_credentials)
 
                 # Determinar duración: si es 0, usar 60 min por defecto para Zoom
                 # 0 = duración indefinida en la aplicación
@@ -216,6 +238,7 @@ class MeetingService:
                 int_zoom_meeting_id=zoom_meeting_id,
                 str_zoom_join_url=zoom_join_url,
                 str_zoom_start_url=zoom_start_url,
+                int_zoom_account_id=resolved_zoom_account_id,
                 bln_allow_delegates=allow_delegates,
                 str_status="Programada",
                 bln_quorum_reached=False,
