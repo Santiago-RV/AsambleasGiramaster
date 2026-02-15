@@ -55,6 +55,8 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       meeting_url: meeting.str_zoom_join_url,  // Corregido: era str_meeting_url (no existe)
       zoom_meeting_id: meeting.int_zoom_meeting_id,  // Corregido: era str_zoom_meeting_id (tipo incorrecto)
       zoom_password: meeting.str_zoom_password,  // Contraseña de la reunión
+      str_modality: meeting.str_modality || 'virtual',
+      int_zoom_account_id: meeting.int_zoom_account_id,
     }))
     : [];
 

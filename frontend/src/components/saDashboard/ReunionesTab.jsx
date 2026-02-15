@@ -4,12 +4,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MeetingService } from '../../services/api/MeetingService';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
-import { Calendar, Clock, Users, MapPin, Plus, PlayCircle, ChevronRight, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Users, MapPin, Plus, PlayCircle, ChevronRight, CheckCircle, XCircle, AlertCircle, Video } from 'lucide-react';
 import Modal from '../common/Modal';
+import MeetingTypeSelector from './components/modals/MeetingTypeSelector';
+import SystemConfigService from '../../services/api/SystemConfigService';
 
 const ReunionesTab = ({ onStartMeeting }) => {
+	const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
+	const [meetingMode, setMeetingMode] = useState('virtual');
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' o 'past'
+	const [zoomAccounts, setZoomAccounts] = useState([]);
+	const [loadingAccounts, setLoadingAccounts] = useState(false);
 	const queryClient = useQueryClient();
 
 	const {
@@ -27,8 +33,25 @@ const ReunionesTab = ({ onStartMeeting }) => {
 			dat_schedule_date: '',
 			int_estimated_duration: 60,
 			bln_allow_delegates: false,
+			int_zoom_account_id: '',
 		},
 	});
+
+	// Cargar cuentas Zoom al abrir el modal en modo virtual
+	const loadZoomAccounts = async () => {
+		setLoadingAccounts(true);
+		try {
+			const response = await SystemConfigService.getZoomAccounts();
+			if (response.success) {
+				setZoomAccounts(response.data.accounts || []);
+			}
+		} catch (error) {
+			console.error('Error al cargar cuentas Zoom:', error);
+			setZoomAccounts([]);
+		} finally {
+			setLoadingAccounts(false);
+		}
+	};
 
 	// Query para obtener las unidades residenciales
 	const { data: unidadesData } = useQuery({
@@ -97,6 +120,8 @@ const ReunionesTab = ({ onStartMeeting }) => {
 			dat_schedule_date: scheduleDate,
 			int_estimated_duration: parseInt(data.int_estimated_duration),
 			bln_allow_delegates: data.bln_allow_delegates,
+			str_modality: meetingMode,
+			int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
 		};
 
 		createMeetingMutation.mutate(meetingData);
@@ -265,8 +290,7 @@ const ReunionesTab = ({ onStartMeeting }) => {
 					</button>
 					<button
 						onClick={() => {
-							console.log('Botón Nueva Reunión clickeado');
-							setIsModalOpen(true);
+							setIsTypeSelectorOpen(true);
 						}}
 						className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
 					>
@@ -552,24 +576,60 @@ const ReunionesTab = ({ onStartMeeting }) => {
 				)}
 			</div>
 
-			{/* Modal de creación */}
+			{/* Modal selector de tipo */}
+			<MeetingTypeSelector
+				isOpen={isTypeSelectorOpen}
+				onClose={() => setIsTypeSelectorOpen(false)}
+				onSelect={(mode) => {
+					setMeetingMode(mode);
+					setIsTypeSelectorOpen(false);
+					if (mode === 'virtual') {
+						loadZoomAccounts();
+					}
+					setIsModalOpen(true);
+				}}
+			/>
+
+			{/* Modal de creacion */}
 			<Modal
 				isOpen={isModalOpen}
 				onClose={handleCloseModal}
-				title="Crear Nueva Reunión de Zoom"
+				title={meetingMode === 'virtual' ? "Crear Reunion Virtual" : "Crear Reunion Presencial"}
 				size="lg"
 			>
 				<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-					{/* Información general */}
-					<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-						<h3 className="font-semibold text-blue-800 mb-2">
-							📹 Reunión Virtual con Zoom
-						</h3>
-						<p className="text-sm text-blue-700">
-							Se creará automáticamente una reunión en Zoom con un
-							enlace único para todos los participantes.
-						</p>
-					</div>
+					{/* Banner informativo segun modalidad */}
+					{meetingMode === 'virtual' ? (
+						<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+							<div className="flex items-center gap-3">
+								<Video className="w-6 h-6 text-blue-600 shrink-0" />
+								<div>
+									<h3 className="font-semibold text-blue-800 mb-1">
+										Reunion Virtual con Zoom
+									</h3>
+									<p className="text-sm text-blue-700">
+										Se creara automaticamente una reunion en Zoom con un
+										enlace unico para todos los participantes.
+									</p>
+								</div>
+							</div>
+						</div>
+					) : (
+						<div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+							<div className="flex items-center gap-3">
+								<MapPin className="w-6 h-6 text-emerald-600 shrink-0" />
+								<div>
+									<h3 className="font-semibold text-emerald-800 mb-1">
+										Reunion Presencial
+									</h3>
+									<p className="text-sm text-emerald-700">
+										La reunion sera en un lugar fisico. Se enviaran las
+										invitaciones por correo a todos los copropietarios.
+									</p>
+								</div>
+							</div>
+						</div>
+					)}
 
 					<div className="grid gap-6 grid-cols-1 md:grid-cols-2">
 						{/* Unidad Residencial */}
@@ -711,6 +771,36 @@ const ReunionesTab = ({ onStartMeeting }) => {
 							)}
 						</div>
 
+						{/* Selector de cuenta Zoom (solo virtual y si hay mas de 1) */}
+						{meetingMode === 'virtual' && zoomAccounts.length > 1 && (
+							<div className="md:col-span-2">
+								<label className="block mb-2 font-semibold text-gray-700">
+									Cuenta Zoom *
+								</label>
+								<select
+									{...register('int_zoom_account_id', {
+										required: meetingMode === 'virtual' && zoomAccounts.length > 1 ? 'Selecciona una cuenta Zoom' : false,
+									})}
+									className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+								>
+									<option value="">-- Seleccionar cuenta Zoom --</option>
+									{zoomAccounts.map((account) => (
+										<option key={account.id} value={account.id}>
+											{account.name} (Cuenta #{account.id})
+										</option>
+									))}
+								</select>
+								{errors.int_zoom_account_id && (
+									<span className="text-red-500 text-sm">
+										{errors.int_zoom_account_id.message}
+									</span>
+								)}
+								<p className="text-xs text-gray-500 mt-1">
+									Selecciona la cuenta de Zoom donde se creara la reunion
+								</p>
+							</div>
+						)}
+
 						{/* Permitir Delegados */}
 						<div className="md:col-span-2">
 							<label className="flex items-center gap-3 cursor-pointer">
@@ -766,7 +856,7 @@ const ReunionesTab = ({ onStartMeeting }) => {
 							) : (
 								<>
 									<Plus size={20} />
-									Crear Reunión de Zoom
+									{meetingMode === 'virtual' ? 'Crear Reunion Virtual' : 'Crear Reunion Presencial'}
 								</>
 							)}
 						</button>

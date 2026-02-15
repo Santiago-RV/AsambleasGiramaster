@@ -17,13 +17,22 @@ router = APIRouter()
 logger = get_logger(__name__)
 
 
-async def _get_sdk_key_from_db(db: AsyncSession) -> str | None:
+async def _get_sdk_key_from_db(db: AsyncSession, zoom_account_id: int = None) -> str | None:
     """
-    Intenta obtener ZOOM_SDK_KEY desde la BD (multi-cuenta o legacy).
+    Intenta obtener ZOOM_SDK_KEY desde la BD.
+    Si zoom_account_id se especifica, usa las credenciales de esa cuenta.
+    Si no, usa la primera cuenta disponible o legacy.
     Retorna None si no se encuentra.
     """
     try:
         config_service = SystemConfigService(db)
+        
+        # Si se especifica una cuenta, usar esa
+        if zoom_account_id:
+            creds = await config_service.get_zoom_account_credentials(zoom_account_id)
+            if creds and creds.get("ZOOM_SDK_KEY"):
+                return creds["ZOOM_SDK_KEY"]
+        
         # Intentar multi-cuenta primero (ZOOM_1_SDK_KEY)
         accounts = await config_service.get_zoom_accounts()
         if accounts:
@@ -36,6 +45,36 @@ async def _get_sdk_key_from_db(db: AsyncSession) -> str | None:
             return credentials["ZOOM_SDK_KEY"]
     except Exception as e:
         logger.warning(f"No se pudo obtener SDK Key desde BD: {str(e)}")
+    return None
+
+
+async def _get_sdk_credentials_from_db(db: AsyncSession, zoom_account_id: int = None) -> dict | None:
+    """
+    Obtiene SDK_KEY y SDK_SECRET desde la BD para una cuenta especifica.
+    Si zoom_account_id se especifica, usa esa cuenta.
+    Si no, usa la primera disponible.
+    """
+    try:
+        config_service = SystemConfigService(db)
+        
+        if zoom_account_id:
+            creds = await config_service.get_zoom_account_credentials(zoom_account_id)
+            if creds and creds.get("ZOOM_SDK_KEY") and creds.get("ZOOM_SDK_SECRET"):
+                return {"ZOOM_SDK_KEY": creds["ZOOM_SDK_KEY"], "ZOOM_SDK_SECRET": creds["ZOOM_SDK_SECRET"]}
+        
+        # Fallback: primera cuenta disponible
+        accounts = await config_service.get_zoom_accounts()
+        if accounts:
+            creds = await config_service.get_zoom_account_credentials(accounts[0]["id"])
+            if creds and creds.get("ZOOM_SDK_KEY") and creds.get("ZOOM_SDK_SECRET"):
+                return {"ZOOM_SDK_KEY": creds["ZOOM_SDK_KEY"], "ZOOM_SDK_SECRET": creds["ZOOM_SDK_SECRET"]}
+        
+        # Fallback: legacy
+        credentials = await config_service.get_zoom_credentials()
+        if credentials.get("ZOOM_SDK_KEY") and credentials.get("ZOOM_SDK_SECRET"):
+            return {"ZOOM_SDK_KEY": credentials["ZOOM_SDK_KEY"], "ZOOM_SDK_SECRET": credentials["ZOOM_SDK_SECRET"]}
+    except Exception as e:
+        logger.warning(f"No se pudo obtener credenciales SDK desde BD: {str(e)}")
     return None
 
 
@@ -59,9 +98,17 @@ async def generate_zoom_signature(
     Retorna el signature JWT necesario para unirse a la reunión desde el frontend
     """
     try:
-        zoom_service = ZoomService(db)
+        # Si se especifica zoom_account_id, cargar credenciales de esa cuenta
+        zoom_credentials = None
+        if request.zoom_account_id:
+            zoom_credentials = await _get_sdk_credentials_from_db(db, request.zoom_account_id)
         
-        # Validar y limpiar el número de reunión
+        if zoom_credentials:
+            zoom_service = ZoomService(credentials=zoom_credentials)
+        else:
+            zoom_service = ZoomService(db)
+        
+        # Validar y limpiar el numero de reunion
         clean_meeting_number = zoom_service.validate_meeting_number(request.meeting_number)
         
         # Generar el signature
@@ -72,7 +119,7 @@ async def generate_zoom_signature(
         )
         
         # Obtener sdk_key desde el servicio (BD con fallback a .env)
-        sdk_key = await _get_sdk_key_from_db(db) or settings.ZOOM_SDK_KEY
+        sdk_key = await _get_sdk_key_from_db(db, request.zoom_account_id) or settings.ZOOM_SDK_KEY
         
         # Preparar la respuesta
         response_data = ZoomSignatureResponse(
@@ -156,16 +203,20 @@ async def extract_meeting_info(request: ZoomMeetingInfoRequest):
     summary="Obtener configuración de Zoom SDK",
     description="Obtiene la configuración pública necesaria para inicializar el Zoom SDK en el frontend"
 )
-async def get_zoom_config(db: AsyncSession = Depends(get_db)):
+async def get_zoom_config(
+    db: AsyncSession = Depends(get_db),
+    zoom_account_id: int = None
+):
     """
-    Obtiene la configuración pública de Zoom SDK
+    Obtiene la configuracion publica de Zoom SDK
     
-    Retorna únicamente el SDK Key (información pública) necesaria para el frontend.
+    Retorna unicamente el SDK Key (informacion publica) necesaria para el frontend.
     El SDK Secret NUNCA debe exponerse al frontend.
     Busca primero en base de datos, luego en variables de entorno como fallback.
+    Si se especifica zoom_account_id, retorna las credenciales de esa cuenta.
     """
     # Intentar obtener desde BD (fuente principal)
-    sdk_key = await _get_sdk_key_from_db(db)
+    sdk_key = await _get_sdk_key_from_db(db, zoom_account_id)
     
     # Fallback a .env
     if not sdk_key:

@@ -337,6 +337,8 @@ export default function AppAdmin() {
         int_zoom_meeting_id: meeting.zoom_meeting_id,
         str_zoom_join_url: meeting.meeting_url,
         str_zoom_password: meeting.zoom_password,
+        int_zoom_account_id: meeting.int_zoom_account_id,
+        str_modality: meeting.str_modality,
       });
     } catch (error) {
       // Si falla el registro, mostrar Zoom de todas formas
@@ -346,6 +348,8 @@ export default function AppAdmin() {
         int_zoom_meeting_id: meeting.zoom_meeting_id,
         str_zoom_join_url: meeting.meeting_url,
         str_zoom_password: meeting.zoom_password,
+        int_zoom_account_id: meeting.int_zoom_account_id,
+        str_modality: meeting.str_modality,
       });
     }
   };
