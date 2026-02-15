@@ -57,12 +57,14 @@ export default function MeetingCard({ meeting }) {
 		return mins > 0 ? `${hours}h ${mins}min` : `${hours} hora${hours > 1 ? 's' : ''}`;
 	};
 
+	const isVirtual = meeting.str_modality !== 'presencial';
+
 	const handleJoinMeeting = async () => {
-		if (!status.canJoin) return;
+		if (!status.canJoin || !isVirtual) return;
 
 		// Verificar que tenemos datos de Zoom
 		if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
-			alert('Esta reunión no tiene datos de Zoom válidos');
+			alert('Esta reunion no tiene datos de Zoom validos');
 			return;
 		}
 
@@ -149,7 +151,11 @@ export default function MeetingCard({ meeting }) {
 							{status.text}
 						</span>
 					</div>
-					<Video className="w-8 h-8 text-blue-600" />
+					{isVirtual ? (
+						<Video className="w-8 h-8 text-blue-600" />
+					) : (
+						<MapPin className="w-8 h-8 text-emerald-600" />
+					)}
 				</div>
 
 				{/* Descripción */}
@@ -188,33 +194,42 @@ export default function MeetingCard({ meeting }) {
 					)}
 				</div>
 
-				{/* Botón para unirse - ICONOS DE LUCIDE-REACT */}
-				<button
-					onClick={handleJoinMeeting}
-					disabled={!status.canJoin || isJoining}
-					className={`w-full py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-						status.canJoin && !isJoining
-							? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
-							: 'bg-gray-300 text-gray-500 cursor-not-allowed'
-					}`}
-				>
-					{isJoining ? (
-						<>
-							<Loader2 size={18} className="animate-spin" />
-							Ingresando...
-						</>
-					) : status.canJoin ? (
-						<>
-							<Video size={18} />
-							Unirse a la Reunión
-						</>
-					) : (
-						<>
-							<CalendarX size={18} />
-							Reunión No Disponible
-						</>
-					)}
-				</button>
+				{/* Boton para unirse o info de presencial */}
+				{isVirtual ? (
+					<button
+						onClick={handleJoinMeeting}
+						disabled={!status.canJoin || isJoining}
+						className={`w-full py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+							status.canJoin && !isJoining
+								? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
+								: 'bg-gray-300 text-gray-500 cursor-not-allowed'
+						}`}
+					>
+						{isJoining ? (
+							<>
+								<Loader2 size={18} className="animate-spin" />
+								Ingresando...
+							</>
+						) : status.canJoin ? (
+							<>
+								<Video size={18} />
+								Unirse a la Reunion
+							</>
+						) : (
+							<>
+								<CalendarX size={18} />
+								Reunion No Disponible
+							</>
+						)}
+					</button>
+				) : (
+					<div className="w-full py-3 px-4 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
+						<p className="text-sm text-emerald-700 font-medium flex items-center justify-center gap-2">
+							<MapPin size={16} />
+							Reunion Presencial
+						</p>
+					</div>
+				)}
 			</div>
 		</div>
 	);

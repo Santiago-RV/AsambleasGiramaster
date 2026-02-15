@@ -10,10 +10,11 @@ import {
 	AlertCircle,
 	Clock,
 	Plus,
+	MapPin,
 } from 'lucide-react';
 import SystemConfigService from '../../../../services/api/SystemConfigService';
 
-const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
+const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = 'virtual' }) => {
 	const [zoomAccounts, setZoomAccounts] = useState([]);
 	const [loadingAccounts, setLoadingAccounts] = useState(false);
 
@@ -36,12 +37,12 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 
 	const watchStart = watch('dat_schedule_start');
 
-	// Cargar cuentas Zoom al abrir el modal
+	// Cargar cuentas Zoom al abrir el modal (solo si es virtual)
 	useEffect(() => {
-		if (isOpen) {
+		if (isOpen && meetingMode === 'virtual') {
 			loadZoomAccounts();
 		}
-	}, [isOpen]);
+	}, [isOpen, meetingMode]);
 
 	const loadZoomAccounts = async () => {
 		setLoadingAccounts(true);
@@ -70,28 +71,48 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 		});
 	};
 
-	const showZoomAccountSelector = zoomAccounts.length > 1;
+	const isVirtual = meetingMode === 'virtual';
+	const showZoomAccountSelector = isVirtual && zoomAccounts.length > 1;
 
 	return (
-		<Modal isOpen={isOpen} onClose={handleClose} title="Crear Nueva Reunion" size="2xl">
+		<Modal isOpen={isOpen} onClose={handleClose} title={isVirtual ? "Crear Reunion Virtual" : "Crear Reunion Presencial"} size="2xl">
 			<form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-				{/* BANNER INFORMATIVO ZOOM - Mejorado */}
-				<div className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-indigo-600 p-5 rounded-xl shadow-lg">
-					<div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-10 rounded-full -mr-12 -mt-12"></div>
-					<div className="relative flex items-center gap-4">
-						<div className="p-3 bg-white/20 backdrop-blur-sm rounded-lg shrink-0">
-							<Video className="w-6 h-6 text-white" />
-						</div>
-						<div className="flex-1">
-							<h3 className="font-bold text-white mb-1 text-base">
-								Reunion Virtual con Zoom
-							</h3>
-							<p className="text-sm text-blue-50 leading-relaxed">
-								Se creara automaticamente una reunion en Zoom. Los datos de acceso se enviaran por correo electronico a todos los copropietarios.
-							</p>
+				{/* BANNER INFORMATIVO - Adapta segun modalidad */}
+				{isVirtual ? (
+					<div className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-indigo-600 p-5 rounded-xl shadow-lg">
+						<div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-10 rounded-full -mr-12 -mt-12"></div>
+						<div className="relative flex items-center gap-4">
+							<div className="p-3 bg-white/20 backdrop-blur-sm rounded-lg shrink-0">
+								<Video className="w-6 h-6 text-white" />
+							</div>
+							<div className="flex-1">
+								<h3 className="font-bold text-white mb-1 text-base">
+									Reunion Virtual con Zoom
+								</h3>
+								<p className="text-sm text-blue-50 leading-relaxed">
+									Se creara automaticamente una reunion en Zoom. Los datos de acceso se enviaran por correo electronico a todos los copropietarios.
+								</p>
+							</div>
 						</div>
 					</div>
-				</div>
+				) : (
+					<div className="relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 p-5 rounded-xl shadow-lg">
+						<div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-10 rounded-full -mr-12 -mt-12"></div>
+						<div className="relative flex items-center gap-4">
+							<div className="p-3 bg-white/20 backdrop-blur-sm rounded-lg shrink-0">
+								<MapPin className="w-6 h-6 text-white" />
+							</div>
+							<div className="flex-1">
+								<h3 className="font-bold text-white mb-1 text-base">
+									Reunion Presencial
+								</h3>
+								<p className="text-sm text-emerald-50 leading-relaxed">
+									La reunion sera en un lugar fisico. Se enviaran las invitaciones por correo electronico a todos los copropietarios.
+								</p>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* SECCION: Informacion General */}
 				<div className="space-y-4">

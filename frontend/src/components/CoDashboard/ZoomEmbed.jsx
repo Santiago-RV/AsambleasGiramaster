@@ -152,6 +152,7 @@ const ZoomEmbed = ({
 				{
 					meeting_number: meetingNumber,
 					role: 0, // 0 = participante (copropietario)
+					zoom_account_id: meetingData?.int_zoom_account_id || null,
 				}
 			);
 
@@ -312,10 +313,12 @@ const ZoomEmbed = ({
 				throw new Error('No se pudo extraer el número de reunión');
 			}
 
-			console.log('🔵 Obteniendo configuración de Zoom...');
-			setLoadingMessage('Configurando conexión...');
+			console.log('🔵 Obteniendo configuracion de Zoom...');
+			setLoadingMessage('Configurando conexion...');
 
-			const configResponse = await axiosInstance.get('/zoom/config');
+			const zoomAccountId = meetingData?.int_zoom_account_id;
+			const configUrl = zoomAccountId ? `/zoom/config?zoom_account_id=${zoomAccountId}` : '/zoom/config';
+			const configResponse = await axiosInstance.get(configUrl);
 			const sdkKey = configResponse.data.data.sdk_key;
 
 			console.log('🔵 Generando firma...');

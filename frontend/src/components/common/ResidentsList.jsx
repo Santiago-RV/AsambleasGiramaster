@@ -413,6 +413,7 @@ const ResidentsList = ({
 					});
 				}
 
+
 				// Reportar errores del backend si los hay
 				if (data.data.failed_users && data.data.failed_users.length > 0) {
 					data.data.failed_users.forEach(failed => {
@@ -876,6 +877,7 @@ const ResidentsList = ({
 							</div>
 						</div>
 					)}
+				</div>
 				</div>
 
 				{/* Barra de búsqueda (opcional) */}

@@ -9,6 +9,44 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-02-14 - Modalidad Virtual/Presencial en reuniones y corrección de credenciales Zoom
+
+- **Selector de modalidad al crear reunión**: Al agendar una asamblea, se muestra un modal previo que permite elegir entre reunión **Virtual** (Zoom) o **Presencial**, con tarjetas ilustrativas.
+  - **Backend - Modelo** (`backend/app/models/meeting_model.py`):
+    - Nueva columna `str_modality VARCHAR(20) NOT NULL DEFAULT 'virtual'`.
+  - **Backend - Schemas** (`backend/app/schemas/meeting_create_schema.py`):
+    - Campo `str_modality` añadido a `MeetingCreateRequest` y `MeetingResponse`.
+  - **Backend - Servicio** (`backend/app/services/meeting_service.py`):
+    - `create_meeting()` acepta parámetro `modality`; omite la creación de reunión Zoom cuando la modalidad es `presencial`.
+  - **Backend - Endpoint** (`backend/app/api/v1/endpoints/meeting_endpoint.py`):
+    - Pasa `modality` al servicio de reuniones.
+  - **Frontend - Nuevo componente** (`frontend/src/components/saDashboard/components/modals/MeetingTypeSelector.jsx`):
+    - Modal con tarjetas de selección Virtual/Presencial, íconos de lucide-react, animaciones hover.
+  - **Frontend - MeetingModal.jsx**: Prop `meetingMode` controla banner superior (azul/verde), título dinámico, sección Zoom condicional.
+  - **Frontend - UnidadResidencialDetalles.jsx**: Flujo integrado: tipo selector → modal de creación con modo seleccionado.
+  - **Frontend - ReunionesTab.jsx**: Flujo integrado: tipo selector → formulario inline con selector de cuenta Zoom (solo virtual), campo `str_modality` en submit.
+  - **Frontend - MeetingsList.jsx**: Badges de modalidad (Virtual/Presencial) en listado, botones de Zoom condicionales.
+  - **Frontend - MeetingCard.jsx** (CoDashboard): Botón "Unirse" solo para virtuales; banner informativo para presenciales.
+
+- **Corrección de credenciales Zoom por cuenta**: Los endpoints de firma y configuración Zoom ahora resuelven las credenciales SDK según la cuenta Zoom específica de la reunión, en lugar de usar siempre la cuenta 1.
+  - **Backend - Schema** (`backend/app/schemas/zoom_schema.py`):
+    - Campo opcional `zoom_account_id` en `ZoomSignatureRequest`.
+  - **Backend - Endpoint** (`backend/app/api/v1/endpoints/zoom_endpoint.py`):
+    - `POST /zoom/generate-signature` y `GET /zoom/config` resuelven `SDK_KEY`/`SDK_SECRET` según `zoom_account_id`.
+  - **Frontend - ZoomEmbed.jsx**: Envía `zoom_account_id` a los endpoints de firma y configuración.
+  - **Frontend - ZoomMeetingContainer.jsx**: Envía `zoom_account_id` a los endpoints de firma y configuración.
+  - **Frontend - AdDashboard.jsx**: Pasa `int_zoom_account_id` y `str_modality` al estado de reunión Zoom.
+  - **Frontend - UsersPage.jsx**: Incluye `str_modality` e `int_zoom_account_id` en el mapeo de datos de reunión.
+
+### Corregido
+
+#### 2026-02-14 - Correcciones de estabilidad
+
+- **Backend - Config** (`backend/app/core/config.py`): Valor por defecto `"http://localhost:3000"` para `FRONTEND_URL`, evitando error de arranque.
+- **Frontend - ResidentsList.jsx**: Eliminados 12 bloques de código duplicados y etiqueta `</div>` faltante que impedían la compilación.
+
+### Añadido
+
 #### 2026-02-09 - Soporte para múltiples cuentas Zoom (máx. 3)
 
 - **Soporte multi-cuenta Zoom**: Permite configurar hasta 3 cuentas Zoom independientes para agendar reuniones simultáneas sin conflictos de licencia.

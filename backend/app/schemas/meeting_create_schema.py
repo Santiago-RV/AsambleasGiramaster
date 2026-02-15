@@ -12,7 +12,8 @@ class MeetingCreateRequest(BaseModel):
     dat_schedule_date: datetime = Field(..., description="Fecha y hora programada")
     int_estimated_duration: int = Field(default=0, ge=0, le=480, description="Duración estimada en minutos (0 = indefinida, 15-480 = con límite)")
     bln_allow_delegates: bool = Field(default=True, description="Permite delegados")
-    int_zoom_account_id: Optional[int] = Field(None, ge=1, le=3, description="ID de la cuenta Zoom a usar (1-3). Si no se especifica, usa la primera disponible")
+    str_modality: str = Field(default="virtual", description="Modalidad de la reunion: 'virtual' o 'presencial'")
+    int_zoom_account_id: Optional[int] = Field(None, ge=1, le=3, description="ID de la cuenta Zoom a usar (1-3). Si no se especifica, usa la primera disponible. Solo aplica para reuniones virtuales")
 
 
 class ResidentialUnitBasic(BaseModel):
@@ -43,6 +44,7 @@ class MeetingResponse(BaseModel):
     str_zoom_start_url: Optional[str]  # Puede ser None si no se creó en Zoom
     str_zoom_password: Optional[str]
     int_zoom_account_id: Optional[int]
+    str_modality: str
     bln_allow_delegates: bool
     str_status: str
     bln_quorum_reached: bool

@@ -14,6 +14,7 @@ import ResidentsList from '../common/ResidentsList';
 import MeetingsList from '../common/MeetingsList';
 
 // Modales
+import MeetingTypeSelector from './components/modals/MeetingTypeSelector';
 import MeetingModal from './components/modals/MeetingModal';
 import ResidentModal from './components/modals/ResidentModal';
 import ChangeAdminModal from './components/modals/ChangeAdminModal';
@@ -32,6 +33,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 	const [residentModalMode, setResidentModalMode] = useState('create');
 
 	// Estados de modales
+	const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
+	const [meetingMode, setMeetingMode] = useState('virtual');
 	const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
 	const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
 	const [isChangeAdminModalOpen, setIsChangeAdminModalOpen] = useState(false);
@@ -150,7 +153,8 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 			int_estimated_duration: 0,
 			int_meeting_leader_id: parseInt(data.int_meeting_leader_id),
 			dat_schedule_date: data.dat_schedule_start,
-			int_zoom_account_id: data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
+			str_modality: meetingMode,
+			int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
 		};
 
 		createMeetingMutation.mutate(meetingData, {
@@ -379,7 +383,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 						<MeetingsList
 							meetings={meetingsData}
 							isLoading={isLoadingMeetings}
-							onCreateMeeting={() => setIsMeetingModalOpen(true)}
+							onCreateMeeting={() => setIsTypeSelectorOpen(true)}
 							onStartMeeting={onStartMeeting}
 							onEndMeeting={handleEndMeeting}
 						/>
@@ -390,11 +394,22 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 
 
 			{/* Modales */}
+			<MeetingTypeSelector
+				isOpen={isTypeSelectorOpen}
+				onClose={() => setIsTypeSelectorOpen(false)}
+				onSelect={(mode) => {
+					setMeetingMode(mode);
+					setIsTypeSelectorOpen(false);
+					setIsMeetingModalOpen(true);
+				}}
+			/>
+
 			<MeetingModal
 				isOpen={isMeetingModalOpen}
 				onClose={() => setIsMeetingModalOpen(false)}
 				onSubmit={handleSubmitMeeting}
 				isSubmitting={createMeetingMutation.isPending}
+				meetingMode={meetingMode}
 			/>
 
 			<ResidentModal

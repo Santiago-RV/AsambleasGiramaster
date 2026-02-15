@@ -6,14 +6,20 @@ class ZoomSignatureRequest(BaseModel):
     """Schema para solicitar un signature de Zoom"""
     meeting_number: str = Field(
         ..., 
-        description="Número de la reunión de Zoom (puede contener espacios o guiones)",
+        description="Numero de la reunion de Zoom (puede contener espacios o guiones)",
         example="123-456-7890"
     )
     role: int = Field(
         default=0, 
         ge=0, 
         le=1,
-        description="Rol del usuario (0 = participante, 1 = anfitrión)"
+        description="Rol del usuario (0 = participante, 1 = anfitrion)"
+    )
+    zoom_account_id: Optional[int] = Field(
+        None,
+        ge=1,
+        le=3,
+        description="ID de la cuenta Zoom a usar para generar la firma (1-3). Si no se especifica, usa la primera disponible"
     )
     
     @validator('meeting_number')

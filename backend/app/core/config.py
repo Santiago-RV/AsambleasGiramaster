@@ -82,7 +82,7 @@ class Settings(BaseSettings):
   EMAIL_ENABLED: bool = True  # Activar/desactivar envío de emails
   
   # Generar Qrs
-  FRONTEND_URL: str
+  FRONTEND_URL: str = "http://localhost:5173"
 
   class Config:
     env_file = ".env"
