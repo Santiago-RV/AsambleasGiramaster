@@ -1,4 +1,4 @@
-// CoDashboard.jsx - VERSIÓN CORREGIDA CON LOGOUT EN HEADER
+// CoDashboard.jsx - VERSIÓN CON HEADER DE PODERES DELEGADOS
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -10,7 +10,9 @@ import ProfilePage from '../components/CoDashboard/ProfilePage';
 import VotingPage from '../components/CoDashboard/VotingPage';
 import MeetingsPage from '../components/CoDashboard/MeetingsPage';
 import PowersViewPage from '../components/CoDashboard/PowersViewPage';
+import DelegatedPowersHeader from '../components/CoDashboard/DelegatedPowersHeader';
 import { UserService } from '../services/api/UserService';
+import { PollService } from '../services/api/PollService';
 
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');
@@ -29,7 +31,7 @@ export default function AppCopropietario() {
         const userData = JSON.parse(userString);
         const role = userData.role || "Usuario";
         setUserRole(role);
-        
+
         // Establecer nombre del usuario
         const fullName = `${userData.firstname || ''} ${userData.lastname || ''}`.trim();
         setUserName(fullName || userData.email || 'Usuario');
@@ -41,10 +43,10 @@ export default function AppCopropietario() {
   }, []);
 
   // QUERY PARA OBTENER DATOS COMPLETOS DEL USUARIO Y UNIDAD
-  const { 
+  const {
     data: userData,
     isLoading: isLoadingUser,
-    isError: isErrorUser 
+    isError: isErrorUser
   } = useQuery({
     queryKey: ['copropietario-data'],
     queryFn: async () => {
@@ -73,7 +75,38 @@ export default function AppCopropietario() {
     }
   }, [userData]);
 
+  // ✅ DECLARAR isGuest ANTES de usarlo
   const isGuest = userRole === "Invitado";
+
+  // ✅ QUERY PARA OBTENER REUNIONES EN VIVO (para mostrar poderes delegados)
+  const { data: liveMeetingsData } = useQuery({
+    queryKey: ['live-meetings', residentialUnitId],
+    queryFn: async () => {
+      if (!residentialUnitId) {
+        console.log('⚠️ [CoDashboard] No hay residentialUnitId');
+        return { success: false, data: [] };
+      }
+      console.log('🔄 [CoDashboard] Obteniendo reuniones en vivo para unit:', residentialUnitId);
+      return await PollService.getLiveMeetings(residentialUnitId);
+    },
+    enabled: !!residentialUnitId,
+    refetchInterval: 30000, // Refrescar cada 30 segundos
+  });
+
+  // ✅ Extraer reunión activa
+  const liveMeetings = liveMeetingsData?.data || [];
+  const activeMeeting = liveMeetings.length > 0 ? liveMeetings[0] : null;
+
+  // 🔍 DEBUGGING - Ver reuniones en vivo
+  console.log('🔍 [CoDashboard] Estado de reuniones:', {
+    isGuest,
+    residentialUnitId,
+    liveMeetingsData,
+    liveMeetings,
+    activeMeeting,
+    activeMeetingId: activeMeeting?.id,
+    showDelegatedPowers: !isGuest && !!activeMeeting
+  });
 
   const handleLogout = () => {
     Swal.fire({
@@ -142,16 +175,23 @@ export default function AppCopropietario() {
     profile: 'Mi Perfil'
   };
 
-  // HEADER PERSONALIZADO CON BOTÓN DE LOGOUT A LA IZQUIERDA
+  // HEADER PERSONALIZADO CON PODERES DELEGADOS
   const headerContent = (
     <div className="bg-white border-b border-gray-200 shadow-sm">
       <div className="px-6 py-4">
         {/* Título de la sección */}
         <div className="mb-4 min-w-0">
-          <h1 className=" text-2xl font-semibold text-gray-800 truncate max-w-full"title={titles[section]}>
+          <h1 className="text-2xl font-semibold text-gray-800 truncate max-w-full" title={titles[section]}>
             {titles[section]}
           </h1>
         </div>
+
+        {/* ✅ NUEVO: Mostrar poderes delegados si hay reunión activa */}
+        {!isGuest && activeMeeting && (
+          <div className="mb-4">
+            <DelegatedPowersHeader meetingId={activeMeeting.id} />
+          </div>
+        )}
 
         {/* Información del copropietario y unidad CON BOTÓN DE LOGOUT */}
         {!isGuest && !isLoadingUser && (
@@ -191,9 +231,11 @@ export default function AppCopropietario() {
             </div>
 
             {/* BOTÓN DE LOGOUT SOLO ICONO A LA DERECHA */}
-<button
-  onClick={handleLogout}
-  className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm self-end md:self-auto"title="Cerrar Sesión">
+            <button
+              onClick={handleLogout}
+              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm self-end md:self-auto"
+              title="Cerrar Sesión"
+            >
               <LogOut size={20} />
             </button>
           </div>
@@ -209,7 +251,7 @@ export default function AppCopropietario() {
                 <div className="h-3 bg-gray-300 rounded w-32 animate-pulse"></div>
               </div>
             </div>
-            
+
             {/* Botón de logout durante loading */}
             <button
               onClick={handleLogout}
@@ -239,7 +281,7 @@ export default function AppCopropietario() {
                 <p className="text-sm text-gray-600">Acceso de solo observación</p>
               </div>
             </div>
-            
+
             {/* Botón de logout para invitados */}
             <button
               onClick={handleLogout}
