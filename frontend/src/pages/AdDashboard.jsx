@@ -13,6 +13,7 @@ import PowerModal from "../components/AdDashboard/PowerModal";
 import ResidentModal from "../components/saDashboard/components/modals/ResidentModal";
 import ExcelUploadModal from "../components/saDashboard/components/modals/ExcelUploadModal";
 import MeetingModal from "../components/saDashboard/components/modals/MeetingModal";
+import MeetingTypeSelector from "../components/saDashboard/components/modals/MeetingTypeSelector";
 import ZoomMeetingContainer from "../components/AdDashboard/ZoomMeetingContainer";
 import { useAuth } from "../hooks/useAuth";
 import { useAuthContext } from "../providers/AuthProvider";
@@ -36,6 +37,8 @@ export default function AppAdmin() {
   const [residentModalMode, setResidentModalMode] = useState('create');
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
+  const [meetingMode, setMeetingMode] = useState('virtual');
   const [showZoomMeeting, setShowZoomMeeting] = useState(null);
   const { logout } = useAuth();
   const { user } = useAuthContext();
@@ -286,9 +289,9 @@ export default function AppAdmin() {
     },
   });
 
-  // Handler para crear reunión
+  // Handler para crear reunión - abre selector de tipo (Virtual/Presencial)
   const handleCreateMeeting = () => {
-    setShowMeetingModal(true);
+    setIsTypeSelectorOpen(true);
   };
 
   // Handler para enviar el formulario de reunión
@@ -301,7 +304,9 @@ export default function AppAdmin() {
       bln_allow_delegates: data.bln_allow_delegates,
       int_estimated_duration: 0,
       dat_schedule_date: data.dat_schedule_start,
-      int_zoom_account_id: data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
+      str_modality: meetingMode,
+      int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id
+        ? parseInt(data.int_zoom_account_id) : null,
       // El int_meeting_leader_id se asigna automaticamente en el backend
     };
 
@@ -315,6 +320,40 @@ export default function AppAdmin() {
 
   // Handler para unirse a una reunión usando Zoom Embebido
   const handleJoinMeeting = async (meeting) => {
+    // Si es reunion presencial, solo cambiar estado y mostrar confirmacion
+    if (meeting.str_modality === 'presencial') {
+      try {
+        await MeetingService.startMeeting(meeting.id);
+        queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+        Swal.fire({
+          icon: 'success',
+          title: 'Reunion Presencial En Curso',
+          html: `
+            <div class="text-left">
+              <div class="bg-emerald-50 p-3 rounded-lg mb-3">
+                <p class="font-semibold text-emerald-800">${meeting.titulo}</p>
+                <p class="text-sm text-emerald-700 mt-1">Estado: <strong>En Curso</strong></p>
+              </div>
+              <p class="text-sm text-gray-600">
+                Utilice el escaner QR para registrar la asistencia de los copropietarios.
+              </p>
+            </div>
+          `,
+          confirmButtonColor: '#10b981',
+          confirmButtonText: 'Entendido',
+        });
+      } catch (error) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error.response?.data?.message || error.message || 'Error al iniciar la reunion presencial',
+          confirmButtonColor: '#dc2626',
+        });
+      }
+      return;
+    }
+
+    // Reunion virtual - flujo con Zoom
     // Validar que la reunión tenga datos de Zoom
     if (!meeting.zoom_meeting_id && !meeting.meeting_url) {
       Swal.fire({
@@ -618,11 +657,22 @@ export default function AppAdmin() {
         }}
       />
 
+      <MeetingTypeSelector
+        isOpen={isTypeSelectorOpen}
+        onClose={() => setIsTypeSelectorOpen(false)}
+        onSelect={(mode) => {
+          setMeetingMode(mode);
+          setIsTypeSelectorOpen(false);
+          setShowMeetingModal(true);
+        }}
+      />
+
       <MeetingModal
         isOpen={showMeetingModal}
         onClose={() => setShowMeetingModal(false)}
         onSubmit={handleSubmitMeeting}
         isSubmitting={createMeetingMutation.isPending}
+        meetingMode={meetingMode}
       />
 
       {showAssemblyForm && (

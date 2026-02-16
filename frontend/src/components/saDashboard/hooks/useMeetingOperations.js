@@ -28,7 +28,40 @@ export const useMeetingOperations = (unitId) => {
 		},
 	});
 
+	// Mutación para finalizar reunión
+	const endMeetingMutation = useMutation({
+		mutationFn: (meetingId) => MeetingService.endMeeting(meetingId),
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
+			queryClient.invalidateQueries({ queryKey: ['meetings'] });
+			Swal.fire({
+				icon: 'success',
+				title: 'Reunion Finalizada',
+				html: `
+					<div class="text-left">
+						<p class="mb-3">${response.message || 'La reunion ha sido finalizada exitosamente'}</p>
+						<div class="bg-gray-50 p-3 rounded-lg">
+							<p class="text-sm text-gray-700">
+								Estado: <strong>Completada</strong>
+							</p>
+						</div>
+					</div>
+				`,
+				confirmButtonColor: '#10b981',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: error.response?.data?.message || error.message || 'Error al finalizar la reunion',
+				confirmButtonColor: '#dc2626',
+			});
+		},
+	});
+
 	return {
 		createMeetingMutation,
+		endMeetingMutation,
 	};
 };

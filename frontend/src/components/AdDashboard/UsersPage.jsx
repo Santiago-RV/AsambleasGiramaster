@@ -137,24 +137,28 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
 
   // MUTACIÓN PARA INICIAR REUNIÓN
   const startMeetingMutation = useMutation({
-    mutationFn: async (meetingId) => {
-      return await MeetingService.startMeeting(meetingId);
+    mutationFn: async ({ meetingId, modality }) => {
+      const response = await MeetingService.startMeeting(meetingId);
+      return { ...response, modality };
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
       queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
+
+      const isPresencial = response.modality === 'presencial';
       
       Swal.fire({
         icon: 'success',
-        title: 'Reunión Iniciada',
+        title: isPresencial ? 'Reunion Presencial Iniciada' : 'Reunion Iniciada',
         html: `
           <div class="text-left">
-            <p class="mb-3">${response.message}</p>
-            <div class="bg-green-50 p-3 rounded-lg">
-              <p class="text-sm text-green-700">
-                ✅ Estado: <strong>En Curso</strong>
+            <p class="mb-3">${response.message || 'La reunion ha sido iniciada exitosamente'}</p>
+            <div class="${isPresencial ? 'bg-emerald-50' : 'bg-green-50'} p-3 rounded-lg">
+              <p class="text-sm ${isPresencial ? 'text-emerald-700' : 'text-green-700'}">
+                Estado: <strong>En Curso</strong>
               </p>
             </div>
+            ${isPresencial ? '<p class="text-sm text-gray-600 mt-3">Utilice el escaner QR para registrar la asistencia de los copropietarios.</p>' : ''}
           </div>
         `,
         confirmButtonColor: '#10b981',
@@ -164,7 +168,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.response?.data?.message || error.message || 'Error al iniciar la reunión',
+        text: error.response?.data?.message || error.message || 'Error al iniciar la reunion',
         confirmButtonColor: '#dc2626',
       });
     },
@@ -199,19 +203,26 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
   });
 
   const handleStartMeeting = async (meeting) => {
+    const isPresencial = meeting.str_modality === 'presencial';
+
     const result = await Swal.fire({
-      title: '¿Iniciar Reunión?',
+      title: isPresencial ? '¿Iniciar Reunion Presencial?' : '¿Iniciar Reunion?',
       html: `
         <div class="text-left">
-          <p class="mb-3">¿Estás seguro de iniciar esta reunión?</p>
-          <div class="bg-blue-50 p-3 rounded-lg">
-            <p class="font-semibold text-blue-800">${meeting.titulo}</p>
-            <p class="text-sm text-blue-700 mt-1">
+          <p class="mb-3">¿Estas seguro de iniciar esta reunion?</p>
+          <div class="${isPresencial ? 'bg-emerald-50' : 'bg-blue-50'} p-3 rounded-lg">
+            <p class="font-semibold ${isPresencial ? 'text-emerald-800' : 'text-blue-800'}">${meeting.titulo}</p>
+            <p class="text-sm ${isPresencial ? 'text-emerald-700' : 'text-blue-700'} mt-1">
               <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+            </p>
+            <p class="text-sm ${isPresencial ? 'text-emerald-700' : 'text-blue-700'} mt-1">
+              <strong>Modalidad:</strong> ${isPresencial ? 'Presencial' : 'Virtual'}
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">
-            ✅ Se crearán invitaciones automáticamente para todos los copropietarios
+            ${isPresencial
+              ? 'La reunion cambiara a estado "En Curso". Utilice el escaner QR para registrar asistencia.'
+              : 'Se crearan invitaciones automaticamente para todos los copropietarios'}
           </p>
         </div>
       `,
@@ -219,12 +230,12 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       showCancelButton: true,
       confirmButtonColor: '#10b981',
       cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Sí, Iniciar',
+      confirmButtonText: 'Si, Iniciar',
       cancelButtonText: 'Cancelar'
     });
 
     if (result.isConfirmed) {
-      startMeetingMutation.mutate(meeting.id);
+      startMeetingMutation.mutate({ meetingId: meeting.id, modality: meeting.str_modality });
     }
   };
 

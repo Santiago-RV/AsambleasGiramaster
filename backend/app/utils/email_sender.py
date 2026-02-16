@@ -379,7 +379,10 @@ class EmailSender:
         emails_data: List[dict]
     ) -> dict:
         """
-        Envía múltiples correos electrónicos.
+        Envía múltiples correos electrónicos (método síncrono).
+        
+        NOTA: Este método usa send_email() síncrono (credenciales de .env).
+        Para usar credenciales de DB, use send_bulk_emails_async().
         
         Args:
             emails_data: Lista de diccionarios con los datos de cada email
@@ -437,6 +440,68 @@ class EmailSender:
         
         return stats
 
-
-# Instancia global del email sender
-email_sender = EmailSender()
+    async def send_bulk_emails_async(
+        self,
+        emails_data: List[dict]
+    ) -> dict:
+        """
+        Envía múltiples correos electrónicos de forma asíncrona.
+        
+        Carga credenciales desde DB si está disponible,
+        con fallback automático a .env si falla.
+        
+        Args:
+            emails_data: Lista de diccionarios con los datos de cada email
+                        Cada dict debe contener: to_emails, subject, html_content
+                        Opcionalmente: text_content, cc_emails, bcc_emails, attach_logo
+        
+        Returns:
+            dict: Estadísticas del envío (exitosos, fallidos)
+        """
+        stats = {
+            "total": len(emails_data),
+            "exitosos": 0,
+            "fallidos": 0,
+            "detalles": []
+        }
+        
+        for email_data in emails_data:
+            try:
+                success = await self.send_email_async(
+                    to_emails=email_data["to_emails"],
+                    subject=email_data["subject"],
+                    html_content=email_data["html_content"],
+                    text_content=email_data.get("text_content"),
+                    cc_emails=email_data.get("cc_emails"),
+                    bcc_emails=email_data.get("bcc_emails"),
+                    attach_logo=email_data.get("attach_logo", True)
+                )
+                
+                if success:
+                    stats["exitosos"] += 1
+                    stats["detalles"].append({
+                        "to": email_data["to_emails"],
+                        "status": "exitoso"
+                    })
+                else:
+                    stats["fallidos"] += 1
+                    stats["detalles"].append({
+                        "to": email_data["to_emails"],
+                        "status": "fallido"
+                    })
+                    
+            except Exception as e:
+                logger.error(f"❌ Error al procesar email async: {str(e)}")
+                stats["fallidos"] += 1
+                stats["detalles"].append({
+                    "to": email_data.get("to_emails", ["unknown"]),
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        logger.info(
+            f"📊 Envío masivo async completado: "
+            f"{stats['exitosos']} exitosos, {stats['fallidos']} fallidos de {stats['total']} total"
+        )
+        
+        return stats

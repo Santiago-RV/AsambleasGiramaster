@@ -31,7 +31,7 @@ from app.models.residential_unit_model import ResidentialUnitModel
 from app.schemas.responses_schema import SuccessResponse
 from app.services.simple_auto_login_service import simple_auto_login_service
 from app.services.qr_service import qr_service
-from app.services.email_service import email_service
+from app.services.email_service import EmailService
 from app.core.config import settings
 from app.core.security import security_manager
 
@@ -405,7 +405,8 @@ async def send_enhanced_qr_email(
         )
         
         # Enviar correo con QR (pasar el QR base64 ya generado)
-        email_sent = await email_service.send_qr_access_email(
+        email_svc = EmailService(db)
+        email_sent = await email_svc.send_qr_access_email(
             to_email=request.recipient_email or target_data_user.str_email,
             resident_name=user_info['name'],
             apartment_number=user_info['apartment'],

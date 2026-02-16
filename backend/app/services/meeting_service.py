@@ -13,6 +13,7 @@ from app.models.residential_unit_model import ResidentialUnitModel
 from app.models.meeting_invitation_model import MeetingInvitationModel
 from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.user_model import UserModel
+from app.models.data_user_model import DataUserModel
 from app.core.exceptions import ResourceNotFoundException, ServiceException
 from app.services.zoom_api_service import ZoomAPIService
 from app.core.logging_config import get_logger
@@ -301,10 +302,11 @@ class MeetingService:
 
             # Enviar invitaciones por correo automáticamente
             try:
-                from app.services.email_service import email_service
+                from app.services.email_service import EmailService
+                email_svc = EmailService(self.db)
                 logger.info(f"📧 Enviando invitaciones automáticas para reunión ID {meeting_with_relations.id}")
 
-                email_stats = await email_service.send_meeting_invitation(
+                email_stats = await email_svc.send_meeting_invitation(
                     db=self.db,
                     meeting_id=meeting_with_relations.id,
                     user_ids=None  # Enviar a todos los usuarios de la unidad residencial
@@ -579,3 +581,203 @@ class MeetingService:
                 details={"original_error": str(e), "meeting_id": meeting_id, "user_id": user_id}
             )
 
+    async def register_attendance_by_qr(self, qr_token: str, admin_user_id: int) -> dict:
+        """
+        Registra la asistencia de un copropietario escaneando su QR.
+        
+        Flujo:
+        1. Decodifica el JWT del QR para obtener las credenciales del copropietario
+        2. Valida que el usuario existe y las credenciales son correctas
+        3. Obtiene la unidad residencial del admin que escanea
+        4. Busca la reunión presencial "En Curso" para esa unidad
+        5. Crea invitación si no existe y registra la asistencia
+        
+        Args:
+            qr_token: JWT de auto-login extraído del QR del copropietario
+            admin_user_id: ID del usuario admin que está escaneando
+            
+        Returns:
+            dict con resultado del registro, info del usuario y de la reunión
+        """
+        try:
+            from app.services.simple_auto_login_service import simple_auto_login_service
+            from app.core.security import security_manager
+            
+            # 1. Decodificar el JWT del QR
+            credentials = simple_auto_login_service.decode_auto_login_token(qr_token)
+            
+            if not credentials:
+                logger.warning("QR Attendance: Token QR invalido o expirado")
+                return {
+                    "success": False,
+                    "already_registered": False,
+                    "message": "El codigo QR es invalido o ha expirado. El copropietario debe solicitar un nuevo QR.",
+                    "user_info": None,
+                    "meeting_info": None
+                }
+            
+            username = credentials["username"]
+            password = credentials["password"]
+            
+            # 2. Buscar al usuario por username
+            user_query = select(UserModel).where(UserModel.str_username == username.lower().strip())
+            user_result = await self.db.execute(user_query)
+            target_user = user_result.scalar_one_or_none()
+            
+            if not target_user:
+                logger.warning(f"QR Attendance: Usuario no encontrado: {username}")
+                return {
+                    "success": False,
+                    "already_registered": False,
+                    "message": "El usuario del codigo QR no fue encontrado en el sistema.",
+                    "user_info": None,
+                    "meeting_info": None
+                }
+            
+            # 3. Verificar la contrasena (el QR puede haber sido regenerado)
+            if not security_manager.verify_password(password, target_user.str_password_hash):
+                logger.warning(f"QR Attendance: Credenciales invalidas para usuario {username}")
+                return {
+                    "success": False,
+                    "already_registered": False,
+                    "message": "El codigo QR tiene credenciales obsoletas. El copropietario debe solicitar un nuevo QR.",
+                    "user_info": None,
+                    "meeting_info": None
+                }
+            
+            # 4. Obtener datos personales del usuario
+            data_user_query = select(DataUserModel).where(DataUserModel.id == target_user.int_data_user_id)
+            data_user_result = await self.db.execute(data_user_query)
+            data_user = data_user_result.scalar_one_or_none()
+            
+            full_name = "Sin nombre"
+            if data_user:
+                full_name = f"{data_user.str_firstname} {data_user.str_lastname}".strip()
+            
+            # 5. Obtener la unidad residencial del admin que escanea
+            admin_unit_query = select(UserResidentialUnitModel).where(
+                UserResidentialUnitModel.int_user_id == admin_user_id
+            )
+            admin_unit_result = await self.db.execute(admin_unit_query)
+            admin_unit = admin_unit_result.scalar_one_or_none()
+            
+            if not admin_unit:
+                logger.warning(f"QR Attendance: Admin {admin_user_id} no tiene unidad residencial asignada")
+                return {
+                    "success": False,
+                    "already_registered": False,
+                    "message": "El administrador no tiene una unidad residencial asignada.",
+                    "user_info": None,
+                    "meeting_info": None
+                }
+            
+            residential_unit_id = admin_unit.int_residential_unit_id
+            
+            # 6. Buscar reunion presencial "En Curso" para esa unidad residencial
+            meeting_query = select(MeetingModel).where(
+                MeetingModel.int_id_residential_unit == residential_unit_id,
+                MeetingModel.str_status == "En Curso",
+                MeetingModel.str_modality == "presencial"
+            )
+            meeting_result = await self.db.execute(meeting_query)
+            active_meeting = meeting_result.scalar_one_or_none()
+            
+            if not active_meeting:
+                logger.info(f"QR Attendance: No hay reunion presencial activa para unidad {residential_unit_id}")
+                return {
+                    "success": False,
+                    "already_registered": False,
+                    "message": "No hay ninguna reunion presencial en curso para esta unidad residencial.",
+                    "user_info": {"name": full_name, "user_id": target_user.id},
+                    "meeting_info": None
+                }
+            
+            # 7. Verificar que el copropietario pertenece a la misma unidad residencial
+            coowner_unit_query = select(UserResidentialUnitModel).where(
+                UserResidentialUnitModel.int_user_id == target_user.id,
+                UserResidentialUnitModel.int_residential_unit_id == residential_unit_id
+            )
+            coowner_unit_result = await self.db.execute(coowner_unit_query)
+            coowner_unit = coowner_unit_result.scalar_one_or_none()
+            
+            if not coowner_unit:
+                logger.warning(f"QR Attendance: Usuario {target_user.id} no pertenece a unidad {residential_unit_id}")
+                return {
+                    "success": False,
+                    "already_registered": False,
+                    "message": "El copropietario no pertenece a esta unidad residencial.",
+                    "user_info": {"name": full_name, "user_id": target_user.id},
+                    "meeting_info": {"id": active_meeting.id, "title": active_meeting.str_title}
+                }
+            
+            apartment_number = coowner_unit.str_apartment_number
+            voting_weight = coowner_unit.dec_default_voting_weight or Decimal("1.000000")
+            
+            # 8. Verificar si ya tiene invitacion; si no, crearla
+            invitation_query = select(MeetingInvitationModel).where(
+                MeetingInvitationModel.int_meeting_id == active_meeting.id,
+                MeetingInvitationModel.int_user_id == target_user.id
+            )
+            invitation_result = await self.db.execute(invitation_query)
+            invitation = invitation_result.scalar_one_or_none()
+            
+            if not invitation:
+                # Crear invitacion automaticamente
+                invitation = MeetingInvitationModel(
+                    int_meeting_id=active_meeting.id,
+                    int_user_id=target_user.id,
+                    dec_voting_weight=voting_weight,
+                    dec_quorum_base=voting_weight,
+                    str_apartment_number=apartment_number,
+                    str_invitation_status="delivered",
+                    str_response_status="no_response",
+                    dat_sent_at=datetime.now(),
+                    int_delivery_attemps=0,
+                    bln_will_attend=True,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                    created_by=admin_user_id,
+                    updated_by=admin_user_id
+                )
+                self.db.add(invitation)
+                await self.db.flush()
+                logger.info(f"QR Attendance: Invitacion creada para usuario {target_user.id} en reunion {active_meeting.id}")
+            
+            # 9. Registrar la asistencia
+            result = await self.register_attendance(active_meeting.id, target_user.id)
+            
+            # 10. Construir respuesta con informacion completa
+            user_info = {
+                "user_id": target_user.id,
+                "name": full_name,
+                "username": target_user.str_username,
+                "apartment_number": apartment_number,
+                "email": data_user.str_email if data_user else None
+            }
+            
+            meeting_info = {
+                "id": active_meeting.id,
+                "title": active_meeting.str_title,
+                "type": active_meeting.str_meeting_type,
+                "modality": active_meeting.str_modality,
+                "started_at": active_meeting.dat_actual_start_time.isoformat() if active_meeting.dat_actual_start_time else None
+            }
+            
+            return {
+                "success": result.get("success", False),
+                "already_registered": result.get("already_registered", False),
+                "message": result.get("message", ""),
+                "user_info": user_info,
+                "meeting_info": meeting_info,
+                "joined_at": result.get("joined_at")
+            }
+            
+        except ServiceException:
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al registrar asistencia por QR: {str(e)}")
+            raise ServiceException(
+                message=f"Error al registrar asistencia por QR: {str(e)}",
+                details={"original_error": str(e)}
+            )

@@ -13,8 +13,10 @@ import GuestModal from '../components/saDashboard/components/modals/GuestModal';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthContext } from '../providers/AuthProvider';
 import { useGuestOperations } from '../components/saDashboard/hooks/useGuestOperations';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { GuestService } from '../services/api/GuestService';
+import { MeetingService } from '../services/api/MeetingService';
+import Swal from 'sweetalert2';
 
 const HomeSA = () => {
 	// ==========================================
@@ -31,6 +33,7 @@ const HomeSA = () => {
 	// ==========================================
 	const { logout } = useAuth();
 	const { user } = useAuthContext();
+	const queryClient = useQueryClient();
 
 	// Hook de operaciones de invitados - USA selectedUnitId CORRECTAMENTE
 	const { createGuestMutation } = useGuestOperations(selectedUnitId);
@@ -106,7 +109,41 @@ const HomeSA = () => {
 	// ==========================================
 
 	// Función para iniciar una reunión
-	const handleStartMeeting = (meeting) => {
+	const handleStartMeeting = async (meeting) => {
+		// Si es reunion presencial, solo cambiar estado y mostrar confirmacion
+		if (meeting.str_modality === 'presencial') {
+			try {
+				await MeetingService.startMeeting(meeting.id);
+				queryClient.invalidateQueries({ queryKey: ['meetings'] });
+				Swal.fire({
+					icon: 'success',
+					title: 'Reunion Presencial En Curso',
+					html: `
+						<div class="text-left">
+							<div class="bg-emerald-50 p-3 rounded-lg mb-3">
+								<p class="font-semibold text-emerald-800">${meeting.titulo || meeting.str_title}</p>
+								<p class="text-sm text-emerald-700 mt-1">Estado: <strong>En Curso</strong></p>
+							</div>
+							<p class="text-sm text-gray-600">
+								Utilice el escaner QR para registrar la asistencia de los copropietarios.
+							</p>
+						</div>
+					`,
+					confirmButtonColor: '#10b981',
+					confirmButtonText: 'Entendido',
+				});
+			} catch (error) {
+				Swal.fire({
+					icon: 'error',
+					title: 'Error',
+					text: error.response?.data?.message || error.message || 'Error al iniciar la reunion presencial',
+					confirmButtonColor: '#dc2626',
+				});
+			}
+			return;
+		}
+
+		// Reunion virtual - abrir Zoom
 		setMeetingData(meeting);
 		setActiveTab('zoom-meeting');
 	};

@@ -1,6 +1,7 @@
 """
 Servicio para el envío de correos electrónicos de reuniones.
 Maneja el envío de invitaciones y notificaciones relacionadas con reuniones.
+Carga credenciales SMTP desde la base de datos (tbl_system_config).
 """
 from typing import List, Optional
 from datetime import datetime
@@ -14,7 +15,7 @@ from app.models.user_model import UserModel
 from app.models.data_user_model import DataUserModel
 from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.residential_unit_model import ResidentialUnitModel
-from app.utils.email_sender import email_sender
+from app.utils.email_sender import EmailSender
 from app.services.email_notification_service import EmailNotificationService
 from app.services.qr_service import qr_service
 from jinja2 import Template
@@ -23,9 +24,16 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Servicio para gestionar el envío de correos electrónicos"""
+    """
+    Servicio para gestionar el envío de correos electrónicos.
     
-    def __init__(self):
+    Requiere una sesión de base de datos para cargar credenciales SMTP
+    desde tbl_system_config en vez de variables de entorno.
+    """
+    
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.email_sender = EmailSender(db)
         self.templates_dir = Path(__file__).parent.parent / "templates"
     
     async def send_qr_access_email(
@@ -144,8 +152,8 @@ class EmailService:
             </html>
             """
             
-            # Enviar el correo
-            email_sender.send_email(
+            # Enviar el correo usando credenciales de DB
+            await self.email_sender.send_email_async(
                 to_emails=[to_email],
                 subject=subject,
                 html_content=html_content
@@ -359,8 +367,8 @@ class EmailService:
                     "html_content": html_content
                 })
             
-            # ENVIAR EMAILS
-            stats = email_sender.send_bulk_emails(emails_to_send)
+            # ENVIAR EMAILS usando credenciales de DB
+            stats = await self.email_sender.send_bulk_emails_async(emails_to_send)
             
             # ACTUALIZAR ESTADO DE NOTIFICACIONES
             # Necesito identificar cuáles emails se enviaron exitosamente
@@ -468,8 +476,8 @@ class EmailService:
             # Asunto del email
             subject = f"Credenciales de Acceso - Administrador {residential_unit_name}"
             
-            # Enviar el email usando email_sender (como en send_meeting_invitation)
-            result = email_sender.send_email(
+            # Enviar el email usando credenciales de DB
+            result = await self.email_sender.send_email_async(
                 to_emails=[to_email],
                 subject=subject,
                 html_content=html_content
@@ -555,8 +563,8 @@ class EmailService:
             # Asunto del email
             subject = f"Credenciales de Acceso - {residential_unit_name}"
             
-            # Enviar el email
-            result = email_sender.send_email(
+            # Enviar el email usando credenciales de DB
+            result = await self.email_sender.send_email_async(
                 to_emails=[to_email],
                 subject=subject,
                 html_content=html_content
@@ -631,7 +639,7 @@ class EmailService:
             # Enviar email
             subject = f"Invitación a GIRAMASTER - {residential_unit_name}"
             
-            result = email_sender.send_email(
+            result = await self.email_sender.send_email_async(
                 to_emails=[to_email],
                 subject=subject,
                 html_content=html_content
@@ -647,7 +655,3 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error al enviar email de invitado: {e}")
             return False
-
-
-# Instancia global del servicio de email
-email_service = EmailService()

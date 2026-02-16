@@ -22,7 +22,7 @@ from app.services.email_notification_service import EmailNotificationService
 from app.services.simple_auto_login_service import simple_auto_login_service
 
 from app.models.email_notification_model import EmailNotificationModel
-from app.services.email_service import EmailService, email_sender, email_service
+from app.services.email_service import EmailService
 from sqlalchemy import select
 from datetime import datetime
 import logging
@@ -746,7 +746,7 @@ class ResidentialUnitService:
             
             # 10. Enviar correo de bienvenida (opcional)
             try:
-                email_sent = self._send_welcome_email(
+                email_sent = await self._send_welcome_email(
                     user_email=email,
                     user_name=f"{firstname} {lastname}",
                     username=username,
@@ -792,7 +792,7 @@ class ResidentialUnitService:
                 details={"original_error": str(e)}
             )
             
-    def _send_welcome_email(
+    async def _send_welcome_email(
         self,
         user_email: str,
         user_name: str,
@@ -857,8 +857,10 @@ class ResidentialUnitService:
                 import re
                 html_content = re.sub(r'{{#if phone}}.*?{{/if}}', '', html_content, flags=re.DOTALL)
             
-            # Enviar email
-            success = email_sender.send_email(
+            # Enviar email usando credenciales de DB
+            from app.utils.email_sender import EmailSender
+            db_email_sender = EmailSender(self.db)
+            success = await db_email_sender.send_email_async(
                 to_emails=[user_email],
                 subject=f"Bienvenido a GIRAMASTER - {residential_unit_name}",
                 html_content=html_content,
@@ -1303,7 +1305,8 @@ class ResidentialUnitService:
                 # ============================================
                 # PASO 7: Enviar correo con credenciales y JWT
                 # ============================================
-                email_sent = await email_service.send_coproprietor_credentials_email(
+                email_svc = EmailService(self.db)
+                email_sent = await email_svc.send_coproprietor_credentials_email(
                     to_email=data_user.str_email,
                     firstname=data_user.str_firstname,
                     lastname=data_user.str_lastname,
@@ -1571,14 +1574,14 @@ class ResidentialUnitService:
             # ============================================
             # PASO 7: Enviar email con credenciales
             # ============================================
-            email_service = EmailService()
+            email_svc = EmailService(self.db)
 
             # Obtener el nombre de la unidad residencial para el email
             unit = await self.get_residential_unit_by_id(unit_id)
             unit_name = unit.str_name if unit else "la unidad residencial"
 
             try:
-                await email_service.send_administrator_credentials_email(
+                await email_svc.send_administrator_credentials_email(
                     to_email=admin_data.str_email,
                     firstname=admin_data.str_firstname,
                     lastname=admin_data.str_lastname,
@@ -1961,10 +1964,9 @@ class ResidentialUnitService:
             
             # 8. Enviar email de bienvenida
             try:
-                from app.services.email_service import EmailService
-                email_service = EmailService()
+                email_svc = EmailService(self.db)
                 
-                email_sent = await email_service.send_guest_credentials_email(
+                email_sent = await email_svc.send_guest_credentials_email(
                     to_email=guest_data['email'],
                     firstname=guest_data['firstname'],
                     lastname=guest_data['lastname'],

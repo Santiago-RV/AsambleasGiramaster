@@ -69,7 +69,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 	} = useResidentOperations(unitId);
 
 	// Operaciones de reuniones
-	const { createMeetingMutation } = useMeetingOperations(unitId);
+	const { createMeetingMutation, endMeetingMutation } = useMeetingOperations(unitId);
 
 	// Operaciones de administrador
 	const { changeAdminMutation, createManualAdminMutation } =

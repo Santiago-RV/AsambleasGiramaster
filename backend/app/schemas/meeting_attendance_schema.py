@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 
 class MeetingAttendanceBase(BaseModel):
@@ -21,3 +21,23 @@ class MeetingAttendanceCreate(MeetingAttendanceBase):
 
 class MeetingAttendanceUpdate(MeetingAttendanceBase):
     updated_at: datetime = Field(..., description="Fecha de actualización")
+
+
+# ============================================
+# SCHEMAS PARA REGISTRO DE ASISTENCIA VIA QR
+# ============================================
+
+class QRAttendanceRequest(BaseModel):
+    """Request para registrar asistencia escaneando el QR de un copropietario"""
+    qr_token: str = Field(
+        ..., 
+        description="Token JWT extraído del código QR del copropietario (parte final de la URL de auto-login)"
+    )
+
+class QRAttendanceResponse(BaseModel):
+    """Response del registro de asistencia via QR"""
+    success: bool = Field(..., description="Si el registro fue exitoso")
+    already_registered: bool = Field(default=False, description="Si el usuario ya estaba registrado")
+    message: str = Field(..., description="Mensaje descriptivo del resultado")
+    user_info: Optional[Dict] = Field(default=None, description="Información del copropietario registrado")
+    meeting_info: Optional[Dict] = Field(default=None, description="Información de la reunión")

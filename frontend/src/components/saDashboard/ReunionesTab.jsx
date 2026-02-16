@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MeetingService } from '../../services/api/MeetingService';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
-import { Calendar, Clock, Users, MapPin, Plus, PlayCircle, ChevronRight, CheckCircle, XCircle, AlertCircle, Video } from 'lucide-react';
+import { Calendar, Clock, Users, MapPin, Plus, PlayCircle, ChevronRight, CheckCircle, XCircle, AlertCircle, Video, StopCircle } from 'lucide-react';
 import Modal from '../common/Modal';
 import MeetingTypeSelector from './components/modals/MeetingTypeSelector';
 import SystemConfigService from '../../services/api/SystemConfigService';
@@ -107,6 +107,68 @@ const ReunionesTab = ({ onStartMeeting }) => {
 			});
 		},
 	});
+
+	// Mutación para finalizar reunión
+	const endMeetingMutation = useMutation({
+		mutationFn: (meetingId) => MeetingService.endMeeting(meetingId),
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['meetings'] });
+			Swal.fire({
+				icon: 'success',
+				title: 'Reunion Finalizada',
+				html: `
+					<div class="text-left">
+						<p class="mb-3">${response.message || 'La reunion ha sido finalizada exitosamente'}</p>
+						<div class="bg-gray-50 p-3 rounded-lg">
+							<p class="text-sm text-gray-700">
+								Estado: <strong>Completada</strong>
+							</p>
+						</div>
+					</div>
+				`,
+				confirmButtonColor: '#10b981',
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: error.response?.data?.message || error.message || 'Error al finalizar la reunion',
+				confirmButtonColor: '#dc2626',
+			});
+		},
+	});
+
+	// Handler para finalizar una reunión
+	const handleEndMeeting = async (reunion) => {
+		const result = await Swal.fire({
+			title: '¿Finalizar Reunion?',
+			html: `
+				<div class="text-left">
+					<p class="mb-3">¿Estas seguro de que deseas finalizar esta reunion?</p>
+					<div class="bg-blue-50 p-3 rounded-lg">
+						<p class="font-semibold text-blue-800">${reunion.titulo}</p>
+						<p class="text-sm text-blue-700 mt-1">
+							<strong>Modalidad:</strong> ${reunion.str_modality === 'presencial' ? 'Presencial' : 'Virtual'}
+						</p>
+					</div>
+					<p class="text-xs text-gray-600 mt-3">
+						Esta accion marcara la reunion como finalizada y registrara la fecha y hora de finalizacion.
+					</p>
+				</div>
+			`,
+			icon: 'warning',
+			showCancelButton: true,
+			confirmButtonColor: '#dc2626',
+			cancelButtonColor: '#6b7280',
+			confirmButtonText: 'Si, Finalizar',
+			cancelButtonText: 'Cancelar',
+		});
+
+		if (result.isConfirmed) {
+			endMeetingMutation.mutate(reunion.id);
+		}
+	};
 
 	const onSubmit = (data) => {
 		// Convertir la fecha y hora a formato ISO
@@ -385,17 +447,24 @@ const ReunionesTab = ({ onStartMeeting }) => {
 											</h3>
 											<p className="text-green-100">
 												{reunion.unidad} - En curso
+												{reunion.str_modality === 'presencial' ? ' (Presencial)' : ' (Virtual)'}
 											</p>
 										</div>
 									</div>
-									<button
-										onClick={() =>
-											handleStartMeeting(reunion)
-										}
-										className="px-6 py-3 bg-white text-green-600 rounded-lg hover:bg-green-50 transition-colors font-semibold"
-									>
-										Unirse Ahora
-									</button>
+									{reunion.str_modality === 'presencial' ? (
+										<span className="px-6 py-3 bg-white/20 text-white rounded-lg font-semibold backdrop-blur-sm">
+											Reunion Presencial
+										</span>
+									) : (
+										<button
+											onClick={() =>
+												handleStartMeeting(reunion)
+											}
+											className="px-6 py-3 bg-white text-green-600 rounded-lg hover:bg-green-50 transition-colors font-semibold"
+										>
+											Unirse Ahora
+										</button>
+									)}
 								</div>
 								<div className="grid grid-cols-3 gap-4 mt-6">
 									<div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
@@ -472,6 +541,17 @@ const ReunionesTab = ({ onStartMeeting }) => {
 											<h3 className="text-xl font-bold text-gray-800">
 												{reunion.titulo}
 											</h3>
+											{reunion.str_modality === 'presencial' ? (
+												<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+													<MapPin size={12} />
+													Presencial
+												</span>
+											) : (
+												<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+													<Video size={12} />
+													Virtual
+												</span>
+											)}
 											<span
 												className={`px-3 py-1 rounded-full text-xs font-semibold ${getEstadoColor(
 													reunion.estado
@@ -523,25 +603,42 @@ const ReunionesTab = ({ onStartMeeting }) => {
 								{/* Botones según pestaña */}
 								{activeTab === 'upcoming' ? (
 									<div className="flex gap-2">
-										{(reunion.estado?.toLowerCase() ===
-											'en curso' ||
-											reunion.estado?.toLowerCase() ===
-												'activa' ||
-											reunion.estado?.toLowerCase() ===
-												'programada') && (
-											<button
-												onClick={() =>
-													handleStartMeeting(reunion)
-												}
-												className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
-											>
-												{reunion.estado?.toLowerCase() ===
-													'en curso' ||
-												reunion.estado?.toLowerCase() ===
-													'activa'
-													? 'Unirse'
-													: 'Iniciar'}
-											</button>
+										{reunion.str_modality === 'presencial' ? (
+											<>
+												{reunion.estado?.toLowerCase() === 'programada' && (
+													<button
+														onClick={() => handleStartMeeting(reunion)}
+														className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-semibold text-sm"
+													>
+														Iniciar
+													</button>
+												)}
+												{(reunion.estado?.toLowerCase() === 'en curso' || reunion.estado?.toLowerCase() === 'activa') && (
+													<button
+														onClick={() => handleEndMeeting(reunion)}
+														className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm flex items-center gap-1"
+													>
+														<StopCircle size={16} />
+														Finalizar
+													</button>
+												)}
+											</>
+										) : (
+											<>
+												{(reunion.estado?.toLowerCase() === 'en curso' ||
+													reunion.estado?.toLowerCase() === 'activa' ||
+													reunion.estado?.toLowerCase() === 'programada') && (
+													<button
+														onClick={() => handleStartMeeting(reunion)}
+														className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
+													>
+														{reunion.estado?.toLowerCase() === 'en curso' ||
+														reunion.estado?.toLowerCase() === 'activa'
+															? 'Unirse'
+															: 'Iniciar'}
+													</button>
+												)}
+											</>
 										)}
 										<button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-sm">
 											Ver detalles

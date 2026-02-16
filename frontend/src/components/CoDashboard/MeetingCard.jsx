@@ -223,10 +223,20 @@ export default function MeetingCard({ meeting }) {
 						)}
 					</button>
 				) : (
-					<div className="w-full py-3 px-4 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
-						<p className="text-sm text-emerald-700 font-medium flex items-center justify-center gap-2">
+					<div className={`w-full py-3 px-4 rounded-lg border text-center ${
+						status.text === 'En Curso'
+							? 'bg-emerald-100 border-emerald-300'
+							: 'bg-emerald-50 border-emerald-200'
+					}`}>
+						<p className={`text-sm text-emerald-700 font-medium flex items-center justify-center gap-2 ${
+							status.text === 'En Curso' ? 'animate-pulse' : ''
+						}`}>
 							<MapPin size={16} />
-							Reunion Presencial
+							{status.text === 'En Curso'
+								? 'Reunion Presencial - En Curso'
+								: status.text === 'Finalizada'
+								? 'Reunion Presencial - Finalizada'
+								: 'Reunion Presencial'}
 						</p>
 					</div>
 				)}

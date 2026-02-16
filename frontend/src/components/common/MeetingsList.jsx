@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle, StopCircle, MapPin } from 'lucide-react';
+import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle, StopCircle, MapPin, ScanLine } from 'lucide-react';
+import QRScannerModal from './QRScannerModal';
 
 /**
  * Componente unificado para mostrar lista de reuniones
@@ -17,6 +18,7 @@ const MeetingsList = ({
 	variant = 'compact',
 }) => {
 	const [activeTab, setActiveTab] = useState('upcoming');
+	const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
 
 	// Unificar el handler de unirse a reunión
 	const handleJoinMeeting = onJoinMeeting || onStartMeeting;
@@ -47,6 +49,14 @@ const MeetingsList = ({
 	}, [meetings]);
 
 	const displayMeetings = activeTab === 'upcoming' ? upcomingMeetings : pastMeetings;
+
+	// Verificar si hay alguna reunion presencial activa (En Curso)
+	const hasActivePresencialMeeting = useMemo(() => {
+		return meetings.some(meeting => {
+			const estadoLower = meeting.estado?.toLowerCase();
+			return (estadoLower === 'en curso' || estadoLower === 'activa') && meeting.str_modality === 'presencial';
+		});
+	}, [meetings]);
 
 	const getStatusInfo = (status) => {
 		const statusLower = status?.toLowerCase();
@@ -160,7 +170,17 @@ const MeetingsList = ({
 									{upcomingMeetings.length} próxima{upcomingMeetings.length !== 1 ? 's' : ''} · {pastMeetings.length} pasada{pastMeetings.length !== 1 ? 's' : ''}
 								</p>
 							</div>
-						</div>
+					</div>
+					<div className="flex items-center gap-3">
+						{hasActivePresencialMeeting && (
+							<button
+								onClick={() => setIsQRScannerOpen(true)}
+								className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 animate-pulse"
+							>
+								<ScanLine size={20} />
+								<span>Escanear QR</span>
+							</button>
+						)}
 						<button
 							onClick={onCreateMeeting}
 							className="flex items-center gap-2 px-5 py-2.5 bg-white text-green-600 rounded-xl hover:bg-green-50 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
@@ -170,6 +190,7 @@ const MeetingsList = ({
 						</button>
 					</div>
 				</div>
+			</div>
 
 				{/* Tabs */}
 				<div className="border-b border-gray-200 bg-gray-50">
@@ -301,17 +322,49 @@ const MeetingsList = ({
 										</div>
 
 										{/* Actions for upcoming */}
-										{activeTab === 'upcoming' && (
-											<div className="mt-4 pt-4 border-t border-gray-200">
-												{meeting.str_modality === 'presencial' ? (
-													/* Reunion presencial - sin boton Zoom */
-													<div className="text-center py-2">
-														<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
-															<MapPin size={16} className="text-emerald-500" />
-															Reunion presencial - Sin enlace de Zoom
-														</p>
-													</div>
-												) : (
+									{activeTab === 'upcoming' && (
+										<div className="mt-4 pt-4 border-t border-gray-200">
+											{meeting.str_modality === 'presencial' ? (
+												/* Reunion presencial */
+												<div>
+													{isActive ? (
+														<div className="flex gap-3">
+															<button
+																onClick={() => setIsQRScannerOpen(true)}
+																className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all font-semibold shadow-md hover:shadow-lg"
+															>
+																<ScanLine size={20} />
+																<span>Escanear QR de Asistencia</span>
+															</button>
+															{onEndMeeting && (
+																<button
+																	onClick={() => onEndMeeting(meeting)}
+																	className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-md hover:shadow-lg"
+																	title="Finalizar reunion"
+																>
+																	<StopCircle size={20} />
+																	<span>Finalizar</span>
+																</button>
+															)}
+														</div>
+													) : isProgrammed ? (
+														<button
+															onClick={() => onStartMeeting && onStartMeeting(meeting)}
+															className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-semibold shadow-md hover:shadow-lg"
+														>
+															<PlayCircle size={20} />
+															<span>Iniciar Reunion</span>
+														</button>
+													) : (
+														<div className="text-center py-2">
+															<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
+																<MapPin size={16} className="text-emerald-500" />
+																Reunion presencial
+															</p>
+														</div>
+													)}
+												</div>
+											) : (
 													<>
 														{/* Botones para reuniones EN CURSO (virtual) */}
 														{isActive && (
@@ -405,6 +458,11 @@ const MeetingsList = ({
 						</div>
 					)}
 				</div>
+			{/* QR Scanner Modal - variante admin */}
+			<QRScannerModal
+				isOpen={isQRScannerOpen}
+				onClose={() => setIsQRScannerOpen(false)}
+			/>
 			</div>
 		);
 	}
@@ -421,13 +479,24 @@ const MeetingsList = ({
 					<Calendar size={24} />
 					Reuniones ({meetings?.length || 0})
 				</h2>
-				<button
-					onClick={onCreateMeeting}
-					className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
-				>
-					<Plus size={18} />
-					Nueva Reunión
-				</button>
+				<div className="flex items-center gap-2">
+					{hasActivePresencialMeeting && (
+						<button
+							onClick={() => setIsQRScannerOpen(true)}
+							className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 hover:shadow-lg transition-all font-semibold text-sm animate-pulse"
+						>
+							<ScanLine size={18} />
+							Escanear QR
+						</button>
+					)}
+					<button
+						onClick={onCreateMeeting}
+						className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
+					>
+						<Plus size={18} />
+						Nueva Reunión
+					</button>
+				</div>
 			</div>
 
 			{/* Tabs */}
@@ -548,11 +617,42 @@ const MeetingsList = ({
 									{activeTab === 'upcoming' && (
 										<>
 											{reunion.str_modality === 'presencial' ? (
-												<div className="text-center py-2 mt-2 border-t border-gray-100">
-													<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
-														<MapPin size={14} className="text-emerald-500" />
-														Reunion presencial
-													</p>
+												<div className="mt-2 border-t border-gray-100 pt-2">
+													{isActive ? (
+														<div className="flex gap-2">
+															<button
+																onClick={() => setIsQRScannerOpen(true)}
+																className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-semibold text-sm"
+															>
+																<ScanLine size={18} />
+																Escanear QR
+															</button>
+															{onEndMeeting && (
+																<button
+																	onClick={() => onEndMeeting(reunion)}
+																	className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
+																	title="Finalizar reunion"
+																>
+																	<StopCircle size={18} />
+																</button>
+															)}
+														</div>
+													) : isProgrammed ? (
+														<button
+															onClick={() => onStartMeeting && onStartMeeting(reunion)}
+															className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
+														>
+															<PlayCircle size={18} />
+															Iniciar Reunion
+														</button>
+													) : (
+														<div className="text-center py-2">
+															<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
+																<MapPin size={14} className="text-emerald-500" />
+																Reunion presencial
+															</p>
+														</div>
+													)}
 												</div>
 											) : (
 												<>
@@ -638,6 +738,11 @@ const MeetingsList = ({
 					</div>
 				)}
 			</div>
+			{/* QR Scanner Modal - variante compact */}
+			<QRScannerModal
+				isOpen={isQRScannerOpen}
+				onClose={() => setIsQRScannerOpen(false)}
+			/>
 		</div>
 	);
 };

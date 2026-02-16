@@ -12,8 +12,9 @@ from app.schemas.meeting_create_schema import (
     MeetingResponse,
     MeetingUpdateRequest
 )
+from app.schemas.meeting_attendance_schema import QRAttendanceRequest
 from app.services.meeting_service import MeetingService
-from app.services.email_service import email_service
+from app.services.email_service import EmailService
 from app.auth.auth import get_current_user
 from app.services.user_service import UserService
 
@@ -382,17 +383,20 @@ async def start_meeting(
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
     summary="Finalizar una reunión",
-    description="Marca una reunión como finalizada"
+    description="Marca una reunión como finalizada y registra la fecha/hora de finalización"
 )
 async def end_meeting(
     meeting_id: int,
     db: AsyncSession = Depends(get_db),
-    # current_user: str = Depends(get_current_user)  # Comentado temporalmente para pruebas
+    current_user: str = Depends(get_current_user)
 ):
-    """Finaliza una reunión"""
+    """Finaliza una reunión y registra la fecha/hora de finalización"""
     try:
         meeting_service = MeetingService(db)
-        meeting = await meeting_service.end_meeting(meeting_id, 1)  # TODO: Obtener el ID del usuario actual
+        user_service = UserService(db)
+
+        user = await user_service.get_user_by_username(current_user)
+        meeting = await meeting_service.end_meeting(meeting_id, user.id)
 
         return SuccessResponse(
             success=True,
@@ -499,7 +503,8 @@ async def send_meeting_invitations(
     Solo se envía a usuarios activos que pertenecen a la misma unidad residencial de la reunión.
     """
     try:
-        stats = await email_service.send_meeting_invitation(
+        email_svc = EmailService(db)
+        stats = await email_svc.send_meeting_invitation(
             db=db,
             meeting_id=meeting_id,
             user_ids=request.user_ids
@@ -526,4 +531,69 @@ async def send_meeting_invitations(
         raise ServiceException(
             message=f"Error al enviar invitaciones: {str(e)}",
             details={"original_error": str(e), "meeting_id": meeting_id}
+        )
+
+
+@router.post(
+    "/scan-qr-attendance",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Registrar asistencia presencial via escaneo QR",
+    description="El administrador escanea el QR de un copropietario para registrar su asistencia en la reunion presencial activa"
+)
+async def scan_qr_attendance(
+    request: QRAttendanceRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Registra la asistencia de un copropietario mediante escaneo de su codigo QR.
+    
+    Flujo:
+    1. El admin escanea el QR del copropietario (contiene JWT de auto-login)
+    2. Se decodifica el JWT para identificar al copropietario
+    3. Se busca la reunion presencial "En Curso" de la unidad residencial del admin
+    4. Se registra la asistencia del copropietario en esa reunion
+    
+    Requiere: Rol de Administrador (2) o Super Admin (1)
+    """
+    try:
+        meeting_service = MeetingService(db)
+        user_service = UserService(db)
+        
+        # Obtener el usuario admin autenticado
+        admin_user = await user_service.get_user_by_username(current_user)
+        
+        if not admin_user:
+            raise ServiceException(
+                message="Usuario administrador no encontrado",
+                details={"username": current_user}
+            )
+        
+        # Verificar que sea admin (rol 1 o 2)
+        if admin_user.int_id_rol not in (1, 2):
+            raise ServiceException(
+                message="Solo los administradores pueden registrar asistencia por QR",
+                details={"user_role": admin_user.int_id_rol}
+            )
+        
+        # Registrar asistencia por QR
+        result = await meeting_service.register_attendance_by_qr(
+            qr_token=request.qr_token,
+            admin_user_id=admin_user.id
+        )
+        
+        return SuccessResponse(
+            success=result.get("success", False),
+            status_code=status.HTTP_200_OK,
+            message=result.get("message", ""),
+            data=result
+        )
+        
+    except ServiceException:
+        raise
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al registrar asistencia por QR: {str(e)}",
+            details={"original_error": str(e)}
         )
