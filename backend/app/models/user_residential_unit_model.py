@@ -17,5 +17,5 @@ class UserResidentialUnitModel(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     # Relationships
-    user = relationship("UserModel", backref="residential_units", lazy="selectin")
+    user = relationship("UserModel", back_populates="user_residential_units", lazy="selectin")
     residential_unit = relationship("ResidentialUnitModel", backref="user_units", lazy="selectin")

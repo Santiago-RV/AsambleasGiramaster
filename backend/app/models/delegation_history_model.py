@@ -36,7 +36,7 @@ class DelegationHistoryModel(Base):
     # Foreign Keys
     int_meeting_id = Column(
         Integer, 
-        ForeignKey("tbl_meetings.id", ondelete="CASCADE"),
+        ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
         index=True,
         comment="ID de la reunión donde se realizó la delegación"
@@ -44,18 +44,18 @@ class DelegationHistoryModel(Base):
     
     int_delegator_user_id = Column(
         Integer,
-        ForeignKey("tbl_users.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
         index=True,
-        comment="ID del usuario que CEDE su poder (origen)"
+        comment="ID del usuario que CEDE su poder (origen). SET NULL si se elimina el usuario."
     )
     
     int_delegate_user_id = Column(
         Integer,
-        ForeignKey("tbl_users.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
         index=True,
-        comment="ID del usuario que RECIBE el poder (destino)"
+        comment="ID del usuario que RECIBE el poder (destino). SET NULL si se elimina el usuario."
     )
 
     # Datos de la delegación
@@ -90,8 +90,8 @@ class DelegationHistoryModel(Base):
     # Auditoría
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
-    created_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=True)
-    updated_by = Column(Integer, ForeignKey("tbl_users.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
+    updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
 
     # Relationships
     meeting = relationship("MeetingModel", back_populates="delegation_history")

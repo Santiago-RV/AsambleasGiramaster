@@ -28,5 +28,5 @@ class PollModel(Base):
     updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
 
     meeting = relationship("MeetingModel", back_populates="polls")
-    responses = relationship("PollResponseModel", back_populates="poll", cascade="all, delete-orphan")
-    options = relationship("PollOptionModel", back_populates="poll", cascade="all, delete-orphan")
+    responses = relationship("PollResponseModel", back_populates="poll", cascade="all, delete-orphan", passive_deletes=True)
+    options = relationship("PollOptionModel", back_populates="poll", cascade="all, delete-orphan", passive_deletes=True)

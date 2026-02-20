@@ -7,7 +7,8 @@ from app.schemas.responses_schema import SuccessResponse, ErrorResponse
 from app.schemas.meeting_invitation_schema import (
     BulkUploadResponse,
     MeetingInvitationCreate,
-    MeetingInvitationResponse
+    MeetingInvitationResponse,
+    MeetingInvitationBatchCreate
 )
 from app.services.meeting_invitation_service import MeetingInvitationService
 from app.services.user_service import UserService
@@ -378,5 +379,64 @@ async def get_meeting_invitations(
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise ServiceException(
             message=f"Error al obtener las invitaciones: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.post(
+    "/invitations/batch",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear múltiples invitaciones a una reunión",
+    description="Crea invitaciones para múltiples usuarios a una reunión programada"
+)
+async def create_batch_invitations(
+    invitation_data: MeetingInvitationBatchCreate,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Crea múltiples invitaciones a una reunión.
+    
+    Este endpoint permite invitar a múltiples copropietarios a una reunión programada.
+    El peso de votación y número de apartamento se obtienen automáticamente desde
+    UserResidentialUnitModel.
+    """
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no autenticado"
+            )
+
+        invitation_service = MeetingInvitationService(db)
+        results = await invitation_service.create_batch_invitations(
+            meeting_id=invitation_data.int_meeting_id,
+            user_ids=invitation_data.user_ids,
+            created_by=user.id
+        )
+
+        message = f"Se crearon {results['invitations_created']} invitaciones"
+        if results['failed'] > 0:
+            message += f", {results['failed']} fallidas"
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_201_CREATED,
+            message=message,
+            data=results
+        )
+
+    except ServiceException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"❌ Error al crear invitaciones batch: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise ServiceException(
+            message=f"Error al crear las invitaciones: {str(e)}",
             details={"original_error": str(e)}
         )

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 
@@ -84,3 +84,8 @@ class BulkUploadResponse(BaseModel):
     users_created: int
     invitations_created: int
     errors: list[dict]
+
+class MeetingInvitationBatchCreate(BaseModel):
+    """Schema para crear múltiples invitaciones a una reunión"""
+    int_meeting_id: int = Field(..., description="ID de la reunión")
+    user_ids: List[int] = Field(..., description="Lista de IDs de usuarios a invitar")

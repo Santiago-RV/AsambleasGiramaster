@@ -364,6 +364,9 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 						onBulkToggleAccess={handleBulkToggleAccess}
 						showSearch={true}
 						isSuperAdmin={true}
+						showInviteButton={true}
+						residentialUnitId={unitId}
+						onInviteToMeeting={() => {}}
 					/>
 				</div>
 

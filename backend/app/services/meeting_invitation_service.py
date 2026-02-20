@@ -10,11 +10,13 @@ from app.models.meeting_invitation_model import MeetingInvitationModel
 from app.models.user_model import UserModel
 from app.models.data_user_model import DataUserModel
 from app.models.meeting_model import MeetingModel
+from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.schemas.meeting_invitation_schema import MeetingInvitationCreate
 from app.schemas.user_schema import UserCreate
 from app.schemas.data_user_schema import DataUserCreate
 from app.core.security import security_manager
 from app.core.logging_config import get_logger
+from app.services.email_service import EmailService
 
 logger = get_logger(__name__)
 
@@ -291,4 +293,143 @@ class MeetingInvitationService:
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Error al eliminar invitación: {e}")
+            raise
+
+    async def create_batch_invitations(
+        self,
+        meeting_id: int,
+        user_ids: List[int],
+        created_by: int
+    ) -> Dict:
+        """
+        Crea múltiples invitaciones a una reunión para una lista de usuarios.
+        
+        Obtiene automáticamente el voting_weight y apartment_number desde
+        UserResidentialUnitModel basado en la unidad residencial de la reunión.
+        """
+        from app.models.meeting_model import MeetingModel
+        
+        results = {
+            "successful": 0,
+            "failed": 0,
+            "errors": [],
+            "invitations_created": 0
+        }
+        
+        try:
+            # Obtener la reunión para saber la unidad residencial
+            meeting_result = await self.db.execute(
+                select(MeetingModel).where(MeetingModel.id == meeting_id)
+            )
+            meeting = meeting_result.scalar_one_or_none()
+            
+            if not meeting:
+                raise ValueError(f"La reunión con ID {meeting_id} no existe")
+            
+            residential_unit_id = meeting.int_id_residential_unit
+            
+            # Obtener UserResidentialUnits de la unidad residencial
+            units_result = await self.db.execute(
+                select(UserResidentialUnitModel).where(
+                    UserResidentialUnitModel.int_residential_unit_id == residential_unit_id,
+                    UserResidentialUnitModel.int_user_id.in_(user_ids)
+                )
+            )
+            user_units = {unit.int_user_id: unit for unit in units_result.scalars().all()}
+            
+            # Crear invitaciones para cada usuario
+            for user_id in user_ids:
+                try:
+                    user_unit = user_units.get(user_id)
+                    
+                    if not user_unit:
+                        results["failed"] += 1
+                        results["errors"].append(f"Usuario {user_id}: No tiene relación con esta unidad residencial")
+                        logger.warning(f"⚠️ Usuario {user_id} no tiene relación con la unidad residencial {residential_unit_id}")
+                        continue
+                    
+                    # Verificar si ya existe una invitación
+                    existing = await self.db.execute(
+                        select(MeetingInvitationModel).where(
+                            MeetingInvitationModel.int_meeting_id == meeting_id,
+                            MeetingInvitationModel.int_user_id == user_id
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        results["failed"] += 1
+                        results["errors"].append(f"Usuario {user_id}: Ya tiene invitación a esta reunión")
+                        logger.warning(f"⚠️ Usuario {user_id} ya tiene invitación a la reunión {meeting_id}")
+                        continue
+                    
+                    invitation = MeetingInvitationModel(
+                        int_meeting_id=meeting_id,
+                        int_user_id=user_id,
+                        dec_voting_weight=user_unit.dec_default_voting_weight or Decimal("0"),
+                        dec_quorum_base=user_unit.dec_default_voting_weight or Decimal("0"),
+                        str_apartment_number=user_unit.str_apartment_number or "N/A",
+                        str_invitation_status="pending",
+                        str_response_status="no_response",
+                        dat_sent_at=datetime.now(),
+                        int_delivery_attemps=0,
+                        bln_will_attend=False,
+                        bln_actually_attended=False,
+                        created_by=created_by,
+                        updated_by=created_by
+                    )
+                    
+                    self.db.add(invitation)
+                    results["successful"] += 1
+                    results["invitations_created"] += 1
+                    
+                    logger.info(f"✅ Invitación creada para usuario {user_id}: Peso={user_unit.dec_default_voting_weight}, Apto={user_unit.str_apartment_number}")
+                    
+                except Exception as e:
+                    results["failed"] += 1
+                    results["errors"].append(f"Usuario {user_id}: {str(e)}")
+                    logger.error(f"❌ Error al crear invitación para usuario {user_id}: {e}")
+                    continue
+            
+            # Commit de todas las invitaciones
+            await self.db.commit()
+            
+            # Actualizar contador de invitados en la reunión
+            meeting = await self.db.get(MeetingModel, meeting_id)
+            if meeting and results["invitations_created"] > 0:
+                meeting.int_total_invitated = (meeting.int_total_invitated or 0) + results["invitations_created"]
+                meeting.updated_at = datetime.now()
+                await self.db.commit()
+                logger.info(f"✅ Contador actualizado: {meeting.int_total_invitated} invitados")
+            
+            # Enviar correos de invitación a los usuarios exitosos
+            if results["invitations_created"] > 0 and meeting:
+                try:
+                    email_service = EmailService(self.db)
+                    # Obtener los IDs de usuarios que recibieron invitación exitosamente
+                    successful_user_ids = []
+                    for user_id in user_ids:
+                        # Verificar si la invitación fue exitosa (no está en los errores)
+                        user_has_error = any(str(user_id) in err for err in results.get("errors", []))
+                        if not user_has_error:
+                            successful_user_ids.append(user_id)
+                    
+                    if successful_user_ids:
+                        email_stats = await email_service.send_meeting_invitation(
+                            db=self.db,
+                            meeting_id=meeting_id,
+                            user_ids=successful_user_ids
+                        )
+                        logger.info(f"📧 Correos de invitación enviados: {email_stats}")
+                except Exception as email_error:
+                    logger.warning(f"⚠️ Error al enviar correos de invitación: {email_error}")
+            
+            logger.info(
+                f"📊 Batch completado - Total: {len(user_ids)}, "
+                f"Exitosas: {results['successful']}, Fallidas: {results['failed']}"
+            )
+            
+            return results
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"❌ Error al crear invitaciones batch: {e}")
             raise

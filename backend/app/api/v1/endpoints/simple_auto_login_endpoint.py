@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.schemas.responses_schema import SuccessResponse
 from app.services.simple_auto_login_service import simple_auto_login_service
 from app.services.user_service import UserService
+from app.services.meeting_service import MeetingService
 from app.auth.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.core.security import security_manager
 from app.core.logging_config import get_logger
@@ -122,22 +123,54 @@ async def auto_login_simple(
             f"username={user.str_username}, role={user.rol.str_name}"
         )
         
+        # Registro automatico de asistencia para copropietarios (rol 3) e invitados (rol 4)
+        # Si hay una reunion presencial "En Curso" en su unidad residencial y tienen invitacion
+        attendance_registered = None
+        if user.int_id_rol in (3, 4):
+            try:
+                meeting_service = MeetingService(db)
+                attendance_registered = await meeting_service.auto_register_attendance_on_login(user.id)
+                if attendance_registered and attendance_registered.get("registered"):
+                    if attendance_registered.get("already_registered"):
+                        logger.info(
+                            f"Auto-attendance: Usuario {user.id} ya estaba registrado "
+                            f"en reunion {attendance_registered.get('meeting_id')}"
+                        )
+                    else:
+                        logger.info(
+                            f"Auto-attendance: Asistencia registrada automaticamente "
+                            f"para usuario {user.id} en reunion {attendance_registered.get('meeting_id')}"
+                        )
+            except Exception as e:
+                # No interrumpir el auto-login si falla el registro de asistencia
+                logger.warning(
+                    f"Auto-attendance: Error al intentar registro automatico "
+                    f"para usuario {user.id}: {str(e)}"
+                )
+                attendance_registered = None
+        
+        response_data = {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "username": user.str_username,
+                "role": user.rol.str_name,
+                "name": full_name,
+                "email": email
+            },
+            "auto_login": True
+        }
+        
+        # Incluir info de asistencia si se registro
+        if attendance_registered and attendance_registered.get("registered"):
+            response_data["attendance_registered"] = attendance_registered
+        
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
             message="Autenticación exitosa",
-            data={
-                "access_token": access_token,
-                "token_type": "bearer",
-                "user": {
-                    "id": user.id,
-                    "username": user.str_username,
-                    "role": user.rol.str_name,
-                    "name": full_name,
-                    "email": email
-                },
-                "auto_login": True
-            }
+            data=response_data
         )
         
     except HTTPException:

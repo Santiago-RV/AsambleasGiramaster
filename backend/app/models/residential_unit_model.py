@@ -29,6 +29,6 @@ class ResidentialUnitModel(Base):
     updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
 
     # Relationships
-    meetings = relationship("MeetingModel", back_populates="residential_unit", cascade="all, delete-orphan")
+    meetings = relationship("MeetingModel", back_populates="residential_unit", cascade="all, delete-orphan", passive_deletes=True)
     creator = relationship("UserModel", foreign_keys=[created_by], lazy="selectin")
     updater = relationship("UserModel", foreign_keys=[updated_by], lazy="selectin")

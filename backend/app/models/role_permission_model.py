@@ -11,3 +11,8 @@ class RolePermissionModel(Base):
     int_permission_id = Column(Integer, ForeignKey("tbl_permissions.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     granted_at = Column(DateTime, default=datetime.now)
     granted_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
+
+    # Relationships
+    rol = relationship("RolModel", backref="role_permissions", lazy="selectin")
+    permission = relationship("PermissionModel", backref="role_permissions", lazy="selectin")
+    granted_by_user = relationship("UserModel", foreign_keys=[granted_by], lazy="selectin")

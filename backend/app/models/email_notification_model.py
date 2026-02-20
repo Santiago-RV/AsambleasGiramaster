@@ -14,3 +14,7 @@ class EmailNotificationModel(Base):
     dat_sent_at = Column(DateTime, nullable=True)  # Permite NULL, se llena cuando status="sent"
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Relationships
+    user = relationship("UserModel", back_populates="email_notifications")
+    meeting = relationship("MeetingModel", foreign_keys=[int_meeting_id])

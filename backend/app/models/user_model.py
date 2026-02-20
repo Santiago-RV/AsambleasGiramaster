@@ -23,7 +23,8 @@ class UserModel(Base):
     rol = relationship("RolModel", back_populates="users")
 
     # Relationships for cascade delete
-    email_notifications = relationship("EmailNotificationModel", cascade="all, delete-orphan", passive_deletes=True)
-    meeting_invitations = relationship("MeetingInvitationModel", foreign_keys="MeetingInvitationModel.int_user_id", cascade="all, delete-orphan", passive_deletes=True)
-    meeting_attendances = relationship("MeetingAttendanceModel", cascade="all, delete-orphan", passive_deletes=True)
-    poll_responses = relationship("PollResponseModel", cascade="all, delete-orphan", passive_deletes=True)
+    email_notifications = relationship("EmailNotificationModel", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    meeting_invitations = relationship("MeetingInvitationModel", foreign_keys="MeetingInvitationModel.int_user_id", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    meeting_attendances = relationship("MeetingAttendanceModel", foreign_keys="MeetingAttendanceModel.int_user_id", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    poll_responses = relationship("PollResponseModel", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    user_residential_units = relationship("UserResidentialUnitModel", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)

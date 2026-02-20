@@ -43,13 +43,41 @@ const AutoLogin = () => {
         const response = await publicAxios.get(`/auth/auto-login/${token}`);
 
         if (response.data.success) {
-          const { access_token, user } = response.data.data;
+          const { access_token, user, attendance_registered } = response.data.data;
 
           // Guardar token y datos del usuario en localStorage
           localStorage.setItem('access_token', access_token);
           localStorage.setItem('user', JSON.stringify(user));
 
           setStatus('success');
+
+          // Construir mensaje de asistencia si se registro automaticamente
+          let attendanceHtml = '';
+          if (attendance_registered && attendance_registered.registered) {
+            if (attendance_registered.already_registered) {
+              attendanceHtml = `
+                <div style="background-color: #fff3cd; padding: 12px; border-radius: 8px; border-left: 4px solid #ffc107; margin-top: 12px;">
+                  <p style="margin: 4px 0; color: #856404; font-size: 14px;">
+                    <strong>Ya registrado en reunion presencial:</strong>
+                  </p>
+                  <p style="margin: 4px 0; color: #856404; font-size: 13px;">
+                    ${attendance_registered.meeting_title}
+                  </p>
+                </div>
+              `;
+            } else {
+              attendanceHtml = `
+                <div style="background-color: #d4edda; padding: 12px; border-radius: 8px; border-left: 4px solid #28a745; margin-top: 12px;">
+                  <p style="margin: 4px 0; color: #155724; font-size: 14px;">
+                    <strong>Asistencia registrada automaticamente</strong>
+                  </p>
+                  <p style="margin: 4px 0; color: #155724; font-size: 13px;">
+                    Reunion: ${attendance_registered.meeting_title}
+                  </p>
+                </div>
+              `;
+            }
+          }
 
           // Mostrar mensaje de éxito
           await Swal.fire({
@@ -66,12 +94,13 @@ const AutoLogin = () => {
                     <strong>Rol:</strong> ${user.role}
                   </p>
                 </div>
+                ${attendanceHtml}
                 <p style="margin-top: 8px; color: #7f8c8d; font-size: 12px;">
                   Serás redirigido al sistema en un momento...
                 </p>
               </div>
             `,
-            timer: 2000,
+            timer: attendance_registered?.registered ? 3500 : 2000,
             timerProgressBar: true,
             showConfirmButton: false,
           });
