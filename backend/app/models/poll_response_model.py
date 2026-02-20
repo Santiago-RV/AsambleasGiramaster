@@ -22,3 +22,4 @@ class PollResponseModel(Base):
 
     poll = relationship("PollModel", back_populates="responses")
     option = relationship("PollOptionModel", back_populates="responses")
+    user = relationship("UserModel", back_populates="poll_responses")

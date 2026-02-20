@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
+import Modal from './Modal';
 import { jsPDF } from 'jspdf';
 import QRCodeLib from 'qrcode';
 import { useQuery } from '@tanstack/react-query';
 import { UserService } from '../../services/api/UserService';
+import { MeetingService } from '../../services/api/MeetingService';
 import logoGiramaster from '../../assets/logo-giramaster.jpeg';
 
 /**
@@ -29,6 +31,10 @@ const ResidentsList = ({
 	showSearch = false, // Nueva prop para mostrar/ocultar barra de búsqueda
 	title = "Residentes", // Título personalizable
 	isSuperAdmin = false, // Si es SuperAdmin puede gestionar acceso de todos
+	// Props para invitación a reuniones
+	showInviteButton = false, // Mostrar botón de invitación
+	residentialUnitId = null, // ID de la unidad residencial
+	onInviteToMeeting = null, // Función callback para invitar a reunión
 }) => {
 	const [selectedResidents, setSelectedResidents] = useState([]);
 	const [selectAll, setSelectAll] = useState(false);
@@ -40,6 +46,13 @@ const ResidentsList = ({
 	const [autoLoginUrl, setAutoLoginUrl] = useState('');
 	const [isSendingQRs, setIsSendingQRs] = useState(false);
 	const menuButtonRefs = useRef({});
+
+	// Estado para modal de invitación a reunión
+	const [showInviteModal, setShowInviteModal] = useState(false);
+	const [scheduledMeetings, setScheduledMeetings] = useState([]);
+	const [selectedMeeting, setSelectedMeeting] = useState('');
+	const [loadingMeetings, setLoadingMeetings] = useState(false);
+	const [inviting, setInviting] = useState(false);
 
 	// Obtener datos del usuario actual para nombre de unidad residencial
 	const { data: userData } = useQuery({
@@ -589,6 +602,87 @@ const ResidentsList = ({
 		}
 	};
 
+	// ========== FUNCIONES DE INVITACIÓN A REUNIONES ==========
+	
+	// Cargar reuniones programadas
+	const loadScheduledMeetings = async () => {
+		if (!residentialUnitId) return;
+		
+		setLoadingMeetings(true);
+		try {
+			const response = await MeetingService.getMeetingsByResidentialUnit(residentialUnitId);
+			if (response.success && response.data) {
+				const programmed = response.data.filter((m) => m.str_status === 'Programada');
+				setScheduledMeetings(programmed);
+			}
+		} catch (err) {
+			console.error('Error al cargar reuniones:', err);
+		} finally {
+			setLoadingMeetings(false);
+		}
+	};
+
+	// Abrir modal de invitación
+	const handleOpenInviteModal = async () => {
+		setSelectedMeeting('');
+		await loadScheduledMeetings();
+		setShowInviteModal(true);
+	};
+
+	// Cerrar modal de invitación
+	const handleCloseInviteModal = () => {
+		setShowInviteModal(false);
+		setSelectedMeeting('');
+	};
+
+	// Enviar invitaciones
+	const handleSendInvitations = async () => {
+		if (!selectedMeeting || selectedResidents.length === 0) {
+			Swal.fire({
+				icon: 'warning',
+				title: 'Validación',
+				text: 'Por favor seleccione una reunión y al menos un residente',
+			});
+			return;
+		}
+
+		setInviting(true);
+		try {
+			const response = await MeetingService.createBatchInvitations(
+				parseInt(selectedMeeting),
+				selectedResidents
+			);
+
+			if (response.success) {
+				Swal.fire({
+					icon: 'success',
+					title: 'Invitaciones Enviadas',
+					html: `
+						<div class="text-center">
+							<p class="mb-2">Se crearon <strong>${response.data?.invitations_created || 0}</strong> invitaciones</p>
+							${response.data?.failed > 0 ? `<p class="text-red-500">Fallidas: ${response.data.failed}</p>` : ''}
+						</div>
+					`,
+				});
+				handleCloseInviteModal();
+				if (onInviteToMeeting) {
+					onInviteToMeeting();
+				}
+			} else {
+				throw new Error(response.message || 'Error al enviar invitaciones');
+			}
+		} catch (err) {
+			console.error('Error al enviar invitaciones:', err);
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: err.response?.data?.message || err.message || 'Error al enviar invitaciones',
+			});
+		} finally {
+			setInviting(false);
+		}
+	};
+
 	const handleGenerateQR = async (resident) => {
 		try {
 			// Mostrar loading
@@ -754,78 +848,69 @@ const ResidentsList = ({
 			style={{ maxHeight: '700px' }}
 		>
 			<div className="p-6 border-b border-gray-200 shrink-0">
-				<div className="flex items-center justify-between mb-4">
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
 					<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
 						<UsersIcon size={24} />
 						{title} ({filteredResidents?.length || 0})
 					</h2>
 
-					{/* Botones de acción masiva */}
+					{/* Barra de acciones masivas - solo visible cuando hay selección */}
 					{selectedResidents.length > 0 && (
-						<div className="flex flex-col gap-2">
-
-							{/* Contador mobile */}
-							<span className="md:hidden text-sm font-semibold text-gray-700">
-								({selectedResidents.length} seleccionados)
-							</span>
-
-							{/* Acciones */}
-							<div className="grid grid-cols-2 gap-3 md:flex md:flex-row md:items-center md:gap-2">
-
-								{/* Contador desktop */}
-								<span className="hidden md:inline text-sm font-semibold text-gray-700 mr-2">
-									({selectedResidents.length} seleccionados)
+						<div className="flex flex-col gap-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
+							{/* Primera fila: contador y botón de limpiar */}
+							<div className="flex items-center justify-between gap-2">
+								<span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+									{selectedResidents.length} seleccionado(s)
 								</span>
+								<button
+									onClick={() => setSelectedResidents([])}
+									className="text-xs text-red-500 hover:text-red-700 font-medium"
+								>
+									Limpiar selección
+								</button>
+							</div>
 
-								{/* Botón de envío masivo de credenciales */}
+							{/* Segunda fila: botones de acciones */}
+							<div className="flex flex-wrap gap-2">
+								{/* Botón enviar credenciales */}
 								<button
 									onClick={handleSendBulkCredentials}
 									disabled={isSendingBulk}
-									className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50"
+									className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-xs font-medium disabled:opacity-50"
+									title="Enviar credenciales por correo"
 								>
 									{isSendingBulk ? (
-										<>
-											<svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-												<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-											</svg>
-											<span className="hidden sm:inline">Enviando...</span>
-										</>
+										<svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+											<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+										</svg>
 									) : (
-										<>
-											<Send size={16} />
-											<span className="hidden sm:inline">Enviar Credenciales</span>
-										</>
+										<Send size={14} />
 									)}
+									<span>Credenciales</span>
 								</button>
 
-								{/* Botón de generación masiva de PDF con QRs */}
+								{/* Botón generar PDF QRs */}
 								<button
 									onClick={handleGenerateBulkQRsPDF}
 									disabled={isSendingQRs}
-									className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm disabled:opacity-50"
-									title="Generar documento PDF con códigos QR (4 por página)"
+									className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors text-xs font-medium disabled:opacity-50"
+									title="Generar PDF con códigos QR"
 								>
 									{isSendingQRs ? (
-										<>
-											<svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-												<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-											</svg>
-											<span className="hidden sm:inline">Generando...</span>
-										</>
+										<svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+											<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+										</svg>
 									) : (
-										<>
-											<QrCode size={16} />
-											<span className="hidden sm:inline">Generar PDF QRs</span>
-										</>
+										<QrCode size={14} />
 									)}
+									<span>PDF QRs</span>
 								</button>
 
-								{/* Botón para habilitar acceso masivo - filtra solo residentes modificables */}
+								{/* Botón habilitar acceso */}
 								<button
 									onClick={() => {
-										// Filtrar solo los residentes que el usuario puede modificar
 										const modifiableResidents = selectedResidents.filter((id) => {
 											const resident = filteredResidents.find((r) => r.id === id);
 											return resident && canToggleAccess(resident);
@@ -841,17 +926,16 @@ const ResidentsList = ({
 											});
 										}
 									}}
-									className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
+									className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors text-xs font-medium"
 									title="Habilitar acceso"
 								>
-									<Shield size={16} />
-									<span className="hidden sm:inline">Habilitar</span>
+									<Shield size={14} />
+									<span>Habilitar</span>
 								</button>
 
-								{/* Botón para deshabilitar acceso masivo - filtra solo residentes modificables */}
+								{/* Botón deshabilitar acceso */}
 								<button
 									onClick={() => {
-										// Filtrar solo los residentes que el usuario puede modificar
 										const modifiableResidents = selectedResidents.filter((id) => {
 											const resident = filteredResidents.find((r) => r.id === id);
 											return resident && canToggleAccess(resident);
@@ -867,12 +951,24 @@ const ResidentsList = ({
 											});
 										}
 									}}
-									className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
+									className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-xs font-medium"
 									title="Deshabilitar acceso"
 								>
-									<ShieldOff size={16} />
-									<span className="hidden sm:inline">Deshabilitar</span>
+									<ShieldOff size={14} />
+									<span>Deshabilitar</span>
 								</button>
+
+								{/* Botón invitar a reunión - solo si showInviteButton es true */}
+								{showInviteButton && (
+									<button
+										onClick={handleOpenInviteModal}
+										className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors text-xs font-medium"
+										title="Invitar a reunión programada"
+									>
+										<Calendar size={14} />
+										<span>Invitar</span>
+									</button>
+								)}
 							</div>
 						</div>
 					)}
@@ -1097,21 +1193,124 @@ const ResidentsList = ({
 				/>
 			)}
 
-			{/* Modal de QR Code */}
-			{selectedResidentForQR && (
-				<QRCodeModal
-					resident={selectedResidentForQR}
-					isOpen={qrModalOpen}
-					onClose={() => {
-						setQrModalOpen(false);
-						setSelectedResidentForQR(null);
-						setAutoLoginUrl('');
-					}}
-					autoLoginUrl={autoLoginUrl}
-				/>
-			)}
-		</div>
-	);
+				{/* Modal de QR Code */}
+				{selectedResidentForQR && (
+					<QRCodeModal
+						resident={selectedResidentForQR}
+						isOpen={qrModalOpen}
+						onClose={() => {
+							setQrModalOpen(false);
+							setSelectedResidentForQR(null);
+							setAutoLoginUrl('');
+						}}
+						autoLoginUrl={autoLoginUrl}
+					/>
+				)}
+
+				{/* Modal de Invitación a Reunión */}
+				{showInviteButton && (
+					<Modal
+						isOpen={showInviteModal}
+						onClose={handleCloseInviteModal}
+						title="Invitar a Reunión"
+						size="md"
+					>
+						<div className="space-y-4">
+							{/* Información de selección */}
+							<div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+								<p className="text-blue-800 text-sm">
+									<strong>{selectedResidents.length}</strong> residente(s) seleccionado(s)
+								</p>
+							</div>
+
+							{/* Selector de reunión */}
+							<div>
+								<label className="block text-sm font-semibold text-gray-700 mb-2">
+									Seleccionar Reunión Programada
+								</label>
+								{loadingMeetings ? (
+									<div className="flex items-center justify-center py-4">
+										<div className="animate-spin h-5 w-5 border-2 border-[#3498db] border-t-transparent rounded-full"></div>
+										<span className="ml-2 text-gray-600 text-sm">Cargando reuniones...</span>
+									</div>
+								) : scheduledMeetings.length === 0 ? (
+									<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+										<p className="text-yellow-800 text-sm">
+											No hay reuniones programadas para esta unidad residencial.
+										</p>
+									</div>
+								) : (
+									<select
+										value={selectedMeeting}
+										onChange={(e) => setSelectedMeeting(e.target.value)}
+										className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent text-sm"
+									>
+										<option value="">-- Seleccione una reunión --</option>
+										{scheduledMeetings.map((meeting) => (
+											<option key={meeting.id} value={meeting.id}>
+												{meeting.str_title} - {new Date(meeting.dat_schedule_date).toLocaleString()}
+											</option>
+										))}
+									</select>
+								)}
+							</div>
+
+							{/* Lista de residentes seleccionados */}
+							{selectedResidents.length > 0 && (
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Residentes a invitar:
+									</label>
+									<div className="bg-gray-50 border border-gray-200 rounded-lg p-2 max-h-32 overflow-y-auto">
+										<ul className="space-y-1">
+											{residents
+												.filter((r) => selectedResidents.includes(r.id))
+												.map((r) => (
+													<li key={r.id} className="flex items-center gap-2 text-xs text-gray-700">
+														<span className="text-green-500">✓</span>
+														{r.firstname} {r.lastname} - {r.apartment_number}
+													</li>
+												))}
+										</ul>
+									</div>
+								</div>
+							)}
+
+							{/* Botones de acción */}
+							<div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
+								<button
+									onClick={handleCloseInviteModal}
+									className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+								>
+									Cancelar
+								</button>
+								<button
+									onClick={handleSendInvitations}
+									disabled={!selectedMeeting || selectedResidents.length === 0 || inviting}
+									className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+										selectedMeeting && selectedResidents.length > 0 && !inviting
+											? 'bg-green-500 text-white hover:bg-green-600'
+											: 'bg-gray-200 text-gray-400 cursor-not-allowed'
+									}`}
+								>
+									{inviting ? (
+										<>
+											<div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+											Enviando...
+										</>
+									) : (
+										<>
+											<Send size={16} />
+											Enviar Invitaciones
+										</>
+									)}
+								</button>
+							</div>
+						</div>
+					</Modal>
+				)}
+			</div>
+		);
 };
 
 export default ResidentsList;

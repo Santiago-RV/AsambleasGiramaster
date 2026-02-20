@@ -582,6 +582,9 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
               });
             }}
             isSendingBulk={sendBulkCredentialsMutation.isPending}
+            showInviteButton={true}
+            residentialUnitId={residentialUnitId}
+            onInviteToMeeting={() => {}}
           />
         </div>
 

@@ -11,6 +11,7 @@ import time
 from app.models.meeting_model import MeetingModel
 from app.models.residential_unit_model import ResidentialUnitModel
 from app.models.meeting_invitation_model import MeetingInvitationModel
+from app.models.meeting_attendance_model import MeetingAttendanceModel
 from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.user_model import UserModel
 from app.models.data_user_model import DataUserModel
@@ -450,6 +451,9 @@ class MeetingService:
         Finaliza una reunión.
         Solo cambia el estado si la reunión está 'En Curso'.
         Si ya está 'Completada', simplemente retorna la reunión sin modificar.
+        
+        Para reuniones presenciales, actualiza dat_left_at y calcula la duración
+        en todos los registros de MeetingAttendanceModel.
         """
         try:
             meeting = await self.get_meeting_by_id(meeting_id)
@@ -460,6 +464,10 @@ class MeetingService:
                 meeting.dat_actual_end_time = datetime.now()
                 meeting.updated_at = datetime.now()
                 meeting.updated_by = user_id
+
+                # Si es reunion presencial, actualizar asistencias
+                if meeting.str_modality == "presencial":
+                    await self._finalize_presential_attendances(meeting_id, meeting.dat_actual_end_time)
 
                 await self.db.commit()
                 await self.db.refresh(meeting)
@@ -477,6 +485,50 @@ class MeetingService:
                 message=f"Error al finalizar la reunión: {str(e)}",
                 details={"original_error": str(e)}
             )
+
+    async def _finalize_presential_attendances(self, meeting_id: int, end_time: datetime) -> int:
+        """
+        Actualiza dat_left_at y calcula la duración para todos los registros
+        de asistencia de una reunión presencial que se está finalizando.
+        
+        Args:
+            meeting_id: ID de la reunión
+            end_time: Hora de finalización de la reunión
+            
+        Returns:
+            int: Número de registros actualizados
+        """
+        try:
+            # Buscar todos los registros de asistencia de la reunión
+            attendances_query = select(MeetingAttendanceModel).where(
+                MeetingAttendanceModel.int_meeting_id == meeting_id
+            )
+            result = await self.db.execute(attendances_query)
+            attendances = result.scalars().all()
+            
+            updated_count = 0
+            for attendance in attendances:
+                # Actualizar hora de salida
+                attendance.dat_left_at = end_time
+                
+                # Calcular duración en minutos
+                if attendance.dat_joined_at:
+                    duration = (end_time - attendance.dat_joined_at).total_seconds() / 60
+                    attendance.int_total_duration_minutes = int(duration)
+                else:
+                    attendance.int_total_duration_minutes = 0
+                
+                updated_count += 1
+            
+            logger.info(
+                f"✅ Finalizadas {updated_count} asistencias para reunión presencial {meeting_id}"
+            )
+            
+            return updated_count
+            
+        except Exception as e:
+            logger.error(f"Error al finalizar asistencias: {str(e)}")
+            raise
 
     async def register_attendance(self, meeting_id: int, user_id: int) -> dict:
         """
@@ -781,3 +833,183 @@ class MeetingService:
                 message=f"Error al registrar asistencia por QR: {str(e)}",
                 details={"original_error": str(e)}
             )
+
+    async def auto_register_attendance_on_login(self, user_id: int) -> Optional[dict]:
+        """
+        Registra automaticamente la asistencia de un usuario al hacer auto-login via QR,
+        si existe una reunion presencial "En Curso" en su unidad residencial.
+        
+        Si el usuario no tiene invitacion, la crea automaticamente.
+        Tambien crea un registro en tbl_meeting_attendances para consistencia.
+        
+        Este metodo es tolerante a fallos: si algo sale mal, retorna None
+        en lugar de lanzar excepciones, para no interrumpir el flujo de auto-login.
+        
+        Args:
+            user_id: ID del usuario que se esta auto-logeando
+            
+        Returns:
+            dict con info de la reunion y asistencia si se registro, None si no aplica
+        """
+        try:
+            # 1. Obtener la unidad residencial del usuario
+            user_unit_query = select(UserResidentialUnitModel).where(
+                UserResidentialUnitModel.int_user_id == user_id
+            )
+            user_unit_result = await self.db.execute(user_unit_query)
+            user_unit = user_unit_result.scalar_one_or_none()
+            
+            if not user_unit:
+                logger.debug(f"Auto-attendance: Usuario {user_id} no tiene unidad residencial asignada")
+                return None
+            
+            residential_unit_id = user_unit.int_residential_unit_id
+            
+            # 2. Buscar reunion presencial "En Curso" para esa unidad residencial
+            meeting_query = select(MeetingModel).where(
+                MeetingModel.int_id_residential_unit == residential_unit_id,
+                MeetingModel.str_status == "En Curso",
+                MeetingModel.str_modality == "presencial"
+            )
+            meeting_result = await self.db.execute(meeting_query)
+            active_meeting = meeting_result.scalar_one_or_none()
+            
+            if not active_meeting:
+                logger.debug(f"Auto-attendance: No hay reunion presencial activa para unidad {residential_unit_id}")
+                return None
+            
+            # 3. Verificar si el usuario ya tiene invitacion para esta reunion
+            invitation_query = select(MeetingInvitationModel).where(
+                MeetingInvitationModel.int_meeting_id == active_meeting.id,
+                MeetingInvitationModel.int_user_id == user_id
+            )
+            invitation_result = await self.db.execute(invitation_query)
+            invitation = invitation_result.scalar_one_or_none()
+            
+            # 4. Si no tiene invitacion, crearla automaticamente
+            if not invitation:
+                voting_weight = user_unit.dec_default_voting_weight or Decimal("1.0")
+                
+                invitation = MeetingInvitationModel(
+                    int_meeting_id=active_meeting.id,
+                    int_user_id=user_id,
+                    dec_voting_weight=voting_weight,
+                    dec_quorum_base=voting_weight,
+                    str_apartment_number=user_unit.str_apartment_number or "N/A",
+                    str_invitation_status="pending",
+                    str_response_status="no_response",
+                    dat_sent_at=datetime.now(),
+                    int_delivery_attemps=0,
+                    bln_will_attend=True,
+                    bln_actually_attended=False,
+                    created_by=user_id,
+                    updated_by=user_id
+                )
+                self.db.add(invitation)
+                await self.db.flush()
+                
+                logger.info(
+                    f"Auto-attendance: Invitacion creada automaticamente para usuario {user_id} "
+                    f"en reunion {active_meeting.id}"
+                )
+            
+            # 5. Registrar asistencia solo si no se ha registrado antes
+            # Verificar en tbl_meeting_invitations
+            if invitation.dat_joined_at is not None:
+                logger.info(
+                    f"Auto-attendance: Usuario {user_id} ya registrado en reunion "
+                    f"{active_meeting.id} desde {invitation.dat_joined_at}"
+                )
+                return {
+                    "registered": True,
+                    "already_registered": True,
+                    "meeting_id": active_meeting.id,
+                    "meeting_title": active_meeting.str_title,
+                    "meeting_type": active_meeting.str_meeting_type,
+                    "joined_at": invitation.dat_joined_at.isoformat()
+                }
+            
+            # 5.1 Verificar si ya existe registro en tbl_meeting_attendances
+            existing_attendance_query = select(MeetingAttendanceModel).where(
+                MeetingAttendanceModel.int_meeting_id == active_meeting.id,
+                MeetingAttendanceModel.int_user_id == user_id
+            )
+            existing_attendance_result = await self.db.execute(existing_attendance_query)
+            existing_attendance = existing_attendance_result.scalar_one_or_none()
+            
+            if existing_attendance:
+                logger.info(
+                    f"Auto-attendance: Usuario {user_id} ya tiene registro de asistencia "
+                    f"en tbl_meeting_attendances para reunion {active_meeting.id}"
+                )
+                # Actualizar la invitación también
+                invitation.dat_joined_at = existing_attendance.dat_joined_at
+                invitation.bln_actually_attended = True
+                invitation.str_response_status = "attended"
+                invitation.updated_at = datetime.now()
+                await self.db.commit()
+                return {
+                    "registered": True,
+                    "already_registered": True,
+                    "meeting_id": active_meeting.id,
+                    "meeting_title": active_meeting.str_title,
+                    "meeting_type": active_meeting.str_meeting_type,
+                    "joined_at": existing_attendance.dat_joined_at.isoformat()
+                }
+            
+            # 6. Registrar la asistencia en la invitacion
+            now = datetime.now()
+            invitation.dat_joined_at = now
+            invitation.bln_actually_attended = True
+            invitation.str_response_status = "attended"
+            invitation.str_invitation_status = "attended"
+            invitation.updated_at = now
+            invitation.updated_by = user_id
+            
+            # 7. Crear registro en tbl_meeting_attendances para consistencia
+            attendance = MeetingAttendanceModel(
+                int_meeting_id=active_meeting.id,
+                int_user_id=user_id,
+                str_attendance_type="presencial",
+                dec_voting_weight=invitation.dec_voting_weight,
+                dat_joined_at=now,
+                # dat_left_at queda NULL hasta que el admin finalize la reunion
+                int_total_duration_minutes=0,  # Se calcula al finalizar
+                bln_is_present=True,
+                bln_left_early=False,
+                int_rejoined_count=0
+            )
+            self.db.add(attendance)
+            
+            await self.db.commit()
+            await self.db.refresh(invitation)
+            await self.db.refresh(attendance)
+            
+            logger.info(
+                f"Auto-attendance: Asistencia registrada automaticamente - "
+                f"Usuario {user_id} en reunion presencial {active_meeting.id} "
+                f"({active_meeting.str_title}) a las {invitation.dat_joined_at}. "
+                f"Attendance ID: {attendance.id}"
+            )
+            
+            return {
+                "registered": True,
+                "already_registered": False,
+                "meeting_id": active_meeting.id,
+                "meeting_title": active_meeting.str_title,
+                "meeting_type": active_meeting.str_meeting_type,
+                "joined_at": invitation.dat_joined_at.isoformat(),
+                "attendance_id": attendance.id
+            }
+            
+        except Exception as e:
+            # No propagamos la excepcion para no interrumpir el auto-login
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
+            logger.error(
+                f"Auto-attendance: Error al registrar asistencia automatica "
+                f"para usuario {user_id}: {str(e)}"
+            )
+            return None

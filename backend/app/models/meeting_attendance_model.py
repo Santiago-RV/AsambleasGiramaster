@@ -12,14 +12,15 @@ class MeetingAttendanceModel(Base):
     str_attendance_type = Column(String(50), index=True, nullable=False)
     dec_voting_weight = Column(Numeric, nullable=False)
     dat_joined_at = Column(DateTime, nullable=False)
-    dat_left_at = Column(DateTime, nullable=False)
-    int_total_duration_minutes = Column(Integer, nullable=False)
+    dat_left_at = Column(DateTime, nullable=True, default=None)  # NULL hasta que el usuario sale
+    int_total_duration_minutes = Column(Integer, nullable=False, default=0)
     bln_is_present = Column(Boolean, default=False)
     bln_left_early = Column(Boolean, default=False)
-    int_rejoined_count = Column(Integer, nullable=False)
+    int_rejoined_count = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     # Relationships
     meeting = relationship("MeetingModel", back_populates="attendances")
+    user = relationship("UserModel", foreign_keys=[int_user_id], back_populates="meeting_attendances")

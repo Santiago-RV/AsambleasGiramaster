@@ -9,12 +9,14 @@ from .user_residential_unit_model import UserResidentialUnitModel
 from .meeting_model import MeetingModel
 from .meeting_invitation_model import MeetingInvitationModel
 from .meeting_attendance_model import MeetingAttendanceModel
+from .delegation_history_model import DelegationHistoryModel
 from .zoom_session_model import ZoomSessionModel
 from .poll_model import PollModel
 from .poll_option_model import PollOptionModel
 from .poll_response_model import PollResponseModel
 from .email_notification_model import EmailNotificationModel
 from .audit_log_model import AuditLogModel
+from .system_config_model import SystemConfigModel
 
 __all__ = [
     "DataUserModel",
@@ -27,10 +29,12 @@ __all__ = [
     "MeetingModel",
     "MeetingInvitationModel",
     "MeetingAttendanceModel",
+    "DelegationHistoryModel",
     "ZoomSessionModel",
     "PollModel",
     "PollOptionModel",
     "PollResponseModel",
     "EmailNotificationModel",
-    "AuditLogModel"
+    "AuditLogModel",
+    "SystemConfigModel"
 ]

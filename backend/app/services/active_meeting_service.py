@@ -188,13 +188,13 @@ class ActiveMeetingService:
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
             .join(
                 UserResidentialUnitModel,
-                UserModel.id == UserResidentialUnitModel.int_id_users
+                UserModel.id == UserResidentialUnitModel.int_user_id
             )
             .where(
                 and_(
-                    UserResidentialUnitModel.int_id_residential_units == unit_id,
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
                     UserResidentialUnitModel.bool_is_admin == True,
-                    UserResidentialUnitModel.bln_allow_entry == True
+                    UserModel.bln_allow_entry == True
                 )
             )
         )

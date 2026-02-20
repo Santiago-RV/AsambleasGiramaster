@@ -63,13 +63,15 @@ class MeetingModel(Base):
 
     # === RELACIONES ===
     residential_unit = relationship("ResidentialUnitModel", back_populates="meetings")
-    polls = relationship("PollModel", back_populates="meeting", cascade="all, delete-orphan")
-    invitations = relationship("MeetingInvitationModel", back_populates="meeting", cascade="all, delete-orphan")
-    attendances = relationship("MeetingAttendanceModel", back_populates="meeting", cascade="all, delete-orphan")
+    polls = relationship("PollModel", back_populates="meeting", cascade="all, delete-orphan", passive_deletes=True)
+    invitations = relationship("MeetingInvitationModel", back_populates="meeting", cascade="all, delete-orphan", passive_deletes=True)
+    attendances = relationship("MeetingAttendanceModel", back_populates="meeting", cascade="all, delete-orphan", passive_deletes=True)
+    zoom_sessions = relationship("ZoomSessionModel", back_populates="meeting", cascade="all, delete-orphan", passive_deletes=True)
     delegation_history = relationship(
         "DelegationHistoryModel", 
         back_populates="meeting", 
         cascade="all, delete-orphan",
+        passive_deletes=True,
         doc="Histórico completo de todas las delegaciones de poder realizadas en esta reunión"
     )
 

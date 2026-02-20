@@ -129,4 +129,20 @@ export class MeetingService {
     );
     return response.data;
   }
+
+  /**
+   * Crear múltiples invitaciones a una reunión
+   * @param {number} meetingId - ID de la reunión
+   * @param {number[]} userIds - Lista de IDs de usuarios a invitar
+   */
+  static async createBatchInvitations(meetingId, userIds) {
+    const response = await axiosInstance.post(
+      '/meeting-invitations/invitations/batch',
+      {
+        int_meeting_id: meetingId,
+        user_ids: userIds
+      }
+    );
+    return response.data;
+  }
 }

@@ -19,4 +19,4 @@ class PollOptionModel(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     poll = relationship("PollModel", back_populates="options")
-    responses = relationship("PollResponseModel", back_populates="option", cascade="all, delete-orphan")
+    responses = relationship("PollResponseModel", back_populates="option", cascade="all, delete-orphan", passive_deletes=True)
