@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar, FileSpreadsheet } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import logoGiramaster from '../../assets/logo-giramaster.jpeg';
+import * as XLSX from 'xlsx';
 
 /**
  * Componente reutilizable para mostrar lista de residentes
@@ -602,12 +603,119 @@ const ResidentsList = ({
 		}
 	};
 
+	const handleDownloadExcel = async () => {
+		if (selectedResidents.length === 0) {
+			Swal.fire({
+				icon: 'warning',
+				title: 'Sin selección',
+				text: 'Por favor, selecciona al menos un residente para generar el Excel.',
+				confirmButtonColor: '#3498db',
+			});
+			return;
+		}
+
+		const result = await Swal.fire({
+			title: '¿Descargar Excel con tokens QR?',
+			html: `Se generará un Excel con <strong>${selectedResidents.length}</strong> residente(s).<br/>
+               <small style="color:#888">⚠️ Esto regenerará los tokens de acceso de los seleccionados.</small>`,
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonColor: '#16a34a',
+			cancelButtonColor: '#6b7280',
+			confirmButtonText: 'Sí, descargar',
+			cancelButtonText: 'Cancelar'
+		});
+
+		if (!result.isConfirmed) return;
+
+		Swal.fire({
+			title: 'Generando tokens...',
+			html: 'Espera mientras se generan los tokens de acceso...',
+			allowOutsideClick: false,
+			allowEscapeKey: false,
+			didOpen: () => Swal.showLoading(),
+		});
+
+		try {
+			const token = localStorage.getItem('access_token');
+			if (!token) throw new Error('No hay token de autenticación.');
+
+			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+			const response = await fetch(`${apiUrl}/residents/generate-qr-bulk-simple`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${token}`
+				},
+				body: JSON.stringify({
+					user_ids: selectedResidents,
+					expiration_hours: 48
+				})
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.detail || `Error HTTP ${response.status}`);
+			}
+
+			const data = await response.json();
+			const tokens = data.data?.qr_tokens || [];
+
+			if (!tokens.length) throw new Error('No se obtuvieron datos del servidor.');
+
+			// Construir filas del Excel
+			const rows = tokens.map((item) => ({
+				'Nombre': `${item.firstname || ''} ${item.lastname || ''}`.trim(),
+				'Apartamento': item.apartment_number || '',
+				'URL de Acceso': item.auto_login_url || '',
+			}));
+
+			// Crear workbook con SheetJS
+			const worksheet = XLSX.utils.json_to_sheet(rows);
+
+			// Ajustar anchos de columna
+			worksheet['!cols'] = [
+				{ wch: 35 }, // Nombre
+				{ wch: 18 }, // Apartamento
+				{ wch: 90 }, // URL de Acceso
+			];
+
+			const workbook = XLSX.utils.book_new();
+			XLSX.utils.book_append_sheet(workbook, worksheet, 'Tokens QR');
+
+			// Nombre del archivo con fecha
+			const fecha = new Date().toISOString().slice(0, 10);
+			const nombreArchivo = `tokens_qr_${residentialUnitName?.replace(/\s+/g, '_') || 'residentes'}_${fecha}.xlsx`;
+
+			XLSX.writeFile(workbook, nombreArchivo);
+
+			Swal.fire({
+				icon: 'success',
+				title: '¡Excel descargado!',
+				html: `Se generaron <strong>${tokens.length}</strong> tokens de acceso.<br/>
+                   <small style="color:#888">Los tokens tienen vigencia de 48 horas.</small>`,
+				confirmButtonColor: '#16a34a',
+				timer: 4000,
+				timerProgressBar: true,
+			});
+
+		} catch (error) {
+			console.error('❌ Error al generar Excel:', error);
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al generar Excel',
+				text: error.message || 'Ocurrió un error inesperado.',
+				confirmButtonColor: '#e74c3c'
+			});
+		}
+	};
+
 	// ========== FUNCIONES DE INVITACIÓN A REUNIONES ==========
-	
+
 	// Cargar reuniones programadas
 	const loadScheduledMeetings = async () => {
 		if (!residentialUnitId) return;
-		
+
 		setLoadingMeetings(true);
 		try {
 			const response = await MeetingService.getMeetingsByResidentialUnit(residentialUnitId);
@@ -908,6 +1016,15 @@ const ResidentsList = ({
 									<span>PDF QRs</span>
 								</button>
 
+								<button
+									onClick={handleDownloadExcel}
+									className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs font-medium"
+									title="Descargar Excel con nombre, apartamento y token QR"
+								>
+									<FileSpreadsheet size={14} />
+									<span>Excel QRs</span>
+								</button>
+
 								{/* Botón habilitar acceso */}
 								<button
 									onClick={() => {
@@ -1051,7 +1168,7 @@ const ResidentsList = ({
 											checked={selectedResidents.includes(resident.id)}
 											onChange={() => handleSelectResident(resident.id)}
 											onClick={(e) => e.stopPropagation()}
-											className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+											className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer shrink-0"
 										/>
 
 										{/* Información del residente */}
@@ -1070,7 +1187,7 @@ const ResidentsList = ({
 										</div>
 
 										{/* Indicador de estado */}
-										<div className="flex-shrink-0 mr-2">
+										<div className="shrink-0 mr-2">
 											<span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${resident.bln_allow_entry
 												? 'bg-green-100 text-green-700'
 												: 'bg-red-100 text-red-700'
@@ -1080,7 +1197,7 @@ const ResidentsList = ({
 										</div>
 
 										{/* Botones de acción */}
-										<div className="flex items-center gap-2 flex-shrink-0">
+										<div className="flex items-center gap-2 shrink-0">
 
 											{/* Botón para enviar WhatsApp */}
 											<button
@@ -1193,124 +1310,123 @@ const ResidentsList = ({
 				/>
 			)}
 
-				{/* Modal de QR Code */}
-				{selectedResidentForQR && (
-					<QRCodeModal
-						resident={selectedResidentForQR}
-						isOpen={qrModalOpen}
-						onClose={() => {
-							setQrModalOpen(false);
-							setSelectedResidentForQR(null);
-							setAutoLoginUrl('');
-						}}
-						autoLoginUrl={autoLoginUrl}
-					/>
-				)}
+			{/* Modal de QR Code */}
+			{selectedResidentForQR && (
+				<QRCodeModal
+					resident={selectedResidentForQR}
+					isOpen={qrModalOpen}
+					onClose={() => {
+						setQrModalOpen(false);
+						setSelectedResidentForQR(null);
+						setAutoLoginUrl('');
+					}}
+					autoLoginUrl={autoLoginUrl}
+				/>
+			)}
 
-				{/* Modal de Invitación a Reunión */}
-				{showInviteButton && (
-					<Modal
-						isOpen={showInviteModal}
-						onClose={handleCloseInviteModal}
-						title="Invitar a Reunión"
-						size="md"
-					>
-						<div className="space-y-4">
-							{/* Información de selección */}
-							<div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-								<p className="text-blue-800 text-sm">
-									<strong>{selectedResidents.length}</strong> residente(s) seleccionado(s)
-								</p>
-							</div>
+			{/* Modal de Invitación a Reunión */}
+			{showInviteButton && (
+				<Modal
+					isOpen={showInviteModal}
+					onClose={handleCloseInviteModal}
+					title="Invitar a Reunión"
+					size="md"
+				>
+					<div className="space-y-4">
+						{/* Información de selección */}
+						<div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+							<p className="text-blue-800 text-sm">
+								<strong>{selectedResidents.length}</strong> residente(s) seleccionado(s)
+							</p>
+						</div>
 
-							{/* Selector de reunión */}
+						{/* Selector de reunión */}
+						<div>
+							<label className="block text-sm font-semibold text-gray-700 mb-2">
+								Seleccionar Reunión Programada
+							</label>
+							{loadingMeetings ? (
+								<div className="flex items-center justify-center py-4">
+									<div className="animate-spin h-5 w-5 border-2 border-[#3498db] border-t-transparent rounded-full"></div>
+									<span className="ml-2 text-gray-600 text-sm">Cargando reuniones...</span>
+								</div>
+							) : scheduledMeetings.length === 0 ? (
+								<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+									<p className="text-yellow-800 text-sm">
+										No hay reuniones programadas para esta unidad residencial.
+									</p>
+								</div>
+							) : (
+								<select
+									value={selectedMeeting}
+									onChange={(e) => setSelectedMeeting(e.target.value)}
+									className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent text-sm"
+								>
+									<option value="">-- Seleccione una reunión --</option>
+									{scheduledMeetings.map((meeting) => (
+										<option key={meeting.id} value={meeting.id}>
+											{meeting.str_title} - {new Date(meeting.dat_schedule_date).toLocaleString()}
+										</option>
+									))}
+								</select>
+							)}
+						</div>
+
+						{/* Lista de residentes seleccionados */}
+						{selectedResidents.length > 0 && (
 							<div>
 								<label className="block text-sm font-semibold text-gray-700 mb-2">
-									Seleccionar Reunión Programada
+									Residentes a invitar:
 								</label>
-								{loadingMeetings ? (
-									<div className="flex items-center justify-center py-4">
-										<div className="animate-spin h-5 w-5 border-2 border-[#3498db] border-t-transparent rounded-full"></div>
-										<span className="ml-2 text-gray-600 text-sm">Cargando reuniones...</span>
-									</div>
-								) : scheduledMeetings.length === 0 ? (
-									<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-										<p className="text-yellow-800 text-sm">
-											No hay reuniones programadas para esta unidad residencial.
-										</p>
-									</div>
-								) : (
-									<select
-										value={selectedMeeting}
-										onChange={(e) => setSelectedMeeting(e.target.value)}
-										className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent text-sm"
-									>
-										<option value="">-- Seleccione una reunión --</option>
-										{scheduledMeetings.map((meeting) => (
-											<option key={meeting.id} value={meeting.id}>
-												{meeting.str_title} - {new Date(meeting.dat_schedule_date).toLocaleString()}
-											</option>
-										))}
-									</select>
-								)}
-							</div>
-
-							{/* Lista de residentes seleccionados */}
-							{selectedResidents.length > 0 && (
-								<div>
-									<label className="block text-sm font-semibold text-gray-700 mb-2">
-										Residentes a invitar:
-									</label>
-									<div className="bg-gray-50 border border-gray-200 rounded-lg p-2 max-h-32 overflow-y-auto">
-										<ul className="space-y-1">
-											{residents
-												.filter((r) => selectedResidents.includes(r.id))
-												.map((r) => (
-													<li key={r.id} className="flex items-center gap-2 text-xs text-gray-700">
-														<span className="text-green-500">✓</span>
-														{r.firstname} {r.lastname} - {r.apartment_number}
-													</li>
-												))}
-										</ul>
-									</div>
+								<div className="bg-gray-50 border border-gray-200 rounded-lg p-2 max-h-32 overflow-y-auto">
+									<ul className="space-y-1">
+										{residents
+											.filter((r) => selectedResidents.includes(r.id))
+											.map((r) => (
+												<li key={r.id} className="flex items-center gap-2 text-xs text-gray-700">
+													<span className="text-green-500">✓</span>
+													{r.firstname} {r.lastname} - {r.apartment_number}
+												</li>
+											))}
+									</ul>
 								</div>
-							)}
-
-							{/* Botones de acción */}
-							<div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
-								<button
-									onClick={handleCloseInviteModal}
-									className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-								>
-									Cancelar
-								</button>
-								<button
-									onClick={handleSendInvitations}
-									disabled={!selectedMeeting || selectedResidents.length === 0 || inviting}
-									className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-										selectedMeeting && selectedResidents.length > 0 && !inviting
-											? 'bg-green-500 text-white hover:bg-green-600'
-											: 'bg-gray-200 text-gray-400 cursor-not-allowed'
-									}`}
-								>
-									{inviting ? (
-										<>
-											<div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-											Enviando...
-										</>
-									) : (
-										<>
-											<Send size={16} />
-											Enviar Invitaciones
-										</>
-									)}
-								</button>
 							</div>
+						)}
+
+						{/* Botones de acción */}
+						<div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
+							<button
+								onClick={handleCloseInviteModal}
+								className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+							>
+								Cancelar
+							</button>
+							<button
+								onClick={handleSendInvitations}
+								disabled={!selectedMeeting || selectedResidents.length === 0 || inviting}
+								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedMeeting && selectedResidents.length > 0 && !inviting
+									? 'bg-green-500 text-white hover:bg-green-600'
+									: 'bg-gray-200 text-gray-400 cursor-not-allowed'
+									}`}
+							>
+								{inviting ? (
+									<>
+										<div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+										Enviando...
+									</>
+								) : (
+									<>
+										<Send size={16} />
+										Enviar Invitaciones
+									</>
+								)}
+							</button>
 						</div>
-					</Modal>
-				)}
-			</div>
-		);
+					</div>
+				</Modal>
+			)}
+		</div>
+	);
 };
 
 export default ResidentsList;

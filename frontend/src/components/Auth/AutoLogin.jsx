@@ -185,7 +185,7 @@ const AutoLogin = () => {
   }, [token, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+    <div className="min-h-screen flex items-center justify-center gradient-to-br from-blue-50 to-blue-100">
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
         <div className="text-center">
           {status === 'processing' && (
