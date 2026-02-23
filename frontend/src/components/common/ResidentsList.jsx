@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import logoGiramaster from '../../assets/logo-giramaster.jpeg';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 /**
  * Componente reutilizable para mostrar lista de residentes
@@ -663,31 +663,53 @@ const ResidentsList = ({
 
 			if (!tokens.length) throw new Error('No se obtuvieron datos del servidor.');
 
-			// Construir filas del Excel
-			const rows = tokens.map((item) => ({
-				'Nombre': `${item.firstname || ''} ${item.lastname || ''}`.trim(),
-				'Apartamento': item.apartment_number || '',
-				'URL de Acceso': item.auto_login_url || '',
-			}));
+			// Crear workbook con ExcelJS
+			const workbook = new ExcelJS.Workbook();
+			workbook.creator = 'GIRAMASTER';
+			workbook.created = new Date();
 
-			// Crear workbook con SheetJS
-			const worksheet = XLSX.utils.json_to_sheet(rows);
+			// Agregar worksheet
+			const worksheet = workbook.addWorksheet('Tokens QR');
+
+			// Agregar encabezados
+			worksheet.addRow(['Nombre', 'Apartamento', 'URL de Acceso']);
+
+			// Aplicar estilo a los encabezados
+			const headerRow = worksheet.getRow(1);
+			headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
+			headerRow.fill = {
+				type: 'pattern',
+				pattern: 'solid',
+				fgColor: { argb: '3498DB' }
+			};
+			headerRow.alignment = { horizontal: 'center' };
+
+			// Agregar datos
+			tokens.forEach((item) => {
+				worksheet.addRow([
+					`${item.firstname || ''} ${item.lastname || ''}`.trim(),
+					item.apartment_number || '',
+					item.auto_login_url || ''
+				]);
+			});
 
 			// Ajustar anchos de columna
-			worksheet['!cols'] = [
-				{ wch: 35 }, // Nombre
-				{ wch: 18 }, // Apartamento
-				{ wch: 90 }, // URL de Acceso
-			];
-
-			const workbook = XLSX.utils.book_new();
-			XLSX.utils.book_append_sheet(workbook, worksheet, 'Tokens QR');
+			worksheet.getColumn(1).width = 35;
+			worksheet.getColumn(2).width = 18;
+			worksheet.getColumn(3).width = 90;
 
 			// Nombre del archivo con fecha
 			const fecha = new Date().toISOString().slice(0, 10);
 			const nombreArchivo = `tokens_qr_${residentialUnitName?.replace(/\s+/g, '_') || 'residentes'}_${fecha}.xlsx`;
 
-			XLSX.writeFile(workbook, nombreArchivo);
+			// Generar y descargar el archivo
+			const buffer = await workbook.xlsx.writeBuffer();
+			const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(blob);
+			link.download = nombreArchivo;
+			link.click();
+			URL.revokeObjectURL(link.href);
 
 			Swal.fire({
 				icon: 'success',

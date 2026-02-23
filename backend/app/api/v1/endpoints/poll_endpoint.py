@@ -723,3 +723,127 @@ async def get_poll_results(
             message=f"Error al obtener resultados: {str(e)}",
             details={"original_error": str(e)}
         )
+
+
+@router.get(
+    "/{poll_id}/votes",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener votos detallados de una encuesta",
+    description="Retorna los votos individuales de cada opción de la encuesta, incluyendo quién votó y cuándo"
+)
+async def get_poll_votes(
+    poll_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene los detalles de todos los votos de una encuesta.
+    
+    Returns:
+    - Información de la encuesta
+    - Lista de opciones con sus votos individuales
+    - Por cada voto: usuario, apartamento, fecha/hora
+    """
+    try:
+        user_service = UserService(db)
+        current = await user_service.get_user_by_username(current_user)
+        
+        if not current or current.int_id_rol not in (1, 2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para ver los votos"
+            )
+        
+        from app.models.poll_model import PollModel
+        from app.models.poll_option_model import PollOptionModel
+        from app.models.poll_response_model import PollResponseModel
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from sqlalchemy import select, and_
+        
+        poll_query = select(PollModel).where(PollModel.id == poll_id)
+        poll_result = await db.execute(poll_query)
+        poll = poll_result.scalar_one_or_none()
+        
+        if not poll:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Encuesta no encontrada"
+            )
+        
+        options_query = select(PollOptionModel).where(
+            PollOptionModel.int_poll_id == poll_id
+        ).order_by(PollOptionModel.int_option_order)
+        
+        options_result = await db.execute(options_query)
+        options = options_result.scalars().all()
+        
+        options_with_votes = []
+        
+        for option in options:
+            votes_query = (
+                select(
+                    PollResponseModel,
+                    UserModel.id.label("voter_id"),
+                    DataUserModel.str_firstname,
+                    DataUserModel.str_lastname,
+                    UserResidentialUnitModel.str_apartment_number,
+                    PollResponseModel.dat_response_at
+                )
+                .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
+                .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .join(
+                    UserResidentialUnitModel,
+                    UserResidentialUnitModel.int_user_id == UserModel.id
+                )
+                .where(
+                    and_(
+                        PollResponseModel.int_option_id == option.id,
+                        PollResponseModel.bln_is_abstention == False
+                    )
+                )
+                .order_by(PollResponseModel.dat_response_at.desc())
+            )
+            
+            votes_result = await db.execute(votes_query)
+            votes = votes_result.all()
+            
+            votes_list = []
+            for vote in votes:
+                votes_list.append({
+                    "user_id": vote.voter_id,
+                    "full_name": f"{vote.str_firstname} {vote.str_lastname}".strip(),
+                    "apartment_number": vote.str_apartment_number or "N/A",
+                    "voted_at": vote.dat_response_at.isoformat() if vote.dat_response_at else None
+                })
+            
+            options_with_votes.append({
+                "option_id": option.id,
+                "option_text": option.str_option_text,
+                "votes_count": len(votes_list),
+                "votes": votes_list
+            })
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Votos obtenidos para encuesta {poll_id}",
+            data={
+                "poll_id": poll.id,
+                "title": poll.str_title,
+                "description": poll.str_description,
+                "status": poll.str_status,
+                "poll_type": poll.str_poll_type,
+                "options": options_with_votes
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al obtener votos: {str(e)}",
+            details={"original_error": str(e)}
+        )

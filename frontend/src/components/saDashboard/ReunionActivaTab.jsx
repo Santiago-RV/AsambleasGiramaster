@@ -16,7 +16,7 @@ const ReunionActivaTab = () => {
 	const [meetingDetails, setMeetingDetails] = useState(null);
 	const [modalOpen, setModalOpen] = useState(false);
 	const [loadingDetails, setLoadingDetails] = useState(false);
-
+	
 	// Cargar reuniones activas al montar el componente
 	useEffect(() => {
 		loadActiveMeetings();

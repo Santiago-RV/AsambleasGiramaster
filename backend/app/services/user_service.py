@@ -177,8 +177,9 @@ class UserService:
     
       except Exception as e:
         raise ServiceException(
-          message="Error al obtener el usuario",
-          error_code="GET_USER_BY_USERNAME_ERROR"
+          message=f"Error al obtener el usuario: {str(e)}",
+          error_code="GET_USER_BY_USERNAME_ERROR",
+          details={"original_error": str(e), "username": username}
         )
         
     async def enable_all_coowners_by_meeting(self, meeting_id: int) -> dict:

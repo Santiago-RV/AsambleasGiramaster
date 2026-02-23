@@ -1,6 +1,7 @@
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime
@@ -930,10 +931,11 @@ class MeetingService:
                 }
             
             # 5.1 Verificar si ya existe registro en tbl_meeting_attendances
+            # Usar FOR UPDATE para serializar requests concurrentes (evitar race condition)
             existing_attendance_query = select(MeetingAttendanceModel).where(
                 MeetingAttendanceModel.int_meeting_id == active_meeting.id,
                 MeetingAttendanceModel.int_user_id == user_id
-            )
+            ).with_for_update()
             existing_attendance_result = await self.db.execute(existing_attendance_query)
             existing_attendance = existing_attendance_result.scalar_one_or_none()
             
@@ -942,7 +944,7 @@ class MeetingService:
                     f"Auto-attendance: Usuario {user_id} ya tiene registro de asistencia "
                     f"en tbl_meeting_attendances para reunion {active_meeting.id}"
                 )
-                # Actualizar la invitación también
+                # Actualizar la invitacion tambien
                 invitation.dat_joined_at = existing_attendance.dat_joined_at
                 invitation.bln_actually_attended = True
                 invitation.str_response_status = "attended"
@@ -967,40 +969,56 @@ class MeetingService:
             invitation.updated_by = user_id
             
             # 7. Crear registro en tbl_meeting_attendances para consistencia
-            attendance = MeetingAttendanceModel(
-                int_meeting_id=active_meeting.id,
-                int_user_id=user_id,
-                str_attendance_type="presencial",
-                dec_voting_weight=invitation.dec_voting_weight,
-                dat_joined_at=now,
-                # dat_left_at queda NULL hasta que el admin finalize la reunion
-                int_total_duration_minutes=0,  # Se calcula al finalizar
-                bln_is_present=True,
-                bln_left_early=False,
-                int_rejoined_count=0
-            )
-            self.db.add(attendance)
-            
-            await self.db.commit()
-            await self.db.refresh(invitation)
-            await self.db.refresh(attendance)
-            
-            logger.info(
-                f"Auto-attendance: Asistencia registrada automaticamente - "
-                f"Usuario {user_id} en reunion presencial {active_meeting.id} "
-                f"({active_meeting.str_title}) a las {invitation.dat_joined_at}. "
-                f"Attendance ID: {attendance.id}"
-            )
-            
-            return {
-                "registered": True,
-                "already_registered": False,
-                "meeting_id": active_meeting.id,
-                "meeting_title": active_meeting.str_title,
-                "meeting_type": active_meeting.str_meeting_type,
-                "joined_at": invitation.dat_joined_at.isoformat(),
-                "attendance_id": attendance.id
-            }
+            # Envuelto en try/except IntegrityError como ultima capa de proteccion
+            try:
+                attendance = MeetingAttendanceModel(
+                    int_meeting_id=active_meeting.id,
+                    int_user_id=user_id,
+                    str_attendance_type="presencial",
+                    dec_voting_weight=invitation.dec_voting_weight,
+                    dat_joined_at=now,
+                    int_total_duration_minutes=0,
+                    bln_is_present=True,
+                    bln_left_early=False,
+                    int_rejoined_count=0
+                )
+                self.db.add(attendance)
+                
+                await self.db.commit()
+                await self.db.refresh(invitation)
+                await self.db.refresh(attendance)
+                
+                logger.info(
+                    f"Auto-attendance: Asistencia registrada automaticamente - "
+                    f"Usuario {user_id} en reunion presencial {active_meeting.id} "
+                    f"({active_meeting.str_title}) a las {invitation.dat_joined_at}. "
+                    f"Attendance ID: {attendance.id}"
+                )
+                
+                return {
+                    "registered": True,
+                    "already_registered": False,
+                    "meeting_id": active_meeting.id,
+                    "meeting_title": active_meeting.str_title,
+                    "meeting_type": active_meeting.str_meeting_type,
+                    "joined_at": invitation.dat_joined_at.isoformat(),
+                    "attendance_id": attendance.id
+                }
+            except IntegrityError:
+                # Race condition: otra request creo el registro entre el SELECT FOR UPDATE y el INSERT
+                await self.db.rollback()
+                logger.warning(
+                    f"Auto-attendance: IntegrityError (duplicado) para usuario {user_id} "
+                    f"en reunion {active_meeting.id} - registro ya existia"
+                )
+                return {
+                    "registered": True,
+                    "already_registered": True,
+                    "meeting_id": active_meeting.id,
+                    "meeting_title": active_meeting.str_title,
+                    "meeting_type": active_meeting.str_meeting_type,
+                    "joined_at": now.isoformat()
+                }
             
         except Exception as e:
             # No propagamos la excepcion para no interrumpir el auto-login

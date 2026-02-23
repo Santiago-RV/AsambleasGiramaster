@@ -242,7 +242,8 @@ class ActiveMeetingService:
             .where(
                 and_(
                     MeetingInvitationModel.int_meeting_id == meeting_id,
-                    MeetingInvitationModel.bln_actually_attended == True
+                    MeetingInvitationModel.bln_actually_attended == True,
+                    MeetingInvitationModel.dat_left_at == None
                 )
             )
             .order_by(DataUserModel.str_firstname.asc())
@@ -300,3 +301,241 @@ class ActiveMeetingService:
             ))
 
         return poll_summaries
+
+    async def get_active_meetings_by_unit(self, residential_unit_id: int) -> ActiveMeetingsListResponse:
+        """
+        Obtiene las reuniones activas (En Curso) para una unidad residencial específica.
+
+        Args:
+            residential_unit_id: ID de la unidad residencial
+
+        Returns:
+            ActiveMeetingsListResponse con lista de reuniones activas
+        """
+        query = (
+            select(
+                MeetingModel.id,
+                MeetingModel.str_title,
+                ResidentialUnitModel.str_name.label("residential_unit_name"),
+                MeetingModel.str_meeting_type,
+                MeetingModel.str_status,
+                MeetingModel.dat_actual_start_time,
+                MeetingModel.int_total_invitated,
+                MeetingModel.bln_quorum_reached
+            )
+            .join(
+                ResidentialUnitModel,
+                MeetingModel.int_id_residential_unit == ResidentialUnitModel.id
+            )
+            .where(
+                and_(
+                    MeetingModel.str_status == "En Curso",
+                    MeetingModel.int_id_residential_unit == residential_unit_id
+                )
+            )
+            .order_by(MeetingModel.dat_actual_start_time.desc())
+        )
+
+        result = await self.db.execute(query)
+        meetings = result.all()
+
+        active_meetings = []
+        for meeting in meetings:
+            connected_count = await self._count_connected_users(meeting.id)
+            active_polls_count = await self._count_active_polls(meeting.id)
+
+            active_meetings.append(ActiveMeetingCardSchema(
+                meeting_id=meeting.id,
+                title=meeting.str_title,
+                residential_unit_name=meeting.residential_unit_name,
+                meeting_type=meeting.str_meeting_type,
+                status=meeting.str_status,
+                started_at=meeting.dat_actual_start_time,
+                connected_users_count=connected_count,
+                total_invited=meeting.int_total_invitated or 0,
+                quorum_reached=meeting.bln_quorum_reached or False,
+                active_polls_count=active_polls_count
+            ))
+
+        return ActiveMeetingsListResponse(
+            active_meetings=active_meetings,
+            total_count=len(active_meetings)
+        )
+
+
+    async def get_meeting_in_progress_details(self, residential_unit_id: int) -> Optional[dict]:
+        """
+        Obtiene los detalles completos de la reunión en curso.
+        
+        Args:
+            residential_unit_id: ID de la unidad residencial
+            
+        Returns:
+            Dict con todos los detalles o None si no hay reunión en curso
+        """
+        from datetime import datetime
+        
+        query = select(MeetingModel).where(
+            and_(
+                MeetingModel.int_id_residential_unit == residential_unit_id,
+                MeetingModel.str_status == "En Curso"
+            )
+        )
+        result = await self.db.execute(query)
+        meeting = result.scalar_one_or_none()
+        
+        if not meeting:
+            return None
+        
+        connected_users = await self._get_connected_users(meeting.id)
+        disconnected_users = await self._get_disconnected_users(meeting.id)
+        polls = await self._get_meeting_polls(meeting.id)
+        
+        # Convertir objetos schema a diccionarios
+        connected_users_data = [
+            {
+                "user_id": u.user_id,
+                "full_name": u.full_name,
+                "email": u.email,
+                "apartment_number": u.apartment_number,
+                "voting_weight": float(u.voting_weight) if u.voting_weight else 0,
+                "is_present": u.is_present,
+                "joined_at": u.joined_at.isoformat() if u.joined_at else None,
+                "attendance_type": u.attendance_type
+            }
+            for u in connected_users
+        ]
+        
+        disconnected_users_data = [
+            {
+                "user_id": u["user_id"],
+                "full_name": u["full_name"],
+                "email": u["email"],
+                "apartment_number": u["apartment_number"],
+                "voting_weight": u["voting_weight"],
+                "is_connected": False
+            }
+            for u in disconnected_users
+        ]
+        
+        total_quorum = sum(u["voting_weight"] for u in connected_users_data + disconnected_users_data)
+        connected_quorum = sum(u["voting_weight"] for u in connected_users_data)
+        
+        connected_count = len(connected_users_data)
+        disconnected_count = len(disconnected_users_data)
+        total_invited = connected_count + disconnected_count
+        
+        return {
+            "meeting_id": meeting.id,
+            "title": meeting.str_title,
+            "description": meeting.str_description,
+            "meeting_type": meeting.str_meeting_type,
+            "status": meeting.str_status,
+            "started_at": meeting.dat_actual_start_time.isoformat() if meeting.dat_actual_start_time else None,
+            "total_invited": total_invited,
+            "connected_count": connected_count,
+            "disconnected_count": disconnected_count,
+            "total_quorum": float(total_quorum),
+            "connected_quorum": float(connected_quorum),
+            "quorum_percentage": round((connected_quorum / total_quorum * 100) if total_quorum > 0 else 0, 2),
+            "quorum_reached": meeting.bln_quorum_reached or False,
+            "connected_users": connected_users_data,
+            "disconnected_users": disconnected_users_data,
+            "polls": polls
+        }
+
+    async def _get_disconnected_users(self, meeting_id: int) -> List[dict]:
+        """Obtiene lista de usuarios invitados que no están conectados"""
+        query = (
+            select(
+                UserModel.id,
+                DataUserModel.str_firstname,
+                DataUserModel.str_lastname,
+                DataUserModel.str_email,
+                UserResidentialUnitModel.str_apartment_number,
+                MeetingInvitationModel.dec_voting_weight,
+                MeetingInvitationModel.dat_joined_at,
+                MeetingInvitationModel.dat_left_at
+            )
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .join(
+                UserResidentialUnitModel,
+                UserResidentialUnitModel.int_user_id == UserModel.id
+            )
+            .join(
+                MeetingInvitationModel,
+                and_(
+                    MeetingInvitationModel.int_user_id == UserModel.id,
+                    MeetingInvitationModel.int_meeting_id == meeting_id
+                )
+            )
+            .where(
+                or_(
+                    MeetingInvitationModel.bln_actually_attended == False,
+                    MeetingInvitationModel.dat_left_at != None
+                )
+            )
+            .order_by(DataUserModel.str_lastname, DataUserModel.str_firstname)
+        )
+        
+        result = await self.db.execute(query)
+        users = result.all()
+        
+        return [
+            {
+                "user_id": user.id,
+                "full_name": f"{user.str_firstname} {user.str_lastname}".strip(),
+                "email": user.str_email,
+                "apartment_number": user.str_apartment_number,
+                "voting_weight": float(user.dec_voting_weight or 0),
+                "joined_at": user.dat_joined_at.isoformat() if user.dat_joined_at else None,
+                "left_at": user.dat_left_at.isoformat() if user.dat_left_at else None,
+                "is_connected": False
+            }
+            for user in users
+        ]
+
+    async def close_user_session(
+        self, 
+        meeting_id: int, 
+        user_id: int, 
+        residential_unit_id: int
+    ) -> dict:
+        """
+        Cierra la sesión de un usuario en la reunión.
+        
+        Args:
+            meeting_id: ID de la reunión
+            user_id: ID del usuario
+            residential_unit_id: ID de la unidad residencial
+            
+        Returns:
+            Dict con resultado de la operación
+        """
+        from datetime import datetime
+        
+        query = select(MeetingInvitationModel).where(
+            and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_user_id == user_id
+            )
+        )
+        result = await self.db.execute(query)
+        invitation = result.scalar_one_or_none()
+        
+        if not invitation:
+            return {"success": False, "message": "Invitación no encontrada"}
+        
+        invitation.dat_left_at = datetime.now()
+        await self.db.commit()
+        
+        from app.services.session_service import SessionService
+        session_service = SessionService(self.db)
+        await session_service.deactivate_all_sessions(user_id)
+        
+        return {
+            "success": True, 
+            "message": "Sesión cerrada exitosamente",
+            "user_id": user_id,
+            "meeting_id": meeting_id
+        }

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -18,9 +19,29 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    jti = str(uuid.uuid4())
+    to_encode.update({
+        "exp": expire,
+        "jti": jti
+    })
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def get_token_jti(token: str) -> str | None:
+    """
+    Extrae el JTI (JWT ID) de un token
+    
+    Args:
+        token: JWT token
+        
+    Returns:
+        JTI del token o None si no existe
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        return payload.get("jti")
+    except JWTError:
+        return None
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     try:

@@ -440,7 +440,8 @@ class EmailService:
         lastname: str,
         username: str,
         password: str,
-        residential_unit_name: str
+        residential_unit_name: str,
+        auto_login_token: Optional[str] = None
     ) -> bool:
         """
         Envía un email con las credenciales de acceso para un nuevo administrador.
@@ -452,6 +453,7 @@ class EmailService:
             username: Username para acceso
             password: Contraseña temporal
             residential_unit_name: Nombre de la unidad residencial
+            auto_login_token: Token JWT para auto-login (opcional)
 
         Returns:
             bool: True si se envió exitosamente, False en caso contrario
@@ -463,6 +465,13 @@ class EmailService:
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
             
+            # Construir URL de auto-login si hay JWT
+            auto_login_url = None
+            if auto_login_token:
+                from app.core.config import settings
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
+            
             # Renderizar el template con los datos usando Jinja2
             template = Template(template_content)
             html_content = template.render(
@@ -470,7 +479,8 @@ class EmailService:
                 lastname=lastname,
                 username=username,
                 password=password,
-                residential_unit_name=residential_unit_name
+                residential_unit_name=residential_unit_name,
+                auto_login_url=auto_login_url
             )
             
             # Asunto del email

@@ -32,30 +32,32 @@ export const useAuth = () => {
       // Limpiar el cache de la query
       queryClient.clear();
 
-      // Mostrar mensaje de éxito
-      Swal.fire({
-        icon: 'success',
-        title: 'Inicio de Sesión Exitoso',
-        text: data.message || 'Bienvenido al sistema',
-        timer: 2000,
-        showConfirmButton: false,
-      });
-
-      // Redirigir según el rol del usuario
-      if (userData.role === 'Super Administrador') {
-        navigate('/super-admin');
-      } else if (userData.role === 'Administrador') {
-        navigate('/admin');
-      } else if (userData.role === 'Usuario'){
-        navigate('/copropietario');
-      } else {
-        navigate('/');
-      }
+      // Retornar datos incluyendo active_meeting para que el componente Login maneje el modal
+      return {
+        success: data.success,
+        message: data.message,
+        data: data.data,
+        active_meeting: data.data.active_meeting || null,
+        userData: userData,
+      };
     },
     onError: (error) => {
       console.error('Error al iniciar sesión:', error);
     },
   });
+
+  // Función helper para navegar después de que el modal se cierre
+  const navigateByRole = (role) => {
+    if (role === 'Super Administrador') {
+      navigate('/super-admin');
+    } else if (role === 'Administrador') {
+      navigate('/admin');
+    } else if (role === 'Usuario'){
+      navigate('/copropietario');
+    } else {
+      navigate('/');
+    }
+  };
 
   const registerMutation = useMutation({
     mutationFn: (data) => AuthService.register(data),
@@ -95,5 +97,6 @@ export const useAuth = () => {
     isAuthenticated,
     user,
     isLoading: loginMutation.isPending || registerMutation.isPending,
+    navigateByRole,
   };
 };

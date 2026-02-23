@@ -34,6 +34,13 @@ api_router.include_router(
 )
 
 api_router.include_router(
+    administrator.router,
+    prefix="/administrator",
+    tags=["Administrator"],
+    dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
     residential_enpoint.router,
     prefix="/residential",
     tags=["Residential"],
@@ -129,4 +136,23 @@ api_router.include_router(
     system_config_endpoint.router,
     prefix="/system-config",
     tags=["System Configuration"]
+)
+
+# ============================================
+# Sessions - Control de Sesiones
+# ============================================
+from app.api.v1.endpoints import session_endpoint
+from app.api.v1.endpoints import admin_session_endpoint
+
+api_router.include_router(
+    session_endpoint.router,
+    prefix="/auth",
+    tags=["Sesiones"]
+)
+
+api_router.include_router(
+    admin_session_endpoint.router,
+    prefix="/admin",
+    tags=["Admin - Sesiones"],
+    dependencies=[Depends(get_current_user)]
 )

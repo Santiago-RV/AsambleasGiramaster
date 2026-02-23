@@ -440,3 +440,415 @@ async def create_batch_invitations(
             message=f"Error al crear las invitaciones: {str(e)}",
             details={"original_error": str(e)}
         )
+
+
+# ==========================================
+# ENDPOINTS DE REUNIONES ACTIVAS PARA ADMIN
+# ==========================================
+
+@router.get(
+    "/active-meetings",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener reuniones activas del admin",
+    description="Obtiene las reuniones activas (En Curso) de la unidad residencial del administrador"
+)
+async def get_admin_active_meetings(
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene las reuniones activas de la unidad residencial del administrador.
+    
+    Retorna:
+    - Información básica de reuniones en curso
+    - Cantidad de usuarios conectados
+    - Total de invitados
+    - Estado de quórum
+    """
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no autenticado"
+            )
+
+        # Verificar que sea admin (rol 2) o super admin (rol 1)
+        if user.int_id_rol not in (1, 2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para acceder a esta información"
+            )
+
+        # Obtener la unidad residencial del admin
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from sqlalchemy import select
+        
+        unit_query = select(UserResidentialUnitModel.int_residential_unit_id).where(
+            UserResidentialUnitModel.int_user_id == user.id,
+            UserResidentialUnitModel.bool_is_admin == True
+        )
+        unit_result = await db.execute(unit_query)
+        residential_unit_id = unit_result.scalar_one_or_none()
+        
+        if not residential_unit_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No tienes una unidad residencial asignada como administrador"
+            )
+
+        # Obtener reuniones activas para esta unidad
+        from app.services.active_meeting_service import ActiveMeetingService
+        active_meeting_service = ActiveMeetingService(db)
+        active_meetings = await active_meeting_service.get_active_meetings_by_unit(residential_unit_id)
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Se encontraron {active_meetings.total_count} reuniones activas",
+            data={
+                "active_meetings": [
+                    {
+                        "meeting_id": meeting.meeting_id,
+                        "title": meeting.title,
+                        "residential_unit_name": meeting.residential_unit_name,
+                        "meeting_type": meeting.meeting_type,
+                        "status": meeting.status,
+                        "started_at": meeting.started_at.isoformat() if meeting.started_at else None,
+                        "connected_users_count": meeting.connected_users_count,
+                        "total_invited": meeting.total_invited,
+                        "quorum_reached": meeting.quorum_reached,
+                        "active_polls_count": meeting.active_polls_count
+                    }
+                    for meeting in active_meetings.active_meetings
+                ],
+                "total_count": active_meetings.total_count
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al obtener reuniones activas del admin: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise ServiceException(
+            message=f"Error al obtener reuniones activas: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
+    "/active-meetings/{meeting_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener detalles de reunión activa del admin",
+    description="Obtiene los detalles completos de una reunión activa de la unidad del admin"
+)
+async def get_admin_active_meeting_details(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene los detalles completos de una reunión activa.
+    
+    Solo permite acceder a reuniones de la unidad residencial del administrador.
+    """
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no autenticado"
+            )
+
+        # Verificar que sea admin (rol 2) o super admin (rol 1)
+        if user.int_id_rol not in (1, 2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para acceder a esta información"
+            )
+
+        # Obtener la unidad residencial del admin
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from sqlalchemy import select
+        
+        unit_query = select(UserResidentialUnitModel.int_residential_unit_id).where(
+            UserResidentialUnitModel.int_user_id == user.id,
+            UserResidentialUnitModel.bool_is_admin == True
+        )
+        unit_result = await db.execute(unit_query)
+        residential_unit_id = unit_result.scalar_one_or_none()
+        
+        if not residential_unit_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No tienes una unidad residencial asignada como administrador"
+            )
+
+        # Verificar que la reunión pertenezca a la unidad del admin
+        from app.models.meeting_model import MeetingModel
+        meeting_query = select(MeetingModel).where(
+            MeetingModel.id == meeting_id,
+            MeetingModel.int_id_residential_unit == residential_unit_id
+        )
+        meeting_result = await db.execute(meeting_query)
+        meeting = meeting_result.scalar_one_or_none()
+        
+        if not meeting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Reunión no encontrada en tu unidad residencial"
+            )
+
+        # Obtener detalles de la reunión
+        from app.services.active_meeting_service import ActiveMeetingService
+        active_meeting_service = ActiveMeetingService(db)
+        meeting_details = await active_meeting_service.get_meeting_details(meeting_id)
+
+        if not meeting_details:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"La reunión con ID {meeting_id} no existe"
+            )
+
+        # Formatear igual que super_admin para compatibilidad con el frontend
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Detalles de la reunión obtenidos exitosamente",
+            data={
+                "meeting_id": meeting_details.meeting_id,
+                "title": meeting_details.title,
+                "description": meeting_details.description,
+                "residential_unit": {
+                    "id": meeting_details.residential_unit_id,
+                    "name": meeting_details.residential_unit_name,
+                    "nit": meeting_details.residential_unit_nit
+                },
+                "meeting_type": meeting_details.meeting_type,
+                "status": meeting_details.status,
+                "scheduled_date": meeting_details.scheduled_date.isoformat(),
+                "actual_start_time": meeting_details.actual_start_time.isoformat() if meeting_details.actual_start_time else None,
+                "actual_end_time": meeting_details.actual_end_time.isoformat() if meeting_details.actual_end_time else None,
+                "total_invited": meeting_details.total_invited,
+                "total_confirmed": meeting_details.total_confirmed,
+                "quorum_reached": meeting_details.quorum_reached,
+                "zoom_join_url": meeting_details.zoom_join_url,
+                "zoom_meeting_id": meeting_details.zoom_meeting_id,
+                "administrator": {
+                    "user_id": meeting_details.administrator.user_id,
+                    "full_name": meeting_details.administrator.full_name,
+                    "email": meeting_details.administrator.email,
+                    "phone": meeting_details.administrator.phone
+                } if meeting_details.administrator else None,
+                "connected_users": [
+                    {
+                        "user_id": user.user_id,
+                        "full_name": user.full_name,
+                        "email": user.email,
+                        "apartment_number": user.apartment_number,
+                        "voting_weight": float(user.voting_weight),
+                        "is_present": user.is_present,
+                        "joined_at": user.joined_at.isoformat() if user.joined_at else None,
+                        "attendance_type": user.attendance_type
+                    }
+                    for user in meeting_details.connected_users
+                ],
+                "polls": [
+                    {
+                        "poll_id": poll.poll_id,
+                        "title": poll.title,
+                        "description": poll.description,
+                        "poll_type": poll.poll_type,
+                        "status": poll.status,
+                        "started_at": poll.started_at.isoformat() if poll.started_at else None,
+                        "ended_at": poll.ended_at.isoformat() if poll.ended_at else None,
+                        "total_votes": poll.total_votes,
+                        "requires_quorum": poll.requires_quorum,
+                        "minimum_quorum_percentage": float(poll.minimum_quorum_percentage) if poll.minimum_quorum_percentage else 0
+                    }
+                    for poll in meeting_details.polls
+                ]
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al obtener detalles de reunión activa: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise ServiceException(
+            message=f"Error al obtener detalles de reunión: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
+    "/meeting-in-progress",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener reunión en curso",
+    description="Obtiene la reunión actualmente en curso con todos los detalles: conectados, desconectados, quorum, encuestas"
+)
+async def get_meeting_in_progress(
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene la reunión actualmente en curso para la unidad residencial del admin.
+    
+    Retorna:
+    - Información de la reunión
+    - Lista de conectados con peso de quorum
+    - Lista de desconectados con peso de quorum
+    - Total quorum de invitados
+    - Encuestas con estado
+    """
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no autenticado"
+            )
+
+        if user.int_id_rol not in (1, 2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para acceder a esta información"
+            )
+
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from sqlalchemy import select
+        
+        unit_query = select(UserResidentialUnitModel.int_residential_unit_id).where(
+            UserResidentialUnitModel.int_user_id == user.id,
+            UserResidentialUnitModel.bool_is_admin == True
+        )
+        unit_result = await db.execute(unit_query)
+        residential_unit_id = unit_result.scalar_one_or_none()
+        
+        if not residential_unit_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No tienes una unidad residencial asignada como administrador"
+            )
+
+        from app.services.active_meeting_service import ActiveMeetingService
+        active_meeting_service = ActiveMeetingService(db)
+        meeting_data = await active_meeting_service.get_meeting_in_progress_details(residential_unit_id)
+
+        if not meeting_data:
+            return SuccessResponse(
+                success=True,
+                status_code=status.HTTP_200_OK,
+                message="No hay reuniones en curso",
+                data=None
+            )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Reunión en curso obtenida",
+            data=meeting_data
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al obtener reunión en curso: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise ServiceException(
+            message=f"Error al obtener reunión en curso: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.post(
+    "/meeting/{meeting_id}/close-user-session/{user_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cerrar sesión de usuario en reunión",
+    description="Cierra la sesión de un usuario en la reunión y en el sistema"
+)
+async def close_user_session(
+    meeting_id: int,
+    user_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Cierra la sesión de un usuario específico en una reunión.
+    
+    Acciones:
+    1. Registra la hora de salida en la invitación (dat_left_at)
+    2. Invalida las sesiones del usuario en el sistema
+    """
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no autenticado"
+            )
+
+        if user.int_id_rol not in (1, 2):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para realizar esta acción"
+            )
+
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from sqlalchemy import select
+        
+        unit_query = select(UserResidentialUnitModel.int_residential_unit_id).where(
+            UserResidentialUnitModel.int_user_id == user.id,
+            UserResidentialUnitModel.bool_is_admin == True
+        )
+        unit_result = await db.execute(unit_query)
+        residential_unit_id = unit_result.scalar_one_or_none()
+        
+        if not residential_unit_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No tienes una unidad residencial asignada"
+            )
+
+        from app.services.active_meeting_service import ActiveMeetingService
+        active_meeting_service = ActiveMeetingService(db)
+        result = await active_meeting_service.close_user_session(meeting_id, user_id, residential_unit_id)
+
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=result["message"]
+            )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=result["message"],
+            data=result
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al cerrar sesión: {str(e)}")
+        raise ServiceException(
+            message=f"Error al cerrar sesión: {str(e)}",
+            details={"original_error": str(e)}
+        )

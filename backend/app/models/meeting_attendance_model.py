@@ -1,10 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
 
 class MeetingAttendanceModel(Base):
     __tablename__ = "tbl_meeting_attendances"
+    __table_args__ = (
+        UniqueConstraint('int_meeting_id', 'int_user_id', name='uq_meeting_user_attendance'),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     int_meeting_id = Column(Integer, ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)

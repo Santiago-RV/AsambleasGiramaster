@@ -63,12 +63,26 @@ export class AuthService {
 
 			console.log('✅ Login exitoso:', userData);
 
+			// Incluir active_meeting si existe
+			const responseData = {
+				user: userData,
+			};
+
+			let activeMeetingData = null;
+			if (data.active_meeting) {
+				responseData.active_meeting = data.active_meeting;
+				activeMeetingData = data.active_meeting;
+			}
+
+			// Guardar datos temporales para uso en el frontend
+			AuthService._lastAuthData = {
+				active_meeting: activeMeetingData,
+			};
+
 			return {
 				success: true,
 				message: response.data.message,
-				data: {
-					user: userData,
-				},
+				data: responseData,
 			};
 		} catch (error) {
 			// Logging del error completo para debugging
@@ -141,4 +155,15 @@ export class AuthService {
 	static getToken() {
 		return localStorage.getItem('access_token');
 	}
+
+	/**
+	 * Obtener datos de la última autenticación (para modal de reunión)
+	 * @returns {Object|null}
+	 */
+	static getLastAuthData() {
+		return AuthService._lastAuthData || null;
+	}
 }
+
+// Inicializar datos temporales
+AuthService._lastAuthData = null;

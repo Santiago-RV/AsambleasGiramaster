@@ -1252,37 +1252,31 @@ class ResidentialUnitService:
             import secrets
             import string
             
-            # Generar contraseña aleatoria segura de 12 caracteres
-            alphabet = string.ascii_letters + string.digits + "!@#$%"
-            temporary_password = ''.join(secrets.choice(alphabet) for i in range(12))
-            
-            logger.info(f"Contraseña temporal generada para {data_user.str_email}")
-            
             # ============================================
-            # PASO 4: Generar JWT de auto-login
+            # Generar JWT de auto-login (sin contraseña temporal)
             # ============================================
             auto_login_token = simple_auto_login_service.generate_auto_login_token(
                 username=user.str_username,
-                password=temporary_password,  # Contraseña en texto plano
-                expiration_hours=48
+                expiration_hours=24
             )
+            
+            # Guardar el token para el usuario (invalidar anteriores)
+            token_payload = simple_auto_login_service.decode_auto_login_token(auto_login_token)
+            if token_payload and token_payload.get("token_id"):
+                await simple_auto_login_service.upsert_user_token(
+                    self.db, 
+                    token_payload["token_id"], 
+                    user.id, 
+                    None
+                )
             
             logger.info(f"JWT de auto-login generado para {user.str_username}")
             
-            # ============================================
-            # PASO 5: Actualizar contraseña en la base de datos
-            # ============================================
-            hashed_password = security_manager.create_password_hash(temporary_password)
-            user.str_password_hash = hashed_password
-            user.updated_at = datetime.now()
-            
-            # COMMIT O FLUSH según el modo
+            # COMMIT O FLUSH según el modo (sin cambios de contraseña)
             if auto_commit:
                 await self.db.commit()
-                logger.info(f"Contraseña actualizada y confirmada (commit) para user_id={user_id}")
             else:
                 await self.db.flush()
-                logger.info(f"Contraseña actualizada (flush) para user_id={user_id}")
             
             # ============================================
             # PASO 6: Registrar notificación en estado "pending"
@@ -1311,7 +1305,7 @@ class ResidentialUnitService:
                     firstname=data_user.str_firstname,
                     lastname=data_user.str_lastname,
                     username=user.str_username,
-                    password=temporary_password,  # Contraseña sin hashear
+                    password=None,  # Ya no se envía contraseña temporal
                     residential_unit_name=residential_unit.str_name,
                     apartment_number=user_unit.str_apartment_number,
                     voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
@@ -1579,6 +1573,24 @@ class ResidentialUnitService:
             # Obtener el nombre de la unidad residencial para el email
             unit = await self.get_residential_unit_by_id(unit_id)
             unit_name = unit.str_name if unit else "la unidad residencial"
+            
+            # Generar token de auto-login
+            from app.services.simple_auto_login_service import SimpleAutoLoginService
+            auto_login_service = SimpleAutoLoginService()
+            auto_login_token = auto_login_service.generate_auto_login_token(
+                username=username,
+                expiration_hours=24
+            )
+            
+            # Guardar el token para el usuario (invalidar anteriores)
+            token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
+            if token_payload and token_payload.get("token_id"):
+                await auto_login_service.upsert_user_token(
+                    self.db, 
+                    token_payload["token_id"], 
+                    user.id, 
+                    None
+                )
 
             try:
                 await email_svc.send_administrator_credentials_email(
@@ -1587,7 +1599,8 @@ class ResidentialUnitService:
                     lastname=admin_data.str_lastname,
                     username=username,
                     password=default_password,
-                    residential_unit_name=unit_name
+                    residential_unit_name=unit_name,
+                    auto_login_token=auto_login_token
                 )
 
                 logger.info(f"Email de credenciales enviado a {admin_data.str_email}")
@@ -1956,9 +1969,18 @@ class ResidentialUnitService:
             auto_login_service = SimpleAutoLoginService()
             auto_login_token = auto_login_service.generate_auto_login_token(
                 username=username,  # Username en minúsculas
-                password=password,  # Contraseña sin hashear
-                expiration_hours=48
+                expiration_hours=24
             )
+            
+            # Guardar el token para el usuario (invalidar anteriores)
+            token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
+            if token_payload and token_payload.get("token_id"):
+                await auto_login_service.upsert_user_token(
+                    self.db, 
+                    token_payload["token_id"], 
+                    user.id, 
+                    None
+                )
             
             logger.info(f"🎟️ Token de auto-login generado para {username}")
             

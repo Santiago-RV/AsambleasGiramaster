@@ -46,8 +46,8 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 								</h2>
 								<p className="text-green-100 flex items-center gap-2">
 									<Building2 size={16} />
-									{meetingDetails.residential_unit.name}
-								</p>
+								{meetingDetails.residential_unit?.name || meetingDetails.residential_unit_name}
+							</p>
 							</div>
 						</div>
 						<button
@@ -340,13 +340,13 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 										Nombre
 									</p>
 									<p className="font-semibold text-gray-800">
-										{meetingDetails.residential_unit.name}
+										{meetingDetails.residential_unit?.name || meetingDetails.residential_unit_name}
 									</p>
 									<p className="text-sm text-gray-600 mt-3">
 										NIT
 									</p>
 									<p className="font-semibold text-gray-800">
-										{meetingDetails.residential_unit.nit}
+										{meetingDetails.residential_unit?.nit || meetingDetails.residential_unit_nit}
 									</p>
 								</div>
 							</div>

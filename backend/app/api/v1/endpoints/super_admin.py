@@ -684,7 +684,7 @@ async def get_active_meeting_details(
                         "ended_at": poll.ended_at.isoformat() if poll.ended_at else None,
                         "total_votes": poll.total_votes,
                         "requires_quorum": poll.requires_quorum,
-                        "minimum_quorum_percentage": float(poll.minimum_quorum_percentage)
+                        "minimum_quorum_percentage": float(poll.minimum_quorum_percentage) if poll.minimum_quorum_percentage is not None else 0
                     }
                     for poll in meeting_details.polls
                 ]

@@ -210,6 +210,7 @@ class RateLimiter:
     endpoint_limits = {
       "/api/v1/auth/login": {"max_requests": 20, "window_minutes": 15},  # Login: 5 intentos en 15 min
       "/api/v1/auth/register": {"max_requests": 3, "window_minutes": 60},  # Registro: 3 en 1 hora
+      "/api/v1/auth/register-participation": {"max_requests": 100, "window_minutes": 60},  # Participación en reuniones
       "/api/v1/residents/generate-auto-login": {"max_requests": 30, "window_minutes": 60},  # QR generation
       "/api/v1/residents/send-qr-email": {"max_requests": 10, "window_minutes": 60},  # Email QR
       "/api/v1/residents/generate-qr-bulk-simple": {"max_requests": 50, "window_minutes": 60},  # Bulk QR tokens

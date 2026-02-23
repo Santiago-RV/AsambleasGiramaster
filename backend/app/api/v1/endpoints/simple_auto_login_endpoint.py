@@ -8,9 +8,11 @@ from app.schemas.responses_schema import SuccessResponse
 from app.services.simple_auto_login_service import simple_auto_login_service
 from app.services.user_service import UserService
 from app.services.meeting_service import MeetingService
-from app.auth.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.services.session_service import SessionService
+from app.auth.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_token_jti
 from app.core.security import security_manager
 from app.core.logging_config import get_logger
+from app.core.exceptions import ServiceException
 from sqlalchemy import select
 from app.models.data_user_model import DataUserModel
 
@@ -67,9 +69,9 @@ async def auto_login_simple(
             )
         
         username = credentials["username"]
-        password = credentials["password"]
+        token_id = credentials.get("token_id")
         
-        # Verificar credenciales con la base de datos
+        # Obtener usuario de la base de datos primero
         user_service = UserService(db)
         user = await user_service.get_user_by_username(username)
         
@@ -80,13 +82,15 @@ async def auto_login_simple(
                 detail="Usuario no encontrado"
             )
         
-        # Verificar contraseña
-        if not security_manager.verify_password(password, user.str_password_hash):
-            logger.warning(f"Contraseña incorrecta para: {username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Credenciales inválidas"
-            )
+        # Verificar si el token es válido para este usuario
+        if token_id:
+            token_valid = await simple_auto_login_service.is_token_valid_for_user(db, token_id, user.id)
+            if not token_valid:
+                logger.warning(f"Token inválido para el usuario {username}: {token_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_410_GONE,
+                    detail="Este enlace de acceso ya no es válido. Solicita uno nuevo."
+                )
         
         # Verificar que el usuario tiene acceso permitido
         if not user.bln_allow_entry:
@@ -118,10 +122,33 @@ async def auto_login_simple(
             expires_delta=access_token_expires
         )
         
+        # Crear sesión en la base de datos
+        token_jti = get_token_jti(access_token)
+        if token_jti:
+            try:
+                session_service = SessionService(db)
+                await session_service.create_session(
+                    user_id=user.id,
+                    token_jti=token_jti,
+                    ip_address=client_ip,
+                    device_info=request.headers.get("User-Agent", "Unknown")
+                )
+            except Exception as e:
+                logger.warning(f"No se pudo crear la sesión: {str(e)}")
+        
         logger.info(
             f"✅ Auto-login exitoso: user_id={user.id}, "
             f"username={user.str_username}, role={user.rol.str_name}"
         )
+        
+        # Actualizar el token del usuario (nuevo: upsert)
+        if token_id:
+            try:
+                await simple_auto_login_service.upsert_user_token(
+                    db, token_id, user.id, client_ip
+                )
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar el token: {str(e)}")
         
         # Registro automatico de asistencia para copropietarios (rol 3) e invitados (rol 4)
         # Si hay una reunion presencial "En Curso" en su unidad residencial y tienen invitacion
@@ -175,8 +202,17 @@ async def auto_login_simple(
         
     except HTTPException:
         raise
+    except ServiceException as e:
+        logger.error(
+            f"❌ Error de servicio en auto-login: {e.message} | "
+            f"Detalles: {e.details}"
+        )
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.message
+        )
     except Exception as e:
-        logger.error(f"❌ Error inesperado en auto-login: {str(e)}")
+        logger.error(f"❌ Error inesperado en auto-login: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al procesar el auto-login"

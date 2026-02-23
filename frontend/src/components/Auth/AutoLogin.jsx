@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { publicAxios } from '../../services/api/axiosconfig';
 import Swal from 'sweetalert2';
@@ -12,8 +12,13 @@ const AutoLogin = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState('processing'); // processing, success, error
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
+    // Guard: evitar doble ejecucion (React StrictMode monta 2 veces en dev)
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+
     const processAutoLogin = async () => {
       if (!token) {
         setStatus('error');

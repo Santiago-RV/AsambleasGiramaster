@@ -17,6 +17,8 @@ from .poll_response_model import PollResponseModel
 from .email_notification_model import EmailNotificationModel
 from .audit_log_model import AuditLogModel
 from .system_config_model import SystemConfigModel
+from .used_auto_login_token_model import UsedAutoLoginTokenModel
+from .user_session_model import UserSessionModel
 
 __all__ = [
     "DataUserModel",
@@ -36,5 +38,7 @@ __all__ = [
     "PollResponseModel",
     "EmailNotificationModel",
     "AuditLogModel",
-    "SystemConfigModel"
+    "SystemConfigModel",
+    "UsedAutoLoginTokenModel",
+    "UserSessionModel"
 ]

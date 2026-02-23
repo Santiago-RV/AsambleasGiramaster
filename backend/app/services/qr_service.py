@@ -196,9 +196,8 @@ class QRCodeService:
         self,
         user_id: int,
         username: str,
-        password: str,
         user_info: Dict,
-        expiration_hours: int = 48
+        expiration_hours: int = 24
     ) -> Dict[str, str]:
         """
         Genera todos los datos necesarios para el QR de un usuario
@@ -206,7 +205,7 @@ class QRCodeService:
         Args:
             user_id: ID del usuario
             username: Nombre de usuario
-            password: Contraseña temporal
+            user_info: Información adicional del usuario
             user_info: Información adicional del usuario
             expiration_hours: Horas de expiración
             
@@ -214,10 +213,9 @@ class QRCodeService:
             Dict con token, URL y QR en base64
         """
         try:
-            # Generar token de auto-login
+            # Generar token de auto-login (sin contraseña)
             auto_login_token = simple_auto_login_service.generate_auto_login_token(
                 username=username,
-                password=password,
                 expiration_hours=expiration_hours
             )
             
@@ -260,7 +258,7 @@ class QRCodeService:
     def generate_bulk_qr_codes(
         self,
         users_data: list,
-        expiration_hours: int = 48
+        expiration_hours: int = 24
     ) -> list:
         """
         Genera códigos QR para múltiples usuarios
@@ -268,7 +266,7 @@ class QRCodeService:
         Args:
             users_data: Lista de diccionarios con información de usuarios
             expiration_hours: Horas de expiración
-            
+             
         Returns:
             List de diccionarios con QR data para cada usuario
         """
@@ -278,9 +276,8 @@ class QRCodeService:
             try:
                 user_id = user_data.get('user_id')
                 username = user_data.get('username')
-                password = user_data.get('password')
                 
-                if not all([user_id, username, password]):
+                if not all([user_id, username]):
                     logger.warning(f"Datos incompletos para usuario ID {user_id}")
                     continue
                 
@@ -296,7 +293,6 @@ class QRCodeService:
                 qr_data = self.generate_user_qr_data(
                     user_id=user_id,
                     username=username,
-                    password=password,
                     user_info=qr_user_info,
                     expiration_hours=expiration_hours
                 )

@@ -228,20 +228,22 @@ async def generate_qr_simple(
         target_user, target_data_user, user_residential_unit, residential_unit = \
             await _get_user_complete_data(db, request.userId)
         
-        # Generar contraseña temporal
-        temp_password = _generate_temporary_password()
-        logger.info(f"🔐 Contraseña temporal generada para {target_user.str_username}")
-        
-        # Actualizar hash en BD
-        await _update_user_password(db, target_user, temp_password)
-        logger.info(f"✅ Hash actualizado en BD para user_id={request.userId}")
-        
-        # Generar token JWT con contraseña temporal
+        # Generar token JWT (sin contraseña - solo valida el token)
         auto_login_token = simple_auto_login_service.generate_auto_login_token(
             username=target_user.str_username,
-            password=temp_password,
-            expiration_hours=48
+            expiration_hours=24
         )
+        
+        # Guardar el token para el usuario (invalidar anteriores)
+        from app.services.simple_auto_login_service import simple_auto_login_service as sal_service
+        token_payload = sal_service.decode_auto_login_token(auto_login_token)
+        if token_payload and token_payload.get("token_id"):
+            await sal_service.upsert_user_token(
+                db, 
+                token_payload["token_id"], 
+                target_user.id, 
+                None
+            )
         
         # Construir URL del frontend
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://10.1.1.171:5173')
@@ -256,7 +258,7 @@ async def generate_qr_simple(
             data=SimpleQRResponse(
                 auto_login_token=auto_login_token,
                 auto_login_url=auto_login_url,
-                expires_in_hours=48
+                expires_in_hours=24
             ),
             message="Código QR generado exitosamente"
         )
@@ -319,10 +321,19 @@ async def generate_enhanced_qr(
         qr_data = qr_service.generate_user_qr_data(
             user_id=target_user.id,
             username=target_user.str_username,
-            password=temp_password,
             user_info=user_info,
-            expiration_hours=request.expiration_hours
+            expiration_hours=request.expiration_hours if request.expiration_hours else 24
         )
+        
+        # Guardar el token para el usuario (invalidar anteriores)
+        token_payload = simple_auto_login_service.decode_auto_login_token(qr_data['auto_login_token'])
+        if token_payload and token_payload.get("token_id"):
+            await simple_auto_login_service.upsert_user_token(
+                db, 
+                token_payload["token_id"], 
+                target_user.id, 
+                None
+            )
         
         logger.info(f"🎯 QR mejorado generado para {user_info.get('name', 'Unknown')}")
         
@@ -395,13 +406,12 @@ async def send_enhanced_qr_email(
             'role': 'Admin' if target_user.int_id_rol in [1, 2] else 'Resident'
         }
         
-        # Generar QR con contraseña temporal
+        # Generar QR (sin contraseña)
         qr_data = qr_service.generate_user_qr_data(
             user_id=target_user.id,
             username=target_user.str_username,
-            password=temp_password,
             user_info=user_info,
-            expiration_hours=48
+            expiration_hours=24
         )
         
         # Enviar correo con QR (pasar el QR base64 ya generado)
@@ -599,18 +609,21 @@ async def generate_qr_bulk_simple(
         # Procesar cada usuario
         for target_user, target_data_user, user_residential_unit in users_data:
             try:
-                # Generar contraseña temporal
-                temp_password = _generate_temporary_password()
-                
-                # Actualizar hash en BD
-                await _update_user_password(db, target_user, temp_password)
-                
-                # Generar token de auto-login
+                # Generar token de auto-login (sin contraseña)
                 token = simple_auto_login_service.generate_auto_login_token(
                     username=target_user.str_username,
-                    password=temp_password,
-                    expiration_hours=request.expiration_hours
+                    expiration_hours=request.expiration_hours if request.expiration_hours else 24
                 )
+                
+                # Guardar el token para el usuario (invalidar anteriores)
+                token_payload = simple_auto_login_service.decode_auto_login_token(token)
+                if token_payload and token_payload.get("token_id"):
+                    await simple_auto_login_service.upsert_user_token(
+                        db, 
+                        token_payload["token_id"], 
+                        target_user.id, 
+                        None
+                    )
                 
                 # Construir URL de auto-login
                 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")

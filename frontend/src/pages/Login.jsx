@@ -5,9 +5,16 @@ import { User, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import Swal from 'sweetalert2';
 import logo from '../assets/logo-giramaster.jpeg';
 import background from '../assets/background_giramaster.jpeg';
+import MeetingParticipationModal from '../components/common/MeetingParticipationModal';
+import { publicAxios } from '../services/api/axiosconfig';
+import { AuthService } from '../services/api/AuthService';
 
 const Login = () => {
 	const [showPassword, setShowPassword] = useState(false);
+	const [showMeetingModal, setShowMeetingModal] = useState(false);
+	const [activeMeeting, setActiveMeeting] = useState(null);
+	const [isRegisteringParticipation, setIsRegisteringParticipation] = useState(false);
+	const [loggedInUser, setLoggedInUser] = useState(null);
 
 	const {
 		register,
@@ -20,21 +27,44 @@ const Login = () => {
 			rememberMe: false,
 		},
 	});
-	const { login } = useAuth();
+	const { login, navigateByRole } = useAuth();
 
 	const onSubmit = async (data) => {
 		try {
-			// Mapear 'usuario' a 'username' que es lo que espera el backend
 			const credentials = {
 				username: data.username,
 				password: data.password,
 			};
 
 			await login(credentials);
+			
+			// Obtener datos del usuario desde localStorage
+			const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+			
+			// Mostrar mensaje de éxito
+			Swal.fire({
+				icon: 'success',
+				title: 'Inicio de Sesión Exitoso',
+				text: 'Bienvenido al sistema',
+				timer: 2000,
+				showConfirmButton: false,
+			});
+
+			// Verificar si hay una reunión activa
+			// Los datos vienen en AuthService y se almacenan también en data
+			const authData = AuthService.getLastAuthData?.() || null;
+			
+			if (authData && authData.active_meeting) {
+				setLoggedInUser(storedUser);
+				setActiveMeeting(authData.active_meeting);
+				setShowMeetingModal(true);
+			} else {
+				// Si no hay modal, navegar inmediatamente
+				navigateByRole(storedUser.role);
+			}
 		} catch (error) {
 			console.error('Error al iniciar sesión:', error);
 
-			// Obtener mensaje de error de manera segura
 			let errorMessage = 'Error al iniciar sesión';
 
 			if (error.response?.data) {
@@ -53,6 +83,65 @@ const Login = () => {
 				confirmButtonText: 'Cerrar',
 				confirmButtonColor: '#2563eb',
 			});
+		}
+	};
+
+	const handleConfirmParticipation = async () => {
+		if (!activeMeeting || !loggedInUser) return;
+		
+		setIsRegisteringParticipation(true);
+		try {
+			const token = localStorage.getItem('access_token');
+			await publicAxios.post(
+				`/auth/register-participation?meeting_id=${activeMeeting.id}`,
+				{},
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				}
+			);
+			
+			Swal.fire({
+				icon: 'success',
+				title: 'Participación Registrada',
+				text: activeMeeting.already_participated 
+					? 'Su reconexión ha sido registrada correctamente'
+					: 'Su participación ha sido registrada correctamente',
+				confirmButtonColor: '#2563eb',
+			});
+			
+			setShowMeetingModal(false);
+			// Navegar después de registrar participación
+			navigateByRole(loggedInUser.role);
+		} catch (error) {
+			console.error('Error al registrar participación:', error);
+			
+			let errorMessage = 'No se pudo registrar la participación. Intente más tarde.';
+			
+			if (error.response?.status === 429) {
+				errorMessage = 'Demasiadas peticiones. Espere un momento e intente de nuevo.';
+			} else if (error.response?.data?.detail) {
+				errorMessage = error.response.data.detail;
+			}
+			
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: errorMessage,
+				confirmButtonColor: '#2563eb',
+			});
+		} finally {
+			setIsRegisteringParticipation(false);
+		}
+	};
+
+	const handleDeclineParticipation = () => {
+		setShowMeetingModal(false);
+		setActiveMeeting(null);
+		// Navegar cuando el usuario decline el modal
+		if (loggedInUser) {
+			navigateByRole(loggedInUser.role);
 		}
 	};
 
@@ -239,6 +328,14 @@ const Login = () => {
 					</p>
 				</div>
 			</div>
+
+			<MeetingParticipationModal
+				show={showMeetingModal}
+				meeting={activeMeeting}
+				onConfirm={handleConfirmParticipation}
+				onDecline={handleDeclineParticipation}
+				isLoading={isRegisteringParticipation}
+			/>
 		</div>
 	);
 };

@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Video, FileText, Settings, LogOut, HandCoins } from 'lucide-react';
+import { Users, Video, FileText, HandCoins, LogOut, Calendar } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DashboardLayout from "../components/layout/DashboardLayout";
 import UsersPage from "../components/AdDashboard/UsersPage";
 import AssembliesPage from "../components/AdDashboard/AssembliesPage";
 import LivePage from "../components/AdDashboard/LivePage";
 import ReportsPage from "../components/AdDashboard/ReportsPage";
-import SettingsPage from "../components/AdDashboard/SettingsPage";
 import PowersManagementPage from "../components/AdDashboard/PowersManagementPage";
+import ReunionEnCursoTab from "../components/AdDashboard/ReunionEnCursoTab";
 import PowerModal from "../components/AdDashboard/PowerModal";
 import ResidentModal from "../components/saDashboard/components/modals/ResidentModal";
 import ExcelUploadModal from "../components/saDashboard/components/modals/ExcelUploadModal";
@@ -44,6 +44,9 @@ export default function AppAdmin() {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
   const [showGuestModal, setShowGuestModal] = useState(false);
+  
+  // Verificar si es admin o superadmin
+  const isAdmin = user?.role === 'Super Administrador' || user?.role === 'Administrador';
 
   // Hook para operaciones de invitados
   const { createGuestMutation } = useGuestOperations(residentialUnitId);
@@ -96,9 +99,9 @@ export default function AppAdmin() {
     { id: 'users', label: 'Gestión de Copropietarios', icon: Users },
     // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
+    ...(isAdmin ? [{ id: 'meeting-progress', label: 'Reunión en Curso', icon: Calendar }] : []),
     { id: 'powers', label: 'Poderes', icon: HandCoins },
     { id: 'reports', label: 'Reportes', icon: FileText },
-    { id: 'settings', label: 'Configuración', icon: Settings },
   ];
 
   // Títulos para cada sección
@@ -106,9 +109,9 @@ export default function AppAdmin() {
     users: "Gestión de Co - propietarios",
     // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
+    ...(isAdmin ? { "meeting-progress": "Reunión en Curso" } : {}),
     powers: "Gestión de Poderes",
     reports: "Reportes",
-    settings: "Configuración",
   };
 
   const openPowerModal = (fromLabel, onConfirm) => {
@@ -520,15 +523,6 @@ export default function AppAdmin() {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Configuración */}
-        <button
-          onClick={() => setSection('settings')}
-          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Configuración"
-        >
-          <Settings size={20} />
-        </button>
-
         {/* Separador */}
         <div className="w-px h-8 bg-gray-300"></div>
 
@@ -555,31 +549,14 @@ export default function AppAdmin() {
 
         </div>
 
-        {/* Cerrar sesión con menú desplegable */}
-        <div className="relative group">
-          <button
-            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Cerrar sesión"
-          >
-            <LogOut size={20} />
-          </button>
-
-          {/* Menú desplegable */}
-          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-            <button
-              onClick={() => setSection('users')}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors"
-            >
-              Volver al Inicio
-            </button>
-            <button
-              onClick={logout}
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg transition-colors"
-            >
-              Cerrar Sesión
-            </button>
-          </div>
-        </div>
+        {/* Cerrar sesión */}
+        <button
+          onClick={logout}
+          className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          title="Cerrar sesión"
+        >
+          <LogOut size={20} />
+        </button>
       </div>
     </div>
   );
@@ -632,9 +609,9 @@ export default function AppAdmin() {
         />
       )}
       {section === "live" && <LivePage />}
+      {section === "meeting-progress" && <ReunionEnCursoTab />}
       {section === "powers" && <PowersManagementPage />}
       {section === "reports" && <ReportsPage />}
-      {section === "settings" && <SettingsPage />}
 
       <ResidentModal
         isOpen={showUserForm}

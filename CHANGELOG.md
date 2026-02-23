@@ -9,6 +9,102 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-02-23 - Sistema de sesiones y control de acceso
+
+- **Sesiones de usuarios**: Sistema completo para gestionar sesiones activas de usuarios.
+  - **Backend - Modelo** (`backend/app/models/user_session_model.py`):
+    - Nueva tabla `tbl_user_sessions` con campos: user_id, token_jti, device_info, ip_address, created_at, expires_at, is_active.
+  - **Backend - Modelo** (`backend/app/models/used_auto_login_token_model.py`):
+    - Nueva tabla `tbl_used_auto_login_tokens` para validar tokens de un solo uso.
+  - **Backend - Servicio** (`backend/app/services/session_service.py`):
+    - Métodos: create_session, get_active_sessions, deactivate_session, deactivate_all_sessions, deactivate_user_session_by_admin.
+  - **Backend - Endpoints** (`backend/app/api/v1/endpoints/session_endpoint.py`, `admin_session_endpoint.py`):
+    - GET/DELETE /auth/sessions - Gestión de sesiones propias.
+    - GET/DELETE /admin/sessions/{user_id} - Admin puede ver y cerrar sesiones de otros usuarios.
+
+- **Mejoras en autenticación**:
+  - **Backend - Auth** (`backend/app/auth/auth.py`):
+    - Todos los tokens de acceso ahora incluyen JTI único (UUID).
+    - Nueva función `get_token_jti()` para extraer el JTI del token.
+  - **Backend - Login** (`backend/app/api/v1/endpoints/auth_endpoint.py`):
+    - Login normal ahora crea sesión automáticamente en BD.
+  - **Backend - Auto-login** (`backend/app/api/v1/endpoints/simple_auto_login_endpoint.py`):
+    - Auto-login ahora crea sesión automáticamente en BD.
+
+- **Tokens de auto-login mejorados**:
+  - **Backend - Servicio** (`backend/app/services/simple_auto_login_service.py`):
+    - Expiración reducida de 48h a 24h.
+    - Tokens de un solo uso: se validan contra BD antes de permitir acceso.
+    - El token ya no contiene contraseña (solo username y token_id).
+    - Validación de fecha en generación (evita tokens con expiración en el pasado).
+  - **Backend - QR Endpoints** (`backend/app/api/v1/endpoints/qr_endpoints.py`):
+    - Generación de QR ya no modifica la contraseña del usuario.
+  - **Backend - Residential Service** (`backend/app/services/residential_unit_service.py`):
+    - Envío de credenciales ya no cambia la contraseña del usuario.
+
+- **Correcciones de correo electrónico**:
+  - **Backend - Email Service** (`backend/app/services/email_service.py`):
+    - Parámetro opcional `auto_login_token` en send_administrator_credentials_email.
+  - **Template** (`backend/app/templates/admin_invitation.html`):
+    - Ahora muestra enlace de acceso con "UN SOLO USO" y "válido por 24 horas".
+    - Contraseña temporal solo como fallback si no hay token.
+
+- **Cambios en el Dashboard del Administrador**:
+  - **Frontend** (`frontend/src/pages/AdDashboard.jsx`):
+    - Eliminado tab "Reuniones Activas" (solo disponible para Super Administrador).
+    - Eliminado import de ReunionActivaTab y Calendar icon.
+  - **Frontend** (`frontend/src/components/saDashboard/ReunionActivaTab.jsx`):
+    - Simplificado para usar solo endpoints de superadmin.
+    - Eliminada lógica condicional por rol.
+
+#### 2026-02-20 - Sistema de invitación a reuniones y mejoras
+
+- **Sistema de invitación a reuniones programadas**: Permite invitar copropietarios a reuniones desde la lista de residentes.
+  - **Backend - Schema** (`backend/app/schemas/meeting_invitation_schema.py`):
+    - Nuevo schema `MeetingInvitationBatchCreate` para recibir lista de user_ids y meeting_id.
+  - **Backend - Servicio** (`backend/app/services/meeting_invitation_service.py`):
+    - Nuevo método `create_batch_invitations()` con obtención automática de voting_weight y apartment_number desde UserResidentialUnitModel.
+    - Envío automático de correos de invitación.
+    - Actualización automática del contador `int_total_invitated` en la reunión.
+  - **Backend - Endpoint** (`backend/app/api/v1/endpoints/administrator.py`):
+    - Nuevo endpoint `POST /meeting-invitations/invitations/batch`.
+  - **Frontend - Servicio** (`frontend/src/services/api/MeetingService.js`):
+    - Nuevo método `createBatchInvitations(meetingId, userIds)`.
+  - **Frontend - Componentes**:
+    - `ResidentsList.jsx`: Modal de invitación con selector de reuniones programadas, integración en barra de acciones masivas.
+    - `ResidentesTab.jsx`: Botón de invitación con selección múltiple de residentes.
+
+- **Corrección de asistencia duplicada en auto-login**: Evita registros duplicados en tbl_meeting_attendances al registrar asistencia automáticamente.
+  - **Backend - Servicio** (`backend/app/services/meeting_service.py`):
+    - Verificación adicional de existencia de registro en tbl_meeting_attendances antes de crear nuevo.
+    - Retorna información de registro existente si ya existe.
+  - **Backend - Modelo** (`backend/app/models/meeting_attendance_model.py`):
+    - Valores por defecto agregados (default=None, default=0) para evitar errores de constraints en la base de datos.
+
+- **Corrección de UI en barra de acciones masivas**: Botones organizados en diseño responsive.
+  - **Frontend - ResidentsList.jsx**:
+    - Nueva barra de acciones con diseño flex-wrap que evita desbordamiento.
+    - Botones más compactos: padding reducido, texto más corto.
+    - Botón "Invitar" integrado junto con Credenciales, PDF QRs, Habilitar, Deshabilitar.
+
+- **Limpieza de archivos sin uso**: Eliminados componentes y archivos no utilizados del proyecto.
+  - Eliminados 9 componentes sin uso: ReunionesTab.jsx, ZoomConfigWizard.jsx, PollCard.jsx, PollDetailModal.jsx, Main.jsx, VotingItem.jsx, AssemblyPage.jsx, UsersTable.jsx, StatCard.jsx.
+  - Eliminada página sin uso: SADashboard.jsx.
+  - Eliminado hook sin uso: UseAxios.js.
+  - Eliminados servicios sin usar: api/index.js, residentialUnitService.js.
+  - Eliminados archivos de backup: ConfiguracionTab.jsx.old, ConfiguracionTab.jsx.backup.
+
+### Cambios de Dependencias
+
+- **Migración de xlsx a exceljs**: 
+  - Eliminado paquete `xlsx` del proyecto.
+  - Migrada funcionalidad de exportación Excel a `exceljs@4.1.1`.
+  - Reescrita función `handleDownloadExcel()` en ResidentsList.jsx para usar la nueva librería.
+
+- **Corrección de vulnerabilidades npm**:
+  - Agregado `overrides` en package.json para forzar `minimatch@10.2.1`.
+  - Reducción de vulnerabilidades de 13 (10 altas) a 5 (todas moderadas, sin fix disponible de eslint).
+
 #### 2026-02-14 - Modalidad Virtual/Presencial en reuniones y corrección de credenciales Zoom
 
 - **Selector de modalidad al crear reunión**: Al agendar una asamblea, se muestra un modal previo que permite elegir entre reunión **Virtual** (Zoom) o **Presencial**, con tarjetas ilustrativas.

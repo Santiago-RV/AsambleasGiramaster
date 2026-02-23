@@ -330,10 +330,23 @@
                     <div class="credential-value">{{ username }}</div>
                 </div>
 
+                {% if auto_login_url %}
+                <!-- Información del enlace de acceso -->
+                <div style="background-color: #FEF3C7; border: 2px solid #F59E0B; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                    <div style="color: #92400E; font-size: 16px; font-weight: 600; margin-bottom: 15px;">⚠️ Importante - Lea antes de acceder</div>
+                    <ul style="color: #92400E; font-size: 14px; margin-left: 20px; line-height: 1.8;">
+                        <li><strong>Este enlace de acceso es de UN SOLO USO</strong></li>
+                        <li>El enlace es <strong>válido por 24 horas</strong></li>
+                        <li>Una vez usado, necesitarás solicitar uno nuevo</li>
+                        <li>Por seguridad, no comparta este enlace con nadie</li>
+                    </ul>
+                </div>
+                {% else %}
                 <div class="credential-box">
                     <div class="credential-label">Contraseña Temporal</div>
                     <div class="credential-value">{{ password }}</div>
                 </div>
+                {% endif %}
 
                 <div class="credential-box">
                     <div class="credential-label">Unidad Residencial</div>
@@ -345,9 +358,12 @@
             <div class="warning-box">
                 <div class="warning-title">Importante</div>
                 <div class="warning-text">
+                    {% if auto_login_url %}
+                    Este enlace de acceso es de un solo uso y válido por 24 horas.
+                    {% else %}
                     Por razones de seguridad, te recomendamos <strong>cambiar tu contraseña</strong>
-                    en tu primer inicio de sesión. Esta contraseña es temporal y debes actualizarla
-                    desde tu perfil.
+                    en tu primer inicio de sesión.
+                    {% endif %}
                 </div>
             </div>
 
@@ -355,11 +371,18 @@
             <div class="steps-section">
                 <div class="steps-title">Próximos Pasos</div>
                 <ol class="steps-list">
+                    {% if auto_login_url %}
+                    <li>Haz clic en el botón de acceso rápido untenlace</li>
+                    <li>Explora el panel de administración</li>
+                    <li>Configura los parámetros de la unidad residencial</li>
+                    <li>Comienza a gestionar reuniones y copropietarios</li>
+                    {% else %}
                     <li>Ingresa a la plataforma con tus credenciales</li>
                     <li>Cambia tu contraseña temporal por una segura</li>
                     <li>Explora el panel de administración</li>
                     <li>Configura los parámetros de la unidad residencial</li>
                     <li>Comienza a gestionar reuniones y copropietarios</li>
+                    {% endif %}
                 </ol>
             </div>
 

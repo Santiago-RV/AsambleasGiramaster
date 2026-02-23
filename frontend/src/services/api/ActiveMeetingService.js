@@ -18,9 +18,8 @@ export const getActiveMeetings = async () => {
 	}
 };
 
-/**
- * Obtiene los detalles completos de una reunión activa
- * @param {number} meetingId - ID de la reunión
+
+/* @param {number} meetingId - ID de la reunión
  * @returns {Promise} - Promesa con los detalles de la reunión
  */
 export const getActiveMeetingDetails = async (meetingId) => {
@@ -35,9 +34,8 @@ export const getActiveMeetingDetails = async (meetingId) => {
 	}
 };
 
-/**
- * Calcula la duración de una reunión desde su inicio
- * @param {string} startTimeISO - Fecha/hora de inicio en formato ISO
+
+/* @param {string} startTimeISO - Fecha/hora de inicio en formato ISO
  * @returns {string} - Duración formateada (ej: "1h 23m")
  */
 export const calculateMeetingDuration = (startTimeISO) => {
