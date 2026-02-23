@@ -18,7 +18,7 @@ from app.schemas.responses_schema import SuccessResponse
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/super-admin/reports", tags=["SA Reports"])
+router = APIRouter()
 
 
 async def _verify_superadmin(current_user: str, db: AsyncSession):
@@ -160,7 +160,7 @@ async def get_polls_report(
     polls_result = await db.execute(
         select(PollModel)
         .where(PollModel.int_meeting_id == meeting_id)
-        .order_by(PollModel.dat_created_at)
+        .order_by(PollModel.created_at)
     )
     polls = polls_result.scalars().all()
 
@@ -218,7 +218,7 @@ async def get_polls_report(
             "title": poll.str_title,
             "type": poll.str_poll_type,
             "status": poll.str_status,
-            "created_at": poll.dat_created_at.isoformat() if poll.dat_created_at else None,
+            "created_at": poll.created_at.isoformat() if poll.created_at else None,
             "options": list(options_map.values()),
             "abstentions": abstentions,
             "total_voters": len(responses),
