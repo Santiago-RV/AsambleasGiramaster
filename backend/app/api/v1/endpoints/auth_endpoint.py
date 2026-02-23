@@ -202,49 +202,48 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     
     # Verificar si hay reunión activa donde el usuario está invitado
     active_meeting_info = None
-    if exists_user.int_id_rol in (3, 4):  # Copropietario o Invitado
-        try:
-            from app.models.meeting_model import MeetingModel
-            from app.models.meeting_invitation_model import MeetingInvitationModel
-            
-            logger.info(f"Buscando reunión activa para usuario {exists_user.id}, rol {exists_user.int_id_rol}")
-            
-            # Buscar reunión "En Curso" donde el usuario está invitado
-            # Simplificado: solo verificar que el usuario tenga invitación a una reunión activa
-            meeting_query = (
-                select(MeetingModel, MeetingInvitationModel)
-                .join(
-                    MeetingInvitationModel,
-                    and_(
-                        MeetingInvitationModel.int_meeting_id == MeetingModel.id,
-                        MeetingInvitationModel.int_user_id == exists_user.id
-                    )
+    try:
+        from app.models.meeting_model import MeetingModel
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        
+        logger.info(f"Buscando reunión activa para usuario {exists_user.id}, rol {exists_user.int_id_rol}")
+        
+        # Buscar reunión "En Curso" donde el usuario está invitado
+        # Cualquier usuario con invitación a una reunión activa recibirá el modal
+        meeting_query = (
+            select(MeetingModel, MeetingInvitationModel)
+            .join(
+                MeetingInvitationModel,
+                and_(
+                    MeetingInvitationModel.int_meeting_id == MeetingModel.id,
+                    MeetingInvitationModel.int_user_id == exists_user.id
                 )
-                .where(MeetingModel.str_status == "En Curso")
             )
-            meeting_result = await db.execute(meeting_query)
-            meeting_data = meeting_result.first()
+            .where(MeetingModel.str_status == "En Curso")
+        )
+        meeting_result = await db.execute(meeting_query)
+        meeting_data = meeting_result.first()
+        
+        logger.info(f"Datos de reunión encontrados: {meeting_data}")
+        
+        if meeting_data:
+            meeting, invitation = meeting_data
+            is_connected = (invitation.bln_actually_attended == True) and (invitation.dat_left_at is None)
             
-            logger.info(f"Datos de reunión encontrados: {meeting_data}")
+            logger.info(f"Estado de conexión - attended: {invitation.bln_actually_attended}, left_at: {invitation.dat_left_at}, is_connected: {is_connected}")
             
-            if meeting_data:
-                meeting, invitation = meeting_data
-                is_connected = (invitation.bln_actually_attended == True) and (invitation.dat_left_at is None)
-                
-                logger.info(f"Estado de conexión - attended: {invitation.bln_actually_attended}, left_at: {invitation.dat_left_at}, is_connected: {is_connected}")
-                
-                active_meeting_info = {
-                    "id": meeting.id,
-                    "title": meeting.str_title,
-                    "description": meeting.str_description,
-                    "meeting_type": meeting.str_meeting_type,
-                    "already_participated": invitation.bln_actually_attended or False,
-                    "is_connected": is_connected,
-                    "joined_at": invitation.dat_joined_at.isoformat() if invitation.dat_joined_at else None,
-                    "left_at": invitation.dat_left_at.isoformat() if invitation.dat_left_at else None,
-                }
-        except Exception as e:
-            logger.warning(f"Error al verificar reunión activa: {str(e)}")
+            active_meeting_info = {
+                "id": meeting.id,
+                "title": meeting.str_title,
+                "description": meeting.str_description,
+                "meeting_type": meeting.str_meeting_type,
+                "already_participated": invitation.bln_actually_attended or False,
+                "is_connected": is_connected,
+                "joined_at": invitation.dat_joined_at.isoformat() if invitation.dat_joined_at else None,
+                "left_at": invitation.dat_left_at.isoformat() if invitation.dat_left_at else None,
+            }
+    except Exception as e:
+        logger.warning(f"Error al verificar reunión activa: {str(e)}")
     
     response_data = {
         "access_token": access_token, 

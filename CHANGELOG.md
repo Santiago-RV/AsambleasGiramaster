@@ -57,6 +57,33 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
     - Simplificado para usar solo endpoints de superadmin.
     - Eliminada lógica condicional por rol.
 
+- **Modal de participación/reconexión en login**:
+  - **Backend - Login** (`backend/app/api/v1/endpoints/auth_endpoint.py`):
+    - Verificación automática de reunión activa al hacer login.
+    - Retorna `active_meeting` en respuesta si el usuario tiene invitación a reunión "En Curso".
+    - Nuevo endpoint `POST /auth/register-participation` para registrar asistencia/reconexión.
+    - Eliminada condición de rol: cualquier usuario con invitación recibe el modal.
+  - **Backend - Rate Limiter** (`backend/app/core/security.py`):
+    - Límite aumentado para `/auth/register-participation` (100 req/hora).
+
+- **Frontend - Modal de participación** (`frontend/src/components/common/MeetingParticipationModal.jsx`):
+  - Nuevo componente que pregunta "¿Desea registrar participación?" o "¿Desea registrar su reconexión?".
+  - Muestra tipo de reunión y estado de conexión.
+
+- **Frontend - Integración de login** (`frontend/src/pages/Login.jsx`, `frontend/src/hooks/useAuth.js`, `frontend/src/services/api/AuthService.js`):
+  - Login muestra modal ANTES de redirigir si hay reunión activa.
+  - Botones "Participar" y "Más tarde".
+  - Registro de participación via API al confirmar.
+
+- **Lógica de conectado/desconectado**:
+  - Campo `is_connected` en respuesta: `bln_actually_attended == True` Y `dat_left_at == None`.
+  - Detección de reconexión: si `already_participated == True` y `is_connected == False`.
+
+- **Correcciones de errores**:
+  - Eliminación de imports duplicados de `select` y `and_` en auth_endpoint.py.
+  - Corrección de variable `logger` no definida.
+  - Mejora en manejo de errores 429 (rate limiter) en frontend.
+
 #### 2026-02-20 - Sistema de invitación a reuniones y mejoras
 
 - **Sistema de invitación a reuniones programadas**: Permite invitar copropietarios a reuniones desde la lista de residentes.
