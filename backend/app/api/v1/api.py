@@ -12,6 +12,7 @@ from app.api.v1.endpoints import zoom_signature_endpoint
 from app.api.v1.endpoints import simple_auto_login_endpoint
 from app.api.v1.endpoints import admin_coowners
 from app.api.v1.endpoints import delegation_endpoint
+from app.api.v1.endpoints import reports_superadmin_endpoint
 from app.auth.auth import get_current_user
 from app.api.v1.endpoints import guest_endpoint 
 from app.api.v1.endpoints import qr_endpoints
@@ -154,5 +155,15 @@ api_router.include_router(
     admin_session_endpoint.router,
     prefix="/admin",
     tags=["Admin - Sesiones"],
+    dependencies=[Depends(get_current_user)]
+)
+
+# ============================================
+# Reportes
+# ============================================
+api_router.include_router(
+    reports_superadmin_endpoint.router,
+    prefix="/super-admin/reports",
+    tags=["SA Reports"],
     dependencies=[Depends(get_current_user)]
 )

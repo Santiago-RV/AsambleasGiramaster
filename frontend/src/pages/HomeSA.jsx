@@ -4,7 +4,6 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import DashboardTab from '../components/saDashboard/DashboardTab';
 import UnidadesResidencialesTab from '../components/saDashboard/UnidadesResidencialesTab';
 import ReunionActivaTab from '../components/saDashboard/ReunionActivaTab';
-import InformesTab from '../components/saDashboard/InformesTab';
 import ConfiguracionTab from '../components/saDashboard/ConfiguracionTab';
 import PowersManagementPage from '../components/saDashboard/PowersManagementPage';
 import ZoomMeetingContainer from '../components/AdDashboard/ZoomMeetingContainer';
@@ -16,6 +15,7 @@ import { useGuestOperations } from '../components/saDashboard/hooks/useGuestOper
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { GuestService } from '../services/api/GuestService';
 import { MeetingService } from '../services/api/MeetingService';
+import InformesTab from '../components/saDashboard/components/InformesTab'; 
 import Swal from 'sweetalert2';
 
 const HomeSA = () => {
@@ -253,7 +253,7 @@ const HomeSA = () => {
 
 				{/* Perfil de usuario */}
 				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md">
+					<div className="w-10 h-10 rounded-full bg-linear-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md">
 						{user?.name
 							? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 							: user?.role?.charAt(0).toUpperCase() || 'U'
