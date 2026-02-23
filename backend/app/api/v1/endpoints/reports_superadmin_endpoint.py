@@ -106,7 +106,7 @@ async def get_attendance_report(
             "voting_weight": float(inv.dec_voting_weight),
         }
         if inv.bln_actually_attended:
-            person["attended_at"] = inv.dat_actually_attended.isoformat() if inv.dat_actually_attended else None
+            person["attended_at"] = inv.bln_actually_attended  # o el campo de fecha que corresponda
             attended.append(person)
         else:
             absent.append(person)
