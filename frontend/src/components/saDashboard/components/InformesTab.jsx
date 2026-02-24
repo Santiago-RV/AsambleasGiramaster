@@ -227,7 +227,7 @@ const generatePollsPDF = (data) => {
 };
 
 const generateDelegationsPDF = (data) => {
-    onsole.log('DATA DELEGACIONES:', JSON.stringify(data, null, 2));
+    console.log('DATA DELEGACIONES:', JSON.stringify(data, null, 2));
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, total_delegations, delegations } = data;
 
