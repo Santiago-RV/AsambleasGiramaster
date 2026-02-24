@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, text
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -371,7 +371,6 @@ class PollService:
                 )
 
     async def _get_user_voting_weight(self, user_id: int, meeting_id: int) -> float:
-        """Obtiene el peso de votación del usuario en la reunión"""
         from app.models.meeting_invitation_model import MeetingInvitationModel
         from app.models.meeting_model import MeetingModel
         from app.models.user_model import UserModel
@@ -381,81 +380,83 @@ class PollService:
 
         logger = get_logger(__name__)
 
-        # Obtener información de la reunión
         meeting_result = await self.db.execute(
             select(MeetingModel.int_organizer_id, MeetingModel.int_id_residential_unit, MeetingModel.created_by)
             .where(MeetingModel.id == meeting_id)
         )
         meeting_info = meeting_result.one_or_none()
-
         if not meeting_info:
-            raise ValidationException(
-                message="La reunión no existe",
-                error_code="MEETING_NOT_FOUND"
-            )
+            raise ValidationException(message="La reunión no existe", error_code="MEETING_NOT_FOUND")
 
         organizer_id, residential_unit_id, meeting_creator_id = meeting_info
+        logger.info(f"🗳️ Peso de votación para user_id={user_id} en meeting_id={meeting_id}")
 
-        logger.info(f"🗳️ Obteniendo peso de votación para user_id={user_id} en meeting_id={meeting_id}")
-
-        # Si el usuario es el organizador, tiene peso de votación 1.0
-        if organizer_id == user_id:
-            logger.info(f"   Usuario es organizador, peso=1.0")
+        # Organizador o creador de la reunión → peso administrativo
+        if organizer_id == user_id or meeting_creator_id == user_id:
+            logger.info(f"   Usuario es organizador/creador, peso=1.0")
             return 1.0
 
-        # Si el usuario creó la reunión, tiene peso de votación 1.0
-        if meeting_creator_id == user_id:
-            logger.info(f"   Usuario creó la reunión, peso=1.0")
-            return 1.0
-
-        # Verificar si el usuario es administrador (rol ID 2)
-        user_result = await self.db.execute(
-            select(UserModel.int_id_rol)
-            .where(UserModel.id == user_id)
+        # Administrador que creó la unidad residencial → peso administrativo
+        user_role_result = await self.db.execute(
+            select(UserModel.int_id_rol).where(UserModel.id == user_id)
         )
-        user_role_id = user_result.scalar_one_or_none()
-
-        # Si es administrador, verificar si creó la unidad residencial
+        user_role_id = user_role_result.scalar_one_or_none()
         if user_role_id == 2:
-            residential_unit_result = await self.db.execute(
+            ru_creator_result = await self.db.execute(
                 select(ResidentialUnitModel.created_by)
                 .where(ResidentialUnitModel.id == residential_unit_id)
             )
-            residential_unit_creator_id = residential_unit_result.scalar_one_or_none()
-
-            # Si el administrador creó la unidad residencial, puede votar
-            if residential_unit_creator_id == user_id:
+            if ru_creator_result.scalar_one_or_none() == user_id:
                 logger.info(f"   Usuario es administrador de la unidad, peso=1.0")
                 return 1.0
 
-        # PRIORIDAD 1: Buscar en la lista de invitados de la reunión
-        # IMPORTANTE: También verificar si el usuario delegó su voto
+        # PRIORIDAD 1: Invitación a la reunión
         invitation_result = await self.db.execute(
             select(
                 MeetingInvitationModel.dec_voting_weight,
+                MeetingInvitationModel.dec_quorum_base,
                 MeetingInvitationModel.int_delegated_id
             )
             .where(and_(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
                 MeetingInvitationModel.int_user_id == user_id
             ))
+            .execution_options(populate_existing=True)
         )
         invitation_data = invitation_result.one_or_none()
+        logger.info(f"   Invitación encontrada: {invitation_data}")
 
         if invitation_data is not None:
-            invitation_weight, delegated_id = invitation_data
+            invitation_weight, quorum_base, delegated_id = invitation_data
 
-            # Si el usuario delegó su poder, no puede votar (peso = 0)
+            # Si delegó su poder → bloquear voto
             if delegated_id is not None:
-                logger.info(f"   🚫 Usuario delegó su poder a user_id={delegated_id}, peso=0")
-                return 0.0
+                logger.warning(f"   🚫 user_id={user_id} delegó a user_id={delegated_id}, voto bloqueado")
+                raise BusinessLogicException(
+                    message="Has delegado tu poder de votación. No puedes votar directamente.",
+                    error_code="VOTE_DELEGATED"
+                )
 
-            # Retorna peso normal (puede incluir poderes recibidos de otros)
-            weight = float(invitation_weight)
-            logger.info(f"   Peso encontrado en invitación: {weight}")
+            current_weight = float(invitation_weight)
+            base_weight = float(quorum_base)
+
+            # 🔥 REGLA DEFINITIVA:
+            # - Si tiene delegaciones recibidas: dec_voting_weight > dec_quorum_base → usar dec_voting_weight
+            # - Si es peso normal sin delegaciones: dec_voting_weight == dec_quorum_base → cualquiera
+            # - Si dec_voting_weight = 0 sin delegación activa: dato corrupto → usar dec_quorum_base
+            if current_weight > 0:
+                weight = current_weight
+                logger.info(f"   ✅ Peso desde dec_voting_weight: {weight}")
+            else:
+                weight = base_weight
+                logger.warning(
+                    f"   ⚠️ dec_voting_weight=0 sin delegación activa. "
+                    f"Usando dec_quorum_base={base_weight} para user_id={user_id}"
+                )
+
             return weight
 
-        # PRIORIDAD 2: Buscar el peso por defecto del usuario en la unidad residencial
+        # PRIORIDAD 2: Peso por defecto en unidad residencial
         user_unit_result = await self.db.execute(
             select(UserResidentialUnitModel.dec_default_voting_weight)
             .where(and_(
@@ -464,16 +465,16 @@ class PollService:
             ))
         )
         default_weight = user_unit_result.scalar_one_or_none()
-
         if default_weight is not None:
             weight = float(default_weight)
-            logger.info(f"   Peso encontrado en unidad residencial (default): {weight}")
+            logger.info(f"   Peso desde unidad residencial: {weight}")
             return weight
 
-        # Si no se encuentra en ninguna parte, usar peso por defecto de 1.0
-        # (esto permite que usuarios de la unidad voten aunque no tengan invitación explícita)
-        logger.warning(f"   ⚠️ No se encontró peso de votación para user_id={user_id}, usando peso por defecto=1.0")
-        return 1.0
+        logger.error(f"   ❌ Sin peso válido para user_id={user_id} en meeting_id={meeting_id}")
+        raise BusinessLogicException(
+            message="No tienes una invitación válida para votar en esta reunión.",
+            error_code="NO_VOTING_WEIGHT"
+        )
 
     async def _update_option_stats(self, option_id: int, voting_weight: float):
         """Actualiza las estadísticas de una opción"""

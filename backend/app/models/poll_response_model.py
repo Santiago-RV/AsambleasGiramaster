@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric
+from sqlalchemy import DECIMAL, Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -12,7 +12,7 @@ class PollResponseModel(Base):
     int_option_id = Column(Integer, ForeignKey("tbl_poll_options.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     str_response_text = Column(String(1000), nullable=True)
     dec_response_number = Column(Numeric, nullable=True)
-    dec_voting_weight = Column(Numeric, nullable=False)
+    dec_voting_weight = Column(DECIMAL(10, 6), nullable=False)
     bln_is_abstention = Column(Boolean, default=False)
     dat_response_at = Column(DateTime, nullable=False)
     str_ip_address = Column(String(45), nullable=False)

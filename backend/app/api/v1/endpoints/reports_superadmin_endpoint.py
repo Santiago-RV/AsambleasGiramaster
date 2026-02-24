@@ -207,10 +207,17 @@ async def get_polls_report(
             if resp.bln_is_abstention:
                 abstentions.append(voter_info)
             elif resp.int_option_id in options_map:
-                options_map[resp.int_option_id]["votes_count"] += 1
-                options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight)
-                options_map[resp.int_option_id]["voters"].append(voter_info)
+                if float(resp.dec_voting_weight) > 0:
+                    options_map[resp.int_option_id]["votes_count"] += 1
+                    options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight)
+                    options_map[resp.int_option_id]["voters"].append(voter_info)
+                else:
+                    logger.warning(
+                        f"⚠️ Voto ignorado: user_id={resp.int_user_id} "
+                        f"votó con peso=0 en poll_id={poll.id}"
+                    )
 
+        total_real_voters = sum(opt["votes_count"] for opt in options_map.values()) + len(abstentions)
         total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
 
         polls_data.append({
@@ -221,7 +228,7 @@ async def get_polls_report(
             "created_at": poll.created_at.isoformat() if poll.created_at else None,
             "options": list(options_map.values()),
             "abstentions": abstentions,
-            "total_voters": len(responses),
+            "total_voters": total_real_voters,
             "total_weight_voted": total_weight_voted,
         })
 
