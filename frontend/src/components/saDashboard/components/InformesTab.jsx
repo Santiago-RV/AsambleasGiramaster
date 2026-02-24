@@ -180,11 +180,20 @@ const generatePollsPDF = (data) => {
 
             autoTable(doc, {
                 startY: y,
-                head: [['Copropietario', 'Apartamento', 'Peso de Voto']],
-                body: opt.voters.map(v => [v.full_name, v.apartment, v.voting_weight.toFixed(4)]),
+                head: [['Copropietario', 'Apto', 'Peso de Voto']],
+                body: opt.voters.map(v => [
+                    v.full_name,
+                    v.apartment,
+                    parseFloat(v.voting_weight).toFixed(4),
+                ]),
                 styles: { fontSize: 8 },
-                headStyles: { fillColor: [156, 163, 175], textColor: 20 },
-                alternateRowStyles: { fillColor: [249, 250, 251] },
+                headStyles: { fillColor: [67, 56, 202] },
+                alternateRowStyles: { fillColor: [238, 242, 255] },
+                columnStyles: {
+                    0: { cellWidth: 90 },
+                    1: { cellWidth: 20 },
+                    2: { cellWidth: 30 },
+                },
                 margin: { left: 20, right: 14 },
             });
             y = doc.lastAutoTable.finalY + 4;
@@ -218,6 +227,7 @@ const generatePollsPDF = (data) => {
 };
 
 const generateDelegationsPDF = (data) => {
+    onsole.log('DATA DELEGACIONES:', JSON.stringify(data, null, 2));
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, total_delegations, delegations } = data;
 
