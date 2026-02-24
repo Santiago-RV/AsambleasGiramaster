@@ -378,32 +378,40 @@ export default function MeetingPollsView({ meeting, onBack }) {
 
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <CheckCircle className="text-green-600" size={24} />
+                  <CheckCircle className={stats.quorum_reached ? "text-green-600" : "text-red-500"} size={24} />
                   <h3 className="font-semibold text-gray-700">Quórum</h3>
                 </div>
-                <p className="text-3xl font-bold text-gray-800">
-                  {stats.has_quorum ? 'Alcanzado' : 'No alcanzado'}
+                <p className={`text-3xl font-bold ${stats.quorum_reached ? 'text-green-600' : 'text-red-500'}`}>
+                  {stats.quorum_reached ? 'Alcanzado' : 'No alcanzado'}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Requiere: {stats.required_quorum || 0}%
                 </p>
               </div>
             </div>
 
             {/* Resultados por opción */}
-            {stats.options_stats && stats.options_stats.length > 0 && (
+            {stats.options && stats.options.length > 0 && (
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
                 <div className="space-y-4">
-                  {stats.options_stats.map((option, index) => (
-                    <div key={option.option_id || index}>
+                  {stats.options.map((option, index) => (
+                    <div key={option.id || index}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gray-700">{option.option_text}</span>
-                        <span className="text-sm text-gray-600">
-                          {option.votes_count} votos ({option.percentage?.toFixed(1)}%)
-                        </span>
+                        <span className="font-medium text-gray-700">{option.str_option_text}</span>
+                        <div className="text-right">
+                          <span className="text-sm text-gray-600 block">
+                            {option.int_votes_count} votos ({option.dec_percentage?.toFixed(1)}%)
+                          </span>
+                          <span className="text-xs text-emerald-600 font-medium">
+                            Peso: {option.dec_weight_total?.toFixed(2)}
+                          </span>
+                        </div>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3">
                         <div
-                          className="bg-green-600 h-3 rounded-full transition-all duration-300"
-                          style={{ width: `${option.percentage || 0}%` }}
+                          className="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full transition-all duration-300"
+                          style={{ width: `${option.dec_percentage || 0}%` }}
                         ></div>
                       </div>
                     </div>

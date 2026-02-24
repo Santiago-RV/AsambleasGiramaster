@@ -77,6 +77,18 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
       }
     }
 
+    if (formData.bln_requires_quorum) {
+      const quorumValue = parseFloat(formData.dec_minimum_quorum_percentage);
+      if (isNaN(quorumValue) || quorumValue <= 0 || quorumValue > 100) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error en Quórum',
+          text: 'El porcentaje de quórum debe ser mayor a 0 y menor o igual a 100',
+        });
+        return false;
+      }
+    }
+
     return true;
   };
 

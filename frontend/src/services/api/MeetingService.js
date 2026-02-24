@@ -145,4 +145,17 @@ export class MeetingService {
     );
     return response.data;
   }
+
+  /**
+   * Registrar asistencia presencial mediante escaneo QR
+   * El administrador escanea el QR del copropietario para registrar asistencia
+   * @param {string} qrToken - Token JWT extraído del código QR
+   */
+  static async scanQRAttendance(qrToken) {
+    const response = await axiosInstance.post(
+      '/meetings/scan-qr-attendance',
+      { qr_token: qrToken }
+    );
+    return response.data;
+  }
 }

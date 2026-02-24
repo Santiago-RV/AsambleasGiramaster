@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, User, Clock, CheckCircle } from "lucide-react";
+import { X, User, Clock, CheckCircle, Loader2 } from "lucide-react";
 import axiosInstance from "../../services/api/axiosconfig";
 
 const PollDetailsModal = ({ poll, isOpen, onClose }) => {
@@ -64,7 +64,7 @@ const PollDetailsModal = ({ poll, isOpen, onClose }) => {
         <div className="p-4 overflow-y-auto max-h-[70vh]">
           {loading && (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <Loader2 className="animate-spin text-emerald-600" size={32} />
             </div>
           )}
 

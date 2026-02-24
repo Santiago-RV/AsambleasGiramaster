@@ -852,3 +852,477 @@ async def close_user_session(
             message=f"Error al cerrar sesión: {str(e)}",
             details={"original_error": str(e)}
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ENDPOINTS DE REPORTES PARA ADMIN
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/meetings/{meeting_id}/report/attendance",
+    response_model=SuccessResponse,
+    summary="Reporte de asistencia de una reunión",
+    description="Obtiene el reporte de asistencia de una reunión específica"
+)
+async def get_attendance_report(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene el reporte de asistencia de una reunión"""
+    try:
+        from sqlalchemy import select
+        from app.models.meeting_model import MeetingModel
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        
+        user_service = UserService(db)
+        admin_user = await user_service.get_user_by_username(current_user)
+        
+        if not admin_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        admin_unit_query = select(UserResidentialUnitModel).where(
+            UserResidentialUnitModel.int_user_id == admin_user.id
+        )
+        admin_unit_result = await db.execute(admin_unit_query)
+        admin_unit = admin_unit_result.scalar_one_or_none()
+        
+        if not admin_unit:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes una unidad residencial asignada"
+            )
+        
+        meeting_result = await db.execute(
+            select(MeetingModel).where(MeetingModel.id == meeting_id)
+        )
+        meeting = meeting_result.scalar_one_or_none()
+        
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Reunión no encontrada")
+        
+        if meeting.int_id_residential_unit != admin_unit.int_residential_unit_id:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes acceso a esta reunión"
+            )
+        
+        inv_result = await db.execute(
+            select(MeetingInvitationModel, UserModel, DataUserModel)
+            .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .where(MeetingInvitationModel.int_meeting_id == meeting_id)
+            .order_by(DataUserModel.str_lastname)
+        )
+        invitations = inv_result.all()
+        
+        attended = []
+        absent = []
+        
+        for inv, user, data_user in invitations:
+            person = {
+                "id": user.id,
+                "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
+                "email": data_user.str_email,
+                "apartment": inv.str_apartment_number,
+                "quorum_base": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
+                "voting_weight": float(inv.dec_voting_weight) if inv.dec_voting_weight else 0.0,
+                "attended_at": inv.dat_joined_at.isoformat() if inv.dat_joined_at else None,
+                "status": "Asistió" if inv.bln_actually_attended else "No asistió"
+            }
+            if inv.bln_actually_attended:
+                attended.append(person)
+            else:
+                absent.append(person)
+        
+        total_quorum = sum(p["quorum_base"] for p in attended)
+        
+        return SuccessResponse(
+            success=True,
+            status_code=200,
+            message="Reporte de asistencia obtenido",
+            data={
+                "meeting": {
+                    "id": meeting.id,
+                    "title": meeting.str_title,
+                    "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+                    "status": meeting.str_status,
+                    "modality": meeting.str_modality,
+                },
+                "summary": {
+                    "total_invited": len(invitations),
+                    "total_attended": len(attended),
+                    "total_absent": len(absent),
+                    "attendance_percentage": round((len(attended) / len(invitations) * 100) if invitations else 0, 2),
+                    "quorum_achieved": total_quorum,
+                },
+                "attended": attended,
+                "absent": absent,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al obtener reporte de asistencia: {str(e)}")
+        raise ServiceException(message=f"Error al obtener reporte: {str(e)}")
+
+
+@router.get(
+    "/meetings/{meeting_id}/report/quorum",
+    response_model=SuccessResponse,
+    summary="Reporte de quórum de una reunión",
+    description="Obtiene el análisis de quórum de una reunión específica"
+)
+async def get_quorum_report(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene el análisis de quórum de una reunión"""
+    try:
+        from sqlalchemy import select
+        from app.models.meeting_model import MeetingModel
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        
+        user_service = UserService(db)
+        admin_user = await user_service.get_user_by_username(current_user)
+        
+        if not admin_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        admin_unit_query = select(UserResidentialUnitModel).where(
+            UserResidentialUnitModel.int_user_id == admin_user.id
+        )
+        admin_unit_result = await db.execute(admin_unit_query)
+        admin_unit = admin_unit_result.scalar_one_or_none()
+        
+        if not admin_unit:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes una unidad residencial asignada"
+            )
+        
+        meeting_result = await db.execute(
+            select(MeetingModel).where(MeetingModel.id == meeting_id)
+        )
+        meeting = meeting_result.scalar_one_or_none()
+        
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Reunión no encontrada")
+        
+        if meeting.int_id_residential_unit != admin_unit.int_residential_unit_id:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes acceso a esta reunión"
+            )
+        
+        inv_result = await db.execute(
+            select(MeetingInvitationModel).where(
+                MeetingInvitationModel.int_meeting_id == meeting_id
+            )
+        )
+        invitations = inv_result.scalars().all()
+        
+        total_invited = len(invitations)
+        total_quorum_base = sum(float(inv.dec_quorum_base or 0) for inv in invitations)
+        
+        attended = [inv for inv in invitations if inv.bln_actually_attended]
+        attended_quorum = sum(float(inv.dec_quorum_base or 0) for inv in attended)
+        
+        quorum_percentage = (attended_quorum / total_quorum_base * 100) if total_quorum_base > 0 else 0
+        
+        return SuccessResponse(
+            success=True,
+            status_code=200,
+            message="Reporte de quórum obtenido",
+            data={
+                "meeting": {
+                    "id": meeting.id,
+                    "title": meeting.str_title,
+                    "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+                    "status": meeting.str_status,
+                },
+                "quorum_analysis": {
+                    "total_invited": total_invited,
+                    "total_attended": len(attended),
+                    "total_quorum_base": total_quorum_base,
+                    "quorum_achieved": attended_quorum,
+                    "quorum_percentage": round(quorum_percentage, 2),
+                    "quorum_reached": meeting.bln_quorum_reached if hasattr(meeting, 'bln_quorum_reached') else (quorum_percentage >= 50),
+                    "required_percentage": 50,
+                },
+                "comparison": {
+                    "invitations": {
+                        "attended": len(attended),
+                        "absent": total_invited - len(attended),
+                    },
+                    "quorum_weight": {
+                        "attended": attended_quorum,
+                        "missing": total_quorum_base - attended_quorum,
+                    }
+                }
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al obtener reporte de quórum: {str(e)}")
+        raise ServiceException(message=f"Error al obtener reporte: {str(e)}")
+
+
+@router.get(
+    "/meetings/{meeting_id}/report/polls",
+    response_model=SuccessResponse,
+    summary="Reporte de votaciones de una reunión",
+    description="Obtiene el reporte de votaciones de una reunión específica"
+)
+async def get_polls_report(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene el reporte de votaciones de una reunión"""
+    try:
+        from sqlalchemy import select
+        from app.models.meeting_model import MeetingModel
+        from app.models.poll_model import PollModel
+        from app.models.poll_option_model import PollOptionModel
+        from app.models.poll_response_model import PollResponseModel
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        
+        user_service = UserService(db)
+        admin_user = await user_service.get_user_by_username(current_user)
+        
+        if not admin_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        admin_unit_query = select(UserResidentialUnitModel).where(
+            UserResidentialUnitModel.int_user_id == admin_user.id
+        )
+        admin_unit_result = await db.execute(admin_unit_query)
+        admin_unit = admin_unit_result.scalar_one_or_none()
+        
+        if not admin_unit:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes una unidad residencial asignada"
+            )
+        
+        meeting_result = await db.execute(
+            select(MeetingModel).where(MeetingModel.id == meeting_id)
+        )
+        meeting = meeting_result.scalar_one_or_none()
+        
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Reunión no encontrada")
+        
+        if meeting.int_id_residential_unit != admin_unit.int_residential_unit_id:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes acceso a esta reunión"
+            )
+        
+        polls_result = await db.execute(
+            select(PollModel).where(PollModel.int_meeting_id == meeting_id)
+        )
+        polls = polls_result.scalars().all()
+        
+        polls_data = []
+        for poll in polls:
+            options_result = await db.execute(
+                select(PollOptionModel).where(PollOptionModel.int_poll_id == poll.id)
+            )
+            options = options_result.scalars().all()
+            
+            options_map = {
+                opt.id: {
+                    "id": opt.id,
+                    "text": opt.str_option_text,
+                    "votes_count": 0,
+                    "votes_weight": 0.0,
+                }
+                for opt in options
+            }
+            
+            responses_result = await db.execute(
+                select(PollResponseModel, UserModel, DataUserModel)
+                .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
+                .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .where(PollResponseModel.int_poll_id == poll.id)
+            )
+            responses = responses_result.all()
+            
+            abstentions = []
+            for resp, user, data_user in responses:
+                voter_info = {
+                    "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
+                    "voting_weight": float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0,
+                }
+                if resp.bln_is_abstention:
+                    abstentions.append(voter_info)
+                elif resp.int_option_id in options_map:
+                    options_map[resp.int_option_id]["votes_count"] += 1
+                    options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
+            
+            total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
+            
+            polls_data.append({
+                "id": poll.id,
+                "title": poll.str_title,
+                "description": poll.str_description,
+                "type": poll.str_poll_type,
+                "status": poll.str_status,
+                "is_anonymous": poll.bln_is_anonymous,
+                "requires_quorum": poll.bln_requires_quorum,
+                "minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
+                "options": list(options_map.values()),
+                "abstentions": abstentions,
+                "total_voters": len(responses),
+                "total_weight_voted": total_weight_voted,
+            })
+        
+        return SuccessResponse(
+            success=True,
+            status_code=200,
+            message="Reporte de votaciones obtenido",
+            data={
+                "meeting": {
+                    "id": meeting.id,
+                    "title": meeting.str_title,
+                    "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+                    "status": meeting.str_status,
+                },
+                "total_polls": len(polls_data),
+                "polls": polls_data,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al obtener reporte de votaciones: {str(e)}")
+        raise ServiceException(message=f"Error al obtener reporte: {str(e)}")
+
+
+@router.get(
+    "/meetings/{meeting_id}/report/delegations",
+    response_model=SuccessResponse,
+    summary="Reporte de poderes de una reunión",
+    description="Obtiene el reporte de poderes/delegaciones de una reunión específica"
+)
+async def get_delegations_report(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene el reporte de poderes de una reunión"""
+    try:
+        from sqlalchemy import select
+        from app.models.meeting_model import MeetingModel
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        
+        user_service = UserService(db)
+        admin_user = await user_service.get_user_by_username(current_user)
+        
+        if not admin_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        admin_unit_query = select(UserResidentialUnitModel).where(
+            UserResidentialUnitModel.int_user_id == admin_user.id
+        )
+        admin_unit_result = await db.execute(admin_unit_query)
+        admin_unit = admin_unit_result.scalar_one_or_none()
+        
+        if not admin_unit:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes una unidad residencial asignada"
+            )
+        
+        meeting_result = await db.execute(
+            select(MeetingModel).where(MeetingModel.id == meeting_id)
+        )
+        meeting = meeting_result.scalar_one_or_none()
+        
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Reunión no encontrada")
+        
+        if meeting.int_id_residential_unit != admin_unit.int_residential_unit_id:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes acceso a esta reunión"
+            )
+        
+        delegations_result = await db.execute(
+            select(MeetingInvitationModel, DataUserModel)
+            .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .where(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_delegated_id.isnot(None)
+            )
+        )
+        delegator_rows = delegations_result.all()
+        
+        delegations = []
+        for inv, delegator_data in delegator_rows:
+            delegate_result = await db.execute(
+                select(DataUserModel)
+                .join(UserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .where(UserModel.id == inv.int_delegated_id)
+            )
+            delegate_data = delegate_result.scalar_one_or_none()
+            
+            delegations.append({
+                "id": inv.id,
+                "delegator": {
+                    "id": inv.int_user_id,
+                    "full_name": f"{delegator_data.str_firstname} {delegator_data.str_lastname}",
+                    "email": delegator_data.str_email,
+                    "apartment": inv.str_apartment_number,
+                    "original_weight": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
+                },
+                "delegate": {
+                    "id": inv.int_delegated_id,
+                    "full_name": f"{delegate_data.str_firstname} {delegate_data.str_lastname}" if delegate_data else "—",
+                    "email": delegate_data.str_email if delegate_data else "—",
+                },
+                "delegated_weight": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
+            })
+        
+        total_delegated_weight = sum(d["delegated_weight"] for d in delegations)
+        
+        return SuccessResponse(
+            success=True,
+            status_code=200,
+            message="Reporte de poderes obtenido",
+            data={
+                "meeting": {
+                    "id": meeting.id,
+                    "title": meeting.str_title,
+                    "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+                    "status": meeting.str_status,
+                },
+                "summary": {
+                    "total_delegations": len(delegations),
+                    "total_delegated_weight": total_delegated_weight,
+                },
+                "delegations": delegations,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al obtener reporte de poderes: {str(e)}")
+        raise ServiceException(message=f"Error al obtener reporte: {str(e)}")

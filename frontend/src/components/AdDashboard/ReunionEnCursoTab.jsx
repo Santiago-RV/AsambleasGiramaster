@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axiosInstance from "../../services/api/axiosconfig";
-import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye } from "lucide-react";
+import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Loader2 } from "lucide-react";
 import Swal from "sweetalert2";
 import PollDetailsModal from "./PollDetailsModal";
 
@@ -39,7 +39,7 @@ const ReunionEnCursoTab = () => {
         );
         Swal.fire("Sesión cerrada", "La sesión del usuario ha sido cerrada.", "success");
         setRefreshKey((k) => k + 1);
-      } catch (error) {
+      } catch {
         Swal.fire("Error", "No se pudo cerrar la sesión.", "error");
       }
     }
@@ -48,7 +48,7 @@ const ReunionEnCursoTab = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader2 className="animate-spin text-emerald-600" size={48} />
       </div>
     );
   }

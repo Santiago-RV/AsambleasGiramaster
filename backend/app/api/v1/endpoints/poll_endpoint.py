@@ -621,15 +621,21 @@ async def get_poll_statistics(
                     "id": poll.id,
                     "str_title": poll.str_title,
                     "str_status": poll.str_status,
-                    "str_poll_type": poll.str_poll_type
+                    "str_poll_type": poll.str_poll_type,
+                    "bln_requires_quorum": poll.bln_requires_quorum,
+                    "dec_minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0
                 },
                 "statistics": {
                     "total_responses": stats["total_responses"],
                     "total_votes": stats["total_votes"],
                     "total_abstentions": stats["total_abstentions"],
+                    "total_weight_voted": stats["total_weight_voted"],
+                    "total_weight_invited": stats["total_weight_invited"],
+                    "weight_participation_percentage": stats.get("weight_participation_percentage", 0),
                     "participation_percentage": stats["participation_percentage"],
                     "quorum_reached": stats["quorum_reached"],
-                    "required_quorum": float(poll.dec_minimum_quorum_percentage)
+                    "required_quorum": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
+                    "has_quorum_requirement": poll.bln_requires_quorum
                 },
                 "options": [
                     {
