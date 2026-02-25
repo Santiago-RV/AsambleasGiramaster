@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
-import { X, Loader2, CheckCircle, UserCircle, Building2, Hash } from 'lucide-react';
+import { X, Loader2, CheckCircle, UserCircle, Building2, Hash, AlertTriangle, Eye, BarChart3 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
@@ -460,8 +460,8 @@ const ZoomEmbed = ({
 									<UserCircle size={16} className="text-blue-200" />
 									<span className="font-bold text-lg">{userName}</span>
 								</div>
-								<div className="text-xs text-blue-100">
-									{isGuest ? '👁️ Invitado (Solo observador)' : '✅ Copropietario'}
+								<div className="text-xs text-blue-100 flex items-center gap-2">
+									{isGuest ? <><Eye size={16} /> Invitado (Solo observador)</> : <><CheckCircle size={16} /> Copropietario</>}
 								</div>
 							</div>
 						</div>
@@ -515,7 +515,7 @@ const ZoomEmbed = ({
 			{error && (
 				<div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-50 p-8">
 					<div className="text-center max-w-2xl space-y-4">
-						<div className="text-red-500 text-6xl mb-4">⚠️</div>
+						<AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
 						<h2 className="text-2xl font-bold text-gray-800">Error al conectar</h2>
 						<p className="text-gray-600">{error}</p>
 						<button
@@ -630,8 +630,8 @@ const ZoomEmbed = ({
 
 							{/* Texto */}
 							<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-								<span style={{ fontWeight: 'bold', fontSize: '1.5rem', lineHeight: 1.2 }}>
-									📊 Encuesta Activa
+								<span style={{ fontWeight: 'bold', fontSize: '1.5rem', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+									<BarChart3 size={24} /> Encuesta Activa
 								</span>
 								<span style={{ fontSize: '1rem', color: '#d1fae5', lineHeight: 1.2 }}>
 									Haz clic para votar ahora

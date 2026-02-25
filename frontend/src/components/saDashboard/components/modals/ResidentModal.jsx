@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../../../common/Modal';
-import { Plus, Edit } from 'lucide-react';
+import { Plus, Edit, Lightbulb } from 'lucide-react';
 
 const ResidentModal = ({
     isOpen,
@@ -282,7 +282,8 @@ const ResidentModal = ({
                         className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
                     />
                     <p className="text-sm text-gray-500 mt-1">
-                        💡 Coeficiente de copropiedad (ej: 0.25 = 25%). Dejar vacío para 0.0
+                        <Lightbulb size={14} className="inline mr-1" />
+                        Coeficiente de copropiedad (ej: 0.25 = 25%). Dejar vacío para 0.0
                     </p>
                 </div>
 
@@ -330,7 +331,7 @@ const ResidentModal = ({
                         </span>
                     )}
                     <p className="text-sm text-gray-500 mt-1">
-                        💡{' '}
+                        <Lightbulb size={14} className="inline mr-1" />
                         {mode === 'create'
                             ? 'Si no especificas una contraseña, se usará: Temporal123!'
                             : 'Solo se actualizará si proporcionas una nueva contraseña'}

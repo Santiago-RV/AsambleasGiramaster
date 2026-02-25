@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { UserPlus, Hash, User } from 'lucide-react';
+import { UserPlus, Hash, User, Info } from 'lucide-react';
 import { DelegationService } from '../../services/api/DelegationService';
 
 /**
@@ -142,7 +142,7 @@ export default function DelegatedPowersHeader({ meetingId }) {
                     </div>
 
                     <div className="mt-3 flex items-center gap-2 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-200">
-                        <span className="font-bold">ℹ️</span>
+                        <Info size={14} className="font-bold" />
                         <p>
                             Cuando votes en cualquier encuesta de esta reunión, tu voto contará con el peso total acumulado
                             de <strong>{parseFloat(delegationStatus.total_weight).toFixed(4)}%</strong>

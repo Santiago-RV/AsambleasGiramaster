@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar, FileSpreadsheet } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
@@ -10,6 +10,12 @@ import { useQuery } from '@tanstack/react-query';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import logoGiramaster from '../../assets/logo-giramaster.jpeg';
+
+const SVG_ICONS = {
+    checkCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
+    xCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
+    alertTriangle: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+};
 import ExcelJS from 'exceljs';
 
 /**
@@ -566,8 +572,8 @@ const ResidentsList = ({
 					icon: 'warning',
 					title: 'PDF generado con advertencias',
 					html: `
-					<p>✅ <strong>${successCount}</strong> código(s) generado(s)</p>
-					<p>❌ <strong>${errorCount}</strong> error(es)</p>
+					<p>${SVG_ICONS.checkCircle} <strong>${successCount}</strong> código(s) generado(s)</p>
+					<p>${SVG_ICONS.xCircle} <strong>${errorCount}</strong> error(es)</p>
 					<hr style="margin: 10px 0;">
 					<p style="text-align: left; font-size: 0.9em; max-height: 200px; overflow-y: auto;">
 						${errors.map(err => `• ${err}`).join('<br>')}
@@ -617,7 +623,7 @@ const ResidentsList = ({
 		const result = await Swal.fire({
 			title: '¿Descargar Excel con tokens QR?',
 			html: `Se generará un Excel con <strong>${selectedResidents.length}</strong> residente(s).<br/>
-               <small style="color:#888">⚠️ Esto regenerará los tokens de acceso de los seleccionados.</small>`,
+               <small style="color:#888">${SVG_ICONS.alertTriangle} Esto regenerará los tokens de acceso de los seleccionados.</small>`,
 			icon: 'question',
 			showCancelButton: true,
 			confirmButtonColor: '#16a34a',
@@ -1406,7 +1412,7 @@ const ResidentsList = ({
 											.filter((r) => selectedResidents.includes(r.id))
 											.map((r) => (
 												<li key={r.id} className="flex items-center gap-2 text-xs text-gray-700">
-													<span className="text-green-500">✓</span>
+													<CheckCircle size={14} className="text-green-500" />
 													{r.firstname} {r.lastname} - {r.apartment_number}
 												</li>
 											))}

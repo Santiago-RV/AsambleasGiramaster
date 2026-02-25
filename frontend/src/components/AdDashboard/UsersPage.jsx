@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Plus, UserPlus } from 'lucide-react';
+import { Upload, Plus, UserPlus, Lightbulb, Mail, AlertTriangle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
 import MeetingsList from "../common/MeetingsList";
@@ -7,6 +7,12 @@ import { ResidentialUnitService } from "../../services/api/ResidentialUnitServic
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
+
+const SVG_ICONS = {
+    lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+    alertTriangle: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+    mail: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
+};
 
 export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest }) {
   const queryClient = useQueryClient();
@@ -252,7 +258,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
           </p>
         </div>
         <p class="text-xs text-gray-600 mt-3">
-          ⚠️ Esta acción marcará la reunión como finalizada.
+          ${SVG_ICONS.alertTriangle} Esta acción marcará la reunión como finalizada.
         </p>
       </div>
     `,
@@ -351,7 +357,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">
-            💡 La contraseña actual será reemplazada por una nueva contraseña temporal.
+            ${SVG_ICONS.lightbulb} La contraseña actual será reemplazada por una nueva contraseña temporal.
           </p>
         </div>
       `,
@@ -392,7 +398,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
               </p>
             </div>
             <p class="text-xs text-gray-600 mt-3">
-              📧 El copropietario recibirá un correo con su nueva contraseña temporal.
+              ${SVG_ICONS.mail} El copropietario recibirá un correo con su nueva contraseña temporal.
             </p>
           </div>
         `,
@@ -473,7 +479,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     return (
       <section>
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <div className="text-red-500 text-4xl mb-3">⚠️</div>
+          <AlertTriangle size={40} className="text-red-500 mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-red-800 mb-2">
             Error al cargar usuarios
           </h3>
@@ -564,7 +570,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
                       </p>
                     </div>
                     <p class="text-xs text-gray-600 mt-3">
-                      💡 Cada copropietario recibirá un correo con su contraseña temporal.
+                      ${SVG_ICONS.lightbulb} Cada copropietario recibirá un correo con su contraseña temporal.
                     </p>
                   </div>
                 `,

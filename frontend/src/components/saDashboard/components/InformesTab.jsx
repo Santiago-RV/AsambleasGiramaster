@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown } from 'lucide-react';
+import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown, Calendar, Building2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Swal from 'sweetalert2';
@@ -375,8 +375,8 @@ const InformesTab = () => {
 
                 {selectedMeetingInfo && (
                     <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
-                        <span className="bg-gray-100 px-2 py-1 rounded-lg">📅 {new Date(selectedMeetingInfo.scheduled_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                        <span className="bg-gray-100 px-2 py-1 rounded-lg">🏢 {selectedMeetingInfo.residential_unit}</span>
+                        <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Calendar size={14} /> {new Date(selectedMeetingInfo.scheduled_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                        <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Building2 size={14} /> {selectedMeetingInfo.residential_unit}</span>
                         <span className={`px-2 py-1 rounded-lg font-medium ${selectedMeetingInfo.status === 'En Curso' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{selectedMeetingInfo.status}</span>
                     </div>
                 )}

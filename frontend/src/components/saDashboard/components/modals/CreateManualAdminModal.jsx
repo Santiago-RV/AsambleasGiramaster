@@ -1,7 +1,7 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../../../common/Modal';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, User, Mail } from 'lucide-react';
 
 const CreateManualAdminModal = ({
 	isOpen,
@@ -44,8 +44,8 @@ const CreateManualAdminModal = ({
 			<form onSubmit={handleSubmit(handleFormSubmit)}>
 				<div className="space-y-6">
 					<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-						<h3 className="font-semibold text-blue-800 mb-2">
-							👤 Nuevo Administrador
+						<h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+							<User size={18} /> Nuevo Administrador
 						</h3>
 						<p className="text-sm text-blue-700">
 							Crea un usuario con rol de administrador que NO está asociado a
@@ -140,8 +140,8 @@ const CreateManualAdminModal = ({
 					</div>
 
 					<div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-						<p className="text-sm text-yellow-800">
-							<strong>📧 Nota:</strong> Se generará un usuario y contraseña
+						<p className="text-sm text-yellow-800 flex items-center gap-2">
+							<Mail size={16} /> <strong>Nota:</strong> Se generará un usuario y contraseña
 							temporal automáticamente. El administrador recibirá un email con
 							sus credenciales de acceso.
 						</p>

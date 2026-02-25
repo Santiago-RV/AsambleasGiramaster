@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResidentialCode } from '../../hooks/useResidentialCode';
 import { ResidentialUnitService } from '../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
-import { Building2, FileText, MapPin, Hash, Home, Users, Map, Plus, Phone, User, Briefcase, MoreVertical, Edit2, Trash2, LayoutGrid, List } from 'lucide-react';
+import { Building2, FileText, MapPin, Hash, Home, Users, Map, Plus, Phone, User, Briefcase, MoreVertical, Edit2, Trash2, LayoutGrid, List, AlertTriangle } from 'lucide-react';
 import Modal from '../common/Modal';
 
 const UnidadesResidencialesTab = ({ onViewDetails }) => {
@@ -660,7 +660,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 										/>
 										{errors.str_name && (
 											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-												<span className="font-medium">⚠</span> {errors.str_name.message}
+												<AlertTriangle size={14} /> <span className="font-medium">{errors.str_name.message}</span>
 											</p>
 										)}
 									</div>
@@ -687,7 +687,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 										/>
 										{errors.str_nit && (
 											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-												<span className="font-medium">⚠</span> {errors.str_nit.message}
+												<AlertTriangle size={14} /> <span className="font-medium">{errors.str_nit.message}</span>
 											</p>
 										)}
 									</div>
@@ -733,7 +733,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 										/>
 										{errors.int_total_apartments && (
 											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-												<span className="font-medium">⚠</span> {errors.int_total_apartments.message}
+												<AlertTriangle size={14} /> <span className="font-medium">{errors.int_total_apartments.message}</span>
 											</p>
 										)}
 									</div>
@@ -858,7 +858,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 										/>
 										{errors.str_contact_phone && (
 											<p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-												<span className="font-medium">⚠</span> {errors.str_contact_phone.message}
+												<AlertTriangle size={14} /> <span className="font-medium">{errors.str_contact_phone.message}</span>
 											</p>
 										)}
 									</div>
@@ -901,7 +901,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               </p>
               {errors.int_max_concurrent_meetings && (
                 <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.int_max_concurrent_meetings.message}
+                  <AlertTriangle size={14} /> <span className="font-medium">{errors.int_max_concurrent_meetings.message}</span>
                 </p>
               )}
             </div>
@@ -990,7 +990,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               />
               {errors.admin_str_firstname && (
                 <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.admin_str_firstname.message}
+                  <AlertTriangle size={14} /> <span className="font-medium">{errors.admin_str_firstname.message}</span>
                 </p>
               )}
             </div>
@@ -1018,7 +1018,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               />
               {errors.admin_str_lastname && (
                 <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.admin_str_lastname.message}
+                  <AlertTriangle size={14} /> <span className="font-medium">{errors.admin_str_lastname.message}</span>
                 </p>
               )}
             </div>
@@ -1046,7 +1046,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               />
               {errors.admin_str_email && (
                 <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.admin_str_email.message}
+                  <AlertTriangle size={14} /> <span className="font-medium">{errors.admin_str_email.message}</span>
                 </p>
               )}
             </div>
@@ -1074,7 +1074,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               />
               {errors.admin_str_phone && (
                 <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                  <span className="font-medium">⚠</span> {errors.admin_str_phone.message}
+                  <AlertTriangle size={14} /> <span className="font-medium">{errors.admin_str_phone.message}</span>
                 </p>
               )}
             </div>

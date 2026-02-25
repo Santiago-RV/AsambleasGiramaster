@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ZoomMtg } from '@zoom/meetingsdk';
-import { X, Loader2, CheckCircle } from 'lucide-react';
+import { X, Loader2, CheckCircle, AlertTriangle, Lightbulb, BarChart3, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../services/api/axiosconfig';
@@ -524,7 +524,7 @@ const ZoomMeetingContainer = ({
 			<div className="flex items-center justify-center min-h-screen bg-gray-900">
 				<div className="bg-white rounded-lg shadow-lg p-8 max-w-3xl mx-auto">
 					<div className="text-center">
-						<div className="text-red-500 text-5xl mb-4">⚠️</div>
+						<AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
 						<h3 className="text-xl font-bold text-gray-800 mb-2">
 							Error al cargar la reunión
 						</h3>
@@ -533,13 +533,13 @@ const ZoomMeetingContainer = ({
 						{/* Soluciones sugeridas */}
 						{error.includes('3000') && (
 							<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-								<h4 className="font-bold text-blue-900 mb-2">💡 Soluciones sugeridas:</h4>
+								<h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2"><Lightbulb size={18} /> Soluciones sugeridas:</h4>
 								<ul className="text-sm text-blue-800 space-y-2">
-									<li>✓ Verifica que tienes conexión a internet estable</li>
-									<li>✓ Permite el acceso a cámara y micrófono en tu navegador</li>
-									<li>✓ Desactiva extensiones de navegador que puedan bloquear Zoom</li>
-									<li>✓ Intenta usar otro navegador (Chrome recomendado)</li>
-									<li>✓ Verifica que no haya firewalls bloqueando Zoom</li>
+									<li className="flex items-center gap-2"><CheckCircle size={14} /> Verifica que tienes conexión a internet estable</li>
+									<li className="flex items-center gap-2"><CheckCircle size={14} /> Permite el acceso a cámara y micrófono en tu navegador</li>
+									<li className="flex items-center gap-2"><CheckCircle size={14} /> Desactiva extensiones de navegador que puedan bloquear Zoom</li>
+									<li className="flex items-center gap-2"><CheckCircle size={14} /> Intenta usar otro navegador (Chrome recomendado)</li>
+									<li className="flex items-center gap-2"><CheckCircle size={14} /> Verifica que no haya firewalls bloqueando Zoom</li>
 								</ul>
 							</div>
 						)}
@@ -547,9 +547,9 @@ const ZoomMeetingContainer = ({
 						<div className="flex gap-3 justify-center">
 							<button
 								onClick={() => window.location.reload()}
-								className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+								className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
 							>
-								🔄 Reintentar
+								<RefreshCw size={18} /> Reintentar
 							</button>
 							<button
 								onClick={onClose}
@@ -665,7 +665,7 @@ const ZoomMeetingContainer = ({
 
 						{/* Texto - MÁS GRANDE */}
 						<div className="flex flex-col items-start">
-							<span className="font-bold text-2xl leading-tight">📊 Encuesta Activa</span>
+							<span className="font-bold text-2xl leading-tight flex items-center gap-2"><BarChart3 size={24} /> Encuesta Activa</span>
 							<span className="text-base text-green-100 leading-tight">Haz clic para votar ahora</span>
 						</div>
 

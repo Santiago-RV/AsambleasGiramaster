@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import Modal from '../../../common/Modal';
-import { FileSpreadsheet, Upload, Download, X } from 'lucide-react';
+import { FileSpreadsheet, Upload, Download, X, BarChart3, XCircle, Lightbulb, FileText, Edit, AlertTriangle } from 'lucide-react';
 import { ResidentialUnitService } from '../../../../services/api/ResidentialUnitService';
 import Swal from 'sweetalert2';
+
+const SVG_ICONS = {
+    barChart3: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
+    xCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
+    lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+};
 
 const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 	const [selectedFile, setSelectedFile] = useState(null);
@@ -73,7 +79,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 			let htmlContent = `
 			<div class="text-left space-y-3">
 				<div class="bg-blue-50 p-3 rounded-lg">
-					<p class="font-semibold text-blue-800">📊 Resumen del Proceso</p>
+					<p class="font-semibold text-blue-800">${SVG_ICONS.barChart3} Resumen del Proceso</p>
 					<p class="text-sm text-blue-700">Total de filas procesadas: <strong>${total_rows}</strong></p>
 					<p class="text-sm text-green-700">Copropietarios creados exitosamente: <strong>${successful}</strong></p>
 					<p class="text-sm text-green-700">Nuevos usuarios creados: <strong>${users_created}</strong></p>
@@ -88,7 +94,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 			if (errors && errors.length > 0) {
 				htmlContent += `
 				<div class="bg-red-50 p-3 rounded-lg max-h-48 overflow-y-auto">
-					<p class="font-semibold text-red-800 mb-2">❌ Errores Encontrados:</p>
+					<p class="font-semibold text-red-800 mb-2">${SVG_ICONS.xCircle} Errores Encontrados:</p>
 					<ul class="text-sm text-red-700 space-y-1">
 			`;
 
@@ -104,7 +110,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 
 			htmlContent += `
 				<div class="text-xs text-gray-600 mt-2">
-					<p>💡 Los copropietarios creados ya pueden iniciar sesión con su email y la contraseña configurada.</p>
+					<p>${SVG_ICONS.lightbulb} Los copropietarios creados ya pueden iniciar sesión con su email y la contraseña configurada.</p>
 				</div>
 			</div>
 		`;
@@ -199,8 +205,8 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 					</p>
 					<div className="space-y-3">
 						<div>
-							<p className="text-sm font-semibold text-blue-800 mb-1">
-								📋 Columnas REQUERIDAS:
+							<p className="text-sm font-semibold text-blue-800 mb-1 flex items-center gap-2">
+								<FileText size={16} /> Columnas REQUERIDAS:
 							</p>
 							<ul className="text-sm text-blue-700 list-disc list-inside space-y-1 ml-2">
 								<li>
@@ -223,8 +229,8 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 							</ul>
 						</div>
 						<div>
-							<p className="text-sm font-semibold text-blue-800 mb-1">
-								📝 Columnas OPCIONALES:
+							<p className="text-sm font-semibold text-blue-800 mb-1 flex items-center gap-2">
+								<Edit size={16} /> Columnas OPCIONALES:
 							</p>
 							<ul className="text-sm text-blue-700 list-disc list-inside space-y-1 ml-2">
 								<li>
@@ -235,9 +241,9 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 						</div>
 					</div>
 					<div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-						<p className="text-xs text-yellow-800">
-							⚠️ <strong>Formato de ejemplo:</strong>
-						</p>
+						<p className="text-xs text-yellow-800 flex items-center gap-1">
+								<AlertTriangle size={14} /> <strong>Formato de ejemplo:</strong>
+							</p>
 						<div className="mt-2 bg-white p-2 rounded text-xs font-mono overflow-x-auto">
 							<table className="min-w-full">
 								<thead>

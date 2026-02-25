@@ -4,7 +4,7 @@ from datetime import datetime
 
 # Schema para crear una delegación
 class DelegationCreate(BaseModel):
-    delegator_ids: List[int] = Field(..., min_items=1, description="IDs de los copropietarios que ceden su poder")
+    delegator_ids: List[int] = Field(min_items=1, description="IDs de los copropietarios que ceden su poder")
     delegate_id: int = Field(..., gt=0, description="ID del copropietario que recibe el poder")
 
     @validator('delegator_ids')
@@ -31,7 +31,7 @@ class DelegationUserInfo(BaseModel):
     str_apartment_number: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schema de respuesta para una delegación
 class DelegationResponse(BaseModel):

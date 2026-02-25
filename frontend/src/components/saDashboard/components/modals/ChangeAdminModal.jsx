@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from '../../../common/Modal';
-import { UsersIcon as UsersIcon, Mail, Phone, UserPlus } from 'lucide-react';
+import { UsersIcon as UsersIcon, Mail, Phone, UserPlus, User } from 'lucide-react';
 
 const ChangeAdminModal = ({
 	isOpen,
@@ -25,8 +25,8 @@ const ChangeAdminModal = ({
 		>
 			<div className="space-y-6">
 				<div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-					<h3 className="font-semibold text-blue-800 mb-2">
-						👤 Seleccionar Nuevo Administrador
+					<h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+						<User size={18} /> Seleccionar Nuevo Administrador
 					</h3>
 					<p className="text-sm text-blue-700">
 						Selecciona un residente de la lista para asignarlo como

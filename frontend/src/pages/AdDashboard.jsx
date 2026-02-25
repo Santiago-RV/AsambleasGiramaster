@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Video, FileText, HandCoins, LogOut, Calendar, Loader2 } from 'lucide-react';
+import { Users, Video, FileText, HandCoins, LogOut, Calendar, Loader2, AlertTriangle, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DashboardLayout from "../components/layout/DashboardLayout";
 import UsersPage from "../components/AdDashboard/UsersPage";
@@ -442,7 +442,7 @@ export default function AppAdmin() {
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">
-            ⚠️ Esta acción marcará la reunión como finalizada y no podrá deshacerse.
+            <AlertTriangle size={14} className="inline mr-1" /> Esta acción marcará la reunión como finalizada y no podrá deshacerse.
           </p>
         </div>
       `,
@@ -477,7 +477,7 @@ export default function AppAdmin() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center border border-red-200">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">
             Error al Cargar Información
           </h2>
@@ -637,10 +637,10 @@ export default function AppAdmin() {
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
           <div className="bg-white rounded-lg shadow-lg w-[min(900px,95%)] p-6">
             <button
-              className="float-right text-sm text-gray-500"
+              className="float-right text-sm text-gray-500 hover:text-gray-700"
               onClick={() => setShowAssemblyForm(false)}
             >
-              ✖
+              <X size={20} />
             </button>
             <h3 className="text-lg font-semibold mb-4">Crear/Editar Asamblea</h3>
             <p className="text-sm text-gray-600">Formulario de asamblea</p>
