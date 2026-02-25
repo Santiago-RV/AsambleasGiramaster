@@ -465,7 +465,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </div>
           <button
             onClick={() => setShowCreatePoll(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
+            className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
           >
             <Plus size={20} />
             Nueva Encuesta
@@ -537,7 +537,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </p>
           <button
             onClick={() => setShowCreatePoll(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-linear-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
           >
             <Plus size={20} />
             Crear Primera Encuesta

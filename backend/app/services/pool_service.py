@@ -544,16 +544,27 @@ class PollService:
         # Calcular participación real (total de invitados a la reunión)
         from app.models.meeting_invitation_model import MeetingInvitationModel
 
+        # Contar total de participantes invitados (excluye ADMIN)
         total_participants_result = await self.db.execute(
             select(func.count(MeetingInvitationModel.id))
-            .where(MeetingInvitationModel.int_meeting_id == poll.int_meeting_id)
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == poll.int_meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
         )
         total_participants = total_participants_result.scalar()
 
-        # Calcular peso total de participantes invitados
+        # Calcular peso total de participantes invitados (excluye ADMIN)
         total_weight_invited_result = await self.db.execute(
             select(func.sum(MeetingInvitationModel.dec_voting_weight))
-            .where(MeetingInvitationModel.int_meeting_id == poll.int_meeting_id)
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == poll.int_meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
         )
         total_weight_invited = float(total_weight_invited_result.scalar() or 0)
 
