@@ -265,6 +265,13 @@ class PollService:
                 error_code="POLL_NOT_ACTIVE"
             )
 
+        # Verificar si la encuesta ha expirado por tiempo límite
+        if poll.dat_ended_at and datetime.now() > poll.dat_ended_at:
+            raise BusinessLogicException(
+                message="La encuesta ha expirado por tiempo límite",
+                error_code="POLL_EXPIRED"
+            )
+
         # Verificar si ya votó (solo si no es anónima y tenemos user_id)
         if not poll.bln_is_anonymous and user_id:
             existing = await self._user_has_voted(poll_id, user_id)

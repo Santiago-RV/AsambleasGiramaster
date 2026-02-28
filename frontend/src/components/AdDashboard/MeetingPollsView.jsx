@@ -311,6 +311,16 @@ export default function MeetingPollsView({ meeting, onBack }) {
                     Anónima
                   </span>
                 )}
+                {selectedPoll.bln_requires_quorum && (
+                  <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                    Quórum: {selectedPoll.dec_minimum_quorum_percentage}%
+                  </span>
+                )}
+                {selectedPoll.int_duration_minutes && (
+                  <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                    Límite: {selectedPoll.int_duration_minutes} min
+                  </span>
+                )}
               </div>
             </div>
 

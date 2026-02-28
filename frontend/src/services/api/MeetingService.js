@@ -13,17 +13,7 @@ export class MeetingService {
    * Obtener reuniones filtradas por unidad residencial
    */
   static async getMeetingsByResidentialUnit(residentialUnitId) {
-    const response = await axiosInstance.get('/meetings');
-    if (response.data && response.data.success && response.data.data) {
-      // Filtrar las reuniones por unidad residencial
-      const filteredMeetings = response.data.data.filter(
-        (meeting) => meeting.int_id_residential_unit === residentialUnitId
-      );
-      return {
-        ...response.data,
-        data: filteredMeetings,
-      };
-    }
+    const response = await axiosInstance.get(`/meetings/residential-unit/${residentialUnitId}`);
     return response.data;
   }
 
