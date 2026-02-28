@@ -15,8 +15,8 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.6;
-      color: #333333;
-      background-color: #f5f5f5;
+      color: #1a1a2e;
+      background-color: #eef2ff;
       padding: 20px 0;
     }
 
@@ -24,153 +24,124 @@
       max-width: 600px;
       margin: 0 auto;
       background-color: #ffffff;
-      border-radius: 8px;
+      border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 8px 32px rgba(99, 58, 162, 0.15);
     }
 
-    /* Header con Logo */
+    /* ── Header ─────────────────────────────────────────────────────────── */
     .header {
-      background-color: #ffffff;
-      padding: 30px 40px;
+      background: linear-gradient(135deg, #6B4C9A 0%, #4F35A3 60%, #3B28CC 100%);
+      padding: 36px 40px 28px;
       text-align: center;
-      border-bottom: 3px solid #8BC53F;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: "";
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 180px;
+      height: 180px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 50%;
+    }
+
+    .header::after {
+      content: "";
+      position: absolute;
+      bottom: -60px;
+      left: -30px;
+      width: 220px;
+      height: 220px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 50%;
     }
 
     .logo {
-      max-width: 280px;
+      max-width: 260px;
       height: auto;
-      margin: 0 auto;
+      margin: 0 auto 18px;
+      display: block;
+      position: relative;
+      z-index: 1;
+      filter: brightness(0) invert(1);
     }
 
-    /* Contenido Principal */
-    .content {
-      padding: 40px;
+    .header-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 5px 16px;
+      border-radius: 20px;
+      position: relative;
+      z-index: 1;
     }
 
-    .greeting {
-      font-size: 16px;
-      color: #333333;
-      margin-bottom: 30px;
+    /* ── Greeting ────────────────────────────────────────────────────────── */
+    .greeting-bar {
+      background: linear-gradient(90deg, #f0ebff, #e8f4ff);
+      border-left: 4px solid #6B4C9A;
+      padding: 18px 40px;
+    }
+
+    .greeting-bar p {
+      color: #3d2b6b;
+      font-size: 15px;
       line-height: 1.7;
     }
 
-    .greeting strong {
-      color: #1E3A8A;
-      font-size: 18px;
+    .greeting-bar strong {
+      color: #4F35A3;
+      font-size: 17px;
     }
 
-    /* Botón de Acceso Rápido */
-    .quick-access {
-      background-color: #F9FAFB;
-      border: 2px solid #E5E7EB;
-      border-radius: 8px;
-      padding: 30px;
-      text-align: center;
-      margin-bottom: 30px;
+    /* ── Contenido principal ─────────────────────────────────────────────── */
+    .content {
+      padding: 32px 40px;
     }
 
-    .quick-access-title {
-      color: #1E3A8A;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 20px;
-    }
-
-    .access-button {
-      display: inline-block;
-      background-color: #8BC53F;
-      color: #ffffff;
-      text-decoration: none;
-      padding: 14px 32px;
-      border-radius: 6px;
-      font-size: 16px;
-      font-weight: 600;
-      transition: background-color 0.3s ease;
-    }
-
-    .access-button:hover {
-      background-color: #7AB32F;
-    }
-
-    .quick-access-note {
-      color: #6B7280;
-      font-size: 13px;
-      margin-top: 15px;
-      line-height: 1.5;
-    }
-
-    .token-validity {
-      background-color: #FEF3C7;
-      border-left: 3px solid #F59E0B;
-      padding: 12px 15px;
-      border-radius: 4px;
-      margin-top: 15px;
-      font-size: 13px;
-      color: #92400E;
-    }
-
-    /* Tarjetas de Información */
-    .info-section {
-      background-color: #F9FAFB;
-      border-radius: 8px;
-      padding: 25px;
-      margin-bottom: 20px;
-    }
-
-    .info-section-title {
-      color: #1E3A8A;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #E5E7EB;
-    }
-
-    .info-row {
-      display: flex;
-      padding: 10px 0;
-      border-bottom: 1px solid #E5E7EB;
-    }
-
-    .info-row:last-child {
-      border-bottom: none;
-    }
-
-    .info-label {
-      flex: 0 0 140px;
-      color: #6B7280;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .info-value {
-      flex: 1;
-      color: #111827;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    /* Credenciales */
+    /* ── 1. Credenciales ─────────────────────────────────────────────────── */
     .credentials-section {
-      background: linear-gradient(135deg, #8BC53F 0%, #7AB32F 100%);
-      border-radius: 8px;
-      padding: 25px;
-      margin-bottom: 20px;
+      background: linear-gradient(135deg, #4F35A3 0%, #6B4C9A 50%, #8B5CF6 100%);
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
       color: #ffffff;
+      box-shadow: 0 4px 20px rgba(79, 53, 163, 0.35);
+    }
+
+    .credentials-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .credentials-icon {
+      font-size: 22px;
     }
 
     .credentials-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 20px;
+      font-size: 17px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.3px;
     }
 
     .credential-box {
-      background-color: rgba(255, 255, 255, 0.95);
-      border-radius: 6px;
-      padding: 15px;
-      margin-bottom: 12px;
+      background-color: rgba(255, 255, 255, 0.97);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      border-left: 4px solid #8BC53F;
     }
 
     .credential-box:last-child {
@@ -179,35 +150,138 @@
 
     .credential-label {
       color: #6B7280;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
     }
 
     .credential-value {
-      color: #1E3A8A;
-      font-size: 18px;
-      font-weight: 700;
+      color: #1E1B4B;
+      font-size: 19px;
+      font-weight: 800;
       font-family: 'Courier New', monospace;
       word-break: break-all;
     }
 
-    /* Advertencia */
+    /* ── 2. Botón Acceso Rápido ──────────────────────────────────────────── */
+    .quick-access {
+      background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+      border: 2px solid #86efac;
+      border-radius: 12px;
+      padding: 26px 28px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .quick-access-title {
+      color: #14532d;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      letter-spacing: 0.3px;
+    }
+
+    .access-button {
+      display: inline-block;
+      background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 15px 40px;
+      border-radius: 50px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .quick-access-note {
+      color: #166534;
+      font-size: 13px;
+      margin-top: 14px;
+      line-height: 1.6;
+    }
+
+    .token-validity {
+      display: inline-block;
+      background-color: #fef9c3;
+      border: 1px solid #fde047;
+      color: #713f12;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      margin-top: 12px;
+    }
+
+    /* ── 3. Info cuenta ──────────────────────────────────────────────────── */
+    .info-section {
+      background-color: #fafafa;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+
+    .info-section-title {
+      color: #4F35A3;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #ede9fe;
+    }
+
+    .info-row {
+      display: flex;
+      padding: 9px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      flex: 0 0 150px;
+      color: #9ca3af;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .info-value {
+      flex: 1;
+      color: #111827;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    /* ── 4. Advertencia ──────────────────────────────────────────────────── */
     .warning-box {
-      background-color: #FEF3C7;
-      border-left: 3px solid #F59E0B;
-      border-radius: 6px;
-      padding: 20px;
+      background: linear-gradient(135deg, #fffbeb, #fef3c7);
+      border: 1px solid #fcd34d;
+      border-left: 4px solid #f59e0b;
+      border-radius: 10px;
+      padding: 18px 20px;
       margin-bottom: 20px;
     }
 
     .warning-title {
-      color: #92400E;
-      font-size: 14px;
-      font-weight: 600;
+      color: #78350f;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .warning-list {
@@ -216,33 +290,37 @@
     }
 
     .warning-list li {
-      color: #92400E;
+      color: #92400e;
       font-size: 13px;
-      padding: 4px 0;
-      padding-left: 20px;
+      padding: 4px 0 4px 18px;
       position: relative;
+      line-height: 1.5;
     }
 
     .warning-list li:before {
       content: "•";
       position: absolute;
-      left: 5px;
+      left: 4px;
+      color: #f59e0b;
       font-weight: bold;
     }
 
-    /* Características del Sistema */
+    /* ── 5. Características ──────────────────────────────────────────────── */
     .features-section {
-      background-color: #F9FAFB;
-      border-radius: 8px;
-      padding: 25px;
+      background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+      border: 1px solid #ddd6fe;
+      border-radius: 12px;
+      padding: 22px;
       margin-bottom: 20px;
     }
 
     .features-title {
-      color: #1E3A8A;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 15px;
+      color: #4F35A3;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
     }
 
     .features-list {
@@ -251,10 +329,9 @@
     }
 
     .features-list li {
-      color: #4B5563;
+      color: #3730a3;
       font-size: 14px;
-      padding: 8px 0;
-      padding-left: 25px;
+      padding: 7px 0 7px 28px;
       position: relative;
     }
 
@@ -263,104 +340,121 @@
       position: absolute;
       left: 0;
       color: #8BC53F;
-      font-weight: bold;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    /* ── 6. Soporte Técnico ──────────────────────────────────────────────── */
+    .support-section {
+      background: linear-gradient(135deg, #fff7ed, #ffedd5);
+      border: 1px solid #fed7aa;
+      border-left: 4px solid #f97316;
+      border-radius: 12px;
+      padding: 22px;
+      margin-top: 24px;
+    }
+
+    .support-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .support-icon {
+      font-size: 20px;
+    }
+
+    .support-title {
+      color: #c2410c;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .support-subtitle {
+      color: #9a3412;
+      font-size: 12px;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .support-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #fed7aa;
+    }
+
+    .support-row:last-child {
+      border-bottom: none;
+    }
+
+    .support-emoji {
       font-size: 16px;
+      flex-shrink: 0;
     }
 
-    /* Acceso Manual */
-    .manual-access {
-      background-color: #F9FAFB;
-      border-radius: 6px;
-      padding: 20px;
-      margin-top: 20px;
-    }
-
-    .manual-access-title {
-      color: #6B7280;
-      font-size: 13px;
+    .support-text {
+      color: #7c2d12;
+      font-size: 14px;
       font-weight: 600;
-      margin-bottom: 8px;
     }
 
-    .manual-access p {
-      color: #6B7280;
-      font-size: 13px;
-      line-height: 1.6;
-      margin: 5px 0;
-    }
-
-    .manual-access a {
-      color: #6B4C9A;
+    .support-text a {
+      color: #ea580c;
       text-decoration: none;
-      font-weight: 600;
+      font-weight: 700;
     }
 
-    .manual-access a:hover {
-      text-decoration: underline;
-    }
-
-    /* Footer */
+    /* ── Footer ──────────────────────────────────────────────────────────── */
     .footer {
-      background-color: #1E3A8A;
-      color: #ffffff;
-      padding: 30px 40px;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      padding: 28px 40px;
       text-align: center;
     }
 
     .footer-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 8px;
+      color: #a5b4fc;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
     }
 
     .footer-subtitle {
+      color: #818cf8;
+      font-size: 12px;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .footer-unit {
+      color: #c7d2fe;
       font-size: 13px;
-      opacity: 0.9;
-      margin-bottom: 15px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .footer-divider {
+      border: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      margin: 12px 0;
     }
 
     .footer-note {
-      font-size: 12px;
-      opacity: 0.7;
-      line-height: 1.6;
-      margin-top: 15px;
-      padding-top: 15px;
-      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      color: #6366f1;
+      font-size: 11px;
+      line-height: 1.7;
     }
 
-    /* Responsive */
-    @media only screen and (max-width: 600px) {
-      body {
-        padding: 0;
-      }
-
-      .email-container {
-        border-radius: 0;
-      }
-
-      .header,
-      .content,
-      .footer {
-        padding: 25px 20px;
-      }
-
-      .logo {
-        max-width: 220px;
-      }
-
-      .info-row {
-        flex-direction: column;
-      }
-
-      .info-label {
-        flex: none;
-        margin-bottom: 4px;
-      }
-
-      .access-button {
-        padding: 12px 24px;
-        font-size: 15px;
-      }
+    .footer-copy {
+      color: #4338ca;
+      font-size: 11px;
+      margin-top: 8px;
     }
   </style>
 </head>
@@ -368,44 +462,98 @@
 <body>
   <div class="email-container">
 
-    <!-- Header con Logo -->
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
     <div class="header">
-      <img src="cid:logo" alt="GIRAMASTER" class="logo">
+      <img src="cid:logo" alt="GIRAMASTER" class="logo" />
+      <div class="header-badge">🏢 Credenciales de Acceso</div>
     </div>
 
-    <!-- Contenido Principal -->
+    <!-- ── Saludo ──────────────────────────────────────────────────────── -->
+    <div class="greeting-bar">
+      <p>Bienvenido(a) <strong>{{firstname}} {{lastname}}</strong>, su cuenta ha sido
+        creada exitosamente en el sistema de gestión de asambleas de
+        <strong>{{residential_unit_name}}</strong>.
+      </p>
+    </div>
+
     <div class="content">
 
-      <!-- Saludo -->
-      <div class="greeting">
-        <p><strong>Estimado/a {{firstname}} {{lastname}},</strong></p>
-        <p>
-          Bienvenido/a a GIRAMASTER. Su cuenta ha sido creada exitosamente y ya puede acceder al sistema
-          de gestión de asambleas de su unidad residencial.
-        </p>
+      <!-- ── 1. CREDENCIALES (primero y más visible) ───────────────────── -->
+      <div class="credentials-section">
+        <div class="credentials-header">
+          <span class="credentials-icon">🔑</span>
+          <span class="credentials-title">Sus Credenciales de Acceso</span>
+        </div>
+
+        <div class="credential-box">
+          <div class="credential-label">Usuario</div>
+          <div class="credential-value">{{username}}</div>
+        </div>
+
+        <div class="credential-box">
+          <div class="credential-label">Contraseña Temporal</div>
+          <div class="credential-value">{{password}}</div>
+        </div>
       </div>
 
-      <!-- Botón de Acceso Rápido (si hay token) -->
+      <!-- ── 2. BOTÓN ACCESO DIRECTO ────────────────────────────────────── -->
       {% if auto_login_url %}
       <div class="quick-access">
-        <div class="quick-access-title">Acceso Rápido al Sistema</div>
+        <div class="quick-access-title">🚀 Ingrese directamente al sistema</div>
         <a href="{{auto_login_url}}" class="access-button">ACCEDER AHORA</a>
         <p class="quick-access-note">
-          Haga clic en el botón para ingresar automáticamente.<br>
-          No necesita escribir sus credenciales.
+          Haga clic en el botón para ingresar sin escribir sus credenciales.<br>
+          Se redirigirá automáticamente a su panel.
         </p>
-        <div class="token-validity">
-          <strong>Válido por 48 horas</strong> • Funciona solo una vez por seguridad
-        </div>
+        <div class="token-validity">⏱ Válido por 48 horas · Funciona una sola vez</div>
       </div>
       {% endif %}
 
-      <!-- Información del Usuario -->
+      <!-- ── 3. SOPORTE TÉCNICO (solo si está configurado) ─────────────── -->
+      {% if support_name or support_email or support_phone %}
+      <div class="support-section">
+        <div class="support-header">
+          <span class="support-icon">🛟</span>
+          <span class="support-title">¿Tiene alguna duda con este correo?</span>
+        </div>
+        <p class="support-subtitle">
+          Si tiene inquietudes sobre sus credenciales o necesita asistencia,
+          puede contactar a nuestro equipo de soporte técnico:
+        </p>
+
+        {% if support_name %}
+        <div class="support-row">
+          <span class="support-emoji">👤</span>
+          <span class="support-text">{{support_name}}</span>
+        </div>
+        {% endif %}
+
+        {% if support_email %}
+        <div class="support-row">
+          <span class="support-emoji">✉️</span>
+          <span class="support-text">
+            <a href="mailto:{{support_email}}">{{support_email}}</a>
+          </span>
+        </div>
+        {% endif %}
+
+        {% if support_phone %}
+        <div class="support-row">
+          <span class="support-emoji">📞</span>
+          <span class="support-text">
+            <a href="tel:{{support_phone}}">{{support_phone}}</a>
+          </span>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- ── 4. INFORMACIÓN DE LA CUENTA ──────────────────────────────── -->
       <div class="info-section">
-        <div class="info-section-title">Información de su Cuenta</div>
+        <div class="info-section-title">📋 Información de su Cuenta</div>
 
         <div class="info-row">
-          <span class="info-label">Unidad Residencial</span>
+          <span class="info-label">Unidad</span>
           <span class="info-value">{{residential_unit_name}}</span>
         </div>
 
@@ -427,70 +575,45 @@
         {% endif %}
 
         <div class="info-row">
-          <span class="info-label">Peso de Votación</span>
+          <span class="info-label">Coeficiente</span>
           <span class="info-value">{{voting_weight}}%</span>
         </div>
       </div>
 
-      <!-- Credenciales de Acceso -->
-      <div class="credentials-section">
-        <div class="credentials-title">Sus Credenciales de Acceso</div>
-
-        <div class="credential-box">
-          <div class="credential-label">Usuario</div>
-          <div class="credential-value">{{username}}</div>
-        </div>
-
-        <div class="credential-box">
-          <div class="credential-label">Contraseña Temporal</div>
-          <div class="credential-value">{{password}}</div>
-        </div>
-      </div>
-
-      <!-- Advertencia de Seguridad -->
+      <!-- ── 5. ADVERTENCIA DE SEGURIDAD ──────────────────────────────── -->
       <div class="warning-box">
-        <div class="warning-title">Importante</div>
+        <div class="warning-title">⚠️ Importante</div>
         <ul class="warning-list">
-          <li>Esta contraseña es temporal y debe ser cambiada en su primer acceso</li>
-          <li>Por seguridad, no comparta sus credenciales con nadie</li>
-          <li>Guarde este correo en un lugar seguro</li>
+          <li>Cambie su contraseña temporal en el primer acceso al sistema</li>
+          <li>No comparta sus credenciales con ninguna persona</li>
+          <li>Guarde este correo en un lugar seguro como respaldo</li>
         </ul>
       </div>
 
-      <!-- Características del Sistema -->
+      <!-- ── 6. CARACTERÍSTICAS DEL SISTEMA ───────────────────────────── -->
       <div class="features-section">
-        <div class="features-title">¿Qué puede hacer en el sistema?</div>
+        <div class="features-title">⭐ ¿Qué puede hacer en el sistema?</div>
         <ul class="features-list">
-          <li>Asistir a asambleas virtuales</li>
-          <li>Participar en votaciones electrónicas</li>
-          <li>Consultar actas y documentos</li>
-          <li>Mantenerse informado sobre su comunidad</li>
+          <li>Asistir a asambleas virtuales desde cualquier dispositivo</li>
+          <li>Participar en votaciones electrónicas con su coeficiente</li>
+          <li>Consultar actas y documentos de su unidad</li>
+          <li>Mantenerse informado sobre decisiones de su comunidad</li>
         </ul>
       </div>
-
-      <!-- Acceso Manual (si hay token) -->
-      {% if auto_login_url %}
-      <div class="manual-access">
-        <div class="manual-access-title">Acceso Manual</div>
-        <p>
-          También puede ingresar desde:
-          <a href="https://tu-dominio.com/login">https://tu-dominio.com/login</a>
-        </p>
-        <p>Use las credenciales mostradas arriba.</p>
-      </div>
-      {% endif %}
 
     </div>
 
-    <!-- Footer -->
+    <!-- ── Footer ─────────────────────────────────────────────────────── -->
     <div class="footer">
       <div class="footer-title">GIRAMASTER</div>
       <div class="footer-subtitle">Sistema de Gestión de Asambleas</div>
-      <div>{{residential_unit_name}}</div>
+      <div class="footer-unit">{{residential_unit_name}}</div>
+      <hr class="footer-divider">
       <div class="footer-note">
-        Si tiene problemas para acceder, contacte al administrador<br>
-        de su unidad residencial.
+        Este correo fue generado automáticamente por Asambleas GIRAMASTER.<br>
+        Si no solicitó este acceso, contacte al administrador de su unidad.
       </div>
+      <div class="footer-copy">© 2026 GIRAMASTER · Todos los derechos reservados</div>
     </div>
 
   </div>
