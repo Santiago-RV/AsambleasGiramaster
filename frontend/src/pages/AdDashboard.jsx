@@ -530,7 +530,7 @@ export default function AppAdmin() {
         <div className="flex items-center gap-3">
 
           {/* Avatar (siempre visible) */}
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#059669] to-[#10b981] flex items-center justify-center text-white font-bold shadow-md">
+          <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#059669] to-[#10b981] flex items-center justify-center text-white font-bold shadow-md">
             {user?.name
               ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
               : user?.role?.charAt(0).toUpperCase() || 'A'
@@ -591,6 +591,7 @@ export default function AppAdmin() {
       {section === "users" && (
         <UsersPage
           residentialUnitId={residentialUnitId}
+          unitName={residentialUnitName}
           onCreateUser={handleOpenResidentModal}
           onEditUser={handleEditResident}
           onUploadExcel={() => setShowExcelModal(true)}

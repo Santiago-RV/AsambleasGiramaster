@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Plus, UserPlus } from 'lucide-react';
+import { Upload, Plus, UserPlus, Headphones } from 'lucide-react';
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
 import MeetingsList from "../common/MeetingsList";
@@ -7,6 +7,8 @@ import { ResidentialUnitService } from "../../services/api/ResidentialUnitServic
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
+import SupportModal from '../saDashboard/components/modals/SupportModal';
+
 
 export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest }) {
   const queryClient = useQueryClient();
@@ -24,6 +26,8 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     enabled: !!residentialUnitId,
     retry: 1,
   });
+
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   // Extraer los residentes del response
   const residents = residentsData?.success && residentsData?.data ? residentsData.data : [];
@@ -146,7 +150,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
 
       const isPresencial = response.modality === 'presencial';
-      
+
       Swal.fire({
         icon: 'success',
         title: isPresencial ? 'Reunion Presencial Iniciada' : 'Reunion Iniciada',
@@ -221,8 +225,8 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
           </div>
           <p class="text-xs text-gray-600 mt-3">
             ${isPresencial
-              ? 'La reunion cambiara a estado "En Curso". Utilice el escaner QR para registrar asistencia.'
-              : 'Se crearan invitaciones automaticamente para todos los copropietarios'}
+          ? 'La reunion cambiara a estado "En Curso". Utilice el escaner QR para registrar asistencia.'
+          : 'Se crearan invitaciones automaticamente para todos los copropietarios'}
           </p>
         </div>
       `,
@@ -505,24 +509,33 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
         <div className="flex flex-wrap gap-3">
           <button
             onClick={onUploadExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg transition-all"
           >
             <Upload size={18} />
             <span>Cargar Excel</span>
           </button>
           <button
             onClick={onCreateUser}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:shadow-lg transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-green-600 to-green-700 text-white rounded-lg hover:shadow-lg transition-all"
           >
             <Plus size={18} />
             <span>Agregar Copropietario</span>
           </button>
           <button
             onClick={onCreateGuest}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:shadow-lg transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:shadow-lg transition-all"
           >
             <UserPlus size={18} />
             <span>Agregar Invitado</span>
+          </button>
+
+          <button
+            onClick={() => setIsSupportModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:shadow-lg transition-all"
+            title="Configurar contacto de soporte técnico"
+          >
+            <Headphones size={18} />
+            <span>Soporte Técnico</span>
           </button>
         </div>
       </div>
@@ -584,7 +597,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             isSendingBulk={sendBulkCredentialsMutation.isPending}
             showInviteButton={true}
             residentialUnitId={residentialUnitId}
-            onInviteToMeeting={() => {}}
+            onInviteToMeeting={() => { }}
           />
         </div>
 
@@ -601,6 +614,12 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
           />
         </div>
       </div>
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        unitId={residentialUnitId}
+        unitName={unitName} 
+      />
     </section>
   );
 }
