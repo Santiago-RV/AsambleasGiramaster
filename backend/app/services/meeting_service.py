@@ -19,6 +19,7 @@ from app.models.data_user_model import DataUserModel
 from app.core.exceptions import ResourceNotFoundException, ServiceException
 from app.services.zoom_api_service import ZoomAPIService
 from app.core.logging_config import get_logger
+from app.models.poll_model import PollModel
 
 logger = get_logger(__name__)
 
@@ -470,11 +471,14 @@ class MeetingService:
                 if meeting.str_modality == "presencial":
                     await self._finalize_presential_attendances(meeting_id, meeting.dat_actual_end_time)
 
+                # Finalizar encuestas activas o en borrador
+                await self._finalize_pending_polls(meeting_id, user_id, meeting.dat_actual_end_time)
+
                 await self.db.commit()
                 await self.db.refresh(meeting)
-                logger.info(f"✅ Reunión {meeting_id} finalizada - Estado: Completada")
+                logger.info(f"Reunión {meeting_id} finalizada - Estado: Completada")
             else:
-                logger.info(f"ℹ️ Reunión {meeting_id} no está en curso, estado actual: {meeting.str_status}")
+                logger.info(f"ℹReunión {meeting_id} no está en curso, estado actual: {meeting.str_status}")
 
             return meeting
 
@@ -486,6 +490,31 @@ class MeetingService:
                 message=f"Error al finalizar la reunión: {str(e)}",
                 details={"original_error": str(e)}
             )
+
+    async def _finalize_pending_polls(self, meeting_id: int, user_id: int, end_time: datetime) -> int:
+        """
+        Finaliza automáticamente todas las encuestas activas o en borrador
+        al momento de finalizar la reunión.
+        """
+        result = await self.db.execute(
+            select(PollModel).where(
+                PollModel.int_meeting_id == meeting_id,
+                PollModel.str_status.in_(['active', 'draft'])
+            )
+        )
+        polls = result.scalars().all()
+
+        count = 0
+        for poll in polls:
+            poll.str_status = 'closed'
+            poll.dat_ended_at = end_time
+            poll.updated_by = user_id
+            count += 1
+
+        if count > 0:
+            logger.info(f"Reunión {meeting_id}: {count} encuesta(s) finalizada(s) automáticamente")
+
+        return count
 
     async def _finalize_presential_attendances(self, meeting_id: int, end_time: datetime) -> int:
         """

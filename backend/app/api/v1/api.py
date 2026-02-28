@@ -17,7 +17,8 @@ from app.auth.auth import get_current_user
 from app.api.v1.endpoints import guest_endpoint 
 from app.api.v1.endpoints import qr_endpoints
 from app.api.v1.endpoints import delegation_history_endpoint
-from app.api.v1.endpoints import system_config_endpoint  
+from app.api.v1.endpoints import system_config_endpoint
+from app.api.v1.endpoints import support_endpoint  
 
 api_router = APIRouter()
 
@@ -165,5 +166,15 @@ api_router.include_router(
     reports_superadmin_endpoint.router,
     prefix="/super-admin/reports",
     tags=["SA Reports"],
+    dependencies=[Depends(get_current_user)]
+)
+
+# ============================================
+# Soporte Técnico 
+# ============================================
+api_router.include_router(
+    support_endpoint.router,
+    prefix="/support",
+    tags=["Support"],
     dependencies=[Depends(get_current_user)]
 )

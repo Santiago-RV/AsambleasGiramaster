@@ -519,43 +519,26 @@ class EmailService:
         apartment_number: str,
         voting_weight: float,
         phone: Optional[str] = None,
-        auto_login_token: Optional[str] = None
+        auto_login_token: Optional[str] = None,
+        # ── Nuevos parámetros de soporte técnico ────────────────────────────────
+        support_name: Optional[str] = None,
+        support_email: Optional[str] = None,
+        support_phone: Optional[str] = None,
+        # ────────────────────────────────────────────────────────────────────────
     ) -> bool:
-        """
-        Envía un email con las credenciales de acceso para un copropietario.
-        Incluye un JWT temporal para auto-login si se proporciona.
-
-        Args:
-            to_email: Email del copropietario
-            firstname: Nombre del copropietario
-            lastname: Apellido del copropietario
-            username: Username para acceso
-            password: Contraseña temporal
-            residential_unit_name: Nombre de la unidad residencial
-            apartment_number: Número del apartamento
-            voting_weight: Peso de votación del copropietario (Decimal)
-            phone: Teléfono del copropietario (opcional)
-            auto_login_token: Token JWT para auto-login (opcional)
-
-        Returns:
-            bool: True si se envió exitosamente, False en caso contrario
-        """
         try:
-            # Cargar el template HTML
             template_path = self.templates_dir / "welcome_coproprietario.html"
-            
+
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
-            
-            # Construir URL de auto-login si hay JWT
+
             auto_login_url = None
             if auto_login_token:
                 from app.core.config import settings
                 frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                 auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                 logger.info(f"🔗 URL de auto-login generada para {to_email}")
-            
-            # Renderizar el template con Jinja2
+
             template = Template(template_content)
             html_content = template.render(
                 firstname=firstname,
@@ -564,35 +547,35 @@ class EmailService:
                 password=password,
                 residential_unit_name=residential_unit_name,
                 apartment_number=apartment_number,
-                voting_weight=float(voting_weight),  # Convertir Decimal a float
+                voting_weight=float(voting_weight),
                 user_email=to_email,
                 phone=phone,
-                auto_login_url=auto_login_url
+                auto_login_url=auto_login_url,
+                # ── Soporte técnico ─────────────────────────────────────────────
+                support_name=support_name,
+                support_email=support_email,
+                support_phone=support_phone,
+                # ────────────────────────────────────────────────────────────────
             )
-            
-            # Asunto del email
+
             subject = f"Credenciales de Acceso - {residential_unit_name}"
-            
-            # Enviar el email usando credenciales de DB
+
             result = await self.email_sender.send_email_async(
                 to_emails=[to_email],
                 subject=subject,
                 html_content=html_content
             )
-            
+
             if result:
                 logger.info(f"✅ Email de credenciales enviado exitosamente a {to_email}")
-                if auto_login_token:
-                    logger.info(f"✨ JWT de auto-login incluido en el correo")
                 return True
             else:
                 logger.warning(f"⚠️ No se pudo enviar email a {to_email}")
                 return False
-            
+
         except FileNotFoundError as e:
             logger.error(f"❌ Template no encontrado: {e}")
             return False
-        
         except Exception as e:
             logger.error(f"❌ Error al enviar email de credenciales: {e}")
             return False

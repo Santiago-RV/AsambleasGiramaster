@@ -27,6 +27,8 @@ from sqlalchemy import select
 from datetime import datetime
 import logging
 
+from app.services.support_service import SupportService
+
 logger = logging.getLogger(__name__)
 
 class ResidentialUnitService:
@@ -1243,8 +1245,12 @@ class ResidentialUnitService:
                     message=f"Unidad residencial no encontrada",
                     error_code="RESIDENTIAL_UNIT_NOT_FOUND"
                 )
-            
+
             logger.info(f"Unidad residencial: {residential_unit.str_name}")
+
+            # ── Soporte técnico (opcional) ────────────────────────────────────
+            support_service = SupportService(self.db)
+            support_data = await support_service.get_support_info(unit_id)
             
             # ============================================
             # PASO 3: Generar nueva contraseña temporal
@@ -1305,12 +1311,15 @@ class ResidentialUnitService:
                     firstname=data_user.str_firstname,
                     lastname=data_user.str_lastname,
                     username=user.str_username,
-                    password=None,  # Ya no se envía contraseña temporal
+                    password=None,
                     residential_unit_name=residential_unit.str_name,
                     apartment_number=user_unit.str_apartment_number,
                     voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
                     phone=data_user.str_phone,
-                    auto_login_token=auto_login_token  # ✨ PASAR EL JWT
+                    auto_login_token=auto_login_token,
+                    support_name=support_data["str_support_name"] if support_data else None,
+                    support_email=support_data["str_support_email"] if support_data else None,
+                    support_phone=support_data["str_support_phone"] if support_data else None,
                 )
                 
                 # ============================================

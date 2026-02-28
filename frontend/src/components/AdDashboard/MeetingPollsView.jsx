@@ -213,8 +213,8 @@ export default function MeetingPollsView({ meeting, onBack }) {
         } else {
           console.warn('⚠️ [MeetingPollsView] No se puede iniciar automáticamente:', {
             reason: !response?.success ? 'response.success is falsy' :
-                    !response?.data ? 'response.data is falsy' :
-                    !response?.data?.id ? 'response.data.id is falsy' : 'unknown'
+              !response?.data ? 'response.data is falsy' :
+                !response?.data?.id ? 'response.data.id is falsy' : 'unknown'
           });
         }
       } else {
@@ -277,7 +277,8 @@ export default function MeetingPollsView({ meeting, onBack }) {
 
   // Vista de estadísticas de encuesta seleccionada
   if (selectedPoll) {
-    const stats = statsData?.data;
+    const stats = statsData?.data?.statistics;
+    const statsOptions = statsData?.data?.options;
 
     return (
       <div className="space-y-6">
@@ -303,8 +304,8 @@ export default function MeetingPollsView({ meeting, onBack }) {
                 {getStatusBadge(selectedPoll.str_status)}
                 <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                   {selectedPoll.str_poll_type === 'single' ? 'Opción única' :
-                   selectedPoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
-                   selectedPoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
+                    selectedPoll.str_poll_type === 'multiple' ? 'Múltiple opción' :
+                      selectedPoll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}
                 </span>
                 {selectedPoll.bln_is_anonymous && (
                   <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
@@ -399,36 +400,42 @@ export default function MeetingPollsView({ meeting, onBack }) {
                 </p>
               </div>
             </div>
+              </div>
 
-            {/* Resultados por opción */}
-            {stats.options && stats.options.length > 0 && (
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
-                <div className="space-y-4">
-                  {stats.options.map((option, index) => (
-                    <div key={option.id || index}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gray-700">{option.str_option_text}</span>
-                        <div className="text-right">
-                          <span className="text-sm text-gray-600 block">
-                            {option.int_votes_count} votos ({option.dec_percentage?.toFixed(1)}%)
-                          </span>
-                          <span className="text-xs text-emerald-600 font-medium">
-                            Peso: {option.dec_weight_total?.toFixed(2)}
-                          </span>
+              {/* Resultados por opción */}
+              {statsOptions && statsOptions.length > 0 && (
+                <div className="bg-white rounded-xl shadow-md p-6">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+                  <div className="space-y-4">
+                    {statsOptions.map((option, index) => (
+                      <div key={option.id || index}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span>{option.str_option_text}</span>
+                          <span>{option.int_votes_count} votos ({option.dec_percentage?.toFixed(1)}%)</span>
+                          <div style={{ width: `${option.dec_percentage || 0}%` }}></div>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div
+                            className="bg-green-600 h-3 rounded-full transition-all duration-300"
+                            style={{ width: `${option.percentage || 0}%` }}
+                          ></div>
                         </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div
-                          className="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full transition-all duration-300"
-                          style={{ width: `${option.dec_percentage || 0}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* <div className="bg-white rounded-xl shadow-md p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <CheckCircle className="text-green-600" size={24} />
+                  <h3 className="font-semibold text-gray-700">Quórum</h3>
+                </div>
+                <p className="text-3xl font-bold text-gray-800">
+                  {stats.quorum_reached ? 'Alcanzado' : 'No alcanzado'}
+                </p>
+              </div> */}
+            </div>
 
             {/* Respuestas de texto (si aplica) */}
             {stats.text_responses && stats.text_responses.length > 0 && (
@@ -483,7 +490,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </div>
           <button
             onClick={() => setShowCreatePoll(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
+            className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
           >
             <Plus size={20} />
             Nueva Encuesta
@@ -522,8 +529,8 @@ export default function MeetingPollsView({ meeting, onBack }) {
                 <div className="flex flex-wrap gap-2 text-xs">
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
                     {poll.str_poll_type === 'single' ? 'Opción única' :
-                     poll.str_poll_type === 'multiple' ? 'Múltiple' :
-                     poll.str_poll_type === 'text' ? 'Texto' : 'Numérica'}
+                      poll.str_poll_type === 'multiple' ? 'Múltiple' :
+                        poll.str_poll_type === 'text' ? 'Texto' : 'Numérica'}
                   </span>
                   {poll.bln_is_anonymous && (
                     <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
@@ -555,7 +562,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </p>
           <button
             onClick={() => setShowCreatePoll(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-linear-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold shadow-lg"
           >
             <Plus size={20} />
             Crear Primera Encuesta
