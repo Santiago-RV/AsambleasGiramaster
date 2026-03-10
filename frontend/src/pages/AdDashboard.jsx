@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Video, FileText, HandCoins, LogOut, Calendar, Loader2, AlertTriangle, X } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -41,15 +41,41 @@ export default function AppAdmin() {
   const [meetingMode, setMeetingMode] = useState('virtual');
   const [showZoomMeeting, setShowZoomMeeting] = useState(null);
   const { logout } = useAuth();
-  const { user } = useAuthContext();
+  const { user: contextUser } = useAuthContext();
+
+  // Fallback directo a localStorage si el contexto llega null
+  const user = useMemo(() => {
+    if (contextUser) return contextUser;
+    try {
+      const raw = localStorage.getItem('user');
+      const token = localStorage.getItem('access_token');
+      if (raw && token) return JSON.parse(raw);
+      return null;
+    } catch {
+      return null;
+    }
+  }, [contextUser]);
   const queryClient = useQueryClient();
   const [showGuestModal, setShowGuestModal] = useState(false);
-  
+
   // Verificar si es admin o superadmin
-  const isAdmin = user?.role === 'Super Administrador' || user?.role === 'Administrador';
+  // Usar useMemo para que se recalcule cuando user cambie
+  const isAdmin = useMemo(() => {
+    const result = user?.role === 'Super Administrador' || user?.role === 'Administrador';
+    console.log('useMemo isAdmin recalculado:', result, 'user:', user);
+    return result;
+  }, [user?.role]);
 
   // Hook para operaciones de invitados
   const { createGuestMutation } = useGuestOperations(residentialUnitId);
+
+
+  console.log('USER EN ADDASHBOARD:', user);
+  console.log('ROLE:', user?.role);
+  console.log('isAdmin:', user?.role === 'Super Administrador' || user?.role === 'Administrador');
+
+  console.log('localStorage user:', localStorage.getItem('user'));
+  console.log('localStorage token:', localStorage.getItem('access_token'));
 
   // Query para obtener invitados
   const { data: guestsData, refetch: refetchGuests } = useQuery({
@@ -95,24 +121,22 @@ export default function AppAdmin() {
   }, [unitDetails]);
 
   // Configuración del menú del sidebar
-  const menuItems = [
+  const menuItems = useMemo(() => [
     { id: 'users', label: 'Gestión de Copropietarios', icon: Users },
-    // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
     ...(isAdmin ? [{ id: 'meeting-progress', label: 'Reunión en Curso', icon: Calendar }] : []),
     { id: 'powers', label: 'Poderes', icon: HandCoins },
     { id: 'reports', label: 'Reportes', icon: FileText },
-  ];
+  ], [isAdmin]);
 
   // Títulos para cada sección
-  const sectionTitles = {
+  const sectionTitles = useMemo(() => ({
     users: "Gestión de Co - propietarios",
-    // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
-    ...(isAdmin ? { "meeting-progress": "Reunión en Curso" } : {}),
-    powers: "Gestión de Poderes",
+    ...(isAdmin ? { 'meeting-progress': 'Reunión en Curso' } : {}),
+    powers: "Poderes",
     reports: "Reportes",
-  };
+  }), [isAdmin]);
 
   const openPowerModal = (fromLabel, onConfirm) => {
     setPowerModalData({ fromLabel, onConfirm });
