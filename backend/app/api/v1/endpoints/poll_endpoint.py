@@ -623,7 +623,8 @@ async def get_poll_statistics(
                     "str_status": poll.str_status,
                     "str_poll_type": poll.str_poll_type,
                     "bln_requires_quorum": poll.bln_requires_quorum,
-                    "dec_minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0
+                    "dec_minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
+                    "bln_is_anonymous": poll.bln_is_anonymous
                 },
                 "statistics": {
                     "total_responses": stats["total_responses"],
@@ -645,7 +646,8 @@ async def get_poll_statistics(
                         "dec_weight_total": float(opt.dec_weight_total),
                         "dec_percentage": float(opt.dec_percentage)
                         } for opt in sorted(poll.options, key=lambda x: x.int_option_order)
-                ]
+                ] if poll.str_poll_type in ['single', 'multiple'] else [],
+                "text_responses": stats.get("text_responses", [])
             }
         )
     except NotFoundException as e:

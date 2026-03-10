@@ -349,6 +349,13 @@ class PollService:
                 )
             return
 
+        # Validar que al menos un campo de respuesta esté presente
+        if not response_data.int_option_id and not response_data.str_response_text and response_data.dec_response_number is None:
+            raise ValidationException(
+                message="Debe proporcionar una respuesta (opción, texto o número)",
+                error_code="RESPONSE_REQUIRED"
+            )
+
         if poll.str_poll_type in ['single', 'multiple']:
             if not response_data.int_option_id:
                 raise ValidationException(
@@ -593,5 +600,46 @@ class PollService:
             "total_weight_invited": total_weight_invited,
             "weight_participation_percentage": weight_participation_percentage,
             "quorum_reached": quorum_reached,
-            "participation_percentage": participation_percentage
+            "participation_percentage": participation_percentage,
+            "text_responses": await self._get_text_responses(poll, poll_id)
         }
+
+    async def _get_text_responses(self, poll, poll_id: int) -> list:
+        """Obtiene las respuestas de texto de una encuesta"""
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        
+        # Consultar respuestas con texto
+        result = await self.db.execute(
+            select(PollResponseModel, UserModel, DataUserModel)
+            .outerjoin(UserModel, PollResponseModel.int_user_id == UserModel.id)
+            .outerjoin(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .where(
+                and_(
+                    PollResponseModel.int_poll_id == poll_id,
+                    PollResponseModel.str_response_text.isnot(None),
+                    PollResponseModel.str_response_text != ''
+                )
+            )
+            .order_by(PollResponseModel.dat_response_at.desc())
+        )
+        
+        responses = []
+        for row in result.all():
+            poll_response = row[0]
+            user = row[1] if len(row) > 1 else None
+            data_user = row[2] if len(row) > 2 else None
+            
+            # Obtener nombre del usuario (si no es anónima)
+            user_name = None
+            if not poll.bln_is_anonymous and data_user:
+                user_name = f"{data_user.str_firstname or ''} {data_user.str_lastname or ''}".strip() or None
+            
+            responses.append({
+                "id": poll_response.id,
+                "str_response_text": poll_response.str_response_text,
+                "user_name": user_name,
+                "dat_response_at": poll_response.dat_response_at.isoformat() if poll_response.dat_response_at else None
+            })
+        
+        return responses
