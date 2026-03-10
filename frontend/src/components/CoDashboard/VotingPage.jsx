@@ -50,7 +50,7 @@ export default function VotingPage() {
   const residentialUnitId = userData?.residential_unit?.id;
 
   // Obtener todas las reuniones de la unidad residencial
-  const { data: meetingsData, isLoading: isLoadingMeetings } = useQuery({
+  const { data: meetingsData, isLoading: isLoadingMeetings, refetch: refetchMeetings } = useQuery({
     queryKey: ['residential-meetings', residentialUnitId],
     queryFn: async () => {
       if (!residentialUnitId) return { data: [] };
@@ -58,6 +58,7 @@ export default function VotingPage() {
       return response;
     },
     enabled: !!residentialUnitId,
+    refetchInterval: 5000, // Refrescar cada 5 segundos para detectar cambios de estado
   });
 
   // Obtener todas las encuestas de todas las reuniones
@@ -99,7 +100,8 @@ export default function VotingPage() {
     const isActive = poll.str_status === 'active' || poll.str_status === 'Activa';
     const hasNotVoted = !poll.has_voted;
     
-    if (!isActive || hasNotVoted) return false;
+    // Mostrar solo si: está activa Y el usuario NO ha votado
+    if (!isActive || poll.has_voted) return false;
     
     // Verificar si la encuesta ha expirado por tiempo límite
     if (poll.dat_ended_at) {

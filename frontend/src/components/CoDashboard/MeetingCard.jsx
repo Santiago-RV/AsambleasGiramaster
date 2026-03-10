@@ -9,28 +9,27 @@ export default function MeetingCard({ meeting }) {
 	const [showZoom, setShowZoom] = useState(false);
 	const [isJoining, setIsJoining] = useState(false);
 
-	// Calcular estado de la reunión
+	// Obtener estado desde la base de datos
 	const getStatus = () => {
-		const now = new Date();
-		const scheduledDate = new Date(meeting.dat_schedule_date);
-		const oneHourBefore = new Date(scheduledDate.getTime() - 60 * 60 * 1000);
-
-		const duration = meeting.int_estimated_duration > 0
-			? meeting.int_estimated_duration
-			: 240;
-
-		const meetingEnd = new Date(
-			scheduledDate.getTime() + duration * 60 * 1000
-		);
-
-		if (now < oneHourBefore) {
-			return { text: 'Programada', color: 'blue', canJoin: false };
-		} else if (now < scheduledDate) {
-			return { text: 'Disponible', color: 'green', canJoin: true };
-		} else if (now < meetingEnd) {
-			return { text: 'En Curso', color: 'red', canJoin: true, pulsing: true };
-		} else {
-			return { text: 'Finalizada', color: 'gray', canJoin: false };
+		const status = meeting.str_status?.toLowerCase();
+		
+		switch (status) {
+			case 'in progress':
+			case 'en curso':
+			case 'active':
+				return { text: 'En Curso', color: 'red', canJoin: true, pulsing: true };
+			case 'available':
+			case 'disponible':
+				return { text: 'Disponible', color: 'green', canJoin: true };
+			case 'scheduled':
+			case 'programada':
+				return { text: 'Programada', color: 'blue', canJoin: false };
+			case 'completed':
+			case 'finalizada':
+			case 'cerrada':
+				return { text: 'Finalizada', color: 'gray', canJoin: false };
+			default:
+				return { text: meeting.str_status || 'Programada', color: 'blue', canJoin: false };
 		}
 	};
 

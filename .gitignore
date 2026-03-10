@@ -40,3 +40,6 @@ back_laravel/
 migrations/
 
 qr_codes/
+
+tls-secret.yaml
+secret.yaml

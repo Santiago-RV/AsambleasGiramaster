@@ -1,0 +1,12 @@
+{
+  "api_url": "http://localhost:8001",
+  "residential_unit_id": 1,
+  "user_count": 0,
+  "meeting_ids": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ]
+}
