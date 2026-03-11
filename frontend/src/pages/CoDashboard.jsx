@@ -142,18 +142,18 @@ export default function AppCopropietario() {
       icon: FileText,
       allowedRoles: ["Usuario"],
     },
-    {
-      id: 'powers',
-      label: 'Poderes',
-      icon: HandCoins,
-      allowedRoles: ["Usuario"],
-    },
-    {
-      id: 'profile',
-      label: 'Mi Perfil',
-      icon: User,
-      allowedRoles: ["Usuario"],
-    },
+    // {
+    //   id: 'powers',
+    //   label: 'Poderes',
+    //   icon: HandCoins,
+    //   allowedRoles: ["Usuario"],
+    // },
+    // {
+    //   id: 'profile',
+    //   label: 'Mi Perfil',
+    //   icon: User,
+    //   allowedRoles: ["Usuario"],
+    // },
   ];
 
   const menuItems = allMenuItems.filter((item) =>
@@ -185,13 +185,6 @@ export default function AppCopropietario() {
             {titles[section]}
           </h1>
         </div>
-
-        {/* ✅ NUEVO: Mostrar poderes delegados si hay reunión activa */}
-        {!isGuest && activeMeeting && (
-          <div className="mb-4">
-            <DelegatedPowersHeader meetingId={activeMeeting.id} />
-          </div>
-        )}
 
         {/* Información del copropietario y unidad CON BOTÓN DE LOGOUT */}
         {!isGuest && !isLoadingUser && (
@@ -238,6 +231,13 @@ export default function AppCopropietario() {
             >
               <LogOut size={20} />
             </button>
+          </div>
+        )}
+
+        {/* ✅ NUEVO: Mostrar poderes delegados si hay reunión activa */}
+        {!isGuest && activeMeeting && (
+          <div className="mb-4">
+            <DelegatedPowersHeader meetingId={activeMeeting.id} />
           </div>
         )}
 
