@@ -273,7 +273,11 @@ export class ResidentialUnitService {
         {
           headers: {
             'Authorization': `Bearer ${token}`
-            // ❌ NO agregar 'Content-Type': 'multipart/form-data'
+          },
+          timeout: 120000, // ← 2 minutos para cargas grandes
+          onUploadProgress: (progressEvent) => {
+            // opcional: puedes exponer este callback para mostrar progreso
+            console.log('Upload progress:', Math.round((progressEvent.loaded * 100) / progressEvent.total), '%');
           }
         }
       );
@@ -487,10 +491,10 @@ export class ResidentialUnitService {
 
       // Generar y descargar el archivo
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
-      
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

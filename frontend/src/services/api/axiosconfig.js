@@ -15,9 +15,7 @@ export const publicAxios = axios.create({
 // Instancia de Axios privada (con token) - para endpoints protegidos
 const axiosInstance = axios.create({
 	baseURL: API_BASE_URL,
-	//NO establecer Content-Type por defecto
-	// Axios lo configurará automáticamente según el tipo de datos
-	timeout: 10000,
+	timeout: 30000, // ← subir a 30s de base, o poner 0 para sin límite
 });
 
 // Interceptor para agregar el token a cada request

@@ -5,9 +5,9 @@ import { ResidentialUnitService } from '../../../../services/api/ResidentialUnit
 import Swal from 'sweetalert2';
 
 const SVG_ICONS = {
-    barChart3: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
-    xCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
-    lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+	barChart3: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
+	xCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
+	lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
 };
 
 const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
@@ -83,11 +83,10 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 					<p class="text-sm text-blue-700">Total de filas procesadas: <strong>${total_rows}</strong></p>
 					<p class="text-sm text-green-700">Copropietarios creados exitosamente: <strong>${successful}</strong></p>
 					<p class="text-sm text-green-700">Nuevos usuarios creados: <strong>${users_created}</strong></p>
-					${
-						failed > 0
-							? `<p class="text-sm text-red-700">Filas con errores: <strong>${failed}</strong></p>`
-							: ''
-					}
+					${failed > 0
+					? `<p class="text-sm text-red-700">Filas con errores: <strong>${failed}</strong></p>`
+					: ''
+				}
 				</div>
 		`;
 
@@ -129,23 +128,30 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 			console.error('Error uploading Excel:', error);
 			setIsUploading(false);
 
+			// Detectar específicamente si fue timeout
+			const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+
+			const errorMsg = isTimeout
+				? 'La operación tardó más de lo esperado, pero puede que se haya procesado en segundo plano. Verifica la lista de copropietarios antes de intentar nuevamente.'
+				: (error.response?.data?.detail || error.response?.data?.message || error.message || 'Error desconocido');
+
 			Swal.fire({
-				icon: 'error',
-				title: 'Error al cargar archivo',
+				icon: isTimeout ? 'warning' : 'error',
+				title: isTimeout ? 'Tiempo de espera agotado' : 'Error al cargar archivo',
 				html: `
-				<div class="text-left">
-					<p class="mb-2">${error.message}</p>
-					<div class="bg-gray-50 p-3 rounded text-sm">
+					<div class="text-left">
+						<p class="mb-2">${errorMsg}</p>
+						${!isTimeout ? `
+						<div class="bg-gray-50 p-3 rounded text-sm">
 						<p class="font-semibold mb-1">Verifica que:</p>
 						<ul class="list-disc list-inside space-y-1">
 							<li>El archivo sea formato Excel (.xlsx o .xls)</li>
 							<li>Contenga las columnas requeridas: firstname, lastname, email, apartment_number</li>
 							<li>Los emails sean válidos y únicos</li>
-							<li>Tengas permisos de Super Admin</li>
 						</ul>
+						</div>` : ''}
 					</div>
-				</div>
-			`,
+					`,
 				confirmButtonColor: '#3498db',
 				width: '600px',
 			});
@@ -242,8 +248,8 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 					</div>
 					<div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
 						<p className="text-xs text-yellow-800 flex items-center gap-1">
-								<AlertTriangle size={14} /> <strong>Formato de ejemplo:</strong>
-							</p>
+							<AlertTriangle size={14} /> <strong>Formato de ejemplo:</strong>
+						</p>
 						<div className="mt-2 bg-white p-2 rounded text-xs font-mono overflow-x-auto">
 							<table className="min-w-full">
 								<thead>
@@ -295,13 +301,12 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 						/>
 						<label
 							htmlFor="excel-file-input"
-							className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
-								isUploading
+							className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-all ${isUploading
 									? 'border-gray-300 bg-gray-50 cursor-not-allowed'
 									: selectedFile
-									? 'border-green-300 bg-green-50'
-									: 'border-gray-300 bg-gray-50 hover:border-[#3498db] hover:bg-blue-50'
-							}`}
+										? 'border-green-300 bg-green-50'
+										: 'border-gray-300 bg-gray-50 hover:border-[#3498db] hover:bg-blue-50'
+								}`}
 						>
 							{selectedFile ? (
 								<>
