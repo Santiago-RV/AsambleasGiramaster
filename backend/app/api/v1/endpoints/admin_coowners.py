@@ -11,7 +11,7 @@ from app.services.user_service import UserService
 from app.services.residential_unit_service import ResidentialUnitService
 from app.schemas.resident_update_schema import ResidentUpdate
 from app.schemas.responses_schema import SuccessResponse
-from app.schemas.residential_unit_schema import BulkToggleAccessRequest
+from app.schemas.residential_unit_schema import BulkDeleteRequest, BulkToggleAccessRequest
 from app.core.exceptions import ServiceException, ResourceNotFoundException
 import logging
 
@@ -701,3 +701,50 @@ async def toggle_coowners_access_bulk(
             message=f"Error al modificar acceso masivo: {str(e)}",
             details={"original_error": str(e)}
         )
+        
+@router.delete(
+    "/delete-bulk",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Eliminar múltiples copropietarios seleccionados"
+)
+async def delete_coowners_bulk(
+    request_data: BulkDeleteRequest,  # { user_ids: [int] }
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user_service = UserService(db)
+    user = await user_service.get_user_by_username(current_user)
+
+    if not user or user.int_id_rol not in [1, 2]:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+    residential_service = ResidentialUnitService(db)
+    
+    # Si es admin (rol 2), obtener su unidad; si es superadmin (rol 1), viene en el body
+    if user.int_id_rol == 2:
+        admin_unit = await residential_service.get_admin_residential_unit(user.id)
+        unit_id = admin_unit['id']
+    else:
+        unit_id = request_data.unit_id  # superadmin pasa unit_id
+
+    successful, failed, errors = 0, 0, []
+
+    for user_id in request_data.user_ids:
+        try:
+            await residential_service.delete_resident(
+                user_id=user_id,
+                unit_id=unit_id,
+                deleting_user_role=user.int_id_rol
+            )
+            successful += 1
+        except Exception as e:
+            failed += 1
+            errors.append({"user_id": user_id, "error": str(e)})
+
+    return SuccessResponse(
+        success=True,
+        status_code=200,
+        message=f"{successful} eliminados, {failed} fallidos",
+        data={"successful": successful, "failed": failed, "errors": errors}
+    )

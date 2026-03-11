@@ -11,9 +11,9 @@ import CoownerService from "../../services/api/coownerService";
 import SupportModal from '../saDashboard/components/modals/SupportModal';
 
 const SVG_ICONS = {
-    lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
-    alertTriangle: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
-    mail: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
+  lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+  alertTriangle: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+  mail: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
 };
 
 
@@ -72,30 +72,69 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     : [];
 
   // Mutación para eliminar residente
-  const deleteResidentMutation = useMutation({
-    mutationFn: ({ userId, unitId }) => CoownerService.deleteResident(unitId, userId),
+  const deleteBulkMutation = useMutation({
+    mutationFn: async (userIds) => {
+      // Mostrar Swal de progreso ANTES de la petición
+      Swal.fire({
+        title: 'Eliminando copropietarios...',
+        html: `Procesando <strong>${userIds.length}</strong> usuario(s), por favor espera.`,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => Swal.showLoading(),
+      });
+      return await CoownerService.deleteCoownersBulk(userIds);
+    },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+      const { successful, failed } = response.data || {};
       Swal.fire({
-        icon: 'success',
-        title: '¡Eliminado!',
-        text: response.message || 'El usuario ha sido eliminado exitosamente',
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 3000,
-        backdrop: false,
+        icon: failed > 0 ? 'warning' : 'success',
+        title: failed > 0 ? 'Eliminación parcial' : '¡Eliminados!',
+        html: `
+        <div class="text-left">
+          <p class="text-green-700"><strong>Eliminados:</strong> ${successful}</p>
+          ${failed > 0 ? `<p class="text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
+        </div>
+      `,
+        confirmButtonColor: '#3498db',
       });
     },
     onError: (error) => {
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
       Swal.fire({
-        icon: 'error',
-        title: 'Error al Eliminar',
-        text: error.response?.data?.message || error.message || 'No se pudo eliminar el usuario',
-        confirmButtonColor: '#ef4444',
+        icon: isTimeout ? 'warning' : 'error',
+        title: isTimeout ? 'Tiempo agotado' : 'Error al eliminar',
+        text: isTimeout
+          ? 'El proceso tardó más de lo esperado, pero puede haberse completado. Verifica la lista.'
+          : (error.response?.data?.message || error.message),
+        confirmButtonColor: '#3498db',
       });
     },
   });
+
+  const handleBulkDelete = async (selectedIds) => {
+    if (selectedIds.length === 0) return;
+
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: '¿Eliminar copropietarios?',
+      html: `<p>Se eliminarán <strong>${selectedIds.length}</strong> copropietario(s) de forma permanente.<br/>Esta acción <strong>no se puede deshacer</strong>.</p>`,
+      showCancelButton: true,
+      confirmButtonColor: '#e74c3c',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await CoownerService.deleteCoownersBulk(selectedIds);
+        Swal.fire({ icon: 'success', title: 'Eliminados', timer: 2000, showConfirmButton: false });
+        refetch(); // recargar lista
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Error', text: error.message });
+      }
+    }
+  };
 
   // Mutación para el envío masivo de credenciales
   const sendBulkCredentialsMutation = useMutation({
@@ -559,6 +598,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onDeleteResident={handleDeleteResident}
             onToggleAccess={handleToggleAccess}
             onBulkToggleAccess={handleBulkToggleAccess}
+            onBulkDelete={handleBulkDelete}
             showSearch={true}
             title="Copropietarios"
             isSuperAdmin={false}

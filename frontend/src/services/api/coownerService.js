@@ -141,9 +141,8 @@ const CoownerService = {
 		const response = await axiosInstance.delete(
 			'/admin/coowners/delete-bulk',
 			{
-				data: {
-					user_ids: coownerIds
-				}
+				data: { user_ids: coownerIds },
+				timeout: 120000, // ← 2 minutos
 			}
 		);
 		return response.data;
