@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, Loader2, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
@@ -36,6 +36,7 @@ const ResidentsList = ({
 	onToggleAccess,
 	onBulkToggleAccess,
 	onBulkDelete,
+	isBulkDeleting = false,
 	showSearch = false, // Nueva prop para mostrar/ocultar barra de búsqueda
 	title = "Residentes", // Título personalizable
 	isSuperAdmin = false, // Si es SuperAdmin puede gestionar acceso de todos
@@ -1118,12 +1119,21 @@ const ResidentsList = ({
 
 								{onBulkDelete && (
 									<button
-										onClick={() => onBulkDelete(selectedResidents)}
-										className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-xs font-medium"
-										title="Eliminar copropietarios seleccionados"
+										onClick={() => !isBulkDeleting && onBulkDelete(selectedResidents)}
+										disabled={isBulkDeleting}
+										className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed"
 									>
-										<Trash2 size={14} />
-										<span>Eliminar</span>
+										{isBulkDeleting ? (
+											<>
+												<Loader2 size={14} className="animate-spin" />
+												<span>Eliminando...</span>
+											</>
+										) : (
+											<>
+												<Trash2 size={14} />
+												<span>Eliminar</span>
+											</>
+										)}
 									</button>
 								)}
 							</div>

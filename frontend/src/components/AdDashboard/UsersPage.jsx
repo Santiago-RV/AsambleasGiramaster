@@ -112,6 +112,33 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     },
   });
 
+  const deleteCoownersBulkMutation = useMutation({
+    mutationFn: (ids) => CoownerService.deleteCoownersBulk(ids),
+    onSuccess: (response) => {
+      const { successful, failed } = response.data;
+      refetch();
+      Swal.fire({
+        icon: failed > 0 ? 'warning' : 'success',
+        title: failed > 0 ? 'Eliminación parcial' : '¡Eliminados!',
+        html: `
+        <div class="text-left">
+          <p class="text-green-700"><strong>Eliminados:</strong> ${successful}</p>
+          ${failed > 0 ? `<p class="text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
+        </div>
+      `,
+        confirmButtonColor: '#3498db',
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al eliminar',
+        text: error.response?.data?.message || error.message,
+        confirmButtonColor: '#3498db',
+      });
+    },
+  });
+
   const handleBulkDelete = async (selectedIds) => {
     if (selectedIds.length === 0) return;
 
@@ -126,13 +153,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     });
 
     if (result.isConfirmed) {
-      try {
-        await CoownerService.deleteCoownersBulk(selectedIds);
-        Swal.fire({ icon: 'success', title: 'Eliminados', timer: 2000, showConfirmButton: false });
-        refetch(); // recargar lista
-      } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Error', text: error.message });
-      }
+      deleteCoownersBulkMutation.mutate(selectedIds); // ← Usa la mutación, NO await directo
     }
   };
 
@@ -599,6 +620,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onToggleAccess={handleToggleAccess}
             onBulkToggleAccess={handleBulkToggleAccess}
             onBulkDelete={handleBulkDelete}
+            isBulkDeleting={deleteCoownersBulkMutation.isPending} 
             showSearch={true}
             title="Copropietarios"
             isSuperAdmin={false}
