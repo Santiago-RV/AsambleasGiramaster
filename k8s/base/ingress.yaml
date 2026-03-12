@@ -15,7 +15,7 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - cloud.start
+        - cloud.startcode.com.co
       secretName: tls-secret
   rules:
     - host: cloud.startcode.com.co
