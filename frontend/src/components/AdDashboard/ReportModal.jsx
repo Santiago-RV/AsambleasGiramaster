@@ -356,106 +356,156 @@ const PollsReportContent = ({ data }) => {
     );
   }
 
+  const fmtDate = (iso) => iso
+    ? new Date(iso).toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+    : '—';
+
+  // Colores por índice de opción
+  const optionColors = [
+    { bar: 'from-emerald-400 to-emerald-500', badge: 'bg-emerald-100 text-emerald-700', header: [22, 101, 52] },
+    { bar: 'from-red-400 to-red-500', badge: 'bg-red-100 text-red-700', header: [185, 28, 28] },
+    { bar: 'from-blue-400 to-blue-500', badge: 'bg-blue-100 text-blue-700', header: [29, 78, 216] },
+    { bar: 'from-amber-400 to-amber-500', badge: 'bg-amber-100 text-amber-700', header: [180, 83, 9] },
+    { bar: 'from-purple-400 to-purple-500', badge: 'bg-purple-100 text-purple-700', header: [109, 40, 217] },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {polls.map((poll) => (
-        <div key={poll.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <div className="flex items-center justify-between">
+        <div key={poll.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+
+          {/* Header encuesta */}
+          <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-4">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-gray-800">{poll.title}</h3>
-                {poll.description && <p className="text-sm text-gray-500">{poll.description}</p>}
+                <h3 className="font-bold text-white text-base">{poll.title}</h3>
+                {poll.description && (
+                  <p className="text-indigo-200 text-xs mt-0.5">{poll.description}</p>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${poll.status === 'closed' ? 'bg-gray-100 text-gray-600' :
-                  poll.status === 'active' ? 'bg-green-100 text-green-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                  {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
-                </span>
+              <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${poll.status === 'closed' ? 'bg-gray-200 text-gray-700' :
+                  poll.status === 'active' ? 'bg-green-400 text-green-900' :
+                    'bg-blue-200 text-blue-800'
+                }`}>
+                {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
+              </span>
+            </div>
+
+            {/* Métricas resumen */}
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <div className="bg-white/15 rounded-lg p-2.5 text-center">
+                <p className="text-xl font-bold text-white">{poll.total_voters}</p>
+                <p className="text-xs text-indigo-200">Votantes</p>
+              </div>
+              <div className="bg-white/15 rounded-lg p-2.5 text-center">
+                <p className="text-xl font-bold text-white">
+                  {typeof poll.total_weight_voted === 'number'
+                    ? poll.total_weight_voted.toFixed(4)
+                    : poll.total_weight_voted}
+                </p>
+                <p className="text-xs text-indigo-200">Peso Total</p>
+              </div>
+              <div className="bg-white/15 rounded-lg p-2.5 text-center">
+                <p className="text-xl font-bold text-white">{poll.options.length}</p>
+                <p className="text-xs text-indigo-200">Opciones</p>
               </div>
             </div>
           </div>
 
-          <div className="p-4">
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800">{poll.total_voters}</p>
-                <p className="text-xs text-gray-500">Votantes</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800">{poll.total_weight_voted}</p>
-                <p className="text-xs text-gray-500">Peso Total</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800">{poll.options.length}</p>
-                <p className="text-xs text-gray-500">Opciones</p>
-              </div>
-            </div>
-
+          <div className="p-5 space-y-5">
+            {/* Opciones con barras + tabla de votantes */}
             {poll.options.map((option, optIdx) => {
+              const color = optionColors[optIdx % optionColors.length];
               const percentage = poll.total_weight_voted > 0
                 ? (option.votes_weight / poll.total_weight_voted * 100)
                 : 0;
+
               return (
-                <div key={optIdx} className="mb-4">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">{option.text}</span>
-                    <span className="font-medium">
-                      {option.votes_count} votos ({percentage.toFixed(1)}%)
-                    </span>
+                <div key={optIdx} className="space-y-2">
+                  {/* Barra de progreso */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold text-gray-800">{option.text}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color.badge}`}>
+                        {option.votes_count} {option.votes_count === 1 ? 'voto' : 'votos'}
+                      </span>
+                      <span className="text-gray-500 text-xs">{percentage.toFixed(1)}%</span>
+                    </div>
                   </div>
-                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden mb-2">
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all"
+                      className={`h-full bg-gradient-to-r ${color.bar} rounded-full transition-all duration-500`}
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
-                  {/* Detalle de votantes con fecha */}
+
+                  {/* Tabla de votantes de esta opción */}
                   {option.voters && option.voters.length > 0 && (
-                    <div className="overflow-x-auto mt-1">
-                      <table className="w-full text-xs border border-gray-100 rounded-lg overflow-hidden">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="text-left px-3 py-1.5 font-medium text-gray-500">Copropietario</th>
-                            <th className="text-left px-3 py-1.5 font-medium text-gray-500">Apto</th>
-                            <th className="text-left px-3 py-1.5 font-medium text-gray-500">Fecha y Hora del Voto</th>
-                            <th className="text-right px-3 py-1.5 font-medium text-gray-500">Peso</th>
+                    <div className="mt-2 rounded-lg border border-gray-100 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora del Voto</th>
+                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
                           </tr>
                         </thead>
                         <tbody>
                           {option.voters.map((voter, vIdx) => (
-                            <tr key={vIdx} className="border-t border-gray-50">
-                              <td className="px-3 py-1.5">{voter.full_name}</td>
-                              <td className="px-3 py-1.5">{voter.apartment}</td>
-                              <td className="px-3 py-1.5 text-gray-500">
-                                {voter.voted_at
-                                  ? new Date(voter.voted_at).toLocaleString('es-ES', {
-                                    day: '2-digit', month: '2-digit', year: 'numeric',
-                                    hour: '2-digit', minute: '2-digit'
-                                  })
-                                  : '—'}
+                            <tr key={vIdx} className={`border-t border-gray-50 ${vIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                              <td className="px-3 py-2 font-medium text-gray-700">{voter.full_name}</td>
+                              <td className="px-3 py-2 text-gray-500">{voter.apartment}</td>
+                              <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
+                              <td className="px-3 py-2 text-right font-mono text-gray-600">
+                                {parseFloat(voter.voting_weight).toFixed(4)}
                               </td>
-                              <td className="px-3 py-1.5 text-right">{parseFloat(voter.voting_weight).toFixed(4)}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   )}
+
+                  {option.votes_count === 0 && (
+                    <p className="text-xs text-gray-400 italic pl-1">Sin votos en esta opción</p>
+                  )}
                 </div>
               );
             })}
 
+            {/* Abstenciones */}
             {poll.abstentions && poll.abstentions.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-gray-100">
-                <p className="text-sm text-gray-500 mb-2">Abstenciones: {poll.abstentions.length}</p>
-                <div className="flex flex-wrap gap-1">
-                  {poll.abstentions.map((abs, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
-                      {abs.full_name}
-                    </span>
-                  ))}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-semibold text-gray-600 mb-2">
+                  Abstenciones ({poll.abstentions.length})
+                </p>
+                <div className="rounded-lg border border-gray-100 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {poll.abstentions.map((abs, idx) => (
+                        <tr key={idx} className={`border-t border-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                          <td className="px-3 py-2 font-medium text-gray-700">{abs.full_name}</td>
+                          <td className="px-3 py-2 text-gray-500">{abs.apartment || '—'}</td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(abs.voted_at)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-600">
+                            {parseFloat(abs.voting_weight).toFixed(4)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

@@ -1,3 +1,5 @@
+from operator import and_
+
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -1154,22 +1156,31 @@ async def get_polls_report(
                     "text": opt.str_option_text,
                     "votes_count": 0,
                     "votes_weight": 0.0,
+                    "voters": [],          # ← AGREGA ESTO
                 }
                 for opt in options
             }
-            
+
             responses_result = await db.execute(
-                select(PollResponseModel, UserModel, DataUserModel)
+                select(PollResponseModel, UserModel, DataUserModel, MeetingInvitationModel)
                 .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .outerjoin(                # ← JOIN para obtener apartamento
+                    MeetingInvitationModel,
+                    and_(
+                        MeetingInvitationModel.int_meeting_id == meeting_id,
+                        MeetingInvitationModel.int_user_id == PollResponseModel.int_user_id
+                    )
+                )
                 .where(PollResponseModel.int_poll_id == poll.id)
             )
             responses = responses_result.all()
-            
+
             abstentions = []
-            for resp, user, data_user in responses:
+            for resp, user, data_user, inv in responses:   # ← desempaca inv
                 voter_info = {
                     "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
+                    "apartment": inv.str_apartment_number if inv else "—",   # ← AGREGA
                     "voting_weight": float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0,
                     "voted_at": resp.created_at.isoformat() if resp.created_at else None,
                 }
@@ -1178,6 +1189,7 @@ async def get_polls_report(
                 elif resp.int_option_id in options_map:
                     options_map[resp.int_option_id]["votes_count"] += 1
                     options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
+                    options_map[resp.int_option_id]["voters"].append(voter_info)
             
             total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
             
