@@ -1171,6 +1171,7 @@ async def get_polls_report(
                 voter_info = {
                     "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
                     "voting_weight": float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0,
+                    "voted_at": resp.created_at.isoformat() if resp.created_at else None,
                 }
                 if resp.bln_is_abstention:
                     abstentions.append(voter_info)

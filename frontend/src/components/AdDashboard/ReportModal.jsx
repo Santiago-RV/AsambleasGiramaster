@@ -32,7 +32,7 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
         default:
           throw new Error('Tipo de reporte desconocido');
       }
-      
+
       if (response.success) {
         setData(response.data);
       } else {
@@ -64,10 +64,10 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      
+
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-          
+
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-t-2xl">
             <div className="flex items-center gap-3">
@@ -137,7 +137,7 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
 
 const AttendanceReportContent = ({ data }) => {
   const { summary, attended, absent } = data;
-  
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -181,6 +181,7 @@ const AttendanceReportContent = ({ data }) => {
               <tr>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Nombre</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Apartamento</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">Fecha Ingreso</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">Peso Quórum</th>
               </tr>
             </thead>
@@ -189,6 +190,14 @@ const AttendanceReportContent = ({ data }) => {
                 <tr key={idx} className="border-t border-gray-100">
                   <td className="px-4 py-2">{person.full_name}</td>
                   <td className="px-4 py-2">{person.apartment}</td>
+                  <td className="px-4 py-2 text-sm text-gray-500">
+                    {person.attended_at
+                      ? new Date(person.attended_at).toLocaleString('es-ES', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                      })
+                      : '—'}
+                  </td>
                   <td className="px-4 py-2 text-right">{person.quorum_base}</td>
                 </tr>
               ))}
@@ -240,7 +249,7 @@ const AttendanceReportContent = ({ data }) => {
 
 const QuorumReportContent = ({ data }) => {
   const { quorum_analysis, comparison } = data;
-  
+
   return (
     <div className="space-y-6">
       {/* Quorum Analysis Cards */}
@@ -269,7 +278,7 @@ const QuorumReportContent = ({ data }) => {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="font-semibold text-gray-800 mb-4">Progreso de Quórum</h3>
         <div className="relative h-8 bg-gray-200 rounded-full overflow-hidden">
-          <div 
+          <div
             className={`absolute left-0 top-0 h-full transition-all duration-500 ${quorum_analysis.quorum_reached ? 'bg-emerald-500' : 'bg-amber-500'}`}
             style={{ width: `${Math.min(quorum_analysis.quorum_percentage, 100)}%` }}
           />
@@ -295,7 +304,7 @@ const QuorumReportContent = ({ data }) => {
                 <span className="font-medium text-emerald-600">{comparison.quorum_weight.attended}</span>
               </div>
               <div className="h-2 bg-emerald-100 rounded-full">
-                <div 
+                <div
                   className="h-full bg-emerald-500 rounded-full"
                   style={{ width: `${(comparison.quorum_weight.attended / (comparison.quorum_weight.attended + comparison.quorum_weight.missing || 1)) * 100}%` }}
                 />
@@ -307,7 +316,7 @@ const QuorumReportContent = ({ data }) => {
                 <span className="font-medium text-red-500">{comparison.quorum_weight.missing}</span>
               </div>
               <div className="h-2 bg-red-100 rounded-full">
-                <div 
+                <div
                   className="h-full bg-red-400 rounded-full"
                   style={{ width: `${(comparison.quorum_weight.missing / (comparison.quorum_weight.attended + comparison.quorum_weight.missing || 1)) * 100}%` }}
                 />
@@ -336,7 +345,7 @@ const QuorumReportContent = ({ data }) => {
 
 const PollsReportContent = ({ data }) => {
   const { polls } = data;
-  
+
   if (!polls || polls.length === 0) {
     return (
       <div className="text-center py-12">
@@ -346,7 +355,7 @@ const PollsReportContent = ({ data }) => {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       {polls.map((poll) => (
@@ -358,17 +367,16 @@ const PollsReportContent = ({ data }) => {
                 {poll.description && <p className="text-sm text-gray-500">{poll.description}</p>}
               </div>
               <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  poll.status === 'closed' ? 'bg-gray-100 text-gray-600' :
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${poll.status === 'closed' ? 'bg-gray-100 text-gray-600' :
                   poll.status === 'active' ? 'bg-green-100 text-green-700' :
-                  'bg-blue-100 text-blue-700'
-                }`}>
+                    'bg-blue-100 text-blue-700'
+                  }`}>
                   {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
                 </span>
               </div>
             </div>
           </div>
-          
+
           <div className="p-4">
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div className="text-center">
@@ -384,29 +392,61 @@ const PollsReportContent = ({ data }) => {
                 <p className="text-xs text-gray-500">Opciones</p>
               </div>
             </div>
-            
+
             {poll.options.map((option, optIdx) => {
-              const percentage = poll.total_weight_voted > 0 
-                ? (option.votes_weight / poll.total_weight_voted * 100) 
+              const percentage = poll.total_weight_voted > 0
+                ? (option.votes_weight / poll.total_weight_voted * 100)
                 : 0;
               return (
-                <div key={optIdx} className="mb-3">
+                <div key={optIdx} className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-700">{option.text}</span>
                     <span className="font-medium">
                       {option.votes_count} votos ({percentage.toFixed(1)}%)
                     </span>
                   </div>
-                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
+                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden mb-2">
+                    <div
                       className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all"
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
+                  {/* Detalle de votantes con fecha */}
+                  {option.voters && option.voters.length > 0 && (
+                    <div className="overflow-x-auto mt-1">
+                      <table className="w-full text-xs border border-gray-100 rounded-lg overflow-hidden">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left px-3 py-1.5 font-medium text-gray-500">Copropietario</th>
+                            <th className="text-left px-3 py-1.5 font-medium text-gray-500">Apto</th>
+                            <th className="text-left px-3 py-1.5 font-medium text-gray-500">Fecha y Hora del Voto</th>
+                            <th className="text-right px-3 py-1.5 font-medium text-gray-500">Peso</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {option.voters.map((voter, vIdx) => (
+                            <tr key={vIdx} className="border-t border-gray-50">
+                              <td className="px-3 py-1.5">{voter.full_name}</td>
+                              <td className="px-3 py-1.5">{voter.apartment}</td>
+                              <td className="px-3 py-1.5 text-gray-500">
+                                {voter.voted_at
+                                  ? new Date(voter.voted_at).toLocaleString('es-ES', {
+                                    day: '2-digit', month: '2-digit', year: 'numeric',
+                                    hour: '2-digit', minute: '2-digit'
+                                  })
+                                  : '—'}
+                              </td>
+                              <td className="px-3 py-1.5 text-right">{parseFloat(voter.voting_weight).toFixed(4)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               );
             })}
-            
+
             {poll.abstentions && poll.abstentions.length > 0 && (
               <div className="mt-4 pt-3 border-t border-gray-100">
                 <p className="text-sm text-gray-500 mb-2">Abstenciones: {poll.abstentions.length}</p>
@@ -428,7 +468,7 @@ const PollsReportContent = ({ data }) => {
 
 const DelegationsReportContent = ({ data }) => {
   const { summary, delegations } = data;
-  
+
   if (!delegations || delegations.length === 0) {
     return (
       <div className="text-center py-12">
@@ -438,7 +478,7 @@ const DelegationsReportContent = ({ data }) => {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       {/* Summary */}

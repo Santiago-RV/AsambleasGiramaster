@@ -99,8 +99,18 @@ const generateAttendancePDF = (data) => {
 
     autoTable(doc, {
         startY: y,
-        head: [['Nombre Completo', 'Apartamento', 'Email', 'Coeficiente']],
-        body: attended.map(p => [p.full_name, p.apartment, p.email, p.quorum_base.toFixed(4)]),
+        head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Coeficiente']],
+        body: attended.map(p => [
+            p.full_name,
+            p.apartment,
+            p.attended_at
+                ? new Date(p.attended_at).toLocaleString('es-ES', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                })
+                : '—',
+            p.quorum_base.toFixed(4)
+        ]),
         styles: { fontSize: 8.5 },
         headStyles: { fillColor: [22, 101, 52] },
         alternateRowStyles: { fillColor: [240, 253, 244] },
@@ -119,8 +129,8 @@ const generateAttendancePDF = (data) => {
 
         autoTable(doc, {
             startY: y,
-            head: [['Nombre Completo', 'Apartamento', 'Email', 'Coeficiente']],
-            body: absent.map(p => [p.full_name, p.apartment, p.email, p.quorum_base.toFixed(4)]),
+            head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Coeficiente']],
+            body: absent.map(p => [p.full_name, p.apartment, '—', p.quorum_base.toFixed(4)]),
             styles: { fontSize: 8.5 },
             headStyles: { fillColor: [185, 28, 28] },
             alternateRowStyles: { fillColor: [254, 242, 242] },
@@ -180,19 +190,26 @@ const generatePollsPDF = (data) => {
 
             autoTable(doc, {
                 startY: y,
-                head: [['Copropietario', 'Apto', 'Peso de Voto']],
+                head: [['Copropietario', 'Apto', 'Fecha y Hora del Voto', 'Peso']],
                 body: opt.voters.map(v => [
                     v.full_name,
                     v.apartment,
+                    v.voted_at
+                        ? new Date(v.voted_at).toLocaleString('es-ES', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                        })
+                        : '—',
                     parseFloat(v.voting_weight).toFixed(4),
                 ]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [67, 56, 202] },
                 alternateRowStyles: { fillColor: [238, 242, 255] },
                 columnStyles: {
-                    0: { cellWidth: 90 },
-                    1: { cellWidth: 20 },
-                    2: { cellWidth: 30 },
+                    0: { cellWidth: 70 },
+                    1: { cellWidth: 15 },
+                    2: { cellWidth: 45 },
+                    3: { cellWidth: 25 },
                 },
                 margin: { left: 20, right: 14 },
             });

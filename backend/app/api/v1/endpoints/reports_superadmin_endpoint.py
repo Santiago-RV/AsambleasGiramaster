@@ -209,6 +209,7 @@ async def get_polls_report(
                 "apartment": inv.str_apartment_number if inv else "—",
                 "voting_weight": float(resp.dec_voting_weight),
                 "is_abstention": resp.bln_is_abstention,
+                "voted_at": resp.created_at.isoformat() if resp.created_at else None,
             }
             if resp.bln_is_abstention:
                 abstentions.append(voter_info)
