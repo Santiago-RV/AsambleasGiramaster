@@ -243,7 +243,8 @@ class ActiveMeetingService:
                 and_(
                     MeetingInvitationModel.int_meeting_id == meeting_id,
                     MeetingInvitationModel.bln_actually_attended == True,
-                    MeetingInvitationModel.dat_left_at == None
+                    MeetingInvitationModel.dat_left_at == None,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
                 )
             )
             .order_by(DataUserModel.str_firstname.asc())
@@ -470,17 +471,20 @@ class ActiveMeetingService:
                 )
             )
             .where(
-                or_(
-                    MeetingInvitationModel.bln_actually_attended == False,
-                    MeetingInvitationModel.dat_left_at != None
+                and_(
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    or_(
+                        MeetingInvitationModel.bln_actually_attended == False,
+                        MeetingInvitationModel.dat_left_at != None
+                    )
                 )
             )
             .order_by(DataUserModel.str_lastname, DataUserModel.str_firstname)
         )
-        
+
         result = await self.db.execute(query)
         users = result.all()
-        
+
         return [
             {
                 "user_id": user.id,

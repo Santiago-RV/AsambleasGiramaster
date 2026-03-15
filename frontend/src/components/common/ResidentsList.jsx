@@ -362,7 +362,7 @@ const ResidentsList = ({
 
 			try {
 				// Petición al endpoint bulk
-				const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+				const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 				const endpoint = `${apiUrl}/residents/generate-qr-bulk-simple`;
 
 				const response = await fetch(endpoint, {
@@ -648,7 +648,7 @@ const ResidentsList = ({
 			const token = localStorage.getItem('access_token');
 			if (!token) throw new Error('No hay token de autenticación.');
 
-			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 			const response = await fetch(`${apiUrl}/residents/generate-qr-bulk-simple`, {
 				method: 'POST',
 				headers: {
@@ -843,7 +843,7 @@ const ResidentsList = ({
 			}
 
 
-			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 			const endpoint = `${apiUrl}/residents/generate-qr-simple`;
 
 

@@ -35,7 +35,7 @@ export const options = {
 // Configuración de entorno
 export const config = {
   // URL base de la API - cambiar según entorno
-  apiUrl: __ENV.API_URL || 'http://localhost:8001',
+  apiUrl: __ENV.API_URL || 'http://localhost:8005',
   apiVersion: __ENV.API_VERSION || '/api/v1',
   
   // Credenciales de prueba

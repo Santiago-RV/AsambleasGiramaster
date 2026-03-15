@@ -81,7 +81,7 @@ const generateAttendancePDF = (data) => {
             ['Asistentes', summary.total_attended],
             ['Ausentes', summary.total_absent],
             ['% Asistencia', `${Math.round((summary.total_attended / summary.total_invited) * 100)}%`],
-            ['Quórum Alcanzado', `${summary.quorum_achieved.toFixed(4)}`],
+            ['Quórum en Reunión', `${(summary.quorum_actual ?? summary.quorum_achieved ?? 0).toFixed(4)} / ${(summary.quorum_total ?? 0).toFixed(4)}`],
         ],
         styles: { fontSize: 9 },
         headStyles: { fillColor: [30, 58, 138] },

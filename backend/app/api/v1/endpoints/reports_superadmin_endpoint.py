@@ -98,20 +98,25 @@ async def get_attendance_report(
     absent = []
 
     for inv, user, data_user in invitations:
+        # Excluir registro ADMIN
+        if inv.str_apartment_number == 'ADMIN':
+            continue
+            
         person = {
             "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
             "email": data_user.str_email,
             "apartment": inv.str_apartment_number,
-            "quorum_base": float(inv.dec_quorum_base),
-            "voting_weight": float(inv.dec_voting_weight),
+            "quorum_base": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
+            "voting_weight": float(inv.dec_voting_weight) if inv.dec_voting_weight else 0.0,
+            "attended_at": inv.dat_joined_at.isoformat() if inv.dat_joined_at else None,
         }
         if inv.bln_actually_attended:
-            person["attended_at"] = inv.bln_actually_attended  # o el campo de fecha que corresponda
             attended.append(person)
         else:
             absent.append(person)
 
-    total_quorum = sum(p["quorum_base"] for p in attended)
+    quorum_actual = sum(p["quorum_base"] for p in attended)
+    quorum_total = quorum_actual + sum(p["quorum_base"] for p in absent)
 
     return SuccessResponse(
         success=True, status_code=200,
@@ -125,10 +130,11 @@ async def get_attendance_report(
                 "modality": meeting.str_modality,
             },
             "summary": {
-                "total_invited": len(invitations),
+                "total_invited": len(attended) + len(absent),
                 "total_attended": len(attended),
                 "total_absent": len(absent),
-                "quorum_achieved": total_quorum,
+                "quorum_actual": quorum_actual,
+                "quorum_total": quorum_total,
             },
             "attended": attended,
             "absent": absent,

@@ -923,6 +923,8 @@ async def get_attendance_report(
         absent = []
         
         for inv, user, data_user in invitations:
+            if inv.str_apartment_number == 'ADMIN':  # ← AGREGAR
+                continue
             person = {
                 "id": user.id,
                 "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
@@ -938,11 +940,12 @@ async def get_attendance_report(
             else:
                 absent.append(person)
         
-        total_quorum = sum(p["quorum_base"] for p in attended)
+        quorum_actual = sum(p["quorum_base"] for p in attended)
+        quorum_total = quorum_actual + sum(p["quorum_base"] for p in absent)
+        total = len(attended) + len(absent)
         
         return SuccessResponse(
-            success=True,
-            status_code=200,
+            success=True, status_code=200,
             message="Reporte de asistencia obtenido",
             data={
                 "meeting": {
@@ -953,11 +956,12 @@ async def get_attendance_report(
                     "modality": meeting.str_modality,
                 },
                 "summary": {
-                    "total_invited": len(invitations),
+                    "total_invited": total,
                     "total_attended": len(attended),
                     "total_absent": len(absent),
-                    "attendance_percentage": round((len(attended) / len(invitations) * 100) if invitations else 0, 2),
-                    "quorum_achieved": total_quorum,
+                    "attendance_percentage": round((len(attended) / total * 100) if total else 0, 2),
+                    "quorum_actual": quorum_actual,   # ← NUEVO
+                    "quorum_total": quorum_total,     # ← NUEVO
                 },
                 "attended": attended,
                 "absent": absent,
@@ -1024,22 +1028,22 @@ async def get_quorum_report(
         
         inv_result = await db.execute(
             select(MeetingInvitationModel).where(
-                MeetingInvitationModel.int_meeting_id == meeting_id
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN'  # ← AGREGAR
             )
         )
         invitations = inv_result.scalars().all()
         
         total_invited = len(invitations)
-        total_quorum_base = sum(float(inv.dec_quorum_base or 0) for inv in invitations)
+        quorum_total = sum(float(inv.dec_quorum_base or 0) for inv in invitations)
         
         attended = [inv for inv in invitations if inv.bln_actually_attended]
-        attended_quorum = sum(float(inv.dec_quorum_base or 0) for inv in attended)
+        quorum_actual = sum(float(inv.dec_quorum_base or 0) for inv in attended)
         
-        quorum_percentage = (attended_quorum / total_quorum_base * 100) if total_quorum_base > 0 else 0
+        quorum_percentage = (quorum_actual / quorum_total * 100) if quorum_total > 0 else 0
         
         return SuccessResponse(
-            success=True,
-            status_code=200,
+            success=True, status_code=200,
             message="Reporte de quórum obtenido",
             data={
                 "meeting": {
@@ -1051,10 +1055,10 @@ async def get_quorum_report(
                 "quorum_analysis": {
                     "total_invited": total_invited,
                     "total_attended": len(attended),
-                    "total_quorum_base": total_quorum_base,
-                    "quorum_achieved": attended_quorum,
+                    "quorum_total": quorum_total,      # ← RENOMBRADO (era total_quorum_base)
+                    "quorum_actual": quorum_actual,    # ← RENOMBRADO (era quorum_achieved)
                     "quorum_percentage": round(quorum_percentage, 2),
-                    "quorum_reached": meeting.bln_quorum_reached if hasattr(meeting, 'bln_quorum_reached') else (quorum_percentage >= 50),
+                    "quorum_reached": quorum_percentage >= 50,
                     "required_percentage": 50,
                 },
                 "comparison": {
@@ -1063,8 +1067,9 @@ async def get_quorum_report(
                         "absent": total_invited - len(attended),
                     },
                     "quorum_weight": {
-                        "attended": attended_quorum,
-                        "missing": total_quorum_base - attended_quorum,
+                        "actual": quorum_actual,
+                        "missing": round(quorum_total - quorum_actual, 6),
+                        "total": quorum_total,
                     }
                 }
             }
