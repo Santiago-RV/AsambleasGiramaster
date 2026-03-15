@@ -1317,6 +1317,8 @@ async def get_delegations_report(
                     "email": delegate_data.str_email if delegate_data else "—",
                 },
                 "delegated_weight": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
+                "delegated_at": inv.updated_at.isoformat() if inv.updated_at else None,  # ← AGREGA
+                "notes": inv.str_delegation_notes if hasattr(inv, 'str_delegation_notes') else None,  # ← AGREGA
             })
         
         total_delegated_weight = sum(d["delegated_weight"] for d in delegations)

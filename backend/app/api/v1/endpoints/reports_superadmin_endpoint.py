@@ -309,6 +309,8 @@ async def get_delegations_report(
                 "email": delegate_data.str_email if delegate_data else "—",
             },
             "delegated_weight": float(inv.dec_quorum_base),
+            "delegated_at": inv.updated_at.isoformat() if inv.updated_at else None, 
+            "notes": inv.str_delegation_notes if hasattr(inv, 'str_delegation_notes') else None,  
         })
 
     return SuccessResponse(

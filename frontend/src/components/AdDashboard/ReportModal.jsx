@@ -387,8 +387,8 @@ const PollsReportContent = ({ data }) => {
                 )}
               </div>
               <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${poll.status === 'closed' ? 'bg-gray-200 text-gray-700' :
-                  poll.status === 'active' ? 'bg-green-400 text-green-900' :
-                    'bg-blue-200 text-blue-800'
+                poll.status === 'active' ? 'bg-green-400 text-green-900' :
+                  'bg-blue-200 text-blue-800'
                 }`}>
                 {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
               </span>
@@ -519,6 +519,13 @@ const PollsReportContent = ({ data }) => {
 const DelegationsReportContent = ({ data }) => {
   const { summary, delegations } = data;
 
+  const fmtDate = (iso) => iso
+    ? new Date(iso).toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+    : '—';
+
   if (!delegations || delegations.length === 0) {
     return (
       <div className="text-center py-12">
@@ -533,53 +540,85 @@ const DelegationsReportContent = ({ data }) => {
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-          <p className="text-3xl font-bold text-blue-600">{summary.total_delegations}</p>
-          <p className="text-sm text-blue-700">Total de Poderes</p>
+        <div className="bg-violet-50 rounded-xl p-4 border border-violet-100">
+          <p className="text-3xl font-bold text-violet-600">{summary.total_delegations}</p>
+          <p className="text-sm text-violet-700">Total de Poderes</p>
         </div>
         <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-          <p className="text-3xl font-bold text-purple-600">{summary.total_delegated_weight}</p>
+          <p className="text-3xl font-bold text-purple-600">
+            {typeof summary.total_delegated_weight === 'number'
+              ? summary.total_delegated_weight.toFixed(4)
+              : summary.total_delegated_weight}
+          </p>
           <p className="text-sm text-purple-700">Peso Total Delegado</p>
         </div>
       </div>
 
-      {/* Delegations List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-800">Lista de Poderes ({delegations.length})</h3>
-        </div>
-        <div className="max-h-96 overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 sticky top-0">
-              <tr>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">Otorga Poder</th>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">Apartamento</th>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">Recibe Poder</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">Peso</th>
-              </tr>
-            </thead>
-            <tbody>
-              {delegations.map((delegation, idx) => (
-                <tr key={idx} className="border-t border-gray-100">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <UserX className="text-red-400" size={14} />
-                      <span>{delegation.delegator.full_name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">{delegation.delegator.apartment}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="text-emerald-400" size={14} />
-                      <span>{delegation.delegate.full_name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">{delegation.delegated_weight}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Cards de delegaciones */}
+      <div className="space-y-4">
+        {delegations.map((delegation, idx) => (
+          <div key={idx} className="bg-white rounded-xl border border-violet-100 overflow-hidden shadow-sm">
+            {/* Header de la card */}
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-3 flex items-center justify-between">
+              <span className="text-white font-semibold text-sm">
+                Poder #{idx + 1}
+              </span>
+              <div className="flex items-center gap-3">
+                {delegation.delegated_at && (
+                  <span className="text-violet-200 text-xs flex items-center gap-1">
+                    🕐 {fmtDate(delegation.delegated_at)}
+                  </span>
+                )}
+                <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  Peso: {typeof delegation.delegated_weight === 'number'
+                    ? delegation.delegated_weight.toFixed(4)
+                    : delegation.delegated_weight}
+                </span>
+              </div>
+            </div>
+
+            {/* Cuerpo */}
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Delegante */}
+              <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserX className="text-red-500" size={16} />
+                  <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Otorga el poder</span>
+                </div>
+                <p className="font-bold text-gray-800 text-sm">{delegation.delegator.full_name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Apto: {delegation.delegator.apartment}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{delegation.delegator.email}</p>
+                <div className="mt-2 bg-red-100 rounded px-2 py-1 inline-block">
+                  <span className="text-xs text-red-700 font-medium">
+                    Coef: {typeof delegation.delegator.original_weight === 'number'
+                      ? delegation.delegator.original_weight.toFixed(4)
+                      : delegation.delegated_weight}
+                  </span>
+                </div>
+              </div>
+
+              {/* Delegado */}
+              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserCheck className="text-emerald-500" size={16} />
+                  <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Recibe el poder</span>
+                </div>
+                <p className="font-bold text-gray-800 text-sm">{delegation.delegate.full_name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{delegation.delegate.email}</p>
+              </div>
+            </div>
+
+            {/* Descripción/notas si existe */}
+            {delegation.notes && (
+              <div className="px-4 pb-4">
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">📝 Descripción del poder</p>
+                  <p className="text-sm text-amber-900">{delegation.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

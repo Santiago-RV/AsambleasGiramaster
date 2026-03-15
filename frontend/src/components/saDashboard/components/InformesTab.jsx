@@ -244,8 +244,7 @@ const generatePollsPDF = (data) => {
 };
 
 const generateDelegationsPDF = (data) => {
-    console.log('DATA DELEGACIONES:', JSON.stringify(data, null, 2));
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const { meeting, total_delegations, delegations } = data;
 
     let y = addHeader(doc, 'INFORME DE CESIÓN DE PODERES', meeting.title, meeting.residential_unit, meeting.scheduled_date);
@@ -256,6 +255,13 @@ const generateDelegationsPDF = (data) => {
     doc.text(`Total de delegaciones registradas: ${total_delegations}`, 14, y);
     y += 8;
 
+    const fmtDate = (iso) => iso
+        ? new Date(iso).toLocaleString('es-ES', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        })
+        : '—';
+
     if (delegations.length === 0) {
         doc.setFont('helvetica', 'italic');
         doc.setTextColor(150);
@@ -263,22 +269,27 @@ const generateDelegationsPDF = (data) => {
     } else {
         autoTable(doc, {
             startY: y,
-            head: [['Delegante', 'Apto', 'Email Delegante', 'Coeficiente', 'Delegado A', 'Email Delegado']],
-            body: delegations.map(d => [
+            head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Fecha y Hora']],
+            body: delegations.map((d, idx) => [
+                idx + 1,
                 d.delegator.full_name,
                 d.delegator.apartment,
-                d.delegator.email,
-                d.delegated_weight.toFixed(4),
+                typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
                 d.delegate.full_name,
-                d.delegate.email,
+                fmtDate(d.delegated_at),
+                d.notes || '—',
             ]),
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [124, 58, 237] },
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [124, 58, 237], fontSize: 8, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [245, 243, 255] },
             columnStyles: {
-                0: { cellWidth: 35 },
-                1: { cellWidth: 12 },
-                4: { cellWidth: 35 },
+                0: { cellWidth: 8, halign: 'center' },
+                1: { cellWidth: 50 },
+                2: { cellWidth: 15, halign: 'center' },
+                3: { cellWidth: 22, halign: 'right' },
+                4: { cellWidth: 50 },
+                5: { cellWidth: 35 },
+                6: { cellWidth: 'auto' },
             },
             margin: { left: 14, right: 14 },
         });
