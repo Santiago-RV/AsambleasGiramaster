@@ -3,7 +3,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from datetime import timedelta
-from app.auth.auth import create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES, get_token_jti
+from app.auth.auth import create_access_token, create_refresh_token, verify_refresh_token, get_current_user, get_token_jti, ACCESS_TOKEN_EXPIRE_MINUTES
+from datetime import timedelta
 from app.schemas.auth_token_schema import Token
 
 from app.schemas.responses_schema import SuccessResponse, ErrorResponse
@@ -186,6 +187,12 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         expires_delta=access_token_expires,
     )
     
+    refresh_token_expires = timedelta(days=7)
+    refresh_token = create_refresh_token(
+        data={"sub": exists_user.str_username},
+        expires_delta=refresh_token_expires,
+    )
+    
     # Crear sesión en la base de datos
     token_jti = get_token_jti(access_token)
     if token_jti:
@@ -247,6 +254,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     
     response_data = {
         "access_token": access_token, 
+        "refresh_token": refresh_token,
         "token_type": "bearer", 
         "user": {
             "id": exists_user.id,
@@ -331,3 +339,91 @@ async def register_participation(
 @router.get("/perfil")
 def perfil(usuario: str = Depends(get_current_user)):
     return {"mensaje": f"Hola {usuario}, perfil protegido."}
+
+
+@router.post(
+    "/refresh",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Refrescar token de acceso",
+    description="Obtiene un nuevo access_token usando un refresh_token válido"
+)
+async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Endpoint para refrescar el token de acceso.
+    Recibe un refresh_token y devuelve un nuevo access_token.
+    """
+    try:
+        body = await request.json()
+        refresh_token = body.get("refresh_token")
+        
+        if not refresh_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Refresh token es requerido"
+            )
+        
+        payload = verify_refresh_token(refresh_token)
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token inválido o expirado",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token inválido",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user_service = UserService(db)
+        exists_user = await user_service.get_user_by_username(username)
+        
+        if not exists_user or not exists_user.bln_allow_entry:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no encontrado o inactivo",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": exists_user.str_username},
+            expires_delta=access_token_expires,
+        )
+        
+        client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
+        token_jti = get_token_jti(access_token)
+        if token_jti:
+            try:
+                session_service = SessionService(db)
+                await session_service.create_session(
+                    user_id=exists_user.id,
+                    token_jti=token_jti,
+                    ip_address=client_ip,
+                    device_info=request.headers.get("User-Agent", "Unknown")
+                )
+            except Exception as e:
+                logger.warning(f"No se pudo crear la sesión: {str(e)}")
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Token refrescado exitosamente",
+            data={
+                "access_token": access_token,
+                "token_type": "bearer"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error en refresh token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al procesar el refresh token"
+        )

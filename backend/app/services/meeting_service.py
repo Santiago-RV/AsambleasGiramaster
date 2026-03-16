@@ -451,8 +451,9 @@ class MeetingService:
     async def end_meeting(self, meeting_id: int, user_id: int) -> MeetingModel:
         """
         Finaliza una reunión.
-        Solo cambia el estado si la reunión está 'En Curso'.
-        Si ya está 'Completada', simplemente retorna la reunión sin modificar.
+        - Si está 'En Curso' → cambia a 'Completada'
+        - Si está 'Programada' o 'Pendiente' → cambia a 'Finalizada' sin iniciar
+        Si ya está 'Completada' o 'Finalizada', simplemente retorna la reunión sin modificar.
         
         Para reuniones presenciales, actualiza dat_left_at y calcula la duración
         en todos los registros de MeetingAttendanceModel.
@@ -460,26 +461,36 @@ class MeetingService:
         try:
             meeting = await self.get_meeting_by_id(meeting_id)
 
-            # Solo finalizar si está en curso
+            # Si ya está completada o finalizada, no hacer nada
+            if meeting.str_status in ["Completada", "Finalizada"]:
+                logger.info(f"ℹReunión {meeting_id} ya está finalizada, estado actual: {meeting.str_status}")
+                return meeting
+
+            # Caso 1: Está en curso → Completada
             if meeting.str_status == "En Curso":
                 meeting.str_status = "Completada"
                 meeting.dat_actual_end_time = datetime.now()
-                meeting.updated_at = datetime.now()
-                meeting.updated_by = user_id
-
+                
                 # Si es reunion presencial, actualizar asistencias
                 if meeting.str_modality == "presencial":
                     await self._finalize_presential_attendances(meeting_id, meeting.dat_actual_end_time)
-
+                
                 # Finalizar encuestas activas o en borrador
                 await self._finalize_pending_polls(meeting_id, user_id, meeting.dat_actual_end_time)
-
-                await self.db.commit()
-                await self.db.refresh(meeting)
+                
                 logger.info(f"Reunión {meeting_id} finalizada - Estado: Completada")
-            else:
-                logger.info(f"ℹReunión {meeting_id} no está en curso, estado actual: {meeting.str_status}")
+            
+            # Caso 2: Está programada/pendiente → Finalizada sin iniciar
+            elif meeting.str_status == "Programada" or meeting.str_status == "Pendiente":
+                meeting.str_status = "Finalizada"
+                # No se guarda hora de inicio ni fin real para reuniones que no iniciaron
+                logger.info(f"Reunión {meeting_id} finalizada sin iniciar - Estado: Finalizada")
+            
+            meeting.updated_at = datetime.now()
+            meeting.updated_by = user_id
 
+            await self.db.commit()
+            await self.db.refresh(meeting)
             return meeting
 
         except ResourceNotFoundException:

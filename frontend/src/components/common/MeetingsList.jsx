@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle, StopCircle, MapPin, ScanLine } from 'lucide-react';
+import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle, StopCircle, MapPin, ScanLine, Edit } from 'lucide-react';
 import QRScannerModal from './QRScannerModal';
 
 /**
@@ -15,6 +15,7 @@ const MeetingsList = ({
 	onJoinMeeting,
 	onStartMeeting,
 	onEndMeeting,
+	onEditMeeting,
 	variant = 'compact',
 }) => {
 	const [activeTab, setActiveTab] = useState('upcoming');
@@ -30,18 +31,45 @@ const MeetingsList = ({
 		const past = [];
 
 		meetings.forEach(meeting => {
-			const meetingDate = new Date(meeting.fechaCompleta);
 			const estadoLower = meeting.estado?.toLowerCase();
 
-			if (meetingDate >= now || estadoLower === 'en curso' || estadoLower === 'activa') {
+			// Las reuniones En Curso/Activa siempre van a upcoming
+			if (estadoLower === 'en curso' || estadoLower === 'activa') {
 				upcoming.push(meeting);
-			} else {
+			}
+			// Las reuniones Programadas/Pendientes siempre van a upcoming (aunque ya haya pasado la hora)
+			else if (estadoLower === 'programada' || estadoLower === 'pendiente') {
+				upcoming.push(meeting);
+			}
+			// Las demás van a historial
+			else {
 				past.push(meeting);
 			}
 		});
 
-		// Ordenar próximas: más cercanas primero
-		upcoming.sort((a, b) => new Date(a.fechaCompleta) - new Date(b.fechaCompleta));
+		// Ordenar próximas: primero En Curso, luego por fecha (más cercana primero)
+		upcoming.sort((a, b) => {
+			const now = new Date();
+			const aIsActive = a.estado?.toLowerCase() === 'en curso' || a.estado?.toLowerCase() === 'activa';
+			const bIsActive = b.estado?.toLowerCase() === 'en curso' || b.estado?.toLowerCase() === 'activa';
+			
+			// Primero: En Curso/Activa siempre primero
+			if (aIsActive && !bIsActive) return -1;
+			if (!aIsActive && bIsActive) return 1;
+			
+			// Segundo: Para programadas, las que ya pasaron su hora van al final
+			const aFecha = new Date(a.fechaCompleta);
+			const bFecha = new Date(b.fechaCompleta);
+			const aPasada = aFecha < now;
+			const bPasada = bFecha < now;
+			
+			if (!aPasada && bPasada) return -1;
+			if (aPasada && !bPasada) return 1;
+			
+			// Tercero: orden normal por fecha
+			return aFecha - bFecha;
+		});
+
 		// Ordenar pasadas: más recientes primero
 		past.sort((a, b) => new Date(b.fechaCompleta) - new Date(a.fechaCompleta));
 
@@ -252,6 +280,15 @@ const MeetingsList = ({
 									>
 										{/* Status badge and time until */}
 										<div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+											{onEditMeeting && (
+												<button
+													onClick={() => onEditMeeting(meeting)}
+													className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+													title="Editar reunión"
+												>
+													<Edit size={16} className="text-gray-600" />
+												</button>
+											)}
 											<span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.badgeClass}`}>
 												<StatusIcon size={14} />
 												{statusInfo.text}
@@ -348,13 +385,25 @@ const MeetingsList = ({
 															)}
 														</div>
 													) : isProgrammed ? (
-														<button
-															onClick={() => onStartMeeting && onStartMeeting(meeting)}
-															className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-semibold shadow-md hover:shadow-lg"
-														>
-															<PlayCircle size={20} />
-															<span>Iniciar Reunion</span>
-														</button>
+														<div className="flex gap-3">
+															<button
+																onClick={() => onStartMeeting && onStartMeeting(meeting)}
+																className="flex-[2] flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+															>
+																<PlayCircle size={24} />
+																<span>Iniciar Reunion</span>
+															</button>
+															{onEndMeeting && (
+																<button
+																	onClick={() => onEndMeeting(meeting)}
+																	className="flex-1 flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-md hover:shadow-lg"
+																	title="Finalizar reunion sin iniciar"
+																>
+																	<StopCircle size={20} />
+																	<span>Finalizar</span>
+																</button>
+															)}
+														</div>
 													) : (
 														<div className="text-center py-2">
 															<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
@@ -391,13 +440,25 @@ const MeetingsList = ({
 
 														{/* Botones para reuniones PROGRAMADAS (virtual) */}
 														{isProgrammed && (
-															<button
-																onClick={() => onStartMeeting && onStartMeeting(meeting)}
-																className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-semibold shadow-md hover:shadow-lg"
-															>
-																<PlayCircle size={20} />
-																<span>Iniciar Reunion</span>
-															</button>
+															<div className="flex gap-3">
+																<button
+																	onClick={() => onStartMeeting && onStartMeeting(meeting)}
+																	className="flex-[2] flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+																>
+																	<PlayCircle size={24} />
+																	<span>Iniciar Reunion</span>
+																</button>
+																{onEndMeeting && (
+																	<button
+																		onClick={() => onEndMeeting(meeting)}
+																		className="flex-1 flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-md hover:shadow-lg"
+																		title="Finalizar reunion sin iniciar"
+																	>
+																		<StopCircle size={20} />
+																		<span>Finalizar</span>
+																	</button>
+																)}
+															</div>
 														)}
 													</>
 												)}
@@ -592,6 +653,15 @@ const MeetingsList = ({
 												</span>
 											</div>
 										</div>
+										{onEditMeeting && (
+											<button
+												onClick={() => onEditMeeting(reunion)}
+												className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all"
+												title="Editar reunión"
+											>
+												<Edit size={14} className="text-gray-600" />
+											</button>
+										)}
 									</div>
 
 									<div className="space-y-2 mb-3">
@@ -638,13 +708,24 @@ const MeetingsList = ({
 															)}
 														</div>
 													) : isProgrammed ? (
-														<button
-															onClick={() => onStartMeeting && onStartMeeting(reunion)}
-															className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
-														>
-															<PlayCircle size={18} />
-															Iniciar Reunion
-														</button>
+														<div className="flex gap-2">
+															<button
+																onClick={() => onStartMeeting && onStartMeeting(reunion)}
+																className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-bold text-base shadow-md hover:shadow-lg"
+															>
+																<PlayCircle size={22} />
+																Iniciar Reunion
+															</button>
+															{onEndMeeting && (
+																<button
+																	onClick={() => onEndMeeting(reunion)}
+																	className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
+																	title="Finalizar reunion sin iniciar"
+																>
+																	<StopCircle size={18} />
+																</button>
+															)}
+														</div>
 													) : (
 														<div className="text-center py-2">
 															<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
@@ -680,13 +761,24 @@ const MeetingsList = ({
 
 													{/* Boton para reuniones programadas */}
 													{isProgrammed && (
-														<button
-															onClick={() => onStartMeeting && onStartMeeting(reunion)}
-															className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
-														>
-															<PlayCircle size={18} />
-															Iniciar Reunion
-														</button>
+														<div className="flex gap-2">
+															<button
+																onClick={() => onStartMeeting && onStartMeeting(reunion)}
+																className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-bold text-base shadow-md hover:shadow-lg"
+															>
+																<PlayCircle size={22} />
+																Iniciar Reunion
+															</button>
+															{onEndMeeting && (
+																<button
+																	onClick={() => onEndMeeting(reunion)}
+																	className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
+																	title="Finalizar reunion sin iniciar"
+																>
+																	<StopCircle size={18} />
+																</button>
+															)}
+														</div>
 													)}
 												</>
 											)}
