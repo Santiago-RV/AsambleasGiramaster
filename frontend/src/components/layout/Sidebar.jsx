@@ -172,7 +172,7 @@ const Sidebar = ({
 			) : (
 				<div className="p-6 border-t border-white/10 bg-black/20">
 					<div className="text-xs text-gray-400 text-center">
-						<p>© 2025 Giramaster</p>
+						<p>© {new Date().getFullYear()} Giramaster</p>
 						<p className="mt-1">v1.0.0</p>
 					</div>
 				</div>

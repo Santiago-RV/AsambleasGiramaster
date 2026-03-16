@@ -368,3 +368,58 @@ async def resend_credentials(
             message=f"Error al enviar credenciales: {str(e)}",
             details={"original_error": str(e)}
         )
+
+
+@router.delete(
+    "/units/{unit_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Eliminar unidad residencial",
+    description="Elimina una unidad residencial y todos sus datos asociados (reuniones, usuarios, encuestas, etc.)"
+)
+async def delete_residential_unit(
+    unit_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """Elimina una unidad residencial completamente"""
+    try:
+        from app.services.user_service import UserService
+        from sqlalchemy import select
+        from app.models.user_model import UserModel
+        
+        # Verificar permisos del usuario actual
+        user_service = UserService(db)
+        current_user_data = await user_service.get_user_by_username(current_user)
+        
+        # Solo Super Admin (rol 1) puede eliminar unidades residenciales
+        if current_user_data.int_id_rol != 1:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para eliminar unidades residenciales"
+            )
+        
+        # Obtener la unidad residencial
+        residential_unit_service = ResidentialUnitService(db)
+        unit = await residential_unit_service.get_residential_unit_by_id(unit_id)
+        
+        if not unit:
+            raise ResourceNotFoundException(f"No se encontró la unidad residencial con ID {unit_id}")
+        
+        # Eliminar la unidad (las reuniones se eliminan en cascada automáticamente)
+        await residential_unit_service.delete_residential_unit(unit_id)
+        
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Unidad residencial '{unit.str_name}' eliminada exitosamente",
+            data={"unit_id": unit_id, "unit_name": unit.str_name}
+        )
+        
+    except (ResourceNotFoundException, HTTPException, ServiceException):
+        raise
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al eliminar la unidad residencial: {str(e)}",
+            details={"original_error": str(e)}
+        )

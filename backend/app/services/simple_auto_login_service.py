@@ -105,45 +105,34 @@ class SimpleAutoLoginService:
             logger.error(f"Error al decodificar token: {str(e)}")
             return None
     
-    async def upsert_user_token(self, db, token_id: str, user_id: int, ip_address: str = None):
+    async def upsert_user_token(self, db, token_id: str, user_id: int, ip_address: str = None, expires_at = None):
         """
-        Crea o actualiza el token de auto-login para un usuario.
-        Si el usuario ya tiene un token, lo actualiza (invalidando el anterior).
+        Crea un nuevo token de auto-login para un usuario.
+        Permite múltiples tokens válidos por usuario (uno por cada QR generado).
         
         Args:
             db: Sesión de base de datos
             token_id: UUID del nuevo token
             user_id: ID del usuario
             ip_address: Dirección IP del cliente
+            expires_at: Fecha de expiración del token (si no se pasa, usa 24h por defecto)
         """
         from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
-        from sqlalchemy import select
         
-        # Verificar si el usuario ya tiene un token
-        result = await db.execute(
-            select(UsedAutoLoginTokenModel).where(
-                UsedAutoLoginTokenModel.user_id == user_id
-            )
+        # Calcular expiración si no se proporciona (24 horas por defecto)
+        if expires_at is None:
+            expires_at = datetime.now() + timedelta(hours=24)
+        
+        # Crear nuevo registro (no actualiza los existentes)
+        new_token = UsedAutoLoginTokenModel(
+            token_id=token_id,
+            user_id=user_id,
+            ip_address=ip_address,
+            expires_at=expires_at
         )
-        existing_token = result.scalar_one_or_none()
-        
-        if existing_token:
-            # Actualizar token existente (invalidar anterior)
-            existing_token.token_id = token_id
-            existing_token.created_at = datetime.now()
-            existing_token.ip_address = ip_address
-            logger.info(f"🔄 Token actualizado para usuario {user_id} (anterior: {existing_token.token_id})")
-        else:
-            # Crear nuevo registro
-            new_token = UsedAutoLoginTokenModel(
-                token_id=token_id,
-                user_id=user_id,
-                ip_address=ip_address
-            )
-            db.add(new_token)
-            logger.info(f"🔐 Nuevo token creado para usuario {user_id}")
-        
+        db.add(new_token)
         await db.commit()
+        logger.info(f"🔐 Nuevo token creado para usuario {user_id} (token_id: {token_id})")
     
     async def is_token_valid_for_user(self, db, token_id: str, user_id: int) -> bool:
         """
@@ -155,7 +144,7 @@ class SimpleAutoLoginService:
             user_id: ID del usuario
             
         Returns:
-            bool: True si el token es el actual del usuario
+            bool: True si el token es válido para el usuario y no ha expirado
         """
         from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
         from sqlalchemy import select
@@ -167,7 +156,16 @@ class SimpleAutoLoginService:
             )
         )
         user_token = result.scalar_one_or_none()
-        return user_token is not None
+        
+        if not user_token:
+            return False
+        
+        # Verificar que el token no haya expirado
+        if user_token.expires_at and user_token.expires_at < datetime.now():
+            logger.info(f"⛔ Token {token_id} ha expirado para usuario {user_id}")
+            return False
+        
+        return True
     
     async def is_token_used(self, db, token_id: str) -> bool:
         """
@@ -190,6 +188,31 @@ class SimpleAutoLoginService:
         )
         used_token = result.scalar_one_or_none()
         return used_token is not None
+    
+    async def cleanup_expired_tokens(self, db):
+        """
+        Elimina los tokens de auto-login que han expirado de la base de datos.
+        Puede llamarse periódicamente para mantener la tabla limpia.
+        
+        Args:
+            db: Sesión de base de datos
+            
+        Returns:
+            int: Número de tokens eliminados
+        """
+        from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
+        from sqlalchemy import delete
+        
+        result = await db.execute(
+            delete(UsedAutoLoginTokenModel).where(
+                UsedAutoLoginTokenModel.expires_at < datetime.now()
+            )
+        )
+        await db.commit()
+        deleted_count = result.rowcount
+        if deleted_count > 0:
+            logger.info(f"🧹 Se eliminaron {deleted_count} tokens de auto-login expirados")
+        return deleted_count
 
 
 simple_auto_login_service = SimpleAutoLoginService()

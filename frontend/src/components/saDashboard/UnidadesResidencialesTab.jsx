@@ -12,8 +12,15 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 	const [isEditMode, setIsEditMode] = useState(false);
 	const [editingUnit, setEditingUnit] = useState(null);
 	const [openDropdownId, setOpenDropdownId] = useState(null);
-	const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+	const [viewMode, setViewMode] = useState(() => {
+		return localStorage.getItem('unidadesViewMode') || 'grid';
+	});
 	const queryClient = useQueryClient();
+
+	const handleViewModeChange = (mode) => {
+		setViewMode(mode);
+		localStorage.setItem('unidadesViewMode', mode);
+	};
 
 	const {
 		register,
@@ -192,35 +199,91 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 		setOpenDropdownId(null);
 	};
 
-	const handleDelete = (unidad, e) => {
+	const handleDelete = async (unidad, e) => {
 		e.stopPropagation();
 		setOpenDropdownId(null);
 
-		Swal.fire({
-			title: '¿Estás seguro?',
-			html: `¿Deseas eliminar la unidad residencial <strong>${unidad.str_name}</strong>?<br/><br/><small class="text-red-600">Esta acción eliminará todas las reuniones, encuestas y datos asociados.</small>`,
+		const { value: confirmedName } = await Swal.fire({
+			title: '¿Estás seguro de eliminar esta unidad?',
+			html: `
+				<div class="text-left">
+					<p class="mb-3">Esta acción eliminará <strong>permanentemente</strong>:</p>
+					<ul class="list-disc list-inside text-sm text-gray-600 mb-4">
+						<li>Todas las reuniones programadas</li>
+						<li>Todas las encuestas y votaciones</li>
+						<li>Todos los usuarios registrados</li>
+						<li>Todos los datos asociados</li>
+					</ul>
+					<div class="bg-red-50 p-3 rounded-lg mb-4">
+						<p class="text-sm text-red-700 font-semibold">Unidad: ${unidad.str_name}</p>
+					</div>
+					<label class="block text-sm text-gray-700 mb-2 text-center">
+						Para confirmar, escribe el nombre de la unidad:
+					</label>
+					<input
+						type="text"
+						id="confirmUnitName"
+						class="swal2-input"
+						onPaste="return false;"
+						onpaste="return false;"
+						style="
+								display: block;
+								width: 100%;
+								margin: 0 auto 10px;
+								textAlign: center;
+						"
+						placeholder="Escribe el nombre exacto de la unidad"
+						autocomplete="off"
+					/>
+				</div>
+			`,
 			icon: 'warning',
 			showCancelButton: true,
 			confirmButtonColor: '#ef4444',
 			cancelButtonColor: '#6b7280',
-			confirmButtonText: 'Sí, eliminar',
+			confirmButtonText: 'Eliminar',
 			cancelButtonText: 'Cancelar',
 			reverseButtons: true,
-		}).then((result) => {
-			if (result.isConfirmed) {
-				// TODO: Implementar la llamada al servicio de eliminación
+			preConfirm: () => {
+				const inputElement = document.getElementById('confirmUnitName');
+				
+				// Prevenir pegado de texto
+				inputElement.onpaste = (e) => {
+					e.preventDefault();
+					return false;
+				};
+				
+				const inputValue = inputElement.value;
+				if (inputValue !== unidad.str_name) {
+					Swal.showValidationMessage('El nombre no coincide. Escribe exactamente: ' + unidad.str_name);
+					return false;
+				}
+				return true;
+			}
+		});
+
+		if (confirmedName) {
+			try {
+				await ResidentialUnitService.deleteResidentialUnit(unidad.id);
+
 				Swal.fire({
 					icon: 'success',
 					title: 'Eliminada',
-					text: 'La unidad residencial ha sido eliminada exitosamente.',
-					toast: true,
-					position: 'top-end',
-					showConfirmButton: false,
-					timer: 3000,
-					backdrop: false,
+					text: `La unidad residencial '${unidad.str_name}' ha sido eliminada exitosamente.`,
+					confirmButtonColor: '#2563eb',
+				});
+
+				// Recargar la lista de unidades
+				queryClient.invalidateQueries({ queryKey: ['residentialUnits'] });
+			} catch (error) {
+				Swal.fire({
+					icon: 'error',
+					title: 'Error',
+					text: error.message || 'No se pudo eliminar la unidad residencial',
+					confirmButtonColor: '#dc2626',
 				});
 			}
-		});
+		}
 	};
 
 	const toggleDropdown = (id, e) => {
@@ -265,7 +328,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 					{unidadesData && unidadesData.length > 0 && (
 						<div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
 							<button
-								onClick={() => setViewMode('grid')}
+								onClick={() => handleViewModeChange('grid')}
 								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${viewMode === 'grid'
 										? 'bg-white text-blue-600 shadow-sm'
 										: 'text-gray-600 hover:text-gray-800'
@@ -276,7 +339,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 							</button>
 
 							<button
-								onClick={() => setViewMode('list')}
+								onClick={() => handleViewModeChange('list')}
 								className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${viewMode === 'list'
 										? 'bg-white text-blue-600 shadow-sm'
 										: 'text-gray-600 hover:text-gray-800'
@@ -402,32 +465,22 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 											? 'Activa'
 											: 'Inactiva'}
 									</span>
-									{/* Menú desplegable */}
-									<div className="relative">
+								{/* Botones de acción visibles */}
+									<div className="flex flex-col gap-1">
 										<button
-											onClick={(e) => toggleDropdown(unidad.id, e)}
-											className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+											onClick={(e) => handleEdit(unidad, e)}
+											className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600 transition-colors"
+											title="Editar"
 										>
-											<MoreVertical size={18} className="text-gray-600" />
+											<Edit2 size={16} />
 										</button>
-										{openDropdownId === unidad.id && (
-											<div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-												<button
-													onClick={(e) => handleEdit(unidad, e)}
-													className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-												>
-													<Edit2 size={16} />
-													Editar
-												</button>
-												<button
-													onClick={(e) => handleDelete(unidad, e)}
-													className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
-												>
-													<Trash2 size={16} />
-													Eliminar
-												</button>
-											</div>
-										)}
+										<button
+											onClick={(e) => handleDelete(unidad, e)}
+											className="p-1.5 rounded-md hover:bg-red-50 text-red-600 transition-colors"
+											title="Eliminar"
+										>
+											<Trash2 size={16} />
+										</button>
 									</div>
 								</div>
 							</div>
@@ -478,7 +531,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 				<div className="bg-white rounded-xl shadow-sm border border-gray-200">
 
 					{/* Contenedor scroll horizontal */}
-					<div className="overflow-x-auto">
+					<div className="overflow-x-auto overflow-visible">
 						<table className="min-w-[900px] w-full">
 							<thead className="bg-gray-50 border-b border-gray-200">
 								<tr>
@@ -492,7 +545,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 										Tipo
 									</th>
 									<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-										Unidades
+										Co-Propietarios
 									</th>
 									<th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
 										Estado
@@ -564,7 +617,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 													<MoreVertical size={18} className="text-gray-600" />
 												</button>
 												{openDropdownId === unidad.id && (
-													<div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+													<div className="fixed right-7 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
 														<button
 															onClick={(e) => handleEdit(unidad, e)}
 															className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
@@ -874,7 +927,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
           </div>
 
           <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
-            
+
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <Calendar className="w-4 h-4 text-gray-400 group-hover:text-purple-500 transition-colors" />
@@ -891,8 +944,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
                 })}
                 placeholder="Ej: 5"
                 className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.int_max_concurrent_meetings 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                  errors.int_max_concurrent_meetings
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                     : 'border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100'
                 }`}
               />
@@ -916,7 +969,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
             <h3 className="text-lg font-bold text-gray-800">Administrador de la Unidad</h3>
           </div>
 
-          
+
           <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
             <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
               <UserCog className="w-4 h-4 text-amber-600" />
@@ -966,8 +1019,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
           </div>
 
           <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
-            
-            
+
+
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <User className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -983,8 +1036,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
                 })}
                 placeholder="Ej: Juan Carlos"
                 className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.admin_str_firstname 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                  errors.admin_str_firstname
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                     : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
                 }`}
               />
@@ -995,7 +1048,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               )}
             </div>
 
-            
+
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <User className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -1011,8 +1064,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
                 })}
                 placeholder="Ej: Pérez González"
                 className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.admin_str_lastname 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                  errors.admin_str_lastname
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                     : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
                 }`}
               />
@@ -1023,7 +1076,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               )}
             </div>
 
-            
+
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <Mail className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -1039,8 +1092,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
                 })}
                 placeholder="Ej: admin@ejemplo.com"
                 className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.admin_str_email 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                  errors.admin_str_email
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                     : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
                 }`}
               />
@@ -1051,7 +1104,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
               )}
             </div>
 
-            
+
             <div className="group">
               <label className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
                 <Phone className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
@@ -1067,8 +1120,8 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
                 })}
                 placeholder="Ej: 3102456987"
                 className={`w-full p-3.5 bg-gray-50 border-2 rounded-xl text-base focus:outline-none focus:bg-white transition-all hover:border-gray-300 ${
-                  errors.admin_str_phone 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                  errors.admin_str_phone
+                    ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                     : 'border-gray-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100'
                 }`}
               />

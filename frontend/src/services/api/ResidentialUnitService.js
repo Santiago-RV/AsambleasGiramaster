@@ -509,4 +509,33 @@ export class ResidentialUnitService {
       throw new Error('No se pudo generar la plantilla de Excel');
     }
   }
+
+  /**
+   * Elimina una unidad residencial y todos sus datos asociados
+   * @param {number} unitId - ID de la unidad residencial
+   * @returns {Promise} Respuesta del servidor
+   */
+  static async deleteResidentialUnit(unitId) {
+    try {
+      const response = await axiosInstance.delete(`/residential/units/${unitId}`);
+      
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Error al eliminar la unidad residencial');
+      }
+
+      return {
+        success: true,
+        message: response.data.message,
+        data: response.data.data,
+      };
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al eliminar la unidad residencial';
+      
+      throw new Error(errorMessage);
+    }
+  }
 }
