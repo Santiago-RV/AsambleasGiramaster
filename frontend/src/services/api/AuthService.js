@@ -27,7 +27,7 @@ export class AuthService {
 				timeout: 10000,
 			});
 
-			console.log('✅ Respuesta del servidor:', response.data);
+			// console.log('✅ Respuesta del servidor:', response.data);
 
 			// Validar estructura de respuesta
 			if (!response.data || !response.data.success) {
@@ -46,8 +46,11 @@ export class AuthService {
 				throw new Error('El servidor no retornó los datos de usuario correctamente');
 			}
 
-			// Guardar token
+			// Guardar tokens
 			localStorage.setItem('access_token', data.access_token);
+			if (data.refresh_token) {
+				localStorage.setItem('refresh_token', data.refresh_token);
+			}
 
 			// Preparar datos del usuario
 			const userData = {
@@ -61,7 +64,7 @@ export class AuthService {
 			// Guardar usuario
 			localStorage.setItem('user', JSON.stringify(userData));
 
-			console.log('✅ Login exitoso:', userData);
+			// console.log('✅ Login exitoso:', userData);
 
 			// Incluir active_meeting si existe
 			const responseData = {
@@ -86,12 +89,12 @@ export class AuthService {
 			};
 		} catch (error) {
 			// Logging del error completo para debugging
-			console.error('❌ Error en login:', {
-				status: error.response?.status,
-				statusText: error.response?.statusText,
-				data: error.response?.data,
-				message: error.message,
-			});
+			// console.error('❌ Error en login:', {
+			// 	status: error.response?.status,
+			// 	statusText: error.response?.statusText,
+			// 	data: error.response?.data,
+			// 	message: error.message,
+			// });
 
 			// Extraer mensaje de error del backend
 			let errorMessage = 'Error al iniciar sesión';
@@ -118,8 +121,9 @@ export class AuthService {
 	 */
 	static logout() {
 		localStorage.removeItem('access_token');
+		localStorage.removeItem('refresh_token');
 		localStorage.removeItem('user');
-		console.log('✅ Logout exitoso');
+		// console.log('✅ Logout exitoso');
 	}
 
 	/**
@@ -143,7 +147,7 @@ export class AuthService {
 		try {
 			return JSON.parse(userStr);
 		} catch (error) {
-			console.error('❌ Error al parsear datos de usuario:', error);
+			// console.error('❌ Error al parsear datos de usuario:', error);
 			return null;
 		}
 	}
@@ -162,6 +166,59 @@ export class AuthService {
 	 */
 	static getLastAuthData() {
 		return AuthService._lastAuthData || null;
+	}
+
+	static getRefreshToken() {
+		return localStorage.getItem('refresh_token');
+	}
+
+	static async refreshAccessToken() {
+		const refreshToken = AuthService.getRefreshToken();
+		if (!refreshToken) {
+			throw new Error('No hay refresh token disponible');
+		}
+
+		try {
+			const response = await publicAxios.post('/auth/refresh', {
+				refresh_token: refreshToken
+			}, {
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				timeout: 10000,
+			});
+
+			if (!response.data || !response.data.success) {
+				throw new Error(response.data?.message || 'Error al refrescar token');
+			}
+
+			const { data } = response.data;
+			
+			if (!data.access_token) {
+				throw new Error('El servidor no retornó el token de acceso');
+			}
+
+			localStorage.setItem('access_token', data.access_token);
+
+			return {
+				success: true,
+				access_token: data.access_token
+			};
+		} catch (error) {
+			let errorMessage = 'Error al refrescar token';
+			
+			if (error.response?.data) {
+				if (error.response.data.detail) {
+					errorMessage = error.response.data.detail;
+				} else if (error.response.data.message) {
+					errorMessage = error.response.data.message;
+				}
+			} else if (error.message) {
+				errorMessage = error.message;
+			}
+
+			throw new Error(errorMessage);
+		}
 	}
 }
 

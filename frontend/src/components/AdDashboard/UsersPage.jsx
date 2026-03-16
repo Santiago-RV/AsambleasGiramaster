@@ -17,7 +17,7 @@ const SVG_ICONS = {
 };
 
 
-export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest }) {
+export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest, onEditMeeting }) {
   const queryClient = useQueryClient();
 
   // Obtener los residentes de la unidad residencial
@@ -68,6 +68,10 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
       zoom_password: meeting.str_zoom_password,  // Contraseña de la reunión
       str_modality: meeting.str_modality || 'virtual',
       int_zoom_account_id: meeting.int_zoom_account_id,
+      // Campos adicionales para edición
+      str_meeting_type: meeting.str_meeting_type,
+      str_description: meeting.str_description,
+      bln_allow_delegates: meeting.bln_allow_delegates,
     }))
     : [];
 
@@ -679,6 +683,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onJoinMeeting={onJoinMeeting}
             onStartMeeting={handleStartMeeting}
             onEndMeeting={handleEndMeeting}
+            onEditMeeting={onEditMeeting}
             variant="admin"
           />
         </div>

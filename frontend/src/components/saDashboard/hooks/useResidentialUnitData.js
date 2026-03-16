@@ -74,6 +74,12 @@ export const useResidentialUnitData = (unitId) => {
 						codigo: reunion.str_meeting_code,
 						zoom_url: reunion.str_zoom_join_url,
 						duracion: reunion.int_estimated_duration,
+						// Campos adicionales para edición
+						str_meeting_type: reunion.str_meeting_type,
+						str_description: reunion.str_description,
+						bln_allow_delegates: reunion.bln_allow_delegates,
+						int_zoom_account_id: reunion.int_zoom_account_id,
+						str_modality: reunion.str_modality,
 					};
 				});
 			}

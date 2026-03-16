@@ -37,6 +37,7 @@ export default function AppAdmin() {
   const [residentModalMode, setResidentModalMode] = useState('create');
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [meetingToEdit, setMeetingToEdit] = useState(null);
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
   const [meetingMode, setMeetingMode] = useState('virtual');
   const [showZoomMeeting, setShowZoomMeeting] = useState(null);
@@ -322,7 +323,7 @@ export default function AppAdmin() {
   };
 
   // Handler para enviar el formulario de reunión
-  const handleSubmitMeeting = (data, resetForm) => {
+  const handleSubmitMeeting = (data, { isEditing, meetingId, onSuccess }) => {
     const meetingData = {
       int_id_residential_unit: parseInt(residentialUnitId),
       str_title: data.str_title,
@@ -334,15 +335,38 @@ export default function AppAdmin() {
       str_modality: meetingMode,
       int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id
         ? parseInt(data.int_zoom_account_id) : null,
-      // El int_meeting_leader_id se asigna automaticamente en el backend
     };
 
-    createMeetingMutation.mutate(meetingData, {
-      onSuccess: () => {
-        resetForm();
+    if (isEditing && meetingId) {
+      // Actualizar reunión existente
+      MeetingService.updateMeeting(meetingId, meetingData).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+        onSuccess?.();
         setShowMeetingModal(false);
-      },
-    });
+        setMeetingToEdit(null);
+      });
+    } else {
+      // Crear nueva reunión
+      createMeetingMutation.mutate(meetingData, {
+        onSuccess: () => {
+          onSuccess?.();
+          setShowMeetingModal(false);
+        },
+      });
+    }
+  };
+
+  // Handler para editar una reunión
+  const handleEditMeeting = (meeting) => {
+    setMeetingToEdit(meeting);
+    setMeetingMode(meeting.str_modality === 'virtual' ? 'virtual' : 'presencial');
+    setShowMeetingModal(true);
+  };
+
+  // Handler para cerrar el modal de reunión
+  const handleCloseMeetingModal = () => {
+    setShowMeetingModal(false);
+    setMeetingToEdit(null);
   };
 
   // Handler para unirse a una reunión usando Zoom Embebido
@@ -603,6 +627,7 @@ export default function AppAdmin() {
           onCreateMeeting={handleCreateMeeting}
           onJoinMeeting={handleJoinMeeting}
           onEndMeeting={handleEndMeeting}
+          onEditMeeting={handleEditMeeting}
           onTransferPower={(fromLabel, onConfirm) =>
             openPowerModal(fromLabel, onConfirm)
           }
@@ -652,10 +677,11 @@ export default function AppAdmin() {
 
       <MeetingModal
         isOpen={showMeetingModal}
-        onClose={() => setShowMeetingModal(false)}
+        onClose={handleCloseMeetingModal}
         onSubmit={handleSubmitMeeting}
         isSubmitting={createMeetingMutation.isPending}
         meetingMode={meetingMode}
+        meetingToEdit={meetingToEdit}
       />
 
       {showAssemblyForm && (

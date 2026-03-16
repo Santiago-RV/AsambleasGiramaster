@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../../../common/Modal';
 import {
@@ -11,12 +11,15 @@ import {
 	Clock,
 	Plus,
 	MapPin,
+	Edit,
 } from 'lucide-react';
 import SystemConfigService from '../../../../services/api/SystemConfigService';
 
-const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = 'virtual' }) => {
+const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = 'virtual', meetingToEdit = null }) => {
 	const [zoomAccounts, setZoomAccounts] = useState([]);
 	const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+	const isEditing = useMemo(() => !!meetingToEdit, [meetingToEdit]);
 
 	const {
 		register,
@@ -44,6 +47,49 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 		}
 	}, [isOpen, meetingMode]);
 
+	// Cargar datos de la reunión a editar
+	useEffect(() => {
+		if (meetingToEdit) {
+			let fecha = '';
+			let hora = '';
+			
+			// Procesar la fecha - puede venir como Date, string, o tener fecha/hora separados
+			const fechaRaw = meetingToEdit.fechaCompleta || meetingToEdit.fecha;
+			
+			if (fechaRaw) {
+				// Si es un objeto Date
+				if (fechaRaw instanceof Date && !isNaN(fechaRaw.getTime())) {
+					fecha = fechaRaw.toISOString().split('T')[0];
+					hora = fechaRaw.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+				} 
+				// Si es un string
+				else if (typeof fechaRaw === 'string') {
+					const parts = fechaRaw.split('T');
+					fecha = parts[0] || '';
+					hora = parts[1] ? parts[1].substring(0, 5) : '';
+				}
+			}
+			
+			reset({
+				str_title: meetingToEdit.titulo || meetingToEdit.str_title || '',
+				str_description: meetingToEdit.descripcion || meetingToEdit.str_description || '',
+				str_meeting_type: meetingToEdit.str_meeting_type || meetingToEdit.tipo || 'Ordinaria',
+				dat_schedule_start: fecha ? `${fecha}T${hora || '00:00'}` : '',
+				bln_allow_delegates: meetingToEdit.bln_allow_delegates ?? meetingToEdit.delegados ?? true,
+				int_zoom_account_id: meetingToEdit.int_zoom_account_id || '',
+			});
+		} else {
+			reset({
+				str_title: '',
+				str_description: '',
+				str_meeting_type: 'Ordinaria',
+				dat_schedule_start: '',
+				bln_allow_delegates: true,
+				int_zoom_account_id: '',
+			});
+		}
+	}, [meetingToEdit, reset]);
+
 	const loadZoomAccounts = async () => {
 		setLoadingAccounts(true);
 		try {
@@ -66,8 +112,12 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 	};
 
 	const handleFormSubmit = (data) => {
-		onSubmit(data, () => {
-			reset();
+		onSubmit(data, {
+			isEditing,
+			meetingId: meetingToEdit?.id,
+			onSuccess: () => {
+				reset();
+			}
 		});
 	};
 
@@ -75,7 +125,16 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 	const showZoomAccountSelector = isVirtual && zoomAccounts.length > 1;
 
 	return (
-		<Modal isOpen={isOpen} onClose={handleClose} title={isVirtual ? "Crear Reunion Virtual" : "Crear Reunion Presencial"} size="2xl">
+		<Modal 
+			isOpen={isOpen} 
+			onClose={handleClose} 
+			title={
+				isEditing 
+					? (isVirtual ? "Editar Reunion Virtual" : "Editar Reunion Presencial")
+					: (isVirtual ? "Crear Reunion Virtual" : "Crear Reunion Presencial")
+			} 
+			size="2xl"
+		>
 			<form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
 				{/* BANNER INFORMATIVO - Adapta segun modalidad */}
 				{isVirtual ? (
@@ -365,12 +424,12 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 						{isSubmitting ? (
 							<>
 								<Clock className="animate-spin h-5 w-5" />
-								<span>Creando reunion...</span>
+								<span>{isEditing ? 'Actualizando reunion...' : 'Creando reunion...'}</span>
 							</>
 						) : (
 							<>
-								<Plus className="w-5 h-5" />
-								<span>Crear Reunion</span>
+								{isEditing ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+								<span>{isEditing ? 'Actualizar Reunion' : 'Crear Reunion'}</span>
 							</>
 						)}
 					</button>

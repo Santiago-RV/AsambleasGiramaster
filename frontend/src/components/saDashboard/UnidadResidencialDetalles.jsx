@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
+import { MeetingService } from '../../services/api/MeetingService';
 
 // Hooks personalizados
 import { useResidentialUnitData } from './hooks/useResidentialUnitData';
@@ -36,6 +37,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 	const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
 	const [meetingMode, setMeetingMode] = useState('virtual');
 	const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
+	const [meetingToEdit, setMeetingToEdit] = useState(null);
 	const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
 	const [isChangeAdminModalOpen, setIsChangeAdminModalOpen] = useState(false);
 	const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
@@ -143,7 +145,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 	};
 
 	// Submit handlers
-	const handleSubmitMeeting = (data, resetForm) => {
+	const handleSubmitMeeting = (data, { isEditing, meetingId, onSuccess }) => {
 		const meetingData = {
 			int_id_residential_unit: parseInt(unitId),
 			str_title: data.str_title,
@@ -157,12 +159,34 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 			int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
 		};
 
-		createMeetingMutation.mutate(meetingData, {
-			onSuccess: () => {
-				resetForm();
+		if (isEditing && meetingId) {
+			MeetingService.updateMeeting(meetingId, meetingData).then(() => {
+				queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
+				onSuccess?.();
 				setIsMeetingModalOpen(false);
-			},
-		});
+				setMeetingToEdit(null);
+			});
+		} else {
+			createMeetingMutation.mutate(meetingData, {
+				onSuccess: () => {
+					onSuccess?.();
+					setIsMeetingModalOpen(false);
+				},
+			});
+		}
+	};
+
+	// Handler para editar una reunión
+	const handleEditMeeting = (meeting) => {
+		setMeetingToEdit(meeting);
+		setMeetingMode(meeting.str_modality === 'virtual' ? 'virtual' : 'presencial');
+		setIsMeetingModalOpen(true);
+	};
+
+	// Handler para cerrar el modal de reunión
+	const handleCloseMeetingModal = () => {
+		setIsMeetingModalOpen(false);
+		setMeetingToEdit(null);
 	};
 
 	const handleSubmitResident = (data, residentId, resetForm) => {
@@ -389,6 +413,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 							onCreateMeeting={() => setIsTypeSelectorOpen(true)}
 							onStartMeeting={onStartMeeting}
 							onEndMeeting={handleEndMeeting}
+							onEditMeeting={handleEditMeeting}
 						/>
 					</div>
 				</div>
@@ -409,10 +434,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 
 			<MeetingModal
 				isOpen={isMeetingModalOpen}
-				onClose={() => setIsMeetingModalOpen(false)}
+				onClose={handleCloseMeetingModal}
 				onSubmit={handleSubmitMeeting}
 				isSubmitting={createMeetingMutation.isPending}
 				meetingMode={meetingMode}
+				meetingToEdit={meetingToEdit}
 			/>
 
 			<ResidentModal
