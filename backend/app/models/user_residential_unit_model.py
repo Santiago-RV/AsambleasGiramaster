@@ -18,4 +18,4 @@ class UserResidentialUnitModel(Base):
 
     # Relationships
     user = relationship("UserModel", back_populates="user_residential_units", lazy="selectin")
-    residential_unit = relationship("ResidentialUnitModel", backref="user_units", lazy="selectin")
+    residential_unit = relationship("ResidentialUnitModel", back_populates="user_residential_units", lazy="selectin")

@@ -74,6 +74,39 @@ class ResidentialUnitService:
                 details={"original_error": str(e)}
             )
     
+    async def delete_residential_unit(self, unit_id: int) -> None:
+        """
+        Elimina una unidad residencial y todos sus datos asociados.
+        Gracias a las relaciones en cascada, se eliminan automáticamente:
+        - Reuniones
+        - Encuestas
+        - Invitaciones
+        - Asistencias
+        - Tokens de auto-login
+        """
+        try:
+            # Obtener la unidad residencial
+            unit = await self.get_residential_unit_by_id(unit_id)
+            if not unit:
+                raise ResourceNotFoundException(f"No se encontró la unidad residencial con ID {unit_id}")
+            
+            unit_name = unit.str_name
+            
+            # Eliminar la unidad (las relaciones en cascada eliminan los datos relacionados)
+            await self.db.delete(unit)
+            await self.db.commit()
+            
+            logger.info(f"🗑️ Unidad residencial '{unit_name}' (ID: {unit_id}) eliminada exitosamente")
+            
+        except ResourceNotFoundException:
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            raise ServiceException(
+                message=f"Error al eliminar la unidad residencial: {str(e)}",
+                details={"original_error": str(e)}
+            )
+    
     async def create_residential_unit(self, residential_unit_data: ResidentialUnitCreate) -> ResidentialUnitResponse:
         """
         Crea una unidad residencial y opcionalmente asigna un administrador.

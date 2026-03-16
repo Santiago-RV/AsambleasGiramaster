@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
-import { User, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, AlertCircle, ArrowRight, Eye, EyeOff, Mail, Video } from 'lucide-react';
 import Swal from 'sweetalert2';
 import logo from '../assets/logo-giramaster.jpeg';
 import background from '../assets/background_giramaster.jpeg';
 import MeetingParticipationModal from '../components/common/MeetingParticipationModal';
 import { publicAxios } from '../services/api/axiosconfig';
 import { AuthService } from '../services/api/AuthService';
+import SystemConfigService from '../services/api/SystemConfigService';
 
 const Login = () => {
 	const [showPassword, setShowPassword] = useState(false);
@@ -15,6 +16,7 @@ const Login = () => {
 	const [activeMeeting, setActiveMeeting] = useState(null);
 	const [isRegisteringParticipation, setIsRegisteringParticipation] = useState(false);
 	const [loggedInUser, setLoggedInUser] = useState(null);
+	const [isCheckingConfig, setIsCheckingConfig] = useState(false);
 
 	const {
 		register,
@@ -59,8 +61,8 @@ const Login = () => {
 				setActiveMeeting(authData.active_meeting);
 				setShowMeetingModal(true);
 			} else {
-				// Si no hay modal, navegar inmediatamente
-				navigateByRole(storedUser.role);
+				// Si no hay modal, verificar configuración y navegar
+				handleNavigateWithConfigCheck(storedUser.role);
 			}
 		} catch (error) {
 			console.error('Error al iniciar sesión:', error);
@@ -83,6 +85,104 @@ const Login = () => {
 				confirmButtonText: 'Cerrar',
 				confirmButtonColor: '#2563eb',
 			});
+		}
+	};
+
+	// Función para verificar configuración del sistema
+	const checkSystemConfig = async () => {
+		try {
+			const [smtpStatus, zoomStatus] = await Promise.all([
+				SystemConfigService.checkSMTPConfigStatus(),
+				SystemConfigService.checkZoomConfigStatus(),
+			]);
+
+			return {
+				smtpConfigured: smtpStatus?.success && smtpStatus?.configured,
+				zoomConfigured: zoomStatus?.success && zoomStatus?.configured,
+			};
+		} catch (error) {
+			console.error('Error al verificar configuración:', error);
+			return { smtpConfigured: false, zoomConfigured: false };
+		}
+	};
+
+	// Función para mostrar modal de advertencia de configuración
+	const showConfigWarning = (configStatus, navigateFn) => {
+		const missingConfigs = [];
+		
+		if (!configStatus.smtpConfigured) {
+			missingConfigs.push({
+				name: 'Correo SMTP',
+				icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
+				color: 'text-red-500',
+			});
+		}
+		
+		if (!configStatus.zoomConfigured) {
+			missingConfigs.push({
+				name: 'Cuentas Zoom',
+				icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>',
+				color: 'text-blue-500',
+			});
+		}
+
+		const configList = missingConfigs.map(c => 
+			`<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+				<span class="${c.color}">${c.icon}</span>
+				<span class="font-medium">${c.name}</span>
+			</div>`
+		).join('');
+
+		Swal.fire({
+			icon: 'warning',
+			title: 'Configuración Incompleta',
+			html: `
+				<div class="text-left">
+					<p class="mb-4 text-gray-600">Para un mejor funcionamiento del sistema, se recomienda configurar los siguientes servicios:</p>
+					<div class="space-y-2">${configList}</div>
+				</div>
+			`,
+			showCancelButton: true,
+			confirmButtonText: 'Ir a Configuración',
+			cancelButtonText: 'Omitir',
+			confirmButtonColor: '#2563eb',
+			cancelButtonColor: '#6b7280',
+			width: '450px',
+		}).then((result) => {
+			if (result.isConfirmed) {
+				navigateFn('config');
+			} else {
+				navigateFn('normal');
+			}
+		});
+	};
+
+	// Función para navegar según el rol con verificación de configuración
+	const handleNavigateWithConfigCheck = async (role) => {
+		if (role === 'Administrador' || role === 'Super Administrador') {
+			setIsCheckingConfig(true);
+			
+			const configStatus = await checkSystemConfig();
+			
+			setIsCheckingConfig(false);
+			
+			if (!configStatus.smtpConfigured || !configStatus.zoomConfigured) {
+				showConfigWarning(configStatus, (action) => {
+					if (action === 'config') {
+						if (role === 'Super Administrador') {
+							window.location.href = '/super-admin?tab=config';
+						} else {
+							window.location.href = '/admin?tab=config';
+						}
+					} else {
+						navigateByRole(role);
+					}
+				});
+			} else {
+				navigateByRole(role);
+			}
+		} else {
+			navigateByRole(role);
 		}
 	};
 
@@ -112,8 +212,8 @@ const Login = () => {
 			});
 			
 			setShowMeetingModal(false);
-			// Navegar después de registrar participación
-			navigateByRole(loggedInUser.role);
+			// Navegar después de registrar participación verificando configuración
+			handleNavigateWithConfigCheck(loggedInUser.role);
 		} catch (error) {
 			console.error('Error al registrar participación:', error);
 			
@@ -139,14 +239,25 @@ const Login = () => {
 	const handleDeclineParticipation = () => {
 		setShowMeetingModal(false);
 		setActiveMeeting(null);
-		// Navegar cuando el usuario decline el modal
+		// Navegar cuando el usuario decline el modal verificando configuración
 		if (loggedInUser) {
-			navigateByRole(loggedInUser.role);
+			handleNavigateWithConfigCheck(loggedInUser.role);
 		}
 	};
 
 	return (
 		<div className="min-h-screen flex">
+			{/* Overlay de carga mientras verifica configuración */}
+			{isCheckingConfig && (
+				<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+					<div className="bg-white rounded-xl p-8 flex flex-col items-center shadow-2xl">
+						<div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
+						<p className="text-gray-700 font-medium">Verificando configuración del sistema...</p>
+						<p className="text-gray-500 text-sm mt-1">Por favor espere</p>
+					</div>
+				</div>
+			)}
+
 			{/* Sección izquierda - Branding */}
 			<div className="hidden lg:flex lg:w-1/2 p-12 flex-col justify-center items-center text-white relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url(${background})` }}>
 				

@@ -30,5 +30,6 @@ class ResidentialUnitModel(Base):
 
     # Relationships
     meetings = relationship("MeetingModel", back_populates="residential_unit", cascade="all, delete-orphan", passive_deletes=True)
+    user_residential_units = relationship("UserResidentialUnitModel", back_populates="residential_unit", cascade="all, delete-orphan", passive_deletes=True)
     creator = relationship("UserModel", foreign_keys=[created_by], lazy="selectin")
     updater = relationship("UserModel", foreign_keys=[updated_by], lazy="selectin")

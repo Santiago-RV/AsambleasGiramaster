@@ -272,16 +272,6 @@ const QRCodeModal = ({
 						)}
 					</div>
 
-					{/* URL de acceso */}
-					{autoLoginUrl && (
-						<div className="bg-gray-50 p-3 rounded-lg mb-6">
-							<p className="text-xs text-gray-500 mb-1">Enlace de acceso directo:</p>
-							<p className="text-xs text-gray-700 break-all font-mono">
-								{autoLoginUrl}
-							</p>
-						</div>
-					)}
-
 					{/* Botones de acción */}
 					<div className="grid grid-cols-2 gap-3">
 						<button
