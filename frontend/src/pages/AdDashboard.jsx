@@ -100,7 +100,6 @@ export default function AppAdmin() {
     // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
     ...(isAdmin ? [{ id: 'meeting-progress', label: 'Reunión en Curso', icon: Calendar }] : []),
-    { id: 'powers', label: 'Poderes', icon: HandCoins },
     { id: 'reports', label: 'Reportes', icon: FileText },
   ];
 
@@ -110,7 +109,6 @@ export default function AppAdmin() {
     // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
     ...(isAdmin ? { "meeting-progress": "Reunión en Curso" } : {}),
-    powers: "Gestión de Poderes",
     reports: "Reportes",
   };
 

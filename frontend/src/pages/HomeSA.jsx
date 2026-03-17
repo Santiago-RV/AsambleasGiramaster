@@ -66,11 +66,6 @@ const HomeSA = () => {
 			icon: Calendar,
 		},
 		{
-			id: 'powers',
-			label: 'Poderes',
-			icon: HandCoins,
-		},
-		{
 			id: 'informes',
 			label: 'Informes',
 			icon: FileText,
