@@ -206,16 +206,44 @@ class RateLimiter:
   def get_limits_for_endpoint(self, endpoint_path: str) -> dict:
     """ Retorna límites específicos por endpoint """
     
-    # Configuración de límites por endpoint
+    # Configuración de límites por endpoint - ALTO PARA PRUEBAS DE ESTRÉS
     endpoint_limits = {
-      "/api/v1/auth/login": {"max_requests": 20, "window_minutes": 15},  # Login: 5 intentos en 15 min
-      "/api/v1/auth/register": {"max_requests": 3, "window_minutes": 60},  # Registro: 3 en 1 hora
-      "/api/v1/auth/register-participation": {"max_requests": 100, "window_minutes": 60},  # Participación en reuniones
-      "/api/v1/residents/generate-auto-login": {"max_requests": 30, "window_minutes": 60},  # QR generation
-      "/api/v1/residents/send-qr-email": {"max_requests": 10, "window_minutes": 60},  # Email QR
-      "/api/v1/residents/generate-qr-bulk-simple": {"max_requests": 50, "window_minutes": 60},  # Bulk QR tokens
-      "/api/v1/delegations/": {"max_requests": 100, "window_minutes": 60},
-      "/api/v1/meetings": {"max_requests": 300, "window_minutes": 60},  # Reuniones (GET y escritura)
+      # Auth
+      "/api/v1/auth/login": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/auth/register": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/auth/register-participation": {"max_requests": 10000, "window_minutes": 1},
+      
+      # Residents / QR
+      "/api/v1/residents/generate-auto-login": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/residents/send-qr-email": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/residents/generate-qr-bulk-simple": {"max_requests": 10000, "window_minutes": 1},
+      
+      # Delegations
+      "/api/v1/delegations/": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/delegation-history/": {"max_requests": 10000, "window_minutes": 1},
+      
+      # Meetings
+      "/api/v1/meetings": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/meetings/scan-qr-attendance": {"max_requests": 10000, "window_minutes": 1},
+      
+      # Active meetings
+      "/api/v1/active-meetings": {"max_requests": 10000, "window_minutes": 1},
+      
+      # Polls - estadísticas en tiempo real y voting
+      "/api/v1/polls/": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/polls/{id}/statistics": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/polls/{id}/vote": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/polls/{id}/results": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/polls/code/": {"max_requests": 10000, "window_minutes": 1},
+      
+      # Admin reports
+      "/api/v1/administrator/meetings/{id}/report/attendance": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/administrator/meetings/{id}/report/quorum": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/administrator/meetings/{id}/report/polls": {"max_requests": 10000, "window_minutes": 1},
+      "/api/v1/administrator/meetings/{id}/report/delegations": {"max_requests": 10000, "window_minutes": 1},
+      
+      # Guests
+      "/api/v1/guests/": {"max_requests": 10000, "window_minutes": 1},
     }
     
     # Buscar límite específico para el endpoint
@@ -223,10 +251,10 @@ class RateLimiter:
       if pattern in endpoint_path or endpoint_path in pattern:
         return limits
     
-    # Límites por defecto según método HTTP
+    # Límites por defecto según método HTTP - ALTO PARA PRUEBAS
     if "POST" in endpoint_path or "PUT" in endpoint_path or "DELETE" in endpoint_path:
-      return {"max_requests": 30, "window_minutes": 60}  # Operaciones de escritura más restrictivas
+      return {"max_requests": 10000, "window_minutes": 1}
     else:
-      return {"max_requests": 300, "window_minutes": 60}  # Operaciones de lectura más permisivas
+      return {"max_requests": 10000, "window_minutes": 1}
 
 rate_limiter = RateLimiter()

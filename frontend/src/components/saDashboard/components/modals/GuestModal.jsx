@@ -1,7 +1,7 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../../../common/Modal';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Info } from 'lucide-react';
 
 /**
  * Modal para crear invitados (rol 4)
@@ -51,8 +51,9 @@ const GuestModal = ({
             <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
                 {/* Información sobre invitados */}
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h3 className="font-semibold text-blue-800 mb-2">
-                        ℹ️ Sobre los Invitados
+                    <h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                        <Info size={18} />
+                        Sobre los Invitados
                     </h3>
                     <ul className="text-sm text-blue-700 space-y-1">
                         <li>• Solo recibirán correos con links de asambleas</li>

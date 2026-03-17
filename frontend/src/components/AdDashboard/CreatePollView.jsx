@@ -9,7 +9,7 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
     str_poll_type: 'single',
     bln_is_anonymous: false,
     bln_requires_quorum: false,
-    dec_minimum_quorum_percentage: 0,
+    dec_minimum_quorum_percentage: 50,
     bln_allows_abstention: true,
     int_max_selections: 1,
     int_duration_minutes: null,
@@ -75,6 +75,20 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
         });
         return false;
       }
+    }
+
+    if (formData.bln_requires_quorum) {
+      const quorumValue = parseFloat(formData.dec_minimum_quorum_percentage);
+      if (isNaN(quorumValue) || quorumValue < 1 || quorumValue > 100) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error en Quórum',
+          text: 'El porcentaje de quórum debe ser mayor a 0 y menor o igual a 100',
+        });
+        return false;
+      }
+    } else {
+      formData.dec_minimum_quorum_percentage = 0;
     }
 
     return true;

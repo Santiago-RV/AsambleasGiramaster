@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown } from 'lucide-react';
+import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown, Calendar, Building2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Swal from 'sweetalert2';
@@ -81,7 +81,7 @@ const generateAttendancePDF = (data) => {
             ['Asistentes', summary.total_attended],
             ['Ausentes', summary.total_absent],
             ['% Asistencia', `${Math.round((summary.total_attended / summary.total_invited) * 100)}%`],
-            ['Quórum Alcanzado', `${summary.quorum_achieved.toFixed(4)}`],
+            ['Quórum en Reunión', `${(summary.quorum_actual ?? summary.quorum_achieved ?? 0).toFixed(4)} / ${(summary.quorum_total ?? 0).toFixed(4)}`],
         ],
         styles: { fontSize: 9 },
         headStyles: { fillColor: [30, 58, 138] },
@@ -99,8 +99,18 @@ const generateAttendancePDF = (data) => {
 
     autoTable(doc, {
         startY: y,
-        head: [['Nombre Completo', 'Apartamento', 'Email', 'Coeficiente']],
-        body: attended.map(p => [p.full_name, p.apartment, p.email, p.quorum_base.toFixed(4)]),
+        head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Coeficiente']],
+        body: attended.map(p => [
+            p.full_name,
+            p.apartment,
+            p.attended_at
+                ? new Date(p.attended_at).toLocaleString('es-ES', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                })
+                : '—',
+            p.quorum_base.toFixed(4)
+        ]),
         styles: { fontSize: 8.5 },
         headStyles: { fillColor: [22, 101, 52] },
         alternateRowStyles: { fillColor: [240, 253, 244] },
@@ -119,8 +129,8 @@ const generateAttendancePDF = (data) => {
 
         autoTable(doc, {
             startY: y,
-            head: [['Nombre Completo', 'Apartamento', 'Email', 'Coeficiente']],
-            body: absent.map(p => [p.full_name, p.apartment, p.email, p.quorum_base.toFixed(4)]),
+            head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Coeficiente']],
+            body: absent.map(p => [p.full_name, p.apartment, '—', p.quorum_base.toFixed(4)]),
             styles: { fontSize: 8.5 },
             headStyles: { fillColor: [185, 28, 28] },
             alternateRowStyles: { fillColor: [254, 242, 242] },
@@ -180,19 +190,26 @@ const generatePollsPDF = (data) => {
 
             autoTable(doc, {
                 startY: y,
-                head: [['Copropietario', 'Apto', 'Peso de Voto']],
+                head: [['Copropietario', 'Apto', 'Fecha y Hora del Voto', 'Peso']],
                 body: opt.voters.map(v => [
                     v.full_name,
                     v.apartment,
+                    v.voted_at
+                        ? new Date(v.voted_at).toLocaleString('es-ES', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                        })
+                        : '—',
                     parseFloat(v.voting_weight).toFixed(4),
                 ]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [67, 56, 202] },
                 alternateRowStyles: { fillColor: [238, 242, 255] },
                 columnStyles: {
-                    0: { cellWidth: 90 },
-                    1: { cellWidth: 20 },
-                    2: { cellWidth: 30 },
+                    0: { cellWidth: 70 },
+                    1: { cellWidth: 15 },
+                    2: { cellWidth: 45 },
+                    3: { cellWidth: 25 },
                 },
                 margin: { left: 20, right: 14 },
             });
@@ -227,8 +244,7 @@ const generatePollsPDF = (data) => {
 };
 
 const generateDelegationsPDF = (data) => {
-    console.log('DATA DELEGACIONES:', JSON.stringify(data, null, 2));
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const { meeting, total_delegations, delegations } = data;
 
     let y = addHeader(doc, 'INFORME DE CESIÓN DE PODERES', meeting.title, meeting.residential_unit, meeting.scheduled_date);
@@ -239,6 +255,13 @@ const generateDelegationsPDF = (data) => {
     doc.text(`Total de delegaciones registradas: ${total_delegations}`, 14, y);
     y += 8;
 
+    const fmtDate = (iso) => iso
+        ? new Date(iso).toLocaleString('es-ES', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        })
+        : '—';
+
     if (delegations.length === 0) {
         doc.setFont('helvetica', 'italic');
         doc.setTextColor(150);
@@ -246,22 +269,27 @@ const generateDelegationsPDF = (data) => {
     } else {
         autoTable(doc, {
             startY: y,
-            head: [['Delegante', 'Apto', 'Email Delegante', 'Coeficiente', 'Delegado A', 'Email Delegado']],
-            body: delegations.map(d => [
+            head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Fecha y Hora']],
+            body: delegations.map((d, idx) => [
+                idx + 1,
                 d.delegator.full_name,
                 d.delegator.apartment,
-                d.delegator.email,
-                d.delegated_weight.toFixed(4),
+                typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
                 d.delegate.full_name,
-                d.delegate.email,
+                fmtDate(d.delegated_at),
+                d.notes || '—',
             ]),
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [124, 58, 237] },
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [124, 58, 237], fontSize: 8, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [245, 243, 255] },
             columnStyles: {
-                0: { cellWidth: 35 },
-                1: { cellWidth: 12 },
-                4: { cellWidth: 35 },
+                0: { cellWidth: 8, halign: 'center' },
+                1: { cellWidth: 50 },
+                2: { cellWidth: 15, halign: 'center' },
+                3: { cellWidth: 22, halign: 'right' },
+                4: { cellWidth: 50 },
+                5: { cellWidth: 35 },
+                6: { cellWidth: 'auto' },
             },
             margin: { left: 14, right: 14 },
         });
@@ -375,8 +403,8 @@ const InformesTab = () => {
 
                 {selectedMeetingInfo && (
                     <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
-                        <span className="bg-gray-100 px-2 py-1 rounded-lg">📅 {new Date(selectedMeetingInfo.scheduled_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                        <span className="bg-gray-100 px-2 py-1 rounded-lg">🏢 {selectedMeetingInfo.residential_unit}</span>
+                        <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Calendar size={14} /> {new Date(selectedMeetingInfo.scheduled_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                        <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Building2 size={14} /> {selectedMeetingInfo.residential_unit}</span>
                         <span className={`px-2 py-1 rounded-lg font-medium ${selectedMeetingInfo.status === 'En Curso' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{selectedMeetingInfo.status}</span>
                     </div>
                 )}

@@ -14,7 +14,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
   const { data: pollsData, isLoading: isLoadingPolls } = useQuery({
     queryKey: ['meeting-polls', meeting.id],
     queryFn: async () => await PollService.getPollsByMeeting(meeting.id),
-    refetchInterval: 5000, // Refrescar cada 5 segundos
+    refetchInterval: 5000,
   });
 
   // Obtener estadísticas de una encuesta
@@ -22,7 +22,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
     queryKey: ['poll-statistics', selectedPoll?.id],
     queryFn: async () => await PollService.getStatistics(selectedPoll.id),
     enabled: !!selectedPoll,
-    refetchInterval: 3000, // Refrescar cada 3 segundos
+    refetchInterval: 3000,
   });
 
   // Mutación para iniciar encuesta
@@ -34,16 +34,14 @@ export default function MeetingPollsView({ meeting, onBack }) {
     onSuccess: (response) => {
       console.log('✅ [MeetingPollsView] Encuesta iniciada exitosamente:', response);
 
-      // Actualizar el estado local de la encuesta seleccionada inmediatamente
       if (selectedPoll) {
         setSelectedPoll({
           ...selectedPoll,
-          str_status: 'active', // Actualizar a estado activo
+          str_status: 'active',
           dat_started_at: new Date().toISOString()
         });
       }
 
-      // Invalidar TODAS las queries de encuestas para actualizar en todos lados
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
       queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
 
@@ -77,16 +75,14 @@ export default function MeetingPollsView({ meeting, onBack }) {
     onSuccess: (response) => {
       console.log('✅ [MeetingPollsView] Encuesta finalizada exitosamente:', response);
 
-      // Actualizar el estado local de la encuesta seleccionada inmediatamente
       if (selectedPoll) {
         setSelectedPoll({
           ...selectedPoll,
-          str_status: 'closed', // Actualizar a estado cerrado
+          str_status: 'closed',
           dat_ended_at: new Date().toISOString()
         });
       }
 
-      // Invalidar TODAS las queries de encuestas
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
       queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
 
@@ -119,7 +115,6 @@ export default function MeetingPollsView({ meeting, onBack }) {
     },
     onSuccess: (response) => {
       console.log('✅ [MeetingPollsView] Encuesta creada exitosamente:', response);
-      // Invalidar TODAS las queries de encuestas
       queryClient.invalidateQueries({ queryKey: ['meeting-polls'] });
       queryClient.invalidateQueries({ queryKey: ['live-meetings'] });
 
@@ -226,7 +221,6 @@ export default function MeetingPollsView({ meeting, onBack }) {
   };
 
   const getStatusBadge = (status) => {
-    // Normalizar el estado (manejar tanto inglés como español del backend)
     const normalizedStatus = status?.toLowerCase();
 
     switch (normalizedStatus) {
@@ -264,7 +258,6 @@ export default function MeetingPollsView({ meeting, onBack }) {
     }
   };
 
-  // Vista para crear encuesta
   if (showCreatePoll) {
     return (
       <CreatePollView
@@ -275,14 +268,13 @@ export default function MeetingPollsView({ meeting, onBack }) {
     );
   }
 
-  // Vista de estadísticas de encuesta seleccionada
   if (selectedPoll) {
     const stats = statsData?.data?.statistics;
     const statsOptions = statsData?.data?.options;
+    const textResponses = statsData?.data?.text_responses || [];
 
     return (
       <div className="space-y-6">
-        {/* Header */}
         <div className="bg-white rounded-xl shadow-md p-6">
           <button
             onClick={() => setSelectedPoll(null)}
@@ -312,11 +304,20 @@ export default function MeetingPollsView({ meeting, onBack }) {
                     Anónima
                   </span>
                 )}
+                {selectedPoll.bln_requires_quorum && (
+                  <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                    Quórum: {selectedPoll.dec_minimum_quorum_percentage}%
+                  </span>
+                )}
+                {selectedPoll.int_duration_minutes && (
+                  <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                    Límite: {selectedPoll.int_duration_minutes} min
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Botones de acción */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 ml-4">
               {(selectedPoll.str_status?.toLowerCase() === 'draft' || selectedPoll.str_status === 'Borrador') && (
                 <button
                   onClick={() => handleStartPoll(selectedPoll)}
@@ -349,7 +350,6 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </div>
         </div>
 
-        {/* Estadísticas */}
         {isLoadingStats ? (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
             <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
@@ -357,7 +357,6 @@ export default function MeetingPollsView({ meeting, onBack }) {
           </div>
         ) : stats ? (
           <div className="space-y-6">
-            {/* Resumen de participación */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex items-center gap-3 mb-2">
@@ -377,47 +376,47 @@ export default function MeetingPollsView({ meeting, onBack }) {
                 </p>
               </div>
 
-              {/* Resultados por opción */}
-              {statsOptions && statsOptions.length > 0 && (
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
-                  <div className="space-y-4">
-                    {statsOptions.map((option, index) => (
-                      <div key={option.id || index}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span>{option.str_option_text}</span>
-                          <span>{option.int_votes_count} votos ({option.dec_percentage?.toFixed(1)}%)</span>
-                          <div style={{ width: `${option.dec_percentage || 0}%` }}></div>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div
-                            className="bg-green-600 h-3 rounded-full transition-all duration-300"
-                            style={{ width: `${option.percentage || 0}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <CheckCircle className="text-green-600" size={24} />
+                  <CheckCircle className={stats.quorum_reached ? "text-green-600" : "text-red-500"} size={24} />
                   <h3 className="font-semibold text-gray-700">Quórum</h3>
                 </div>
-                <p className="text-3xl font-bold text-gray-800">
+                <p className={`text-3xl font-bold ${stats.quorum_reached ? 'text-green-600' : 'text-red-500'}`}>
                   {stats.quorum_reached ? 'Alcanzado' : 'No alcanzado'}
                 </p>
-              </div> */}
+                <p className="text-sm text-gray-500 mt-1">
+                  Requiere: {stats.required_quorum || 0}%
+                </p>
+              </div>
             </div>
 
-            {/* Respuestas de texto (si aplica) */}
-            {stats.text_responses && stats.text_responses.length > 0 && (
+            {statsOptions && statsOptions.length > 0 && (
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+                <div className="space-y-4">
+                  {statsOptions.map((option, index) => (
+                    <div key={option.id || index}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span>{option.str_option_text}</span>
+                        <span>{option.int_votes_count} votos ({option.dec_percentage?.toFixed(1)}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-green-600 h-3 rounded-full transition-all duration-300"
+                          style={{ width: `${option.dec_percentage || 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {textResponses.length > 0 && (
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Respuestas de Texto</h3>
                 <div className="space-y-3">
-                  {stats.text_responses.map((response, index) => (
+                  {textResponses.map((response, index) => (
                     <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-700">{response.str_response_text}</p>
                       {!selectedPoll.bln_is_anonymous && response.user_name && (
@@ -439,12 +438,10 @@ export default function MeetingPollsView({ meeting, onBack }) {
     );
   }
 
-  // Vista principal: lista de encuestas
   const polls = pollsData?.data || [];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <button
           onClick={onBack}
@@ -473,7 +470,6 @@ export default function MeetingPollsView({ meeting, onBack }) {
         </div>
       </div>
 
-      {/* Lista de encuestas */}
       {isLoadingPolls ? (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
           <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />

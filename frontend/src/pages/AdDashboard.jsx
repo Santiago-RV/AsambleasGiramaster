@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Video, FileText, HandCoins, LogOut, Calendar } from 'lucide-react';
+import { Users, Video, FileText, HandCoins, LogOut, Calendar, Loader2, AlertTriangle, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DashboardLayout from "../components/layout/DashboardLayout";
 import UsersPage from "../components/AdDashboard/UsersPage";
@@ -41,15 +41,41 @@ export default function AppAdmin() {
   const [meetingMode, setMeetingMode] = useState('virtual');
   const [showZoomMeeting, setShowZoomMeeting] = useState(null);
   const { logout } = useAuth();
-  const { user } = useAuthContext();
+  const { user: contextUser } = useAuthContext();
+
+  // Fallback directo a localStorage si el contexto llega null
+  const user = useMemo(() => {
+    if (contextUser) return contextUser;
+    try {
+      const raw = localStorage.getItem('user');
+      const token = localStorage.getItem('access_token');
+      if (raw && token) return JSON.parse(raw);
+      return null;
+    } catch {
+      return null;
+    }
+  }, [contextUser]);
   const queryClient = useQueryClient();
   const [showGuestModal, setShowGuestModal] = useState(false);
-  
+
   // Verificar si es admin o superadmin
-  const isAdmin = user?.role === 'Super Administrador' || user?.role === 'Administrador';
+  // Usar useMemo para que se recalcule cuando user cambie
+  const isAdmin = useMemo(() => {
+    const result = user?.role === 'Super Administrador' || user?.role === 'Administrador';
+    console.log('useMemo isAdmin recalculado:', result, 'user:', user);
+    return result;
+  }, [user?.role]);
 
   // Hook para operaciones de invitados
   const { createGuestMutation } = useGuestOperations(residentialUnitId);
+
+
+  console.log('USER EN ADDASHBOARD:', user);
+  console.log('ROLE:', user?.role);
+  console.log('isAdmin:', user?.role === 'Super Administrador' || user?.role === 'Administrador');
+
+  console.log('localStorage user:', localStorage.getItem('user'));
+  console.log('localStorage token:', localStorage.getItem('access_token'));
 
   // Query para obtener invitados
   const { data: guestsData, refetch: refetchGuests } = useQuery({
@@ -95,22 +121,25 @@ export default function AppAdmin() {
   }, [unitDetails]);
 
   // Configuración del menú del sidebar
-  const menuItems = [
+  const menuItems = useMemo(() => [
     { id: 'users', label: 'Gestión de Copropietarios', icon: Users },
-    // { id: 'assemblies', label: 'Gestión de Asambleas', icon: Calendar },
     { id: 'live', label: 'Encuestas', icon: Video },
     ...(isAdmin ? [{ id: 'meeting-progress', label: 'Reunión en Curso', icon: Calendar }] : []),
     { id: 'reports', label: 'Reportes', icon: FileText },
-  ];
+  ], [isAdmin]);
 
   // Títulos para cada sección
-  const sectionTitles = {
+  const sectionTitles = useMemo(() => ({
     users: "Gestión de Co - propietarios",
-    // assemblies: "Gestión de Asambleas",
     live: "Encuestas",
+<<<<<<< HEAD
     ...(isAdmin ? { "meeting-progress": "Reunión en Curso" } : {}),
+=======
+    ...(isAdmin ? { 'meeting-progress': 'Reunión en Curso' } : {}),
+    powers: "Poderes",
+>>>>>>> 2bfae0e7c46ea7d0ea16026fd48530e5541e2bc3
     reports: "Reportes",
-  };
+  }), [isAdmin]);
 
   const openPowerModal = (fromLabel, onConfirm) => {
     setPowerModalData({ fromLabel, onConfirm });
@@ -440,7 +469,7 @@ export default function AppAdmin() {
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">
-            ⚠️ Esta acción marcará la reunión como finalizada y no podrá deshacerse.
+            <AlertTriangle size={14} className="inline mr-1" /> Esta acción marcará la reunión como finalizada y no podrá deshacerse.
           </p>
         </div>
       `,
@@ -463,26 +492,7 @@ export default function AppAdmin() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <svg
-            className="animate-spin h-12 w-12 text-green-500 mx-auto mb-4"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
+          <Loader2 className="animate-spin text-emerald-600 mx-auto mb-4" size={48} />
           <p className="text-gray-600 font-semibold">Cargando información...</p>
         </div>
       </div>
@@ -494,7 +504,7 @@ export default function AppAdmin() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center border border-red-200">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">
             Error al Cargar Información
           </h2>
@@ -655,10 +665,10 @@ export default function AppAdmin() {
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
           <div className="bg-white rounded-lg shadow-lg w-[min(900px,95%)] p-6">
             <button
-              className="float-right text-sm text-gray-500"
+              className="float-right text-sm text-gray-500 hover:text-gray-700"
               onClick={() => setShowAssemblyForm(false)}
             >
-              ✖
+              <X size={20} />
             </button>
             <h3 className="text-lg font-semibold mb-4">Crear/Editar Asamblea</h3>
             <p className="text-sm text-gray-600">Formulario de asamblea</p>

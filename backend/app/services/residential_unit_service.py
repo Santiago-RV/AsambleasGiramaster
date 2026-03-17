@@ -663,15 +663,15 @@ class ResidentialUnitService:
             if not username:
                 username = f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", "")
             
-            # 4. Verificar que el email no exista
-            existing_email = await self.db.execute(
-                select(DataUserModel).where(DataUserModel.str_email == email)
-            )
-            if existing_email.scalar_one_or_none():
-                raise ServiceException(
-                    message=f"El email {email} ya está registrado",
-                    details={"field": "email"}
-                )
+            # 4. Verificar que el email no exista (COMENTADO PARA PERMITIR EMAIL DUPLICADO)
+            # existing_email = await self.db.execute(
+            #     select(DataUserModel).where(DataUserModel.str_email == email)
+            # )
+            # if existing_email.scalar_one_or_none():
+            #     raise ServiceException(
+            #         message=f"El email {email} ya está registrado",
+            #         details={"field": "email"}
+            #     )
             
             # 5. Verificar que el username no exista
             existing_username = await self.db.execute(
@@ -962,20 +962,20 @@ class ResidentialUnitService:
                 data_user.str_lastname = update_data['lastname']
             
             if 'email' in update_data and update_data['email']:
-                # Verificar que el email no esté en uso
-                existing = await self.db.execute(
-                    select(DataUserModel).where(
-                        and_(
-                            DataUserModel.str_email == update_data['email'],
-                            DataUserModel.id != data_user.id
-                        )
-                    )
-                )
-                if existing.scalar_one_or_none():
-                    raise ServiceException(
-                        message=f"El email ya está en uso",
-                        details={"field": "email"}
-                    )
+                # Verificar que el email no esté en uso (COMENTADO PARA PERMITIR EMAIL DUPLICADO)
+                # existing = await self.db.execute(
+                #     select(DataUserModel).where(
+                #         and_(
+                #             DataUserModel.str_email == update_data['email'],
+                #             DataUserModel.id != data_user.id
+                #         )
+                #     )
+                # )
+                # if existing.scalar_one_or_none():
+                #     raise ServiceException(
+                #         message=f"El email ya está en uso",
+                #         details={"field": "email"}
+                #     )
                 data_user.str_email = update_data['email']
             
             if 'phone' in update_data:

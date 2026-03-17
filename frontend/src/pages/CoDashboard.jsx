@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Video, FileText, User, LogOut, Building2, Hash, UserCircle, HandCoins } from 'lucide-react';
+import { Video, FileText, User, LogOut, Building2, Hash, UserCircle, HandCoins, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import DashboardLayout from '../components/layout/DashboardLayout';
@@ -142,18 +142,18 @@ export default function AppCopropietario() {
       icon: FileText,
       allowedRoles: ["Usuario"],
     },
-    {
-      id: 'powers',
-      label: 'Poderes',
-      icon: HandCoins,
-      allowedRoles: ["Usuario"],
-    },
-    {
-      id: 'profile',
-      label: 'Mi Perfil',
-      icon: User,
-      allowedRoles: ["Usuario"],
-    },
+    // {
+    //   id: 'powers',
+    //   label: 'Poderes',
+    //   icon: HandCoins,
+    //   allowedRoles: ["Usuario"],
+    // },
+    // {
+    //   id: 'profile',
+    //   label: 'Mi Perfil',
+    //   icon: User,
+    //   allowedRoles: ["Usuario"],
+    // },
   ];
 
   const menuItems = allMenuItems.filter((item) =>
@@ -186,13 +186,6 @@ export default function AppCopropietario() {
           </h1>
         </div>
 
-        {/* ✅ NUEVO: Mostrar poderes delegados si hay reunión activa */}
-        {!isGuest && activeMeeting && (
-          <div className="mb-4">
-            <DelegatedPowersHeader meetingId={activeMeeting.id} />
-          </div>
-        )}
-
         {/* Información del copropietario y unidad CON BOTÓN DE LOGOUT */}
         {!isGuest && !isLoadingUser && (
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
@@ -212,6 +205,20 @@ export default function AppCopropietario() {
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Hash size={14} className="text-blue-500" />
                       <span>Coeficiente: {userCoefficient}%</span>
+                    </div>
+                  )}
+                  {/* ✅ NUEVO: Quórum de la reunión activa */}
+                  {activeMeeting?.str_status === 'En Curso' && (activeMeeting?.quorum_total ?? 0) > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                      <BarChart3 size={14} className="text-indigo-500" />
+                      <span>
+                        Quórum reunión:{' '}
+                        <strong className="text-indigo-700">
+                          {Number(activeMeeting.quorum_actual ?? 0).toFixed(4)}
+                        </strong>
+                        {' / '}
+                        {Number(activeMeeting.quorum_total ?? 0).toFixed(4)}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -238,6 +245,13 @@ export default function AppCopropietario() {
             >
               <LogOut size={20} />
             </button>
+          </div>
+        )}
+
+        {/* ✅ NUEVO: Mostrar poderes delegados si hay reunión activa */}
+        {!isGuest && activeMeeting && (
+          <div className="mb-4">
+            <DelegatedPowersHeader meetingId={activeMeeting.id} />
           </div>
         )}
 

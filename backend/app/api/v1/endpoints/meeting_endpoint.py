@@ -66,16 +66,16 @@ async def get_meetings_by_residential_unit(
     residential_unit_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    """Obtiene todas las reuniones de una unidad residencial"""
+    """Obtiene todas las reuniones de una unidad residencial con quórum calculado"""
     try:
         meeting_service = MeetingService(db)
-        meetings = await meeting_service.get_meetings_by_residential_unit(residential_unit_id)
+        meetings_with_quorum = await meeting_service.get_meetings_by_residential_unit_with_quorum(residential_unit_id)
 
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
             message="Reuniones obtenidas correctamente",
-            data=[MeetingResponse.from_orm(meeting).dict() for meeting in meetings]
+            data=meetings_with_quorum  # Ya es lista de dicts, no necesita from_orm
         )
     except Exception as e:
         raise ServiceException(

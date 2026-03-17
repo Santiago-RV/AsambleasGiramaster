@@ -1060,3 +1060,64 @@ class MeetingService:
                 f"para usuario {user_id}: {str(e)}"
             )
             return None
+        
+    async def get_meetings_by_residential_unit_with_quorum(
+        self, residential_unit_id: int
+    ) -> list:
+        """
+        Igual que get_meetings_by_residential_unit pero enriquece las reuniones
+        'En Curso' con quorum_actual y quorum_total (excluyendo ADMIN).
+        """
+        from sqlalchemy import func, and_, or_
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+
+        meetings = await self.get_meetings_by_residential_unit(residential_unit_id)
+
+        result = []
+        for meeting in meetings:
+            meeting_dict = {
+                "id": meeting.id,
+                "str_title": meeting.str_title,
+                "str_description": meeting.str_description,
+                "str_meeting_type": meeting.str_meeting_type,
+                "str_status": meeting.str_status,
+                "str_modality": meeting.str_modality,
+                "dat_schedule_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+                "dat_actual_start_time": meeting.dat_actual_start_time.isoformat() if meeting.dat_actual_start_time else None,
+                "dat_actual_end_time": meeting.dat_actual_end_time.isoformat() if meeting.dat_actual_end_time else None,
+                "str_zoom_join_url": meeting.str_zoom_join_url,
+                "int_zoom_meeting_id": meeting.int_zoom_meeting_id,
+                "bln_quorum_reached": meeting.bln_quorum_reached or False,
+                "int_total_invitated": meeting.int_total_invitated or 0,
+                "quorum_total": 0.0,
+                "quorum_actual": 0.0,
+            }
+
+            # Solo calcular quórum para reuniones En Curso
+            if meeting.str_status == "En Curso":
+                # Quórum total (todos los invitados menos ADMIN)
+                q_total = await self.db.execute(
+                    select(func.coalesce(func.sum(MeetingInvitationModel.dec_voting_weight), 0)).where(
+                        and_(
+                            MeetingInvitationModel.int_meeting_id == meeting.id,
+                            MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                        )
+                    )
+                )
+                # Quórum actual (conectados: attended=True y no se han ido)
+                q_actual = await self.db.execute(
+                    select(func.coalesce(func.sum(MeetingInvitationModel.dec_voting_weight), 0)).where(
+                        and_(
+                            MeetingInvitationModel.int_meeting_id == meeting.id,
+                            MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                            MeetingInvitationModel.bln_actually_attended == True,
+                            MeetingInvitationModel.dat_left_at == None
+                        )
+                    )
+                )
+                meeting_dict["quorum_total"] = float(q_total.scalar() or 0)
+                meeting_dict["quorum_actual"] = float(q_actual.scalar() or 0)
+
+            result.append(meeting_dict)
+
+        return result

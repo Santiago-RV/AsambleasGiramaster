@@ -69,3 +69,7 @@ class BulkToggleAccessRequest(BaseModel):
   """
   user_ids: List[int] = Field(..., min_items=1)
   enabled: bool
+  
+class BulkDeleteRequest(BaseModel):
+  user_ids: List[int]
+  unit_id: Optional[int] = None  # solo requerido para superadmin

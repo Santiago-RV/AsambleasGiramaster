@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { publicAxios } from '../../services/api/axiosconfig';
 import Swal from 'sweetalert2';
+import { Lightbulb, CheckCircle, Lock } from 'lucide-react';
+
+const SVG_ICONS = {
+    lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+};
 
 /**
  * Componente AutoLogin
@@ -167,7 +172,7 @@ const AutoLogin = () => {
               <p style="margin-bottom: 12px;">${errorMessage}</p>
               <div style="background-color: #f0f8ff; padding: 12px; border-radius: 8px; border-left: 4px solid #3498db;">
                 <p style="margin: 4px 0; color: #2c3e50; font-size: 14px;">
-                  <strong>💡 Puedes intentar:</strong>
+                  <strong>${SVG_ICONS.lightbulb} Puedes intentar:</strong>
                 </p>
                 <ul style="margin: 8px 0; padding-left: 20px; color: #34495e; font-size: 13px;">
                   <li>Solicitar un nuevo enlace de acceso</li>
@@ -202,15 +207,15 @@ const AutoLogin = () => {
               <p className="text-gray-600">
                 Por favor espera mientras validamos tu acceso al sistema
               </p>
-              <div className="mt-4 text-sm text-gray-500">
-                🔒 Conexión segura
+              <div className="mt-4 text-sm text-gray-500 flex items-center justify-center gap-1">
+                <Lock size={14} /> Conexión segura
               </div>
             </>
           )}
 
           {status === 'success' && (
             <>
-              <div className="text-green-500 text-6xl mb-4">✓</div>
+              <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-gray-800 mb-2">
                 ¡Autenticación Exitosa!
               </h2>
@@ -240,8 +245,8 @@ const AutoLogin = () => {
         </div>
 
         <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-center text-gray-500">
-            🔒 Conexión segura - GIRAMASTER
+          <p className="text-xs text-center text-gray-500 flex items-center justify-center gap-1">
+            <Lock size={12} /> Conexión segura - GIRAMASTER
           </p>
         </div>
       </div>

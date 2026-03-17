@@ -46,6 +46,17 @@ export class ResidentService {
         }
     }
 
+    static async deleteResidentsBulk(unitId, userIds) {
+        const response = await axiosInstance.delete(
+            `/super-admin/residential-units/${unitId}/residents/delete-bulk`,
+            {
+                data: { user_ids: userIds },
+                timeout: 120000, // ← 2 minutos
+            }
+        );
+        return response.data;
+    }
+
     static async sendBulkCredentials(unitId, residentIds) {
         const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
 
@@ -93,5 +104,5 @@ export class ResidentService {
         );
         return response.data;
     }
-    
+
 }

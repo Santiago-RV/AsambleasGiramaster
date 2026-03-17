@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Save, TestTube, Eye, EyeOff, HelpCircle } from 'lucide-react';
+import { Save, TestTube, Eye, EyeOff, HelpCircle, Lock, Smartphone } from 'lucide-react';
 import Swal from 'sweetalert2';
 import SystemConfigService from '../../services/api/SystemConfigService';
 
@@ -117,7 +117,7 @@ const ZoomConfigForm = ({
             {/* Sección Meeting SDK */}
             <div className="border-2 border-blue-100 rounded-lg p-6 bg-blue-50">
                 <h4 className="font-bold text-lg text-blue-800 mb-4 flex items-center gap-2">
-                    📱 Meeting SDK Credentials
+                    <Smartphone size={20} /> Meeting SDK Credentials
                     <Tooltip text="Estas credenciales permiten a los usuarios unirse a reuniones desde el navegador" />
                 </h4>
                 
@@ -333,8 +333,8 @@ const ZoomConfigForm = ({
 
             {/* Nota de Seguridad */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
-                    <strong>🔒 Seguridad:</strong> Todas las credenciales sensibles se almacenan encriptadas en la base de datos. 
+                <p className="text-sm text-yellow-800 flex items-center gap-2">
+                    <Lock size={16} /> <strong>Seguridad:</strong> Todas las credenciales sensibles se almacenan encriptadas en la base de datos. 
                     Los valores privados nunca se exponen al frontend.
                 </p>
             </div>

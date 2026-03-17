@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // URL base del backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9001/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 
 // Instancia de Axios pública (sin token) - para login y register
 export const publicAxios = axios.create({
@@ -15,9 +15,7 @@ export const publicAxios = axios.create({
 // Instancia de Axios privada (con token) - para endpoints protegidos
 const axiosInstance = axios.create({
 	baseURL: API_BASE_URL,
-	//NO establecer Content-Type por defecto
-	// Axios lo configurará automáticamente según el tipo de datos
-	timeout: 10000,
+	timeout: 30000, // ← subir a 30s de base, o poner 0 para sin límite
 });
 
 // Interceptor para agregar el token a cada request

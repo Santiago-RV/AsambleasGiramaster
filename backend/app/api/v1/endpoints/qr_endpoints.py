@@ -626,7 +626,7 @@ async def generate_qr_bulk_simple(
                     )
                 
                 # Construir URL de auto-login
-                frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+                frontend_url = os.getenv("FRONTEND_URL", "https://asambleas.giramaster.co")
                 auto_login_url = f"{frontend_url}/auto-login/{token}"
                 
                 # Añadir a resultados exitosos

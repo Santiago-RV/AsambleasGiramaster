@@ -5,43 +5,53 @@ const AuthContext = createContext({
 	user: null,
 	isAuthenticated: false,
 	isLoading: false,
-	updateUser: () => {},
+	updateUser: () => { },
 });
 
 export const useAuthContext = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-	const [user, setUser] = useState(null);
-	const [isLoading, setIsLoading] = useState(false);
 
+	const [user, setUser] = useState(() => {
+		try {
+			const raw = localStorage.getItem('user');
+			const token = localStorage.getItem('access_token');
+			if (raw && token) return JSON.parse(raw);
+			return null;
+		} catch {
+			return null;
+		}
+	});
+
+	// Escuchar cuando otra parte de la app escribe en localStorage
+	// Esto cubre el caso del auto-login que escribe DESPUÉS de navegar
 	useEffect(() => {
-		const checkAuth = async () => {
+		const handleStorageChange = () => {
 			try {
-				const isAuth = AuthService.isAuthenticated();
-
-				if (isAuth) {
-					const userData = AuthService.getUser();
-					if (userData) {
-						setUser(userData);
-					} else {
-						setUser(null);
-					}
+				const raw = localStorage.getItem('user');
+				const token = localStorage.getItem('access_token');
+				if (raw && token) {
+					setUser(JSON.parse(raw));
 				} else {
 					setUser(null);
 				}
-			} catch (error) {
-				console.error('Error al verificar autenticación:', error);
+			} catch {
 				setUser(null);
-			} finally {
-				setIsLoading(false);
 			}
 		};
-		checkAuth();
+
+		// Escuchar cambios en localStorage desde otras pestañas
+		window.addEventListener('storage', handleStorageChange);
+
+		// También revisar inmediatamente por si el auto-login ya escribió
+		// antes de que este useEffect corriera
+		handleStorageChange();
+
+		return () => window.removeEventListener('storage', handleStorageChange);
 	}, []);
 
 	const updateUser = (userData) => {
 		setUser(userData);
-
 		if (userData) {
 			localStorage.setItem('user', JSON.stringify(userData));
 		} else {
@@ -51,7 +61,7 @@ export const AuthProvider = ({ children }) => {
 
 	return (
 		<AuthContext.Provider
-			value={{ user, isAuthenticated: !!user, isLoading, updateUser }}
+			value={{ user, isAuthenticated: !!user, isLoading: false, updateUser }}
 		>
 			{children}
 		</AuthContext.Provider>

@@ -94,34 +94,35 @@ const MeetingsPage = ({ residentialUnitId }) => {
     );
   }
 
-  // CALCULAR ESTADO DINÁMICO PARA CADA REUNIÓN
-  const meetingsWithStatus = meetingsData.map((meeting) => {
-    const now = new Date();
-    const scheduledDate = new Date(meeting.dat_schedule_date);
-    const oneHourBefore = new Date(scheduledDate.getTime() - 60 * 60 * 1000);
-
-    const duration = meeting.int_estimated_duration > 0
-      ? meeting.int_estimated_duration
-      : 240;
-
-    const meetingEnd = new Date(scheduledDate.getTime() + duration * 60 * 1000);
-
-    let computedStatus;
-    if (now < oneHourBefore) {
-      computedStatus = 'Programada';
-    } else if (now < scheduledDate) {
-      computedStatus = 'Disponible';
-    } else if (now < meetingEnd) {
-      computedStatus = 'En Curso';
-    } else {
-      computedStatus = 'Finalizada';
+  // Obtener estado desde la base de datos
+  const getMeetingStatus = (meeting) => {
+    const status = meeting.str_status?.toLowerCase();
+    
+    switch (status) {
+      case 'in progress':
+      case 'en curso':
+      case 'active':
+        return 'En Curso';
+      case 'available':
+      case 'disponible':
+        return 'Disponible';
+      case 'scheduled':
+      case 'programada':
+        return 'Programada';
+      case 'completed':
+      case 'finalizada':
+      case 'cerrada':
+        return 'Finalizada';
+      default:
+        return meeting.str_status || 'Programada';
     }
+  };
 
-    return {
-      ...meeting,
-      computedStatus
-    };
-  });
+  // Usar estado直接从 la base de datos
+  const meetingsWithStatus = meetingsData.map((meeting) => ({
+    ...meeting,
+    computedStatus: getMeetingStatus(meeting)
+  }));
 
   // Separar reuniones por estado CALCULADO
   const activeOrUpcoming = meetingsWithStatus.filter(

@@ -9,6 +9,76 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-02-24 - Sistema de Reportes con Datos Reales para Admin
+
+- **Reportes con datos reales en dashboard Admin**:
+  - **Backend - Nuevos endpoints** (`backend/app/api/v1/endpoints/administrator.py`):
+    - `GET /administrator/meetings/{id}/report/attendance` - Reporte de asistencia
+    - `GET /administrator/meetings/{id}/report/quorum` - Análisis de quórum
+    - `GET /administrator/meetings/{id}/report/polls` - Reporte de votaciones
+    - `GET /administrator/meetings/{id}/report/delegations` - Reporte de poderes
+  - **Frontend - ReportsService** (`frontend/src/services/api/ReportsService.js`):
+    - Agregados métodos para endpoints de admin
+  - **Frontend - ReportModal** (`frontend/src/components/AdDashboard/ReportModal.jsx`):
+    - Nuevo componente para mostrar reportes en modal
+    - Soporta 4 tipos: Participación, Quórum, Votaciones, Poderes
+    - Diseño con cards de estadísticas y tablas de datos
+  - **Frontend - ReportsPage** (`frontend/src/components/AdDashboard/ReportsPage.jsx`):
+    - Selector de reunión (modal Swal) cuando hay múltiples reuniones
+    - Grid de 3 columnas con botones alineados en parte inferior
+    - Botón "Ver Reporte" para cada card
+
+- **Corrección del sistema de encuestas**:
+  - **Frontend - MeetingPollsView** (`frontend/src/components/AdDashboard/MeetingPollsView.jsx`):
+    - Corregido bug: `has_quorum` → `quorum_reached`
+    - Mejorado display de quórum: color verde/rojo según estado + porcentaje requerido
+    - Agregado mostrar peso de votos en resultados por opción
+  - **Frontend - CreatePollView** (`frontend/src/components/AdDashboard/CreatePollView.jsx`):
+    - Agregada validación de quórum al crear encuesta (debe ser > 0 y <= 100)
+  - **Backend - poll_endpoint** (`backend/app/api/v1/endpoints/poll_endpoint.py`):
+    - Mejoradas estadísticas: incluye `total_weight_voted`, `total_weight_invited`, `weight_participation_percentage`, `has_quorum_requirement`
+
+- **Lectura de QR para asistencia en reuniones presenciales**:
+  - **Frontend - MeetingService** (`frontend/src/services/api/MeetingService.js`):
+    - Agregado método `scanQRAttendance(qrToken)` para registrar asistencia por QR
+  - Los QR existentes de auto-login funcionan sin modificaciones
+
+- **Rate Limiting aumentado**:
+  - **Backend - security** (`backend/app/core/security.py`):
+    - Nuevos endpoints configurados:
+      - `/api/v1/delegation-history/`: 300 req/60min
+      - `/api/v1/meetings/scan-qr-attendance`: 100 req/15min
+      - `/api/v1/active-meetings`: 100 req/1min
+      - `/api/v1/polls/*/statistics`: 100 req/1min
+      - `/api/v1/polls/*/vote`: 100 req/1min
+      - `/api/v1/polls/*/results`: 100 req/1min
+      - `/api/v1/administrator/meetings/*/report/*`: 50 req/15min
+      - `/api/v1/guests/`: 200 req/60min
+    - Límites erhöht:
+      - Login: 20 → 50/15min
+      - Register: 3 → 10/60min
+      - Register participation: 100 → 300/60min
+      - Generate auto-login QR: 30 → 100/60min
+      - Send QR email: 10 → 50/60min
+      - Delegations: 100 → 300/60min
+      - Meetings: 300 → 1000/60min
+    - Por defecto: POST/PUT/DELETE 30 → 100/60min, GET 300 → 1000/60min
+
+- **Mejoras de consistencia en Dashboard Admin**:
+  - **Frontend - ReportsPage**:
+    - Rediseño completo con header con gradiente emerald
+    - Cards informativas de solo lectura
+    - Grid de 3 columnas
+    - Botones alineados en parte inferior con `flex flex-col h-full` y `mt-auto`
+  - **Frontend - Varios componentes**:
+    - Estados de loading estandarizados con `Loader2` de lucide-react
+    - Tipografía unificada en títulos de secciones
+  - **Archivos afectados**:
+    - `ReunionEnCursoTab.jsx`
+    - `PollDetailsModal.jsx`
+    - `AdDashboard.jsx` (loading inicial)
+    - `ReportsPage.jsx`
+
 #### 2026-02-23 - Sistema de sesiones y control de acceso
 
 - **Sesiones de usuarios**: Sistema completo para gestionar sesiones activas de usuarios.
@@ -241,16 +311,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 - **🔧 Problema Real Encontrado: Frontend Ignoraba URL del Backend**:
   - **Ubicación del problema**: `frontend/src/components/common/ResidentsList.jsx` línea 364
-  - **Impacto**: QR generado con URL `http://localhost:8001/v1/auto-login/...` en lugar de `http://localhost:5173/auto-login/...`
+  - **Impacto**: QR generado con URL `http://localhost:8005/v1/auto-login/...` en lugar de `http://localhost:5173/auto-login/...`
   
   - **Causa raíz**:
     ```javascript
     // CÓDIGO PROBLEMÁTICO (línea 364)
     const frontendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
-    // VITE_API_URL = "http://localhost:8001/api/v1"
-    // .replace('/api', '') = "http://localhost:8001/v1"  ❌
+    // VITE_API_URL = "http://localhost:8005/api/v1"
+    // .replace('/api', '') = "http://localhost:8005/v1"  ❌
     const url = `${frontendUrl}/auto-login/${token}`;
-    // Resultado: "http://localhost:8001/v1/auto-login/..."  ❌
+    // Resultado: "http://localhost:8005/v1/auto-login/..."  ❌
     ```
   
   - **El backend estaba correcto**:
@@ -345,7 +415,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   
   - **Validación**:
     - ✅ QR generado apunta a: `http://localhost:5173/auto-login/...`
-    - ✅ No más URLs con: `http://localhost:8001/v1/auto-login/...`
+    - ✅ No más URLs con: `http://localhost:8005/v1/auto-login/...`
     - ✅ Un solo QR generado por petición (no duplicados)
     - ✅ Contraseña temporal correcta en JWT
 
@@ -412,7 +482,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   - **Impacto**: Usuarios veían JSON en lugar de ser redirigidos al dashboard
   
   - **URLs incorrectas (ANTES)**:
-    - QR generado: `http://localhost:8001/v1/auto-login/eyJ...` ❌ Backend
+    - QR generado: `http://localhost:8005/v1/auto-login/eyJ...` ❌ Backend
     - Email credenciales: `http://localhost:5173/auto-login/eyJ...` ✅ Frontend (correcto)
   
   - **URLs corregidas (DESPUÉS)**:
