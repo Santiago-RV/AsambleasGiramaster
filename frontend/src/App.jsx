@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import HomeSA from './pages/HomeSA';
 import AppAdmin from './pages/AdDashboard.jsx'
 import AppCopropietario from './pages/CoDashboard.jsx'
+import PresencialVotingPage from './pages/PresencialVotingPage';
 import NotFound from './pages/NotFound';
 import './App.css';
 
@@ -26,6 +27,9 @@ function App() {
 					
 					{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
 					<Route path="/auto-login/:token" element={<AutoLogin />} />
+					
+					{/* ✅ Ruta pública - Votación Presencial (no requiere autenticación previa) */}
+					<Route path="/votacion-presencial/:meetingId" element={<PresencialVotingPage />} />
 
 					{/* ========================================== */}
 					{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
@@ -65,7 +69,7 @@ function App() {
 						</Route>
 
 						<Route path="*" element={<NotFound />} />
-					</Routes>
+				</Routes>
 			</div>
 		</AppProvider>
 	);

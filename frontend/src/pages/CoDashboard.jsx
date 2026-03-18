@@ -13,6 +13,7 @@ import PowersViewPage from '../components/CoDashboard/PowersViewPage';
 import DelegatedPowersHeader from '../components/CoDashboard/DelegatedPowersHeader';
 import { UserService } from '../services/api/UserService';
 import { PollService } from '../services/api/PollService';
+import { MeetingService } from '../services/api/MeetingService';
 
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');
@@ -21,7 +22,9 @@ export default function AppCopropietario() {
   const [userName, setUserName] = useState('');
   const [userCoefficient, setUserCoefficient] = useState(null);
   const [unitName, setUnitName] = useState('');
+  const [checkedInPersonMeeting, setCheckedInPersonMeeting] = useState(false);
   const navigate = useNavigate();
+  const isGuest = userRole === "Invitado";
 
   // OBTENER DATOS DEL USUARIO DESDE LOCALSTORAGE
   useEffect(() => {
@@ -67,7 +70,6 @@ export default function AppCopropietario() {
       if (userData.coefficient) {
         setUserCoefficient(userData.coefficient);
       }
-      // Actualizar nombre si viene del backend
       if (userData.firstname && userData.lastname) {
         const fullName = `${userData.firstname} ${userData.lastname}`.trim();
         setUserName(fullName);
@@ -75,10 +77,33 @@ export default function AppCopropietario() {
     }
   }, [userData]);
 
-  // ✅ DECLARAR isGuest ANTES de usarlo
-  const isGuest = userRole === "Invitado";
+  // DETECTAR REUNIÓN PRESENCIAL ACTIVA Y REDIRIGIR
+  useEffect(() => {
+    if (checkedInPersonMeeting || !residentialUnitId || isGuest) return;
+    setCheckedInPersonMeeting(true);
 
-  // ✅ QUERY PARA OBTENER REUNIONES EN VIVO (para mostrar poderes delegados)
+    const checkInPersonMeeting = async () => {
+      try {
+        const response = await MeetingService.getMeetingsByResidentialUnit(residentialUnitId);
+        const meetings = response.data || [];
+        
+        const inPersonMeeting = meetings.find(m => 
+          m.str_modality === 'presencial' && 
+          (m.str_status === 'En Curso' || m.str_status === 'In Progress' || m.str_status === 'active')
+        );
+        
+        if (inPersonMeeting) {
+          navigate(`/votacion-presencial/${inPersonMeeting.id}`, { replace: true });
+        }
+      } catch (error) {
+        console.error('[CoDashboard] Error checking for in-person meeting:', error);
+      }
+    };
+
+    checkInPersonMeeting();
+  }, [residentialUnitId, isGuest, checkedInPersonMeeting, navigate]);
+
+  // QUERY PARA OBTENER REUNIONES EN VIVO (para mostrar poderes delegados)
   const { data: liveMeetingsData } = useQuery({
     queryKey: ['live-meetings', residentialUnitId],
     queryFn: async () => {
