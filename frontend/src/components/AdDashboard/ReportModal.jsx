@@ -181,6 +181,7 @@ const AttendanceReportContent = ({ data }) => {
               <tr>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Nombre</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Apartamento</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">Tipo</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Fecha Ingreso</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">Peso Quórum</th>
               </tr>
@@ -190,6 +191,17 @@ const AttendanceReportContent = ({ data }) => {
                 <tr key={idx} className="border-t border-gray-100">
                   <td className="px-4 py-2">{person.full_name}</td>
                   <td className="px-4 py-2">{person.apartment}</td>
+                  <td className="px-4 py-2">
+                    {person.attendance_type === 'Delegado' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                        🤝 Por delegación
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                        ✓ Titular
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-sm text-gray-500">
                     {person.attended_at
                       ? new Date(person.attended_at).toLocaleString('es-ES', {
@@ -201,11 +213,6 @@ const AttendanceReportContent = ({ data }) => {
                   <td className="px-4 py-2 text-right">{person.quorum_base}</td>
                 </tr>
               ))}
-              {attended.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-gray-500">No hay asistentes registrados</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -450,7 +457,8 @@ const PollsReportContent = ({ data }) => {
                           <tr className="bg-gray-50">
                             <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
                             <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora del Voto</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Tipo</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
                             <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
                           </tr>
                         </thead>
@@ -458,7 +466,18 @@ const PollsReportContent = ({ data }) => {
                           {option.voters.map((voter, vIdx) => (
                             <tr key={vIdx} className={`border-t border-gray-50 ${vIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                               <td className="px-3 py-2 font-medium text-gray-700">{voter.full_name}</td>
-                              <td className="px-3 py-2 text-gray-500">{voter.apartment}</td>
+                              <td className="px-3 py-2 text-gray-500">{voter.apartment || '—'}</td>
+                              <td className="px-3 py-2">
+                                {voter.is_delegation_vote ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                    🤝 Delegación
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                    ✓ Directo
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
                               <td className="px-3 py-2 text-right font-mono text-gray-600">
                                 {parseFloat(voter.voting_weight).toFixed(4)}

@@ -503,10 +503,6 @@ class MeetingService:
             )
 
     async def _finalize_pending_polls(self, meeting_id: int, user_id: int, end_time: datetime) -> int:
-        """
-        Finaliza automáticamente todas las encuestas activas o en borrador
-        al momento de finalizar la reunión.
-        """
         result = await self.db.execute(
             select(PollModel).where(
                 PollModel.int_meeting_id == meeting_id,
@@ -520,6 +516,13 @@ class MeetingService:
             poll.str_status = 'closed'
             poll.dat_ended_at = end_time
             poll.updated_by = user_id
+
+            # Registrar votos por delegación para encuestas activas
+            # (las que estaban en 'draft' no tienen votos, pero no rompe llamarlas)
+            from app.services.pool_service import PollService
+            poll_service = PollService(self.db)
+            await poll_service._register_delegation_votes(poll.id, meeting_id)
+
             count += 1
 
         if count > 0:

@@ -97,26 +97,44 @@ async def get_attendance_report(
     attended = []
     absent = []
 
+    inv_map = {inv.int_user_id: inv for inv, user, data_user in invitations}
+
     for inv, user, data_user in invitations:
-        # Excluir registro ADMIN
         if inv.str_apartment_number == 'ADMIN':
             continue
-            
+
+        # Determinar presencia efectiva
+        is_directly_present = inv.bln_actually_attended and inv.dat_left_at is None
+        
+        delegate_inv = inv_map.get(inv.int_delegated_id) if inv.int_delegated_id else None
+        is_present_by_delegation = (
+            not is_directly_present
+            and delegate_inv is not None
+            and delegate_inv.bln_actually_attended
+            and delegate_inv.dat_left_at is None
+        )
+
         person = {
             "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
             "email": data_user.str_email,
             "apartment": inv.str_apartment_number,
-            "quorum_base": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
-            "voting_weight": float(inv.dec_voting_weight) if inv.dec_voting_weight else 0.0,
+            "quorum_base": float(inv.dec_quorum_base),
+            "voting_weight": float(inv.dec_voting_weight),
             "attended_at": inv.dat_joined_at.isoformat() if inv.dat_joined_at else None,
+            "attendance_type": (
+                "Titular" if is_directly_present
+                else "Delegado" if is_present_by_delegation
+                else "Ausente"
+            ),
+            "delegated_to": inv.int_delegated_id,
         }
-        if inv.bln_actually_attended:
+
+        if is_directly_present or is_present_by_delegation:
             attended.append(person)
         else:
             absent.append(person)
 
-    quorum_actual = sum(p["quorum_base"] for p in attended)
-    quorum_total = quorum_actual + sum(p["quorum_base"] for p in absent)
+    total_quorum = sum(p["quorum_base"] for p in attended)
 
     return SuccessResponse(
         success=True, status_code=200,
@@ -130,11 +148,10 @@ async def get_attendance_report(
                 "modality": meeting.str_modality,
             },
             "summary": {
-                "total_invited": len(attended) + len(absent),
+                "total_invited": len(invitations),
                 "total_attended": len(attended),
                 "total_absent": len(absent),
-                "quorum_actual": quorum_actual,
-                "quorum_total": quorum_total,
+                "quorum_achieved": total_quorum,
             },
             "attended": attended,
             "absent": absent,
@@ -209,7 +226,9 @@ async def get_polls_report(
                 "apartment": inv.str_apartment_number if inv else "—",
                 "voting_weight": float(resp.dec_voting_weight),
                 "is_abstention": resp.bln_is_abstention,
-                "voted_at": resp.created_at.isoformat() if resp.created_at else None,
+                "voted_at": resp.dat_response_at.isoformat() if resp.dat_response_at else None,
+                # Detectar voto registrado automáticamente por delegación
+                "is_delegation_vote": resp.str_ip_address == "delegation",
             }
             if resp.bln_is_abstention:
                 abstentions.append(voter_info)
@@ -309,8 +328,6 @@ async def get_delegations_report(
                 "email": delegate_data.str_email if delegate_data else "—",
             },
             "delegated_weight": float(inv.dec_quorum_base),
-            "delegated_at": inv.updated_at.isoformat() if inv.updated_at else None, 
-            "notes": inv.str_delegation_notes if hasattr(inv, 'str_delegation_notes') else None,  
         })
 
     return SuccessResponse(

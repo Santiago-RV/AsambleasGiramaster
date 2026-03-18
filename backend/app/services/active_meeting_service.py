@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from typing import List, Optional
 from datetime import datetime
+from sqlalchemy.orm import selectinload, aliased
 
 from app.models.meeting_model import MeetingModel
 from app.models.residential_unit_model import ResidentialUnitModel
@@ -150,16 +151,49 @@ class ActiveMeetingService:
         )
 
     async def _count_connected_users(self, meeting_id: int) -> int:
-        """Cuenta usuarios actualmente conectados a la reunión"""
-        query = select(func.count(MeetingInvitationModel.id)).where(
+        """Cuenta usuarios conectados directamente + delegantes con presencia efectiva."""
+
+        # Directamente conectados
+        query_direct = select(func.count(MeetingInvitationModel.id)).where(
             and_(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
                 MeetingInvitationModel.bln_actually_attended == True,
-                MeetingInvitationModel.dat_left_at == None  # Aún no se han ido
+                MeetingInvitationModel.dat_left_at == None,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN'
             )
         )
-        result = await self.db.execute(query)
-        return result.scalar() or 0
+        result_direct = await self.db.execute(query_direct)
+        direct_count = result_direct.scalar() or 0
+
+        # Delegantes cuyo delegado está activo
+        DelegadoInv = aliased(MeetingInvitationModel)
+        query_delegantes = (
+            select(func.count(MeetingInvitationModel.id))
+            .join(
+                DelegadoInv,
+                and_(
+                    DelegadoInv.int_user_id == MeetingInvitationModel.int_delegated_id,
+                    DelegadoInv.int_meeting_id == meeting_id,
+                    DelegadoInv.bln_actually_attended == True,
+                    DelegadoInv.dat_left_at == None
+                )
+            )
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.int_delegated_id != None,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    or_(
+                        MeetingInvitationModel.bln_actually_attended == False,
+                        MeetingInvitationModel.dat_left_at != None
+                    )
+                )
+            )
+        )
+        result_delegantes = await self.db.execute(query_delegantes)
+        delegantes_count = result_delegantes.scalar() or 0
+
+        return direct_count + delegantes_count
 
     async def _count_active_polls(self, meeting_id: int) -> int:
         """Cuenta encuestas activas de la reunión"""
@@ -213,7 +247,9 @@ class ActiveMeetingService:
         )
 
     async def _get_connected_users(self, meeting_id: int) -> List[ConnectedUserSchema]:
-        """Obtiene lista de usuarios conectados a la reunión"""
+        """Obtiene usuarios conectados + delegantes con presencia efectiva."""
+
+        # --- Bloque 1: conectados directamente (sin cambios) ---
         query = (
             select(
                 UserModel.id,
@@ -228,10 +264,7 @@ class ActiveMeetingService:
                 MeetingAttendanceModel.bln_is_present
             )
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-            .join(
-                MeetingInvitationModel,
-                UserModel.id == MeetingInvitationModel.int_user_id
-            )
+            .join(MeetingInvitationModel, UserModel.id == MeetingInvitationModel.int_user_id)
             .outerjoin(
                 MeetingAttendanceModel,
                 and_(
@@ -249,12 +282,11 @@ class ActiveMeetingService:
             )
             .order_by(DataUserModel.str_firstname.asc())
         )
-
         result = await self.db.execute(query)
-        users = result.all()
+        direct_users = result.all()
 
         connected_users = []
-        for user in users:
+        for user in direct_users:
             connected_users.append(ConnectedUserSchema(
                 user_id=user.id,
                 full_name=f"{user.str_firstname} {user.str_lastname}",
@@ -264,6 +296,65 @@ class ActiveMeetingService:
                 is_present=user.bln_is_present if user.bln_is_present is not None else True,
                 joined_at=user.dat_joined_at,
                 attendance_type=user.str_attendance_type or "Titular"
+            ))
+
+        # --- Bloque 2: delegantes cuyo delegado está activo ---
+        DelegadoInv = aliased(MeetingInvitationModel)
+
+        query_delegantes = (
+            select(
+                UserModel.id,
+                DataUserModel.str_firstname,
+                DataUserModel.str_lastname,
+                DataUserModel.str_email,
+                MeetingInvitationModel.str_apartment_number,
+                MeetingInvitationModel.dec_quorum_base.label("dec_voting_weight"),
+                MeetingInvitationModel.dat_joined_at,
+                MeetingInvitationModel.int_delegated_id,
+            )
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .join(
+                MeetingInvitationModel,
+                and_(
+                    MeetingInvitationModel.int_user_id == UserModel.id,
+                    MeetingInvitationModel.int_meeting_id == meeting_id
+                )
+            )
+            .join(
+                DelegadoInv,
+                and_(
+                    DelegadoInv.int_user_id == MeetingInvitationModel.int_delegated_id,
+                    DelegadoInv.int_meeting_id == meeting_id,
+                    DelegadoInv.bln_actually_attended == True,
+                    DelegadoInv.dat_left_at == None
+                )
+            )
+            .where(
+                and_(
+                    MeetingInvitationModel.int_delegated_id != None,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    # El delegante mismo NO está conectado directamente
+                    or_(
+                        MeetingInvitationModel.bln_actually_attended == False,
+                        MeetingInvitationModel.dat_left_at != None
+                    )
+                )
+            )
+            .order_by(DataUserModel.str_firstname.asc())
+        )
+        result_delegantes = await self.db.execute(query_delegantes)
+        delegantes = result_delegantes.all()
+
+        for user in delegantes:
+            connected_users.append(ConnectedUserSchema(
+                user_id=user.id,
+                full_name=f"{user.str_firstname} {user.str_lastname}",
+                email=user.str_email,
+                apartment_number=user.str_apartment_number,
+                voting_weight=user.dec_voting_weight,  # su peso original (dec_quorum_base)
+                is_present=True,
+                joined_at=user.dat_joined_at,
+                attendance_type="Delegado"  # distingue en el frontend
             ))
 
         return connected_users
@@ -419,7 +510,13 @@ class ActiveMeetingService:
             for u in disconnected_users
         ]
         
-        total_quorum = sum(u["voting_weight"] for u in connected_users_data + disconnected_users_data)
+        total_quorum = sum(
+            u["voting_weight"] for u in disconnected_users_data
+        ) + sum(
+            # Para conectados directos: usar voting_weight normal
+            # Para delegantes (attendance_type="Delegado"): voting_weight ya viene como dec_quorum_base
+            u["voting_weight"] for u in connected_users_data
+        )
         connected_quorum = sum(u["voting_weight"] for u in connected_users_data)
         
         connected_count = len(connected_users_data)
@@ -446,7 +543,11 @@ class ActiveMeetingService:
         }
 
     async def _get_disconnected_users(self, meeting_id: int) -> List[dict]:
-        """Obtiene lista de usuarios invitados que no están conectados"""
+        """Obtiene usuarios invitados que no están conectados.
+        Excluye delegantes cuyo delegado esté actualmente presente."""
+        
+        DelegadoInv = aliased(MeetingInvitationModel)
+
         query = (
             select(
                 UserModel.id,
@@ -455,8 +556,10 @@ class ActiveMeetingService:
                 DataUserModel.str_email,
                 UserResidentialUnitModel.str_apartment_number,
                 MeetingInvitationModel.dec_voting_weight,
+                MeetingInvitationModel.dec_quorum_base,
                 MeetingInvitationModel.dat_joined_at,
-                MeetingInvitationModel.dat_left_at
+                MeetingInvitationModel.dat_left_at,
+                MeetingInvitationModel.int_delegated_id,
             )
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
             .join(
@@ -470,12 +573,25 @@ class ActiveMeetingService:
                     MeetingInvitationModel.int_meeting_id == meeting_id
                 )
             )
+            .outerjoin(
+                DelegadoInv,
+                and_(
+                    DelegadoInv.int_user_id == MeetingInvitationModel.int_delegated_id,
+                    DelegadoInv.int_meeting_id == meeting_id
+                )
+            )
             .where(
                 and_(
                     MeetingInvitationModel.str_apartment_number != 'ADMIN',
                     or_(
                         MeetingInvitationModel.bln_actually_attended == False,
                         MeetingInvitationModel.dat_left_at != None
+                    ),
+                    or_(
+                        MeetingInvitationModel.int_delegated_id == None,
+                        DelegadoInv.id == None,
+                        DelegadoInv.bln_actually_attended == False,
+                        DelegadoInv.dat_left_at != None
                     )
                 )
             )
@@ -491,10 +607,11 @@ class ActiveMeetingService:
                 "full_name": f"{user.str_firstname} {user.str_lastname}".strip(),
                 "email": user.str_email,
                 "apartment_number": user.str_apartment_number,
-                "voting_weight": float(user.dec_voting_weight or 0),
+                "voting_weight": float(user.dec_quorum_base or 0),
                 "joined_at": user.dat_joined_at.isoformat() if user.dat_joined_at else None,
                 "left_at": user.dat_left_at.isoformat() if user.dat_left_at else None,
-                "is_connected": False
+                "is_connected": False,
+                "has_delegated": user.int_delegated_id is not None,
             }
             for user in users
         ]

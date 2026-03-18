@@ -1,5 +1,3 @@
-from operator import and_
-
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -924,9 +922,22 @@ async def get_attendance_report(
         attended = []
         absent = []
         
+        inv_map = {inv.int_user_id: inv for inv, user, data_user in invitations}
+
         for inv, user, data_user in invitations:
-            if inv.str_apartment_number == 'ADMIN':  # ← AGREGAR
+            if inv.str_apartment_number == 'ADMIN':
                 continue
+
+            is_directly_present = inv.bln_actually_attended and inv.dat_left_at is None
+
+            delegate_inv = inv_map.get(inv.int_delegated_id) if inv.int_delegated_id else None
+            is_present_by_delegation = (
+                not is_directly_present
+                and delegate_inv is not None
+                and delegate_inv.bln_actually_attended
+                and delegate_inv.dat_left_at is None
+            )
+
             person = {
                 "id": user.id,
                 "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
@@ -935,19 +946,29 @@ async def get_attendance_report(
                 "quorum_base": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
                 "voting_weight": float(inv.dec_voting_weight) if inv.dec_voting_weight else 0.0,
                 "attended_at": inv.dat_joined_at.isoformat() if inv.dat_joined_at else None,
-                "status": "Asistió" if inv.bln_actually_attended else "No asistió"
+                "attendance_type": (
+                    "Titular" if is_directly_present
+                    else "Delegado" if is_present_by_delegation
+                    else "Ausente"
+                ),
+                "delegated_to": inv.int_delegated_id,
+                "status": (
+                    "Asistió" if is_directly_present
+                    else "Asistió por delegación" if is_present_by_delegation
+                    else "No asistió"
+                )
             }
-            if inv.bln_actually_attended:
+
+            if is_directly_present or is_present_by_delegation:
                 attended.append(person)
             else:
                 absent.append(person)
-        
-        quorum_actual = sum(p["quorum_base"] for p in attended)
-        quorum_total = quorum_actual + sum(p["quorum_base"] for p in absent)
-        total = len(attended) + len(absent)
+
+        total_quorum = sum(p["quorum_base"] for p in attended)
         
         return SuccessResponse(
-            success=True, status_code=200,
+            success=True,
+            status_code=200,
             message="Reporte de asistencia obtenido",
             data={
                 "meeting": {
@@ -958,12 +979,11 @@ async def get_attendance_report(
                     "modality": meeting.str_modality,
                 },
                 "summary": {
-                    "total_invited": total,
+                    "total_invited": len(invitations),
                     "total_attended": len(attended),
                     "total_absent": len(absent),
-                    "attendance_percentage": round((len(attended) / total * 100) if total else 0, 2),
-                    "quorum_actual": quorum_actual,   # ← NUEVO
-                    "quorum_total": quorum_total,     # ← NUEVO
+                    "attendance_percentage": round((len(attended) / len(invitations) * 100) if invitations else 0, 2),
+                    "quorum_achieved": total_quorum,
                 },
                 "attended": attended,
                 "absent": absent,
@@ -1030,22 +1050,34 @@ async def get_quorum_report(
         
         inv_result = await db.execute(
             select(MeetingInvitationModel).where(
-                MeetingInvitationModel.int_meeting_id == meeting_id,
-                MeetingInvitationModel.str_apartment_number != 'ADMIN'  # ← AGREGAR
+                MeetingInvitationModel.int_meeting_id == meeting_id
             )
         )
         invitations = inv_result.scalars().all()
         
         total_invited = len(invitations)
-        quorum_total = sum(float(inv.dec_quorum_base or 0) for inv in invitations)
+        total_quorum_base = sum(float(inv.dec_quorum_base or 0) for inv in invitations)
         
-        attended = [inv for inv in invitations if inv.bln_actually_attended]
-        quorum_actual = sum(float(inv.dec_quorum_base or 0) for inv in attended)
+        inv_map = {inv.int_user_id: inv for inv in invitations}
+        def is_effectively_present(inv):
+            if inv.str_apartment_number == 'ADMIN':
+                return False
+            if inv.bln_actually_attended and inv.dat_left_at is None:
+                return True
+            if inv.int_delegated_id:
+                delegate = inv_map.get(inv.int_delegated_id)
+                if delegate and delegate.bln_actually_attended and delegate.dat_left_at is None:
+                    return True
+            return False
+
+        attended = [inv for inv in invitations if is_effectively_present(inv)]
+        attended_quorum = sum(float(inv.dec_quorum_base or 0) for inv in attended)
         
-        quorum_percentage = (quorum_actual / quorum_total * 100) if quorum_total > 0 else 0
+        quorum_percentage = (attended_quorum / total_quorum_base * 100) if total_quorum_base > 0 else 0
         
         return SuccessResponse(
-            success=True, status_code=200,
+            success=True,
+            status_code=200,
             message="Reporte de quórum obtenido",
             data={
                 "meeting": {
@@ -1057,10 +1089,10 @@ async def get_quorum_report(
                 "quorum_analysis": {
                     "total_invited": total_invited,
                     "total_attended": len(attended),
-                    "quorum_total": quorum_total,      # ← RENOMBRADO (era total_quorum_base)
-                    "quorum_actual": quorum_actual,    # ← RENOMBRADO (era quorum_achieved)
+                    "total_quorum_base": total_quorum_base,
+                    "quorum_achieved": attended_quorum,
                     "quorum_percentage": round(quorum_percentage, 2),
-                    "quorum_reached": quorum_percentage >= 50,
+                    "quorum_reached": meeting.bln_quorum_reached if hasattr(meeting, 'bln_quorum_reached') else (quorum_percentage >= 50),
                     "required_percentage": 50,
                 },
                 "comparison": {
@@ -1069,9 +1101,8 @@ async def get_quorum_report(
                         "absent": total_invited - len(attended),
                     },
                     "quorum_weight": {
-                        "actual": quorum_actual,
-                        "missing": round(quorum_total - quorum_actual, 6),
-                        "total": quorum_total,
+                        "attended": attended_quorum,
+                        "missing": total_quorum_base - attended_quorum,
                     }
                 }
             }
@@ -1156,40 +1187,29 @@ async def get_polls_report(
                     "text": opt.str_option_text,
                     "votes_count": 0,
                     "votes_weight": 0.0,
-                    "voters": [],          # ← AGREGA ESTO
                 }
                 for opt in options
             }
-
+            
             responses_result = await db.execute(
-                select(PollResponseModel, UserModel, DataUserModel, MeetingInvitationModel)
+                select(PollResponseModel, UserModel, DataUserModel)
                 .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-                .outerjoin(                # ← JOIN para obtener apartamento
-                    MeetingInvitationModel,
-                    and_(
-                        MeetingInvitationModel.int_meeting_id == meeting_id,
-                        MeetingInvitationModel.int_user_id == PollResponseModel.int_user_id
-                    )
-                )
                 .where(PollResponseModel.int_poll_id == poll.id)
             )
             responses = responses_result.all()
-
+            
             abstentions = []
-            for resp, user, data_user, inv in responses:   # ← desempaca inv
+            for resp, user, data_user in responses:
                 voter_info = {
                     "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
-                    "apartment": inv.str_apartment_number if inv else "—",   # ← AGREGA
                     "voting_weight": float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0,
-                    "voted_at": resp.created_at.isoformat() if resp.created_at else None,
                 }
                 if resp.bln_is_abstention:
                     abstentions.append(voter_info)
                 elif resp.int_option_id in options_map:
                     options_map[resp.int_option_id]["votes_count"] += 1
                     options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
-                    options_map[resp.int_option_id]["voters"].append(voter_info)
             
             total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
             
@@ -1317,8 +1337,6 @@ async def get_delegations_report(
                     "email": delegate_data.str_email if delegate_data else "—",
                 },
                 "delegated_weight": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
-                "delegated_at": inv.updated_at.isoformat() if inv.updated_at else None,  # ← AGREGA
-                "notes": inv.str_delegation_notes if hasattr(inv, 'str_delegation_notes') else None,  # ← AGREGA
             })
         
         total_delegated_weight = sum(d["delegated_weight"] for d in delegations)

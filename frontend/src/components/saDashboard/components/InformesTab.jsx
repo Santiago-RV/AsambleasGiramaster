@@ -75,17 +75,29 @@ const generateAttendancePDF = (data) => {
 
     autoTable(doc, {
         startY: y,
-        head: [['Indicador', 'Valor']],
-        body: [
-            ['Total Invitados', summary.total_invited],
-            ['Asistentes', summary.total_attended],
-            ['Ausentes', summary.total_absent],
-            ['% Asistencia', `${Math.round((summary.total_attended / summary.total_invited) * 100)}%`],
-            ['Quórum en Reunión', `${(summary.quorum_actual ?? summary.quorum_achieved ?? 0).toFixed(4)} / ${(summary.quorum_total ?? 0).toFixed(4)}`],
-        ],
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [30, 58, 138] },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+        head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Coeficiente']],
+        body: attended.map(p => [
+            p.full_name,
+            p.apartment,
+            p.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
+            p.attended_at
+                ? new Date(p.attended_at).toLocaleString('es-ES', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                })
+                : '—',
+            p.quorum_base.toFixed(4)
+        ]),
+        styles: { fontSize: 8.5 },
+        headStyles: { fillColor: [22, 101, 52] },
+        alternateRowStyles: { fillColor: [240, 253, 244] },
+        // Colorear filas de delegados en amarillo suave
+        didParseCell: (hookData) => {
+            if (hookData.section === 'body' && attended[hookData.row.index]?.attendance_type === 'Delegado') {
+                hookData.cell.styles.fillColor = [254, 243, 199]; // amber-100
+                hookData.cell.styles.textColor = [120, 53, 15];  // amber-900
+            }
+        },
         margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 10;
@@ -190,10 +202,11 @@ const generatePollsPDF = (data) => {
 
             autoTable(doc, {
                 startY: y,
-                head: [['Copropietario', 'Apto', 'Fecha y Hora del Voto', 'Peso']],
+                head: [['Copropietario', 'Apto', 'Tipo', 'Fecha y Hora del Voto', 'Peso']],
                 body: opt.voters.map(v => [
                     v.full_name,
-                    v.apartment,
+                    v.apartment || '—',
+                    v.is_delegation_vote ? 'Por delegación' : 'Directo',
                     v.voted_at
                         ? new Date(v.voted_at).toLocaleString('es-ES', {
                             day: '2-digit', month: '2-digit', year: 'numeric',
@@ -205,11 +218,18 @@ const generatePollsPDF = (data) => {
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [67, 56, 202] },
                 alternateRowStyles: { fillColor: [238, 242, 255] },
+                didParseCell: (hookData) => {
+                    if (hookData.section === 'body' && opt.voters[hookData.row.index]?.is_delegation_vote) {
+                        hookData.cell.styles.fillColor = [254, 243, 199];
+                        hookData.cell.styles.textColor = [120, 53, 15];
+                    }
+                },
                 columnStyles: {
-                    0: { cellWidth: 70 },
-                    1: { cellWidth: 15 },
-                    2: { cellWidth: 45 },
-                    3: { cellWidth: 25 },
+                    0: { cellWidth: 60 },
+                    1: { cellWidth: 12 },
+                    2: { cellWidth: 28 },
+                    3: { cellWidth: 40 },
+                    4: { cellWidth: 20 },
                 },
                 margin: { left: 20, right: 14 },
             });
