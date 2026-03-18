@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Video, FileText, User, LogOut, Building2, Hash, UserCircle, HandCoins } from 'lucide-react';
+import { Video, FileText, User, LogOut, Building2, Hash, UserCircle, HandCoins, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import DashboardLayout from '../components/layout/DashboardLayout';
@@ -230,6 +230,20 @@ export default function AppCopropietario() {
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Hash size={14} className="text-blue-500" />
                       <span>Coeficiente: {userCoefficient}%</span>
+                    </div>
+                  )}
+                  {/* ✅ NUEVO: Quórum de la reunión activa */}
+                  {activeMeeting?.str_status === 'En Curso' && (activeMeeting?.quorum_total ?? 0) > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                      <BarChart3 size={14} className="text-indigo-500" />
+                      <span>
+                        Quórum reunión:{' '}
+                        <strong className="text-indigo-700">
+                          {Number(activeMeeting.quorum_actual ?? 0).toFixed(4)}
+                        </strong>
+                        {' / '}
+                        {Number(activeMeeting.quorum_total ?? 0).toFixed(4)}
+                      </span>
                     </div>
                   )}
                 </div>

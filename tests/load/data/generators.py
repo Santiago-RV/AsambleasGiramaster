@@ -453,7 +453,7 @@ VALUES (1, {self.residential_unit_id}, 'ADMIN', 1, 1.0, NOW(), NOW());
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generador de datos de prueba')
-    parser.add_argument('--api-url', default='http://localhost:8001', help='URL de la API')
+    parser.add_argument('--api-url', default='http://localhost:8005', help='URL de la API')
     parser.add_argument('--count', type=int, default=100, help='Cantidad de usuarios a crear')
     
     args = parser.parse_args()

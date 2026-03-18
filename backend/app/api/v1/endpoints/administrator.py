@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from sqlalchemy import and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -922,7 +923,22 @@ async def get_attendance_report(
         attended = []
         absent = []
         
+        inv_map = {inv.int_user_id: inv for inv, user, data_user in invitations}
+
         for inv, user, data_user in invitations:
+            if inv.str_apartment_number == 'ADMIN':
+                continue
+
+            is_directly_present = inv.bln_actually_attended and inv.dat_left_at is None
+
+            delegate_inv = inv_map.get(inv.int_delegated_id) if inv.int_delegated_id else None
+            is_present_by_delegation = (
+                not is_directly_present
+                and delegate_inv is not None
+                and delegate_inv.bln_actually_attended
+                and delegate_inv.dat_left_at is None
+            )
+
             person = {
                 "id": user.id,
                 "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
@@ -931,13 +947,24 @@ async def get_attendance_report(
                 "quorum_base": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
                 "voting_weight": float(inv.dec_voting_weight) if inv.dec_voting_weight else 0.0,
                 "attended_at": inv.dat_joined_at.isoformat() if inv.dat_joined_at else None,
-                "status": "Asistió" if inv.bln_actually_attended else "No asistió"
+                "attendance_type": (
+                    "Titular" if is_directly_present
+                    else "Delegado" if is_present_by_delegation
+                    else "Ausente"
+                ),
+                "delegated_to": inv.int_delegated_id,
+                "status": (
+                    "Asistió" if is_directly_present
+                    else "Asistió por delegación" if is_present_by_delegation
+                    else "No asistió"
+                )
             }
-            if inv.bln_actually_attended:
+
+            if is_directly_present or is_present_by_delegation:
                 attended.append(person)
             else:
                 absent.append(person)
-        
+
         total_quorum = sum(p["quorum_base"] for p in attended)
         
         return SuccessResponse(
@@ -1032,7 +1059,19 @@ async def get_quorum_report(
         total_invited = len(invitations)
         total_quorum_base = sum(float(inv.dec_quorum_base or 0) for inv in invitations)
         
-        attended = [inv for inv in invitations if inv.bln_actually_attended]
+        inv_map = {inv.int_user_id: inv for inv in invitations}
+        def is_effectively_present(inv):
+            if inv.str_apartment_number == 'ADMIN':
+                return False
+            if inv.bln_actually_attended and inv.dat_left_at is None:
+                return True
+            if inv.int_delegated_id:
+                delegate = inv_map.get(inv.int_delegated_id)
+                if delegate and delegate.bln_actually_attended and delegate.dat_left_at is None:
+                    return True
+            return False
+
+        attended = [inv for inv in invitations if is_effectively_present(inv)]
         attended_quorum = sum(float(inv.dec_quorum_base or 0) for inv in attended)
         
         quorum_percentage = (attended_quorum / total_quorum_base * 100) if total_quorum_base > 0 else 0
@@ -1149,32 +1188,46 @@ async def get_polls_report(
                     "text": opt.str_option_text,
                     "votes_count": 0,
                     "votes_weight": 0.0,
+                    "voters": [],        
                 }
                 for opt in options
             }
-            
+
             responses_result = await db.execute(
-                select(PollResponseModel, UserModel, DataUserModel)
+                select(PollResponseModel, UserModel, DataUserModel, MeetingInvitationModel)
                 .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .outerjoin(                                          #  join con invitación
+                    MeetingInvitationModel,
+                    and_(
+                        MeetingInvitationModel.int_meeting_id == meeting_id,
+                        MeetingInvitationModel.int_user_id == PollResponseModel.int_user_id
+                    )
+                )
                 .where(PollResponseModel.int_poll_id == poll.id)
             )
             responses = responses_result.all()
-            
+
             abstentions = []
-            for resp, user, data_user in responses:
+            for resp, user, data_user, inv in responses:    # desempacar 4 valores
                 voter_info = {
                     "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
-                    "voting_weight": float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0,
+                    "apartment": inv.str_apartment_number if inv else "—",
+                    "voting_weight": float(resp.dec_voting_weight),
+                    "voted_at": resp.dat_response_at.isoformat() if resp.dat_response_at else None,
+                    "is_delegation_vote": resp.str_ip_address == "delegation",
+                    # Para votos por delegación, aclarar que este peso fue cedido al delegado
+                    "weight_note": "Peso cedido al delegado" if resp.str_ip_address == "delegation" else None,
                 }
                 if resp.bln_is_abstention:
                     abstentions.append(voter_info)
                 elif resp.int_option_id in options_map:
                     options_map[resp.int_option_id]["votes_count"] += 1
                     options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
-            
+                    options_map[resp.int_option_id]["voters"].append(voter_info)  
+
             total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
-            
+
             polls_data.append({
                 "id": poll.id,
                 "title": poll.str_title,

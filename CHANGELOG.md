@@ -311,16 +311,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 - **🔧 Problema Real Encontrado: Frontend Ignoraba URL del Backend**:
   - **Ubicación del problema**: `frontend/src/components/common/ResidentsList.jsx` línea 364
-  - **Impacto**: QR generado con URL `http://localhost:8001/v1/auto-login/...` en lugar de `http://localhost:5173/auto-login/...`
+  - **Impacto**: QR generado con URL `http://localhost:8005/v1/auto-login/...` en lugar de `http://localhost:5173/auto-login/...`
   
   - **Causa raíz**:
     ```javascript
     // CÓDIGO PROBLEMÁTICO (línea 364)
     const frontendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
-    // VITE_API_URL = "http://localhost:8001/api/v1"
-    // .replace('/api', '') = "http://localhost:8001/v1"  ❌
+    // VITE_API_URL = "http://localhost:8005/api/v1"
+    // .replace('/api', '') = "http://localhost:8005/v1"  ❌
     const url = `${frontendUrl}/auto-login/${token}`;
-    // Resultado: "http://localhost:8001/v1/auto-login/..."  ❌
+    // Resultado: "http://localhost:8005/v1/auto-login/..."  ❌
     ```
   
   - **El backend estaba correcto**:
@@ -415,7 +415,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   
   - **Validación**:
     - ✅ QR generado apunta a: `http://localhost:5173/auto-login/...`
-    - ✅ No más URLs con: `http://localhost:8001/v1/auto-login/...`
+    - ✅ No más URLs con: `http://localhost:8005/v1/auto-login/...`
     - ✅ Un solo QR generado por petición (no duplicados)
     - ✅ Contraseña temporal correcta en JWT
 
@@ -482,7 +482,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   - **Impacto**: Usuarios veían JSON en lugar de ser redirigidos al dashboard
   
   - **URLs incorrectas (ANTES)**:
-    - QR generado: `http://localhost:8001/v1/auto-login/eyJ...` ❌ Backend
+    - QR generado: `http://localhost:8005/v1/auto-login/eyJ...` ❌ Backend
     - Email credenciales: `http://localhost:5173/auto-login/eyJ...` ✅ Frontend (correcto)
   
   - **URLs corregidas (DESPUÉS)**:

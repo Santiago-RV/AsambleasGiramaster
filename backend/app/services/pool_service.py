@@ -227,7 +227,6 @@ class PollService:
                 error_code="POLL_NOT_FOUND"
             )
 
-        # Verificar permisos de administrador
         await self._verify_admin_permissions(poll.int_meeting_id, user_id)
 
         if poll.str_status != 'active':
@@ -236,17 +235,18 @@ class PollService:
                 error_code="INVALID_POLL_STATUS"
             )
 
-        # Actualizar estado
         poll.str_status = 'closed'
         poll.dat_ended_at = datetime.now()
         poll.updated_by = user_id
-        
-        # Calcular estadísticas finales
+
+        # Registrar votos por delegación ANTES de calcular estadísticas
+        await self._register_delegation_votes(poll_id, poll.int_meeting_id)
+
         await self._calculate_poll_statistics(poll_id)
-        
+
         await self.db.commit()
         await self.db.refresh(poll)
-        
+
         return poll
 
     async def submit_response(self, poll_id: int, user_id: Optional[int], response_data: PollResponseCreate,
@@ -515,6 +515,99 @@ class PollService:
                 option.dec_percentage = 0.0
 
         await self.db.commit()
+        
+    async def _register_delegation_votes(self, poll_id: int, meeting_id: int):
+        """
+        Al cerrar una encuesta, registra automáticamente votos para los delegantes
+        cuyo delegado haya votado y ellos no lo hayan hecho directamente.
+
+        Reglas:
+        - Si el delegante YA votó directamente → no hacer nada
+        - Si el delegado votó → copiar su voto con el peso original del delegante (dec_quorum_base)
+        - Si el delegado no votó o se abstuvo → no registrar nada para el delegante
+        """
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        from app.core.logging_config import get_logger
+
+        logger = get_logger(__name__)
+        logger.info(f"🗳️ Registrando votos por delegación para poll_id={poll_id}, meeting_id={meeting_id}")
+
+        # 1. Obtener todos los delegantes de esta reunión
+        delegantes_result = await self.db.execute(
+            select(MeetingInvitationModel).where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.int_delegated_id.isnot(None),
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
+        )
+        delegantes = delegantes_result.scalars().all()
+
+        if not delegantes:
+            logger.info("   Sin delegantes en esta reunión, saltando.")
+            return
+
+        votos_registrados = 0
+
+        for delegante_inv in delegantes:
+            delegante_id = delegante_inv.int_user_id
+            delegado_id = delegante_inv.int_delegated_id
+            peso_delegante = float(delegante_inv.dec_quorum_base or 0)
+
+            # 2. Verificar que el delegante NO haya votado ya directamente
+            ya_voto = await self._user_has_voted(poll_id, delegante_id)
+            if ya_voto:
+                logger.info(f"   Delegante {delegante_id} ya votó directamente, saltando.")
+                continue
+
+            # 3. Buscar el voto del delegado
+            voto_delegado_result = await self.db.execute(
+                select(PollResponseModel).where(
+                    and_(
+                        PollResponseModel.int_poll_id == poll_id,
+                        PollResponseModel.int_user_id == delegado_id
+                    )
+                )
+            )
+            voto_delegado = voto_delegado_result.scalar_one_or_none()
+
+            if not voto_delegado:
+                logger.info(f"   Delegado {delegado_id} no votó, no se registra voto para delegante {delegante_id}.")
+                continue
+
+            if voto_delegado.bln_is_abstention:
+                logger.info(f"   Delegado {delegado_id} se abstuvo, no se copia voto para delegante {delegante_id}.")
+                continue
+
+            # 4. Registrar voto del delegante copiando la opción del delegado
+            voto_delegante = PollResponseModel(
+                int_poll_id=poll_id,
+                int_user_id=delegante_id,
+                int_option_id=voto_delegado.int_option_id,
+                str_response_text=voto_delegado.str_response_text,
+                dec_response_number=voto_delegado.dec_response_number,
+                dec_voting_weight=peso_delegante,
+                bln_is_abstention=False,
+                dat_response_at=datetime.now(),
+                str_ip_address="delegation",   # sentinel para identificar votos por delegación
+                str_user_agent="delegation"    # sentinel para identificar votos por delegación
+            )
+            self.db.add(voto_delegante)
+
+            # 5. Actualizar estadísticas de la opción con el peso del delegante
+            if voto_delegado.int_option_id:
+                await self._update_option_stats(voto_delegado.int_option_id, peso_delegante)
+
+            votos_registrados += 1
+            logger.info(
+                f"   ✅ Voto registrado: delegante={delegante_id} → "
+                f"opción={voto_delegado.int_option_id}, peso={peso_delegante}"
+            )
+
+        # Flush para persistir antes del commit del caller
+        await self.db.flush()
+        logger.info(f"   Total votos por delegación registrados: {votos_registrados}")
 
     async def get_poll_statistics(self, poll_id: int) -> dict:
         """Obtiene estadísticas detalladas de una encuesta"""

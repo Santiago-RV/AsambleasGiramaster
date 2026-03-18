@@ -80,31 +80,31 @@ axiosInstance.interceptors.response.use(
 
 			try {
 				const refreshToken = AuthService.getRefreshToken();
-				
+
 				if (!refreshToken) {
 					throw new Error('No hay refresh token');
 				}
 
 				const result = await AuthService.refreshAccessToken();
-				
+
 				if (result.success) {
 					processQueue(null, result.access_token);
 					originalRequest.headers.Authorization = `Bearer ${result.access_token}`;
 					isRefreshing = false;
 					return axiosInstance(originalRequest);
 				}
-				
+
 				throw new Error('Refresh falló');
 			} catch (refreshError) {
 				processQueue(refreshError, null);
 				isRefreshing = false;
-				
+
 				AuthService.logout();
 				window.location.href = '/login';
 				return Promise.reject(refreshError);
 			}
 		}
-		
+
 		return Promise.reject(error);
 	}
 );
