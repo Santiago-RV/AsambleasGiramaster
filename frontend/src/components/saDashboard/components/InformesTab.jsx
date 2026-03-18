@@ -73,35 +73,6 @@ const generateAttendancePDF = (data) => {
     doc.text('RESUMEN GENERAL', 14, y + 4);
     y += 8;
 
-    autoTable(doc, {
-        startY: y,
-        head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Coeficiente']],
-        body: attended.map(p => [
-            p.full_name,
-            p.apartment,
-            p.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
-            p.attended_at
-                ? new Date(p.attended_at).toLocaleString('es-ES', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                })
-                : '—',
-            p.quorum_base.toFixed(4)
-        ]),
-        styles: { fontSize: 8.5 },
-        headStyles: { fillColor: [22, 101, 52] },
-        alternateRowStyles: { fillColor: [240, 253, 244] },
-        // Colorear filas de delegados en amarillo suave
-        didParseCell: (hookData) => {
-            if (hookData.section === 'body' && attended[hookData.row.index]?.attendance_type === 'Delegado') {
-                hookData.cell.styles.fillColor = [254, 243, 199]; // amber-100
-                hookData.cell.styles.textColor = [120, 53, 15];  // amber-900
-            }
-        },
-        margin: { left: 14, right: 14 },
-    });
-    y = doc.lastAutoTable.finalY + 10;
-
     // Asistentes
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
@@ -111,18 +82,20 @@ const generateAttendancePDF = (data) => {
 
     autoTable(doc, {
         startY: y,
-        head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Coeficiente']],
+        head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Coeficiente']],
         body: attended.map(p => [
             p.full_name,
             p.apartment,
-            p.attended_at
-                ? new Date(p.attended_at).toLocaleString('es-ES', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                })
-                : '—',
+            p.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
+            p.attended_at ? new Date(p.attended_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
             p.quorum_base.toFixed(4)
         ]),
+        didParseCell: (hookData) => {
+            if (hookData.section === 'body' && attended[hookData.row.index]?.attendance_type === 'Delegado') {
+                hookData.cell.styles.fillColor = [254, 243, 199];
+                hookData.cell.styles.textColor = [120, 53, 15];
+            }
+        },
         styles: { fontSize: 8.5 },
         headStyles: { fillColor: [22, 101, 52] },
         alternateRowStyles: { fillColor: [240, 253, 244] },

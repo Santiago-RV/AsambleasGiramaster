@@ -480,7 +480,14 @@ const PollsReportContent = ({ data }) => {
                               </td>
                               <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
                               <td className="px-3 py-2 text-right font-mono text-gray-600">
-                                {parseFloat(voter.voting_weight).toFixed(4)}
+                                {voter.is_delegation_vote ? (
+                                  <div className="flex flex-col items-end">
+                                    <span>{parseFloat(voter.voting_weight).toFixed(4)}</span>
+                                    <span className="text-xs text-amber-600 font-normal">(peso cedido)</span>
+                                  </div>
+                                ) : (
+                                  parseFloat(voter.voting_weight).toFixed(4)
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -519,7 +526,14 @@ const PollsReportContent = ({ data }) => {
                           <td className="px-3 py-2 text-gray-500">{abs.apartment || '—'}</td>
                           <td className="px-3 py-2 text-gray-500">{fmtDate(abs.voted_at)}</td>
                           <td className="px-3 py-2 text-right font-mono text-gray-600">
-                            {parseFloat(abs.voting_weight).toFixed(4)}
+                            {voter.is_delegation_vote ? (
+                              <div className="flex flex-col items-end">
+                                <span>{parseFloat(voter.voting_weight).toFixed(4)}</span>
+                                <span className="text-xs text-amber-600 font-normal">(peso cedido)</span>
+                              </div>
+                            ) : (
+                              parseFloat(voter.voting_weight).toFixed(4)
+                            )}
                           </td>
                         </tr>
                       ))}
