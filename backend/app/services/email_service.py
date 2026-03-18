@@ -123,7 +123,7 @@ class EmailService:
                     </div>
                     
                     <div class="warning">
-                        <strong>⚠️ Importante:</strong> Este código QR es personal y no debe compartirse con personas no autorizadas. Tiene una validez de 48 horas.
+                         Este código QR es personal y no debe compartirse con personas no autorizadas. Tiene una validez de 48 horas.
                     </div>
                     
                     <div style="text-align: center; margin: 30px 0;">
