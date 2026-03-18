@@ -97,16 +97,39 @@ async def get_attendance_report(
     attended = []
     absent = []
 
+    inv_map = {inv.int_user_id: inv for inv, user, data_user in invitations}
+
     for inv, user, data_user in invitations:
+        if inv.str_apartment_number == 'ADMIN':
+            continue
+
+        # Determinar presencia efectiva
+        is_directly_present = inv.bln_actually_attended and inv.dat_left_at is None
+        
+        delegate_inv = inv_map.get(inv.int_delegated_id) if inv.int_delegated_id else None
+        is_present_by_delegation = (
+            not is_directly_present
+            and delegate_inv is not None
+            and delegate_inv.bln_actually_attended
+            and delegate_inv.dat_left_at is None
+        )
+
         person = {
             "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
             "email": data_user.str_email,
             "apartment": inv.str_apartment_number,
             "quorum_base": float(inv.dec_quorum_base),
             "voting_weight": float(inv.dec_voting_weight),
+            "attended_at": inv.dat_joined_at.isoformat() if inv.dat_joined_at else None,
+            "attendance_type": (
+                "Titular" if is_directly_present
+                else "Delegado" if is_present_by_delegation
+                else "Ausente"
+            ),
+            "delegated_to": inv.int_delegated_id,
         }
-        if inv.bln_actually_attended:
-            person["attended_at"] = inv.bln_actually_attended  # o el campo de fecha que corresponda
+
+        if is_directly_present or is_present_by_delegation:
             attended.append(person)
         else:
             absent.append(person)
