@@ -70,6 +70,7 @@ async def auto_login_simple(
         
         username = credentials["username"]
         token_id = credentials.get("token_id")
+        meeting_id = credentials.get("meeting_id")
         
         # Obtener usuario de la base de datos primero
         user_service = UserService(db)
@@ -188,6 +189,9 @@ async def auto_login_simple(
             },
             "auto_login": True
         }
+        
+        if meeting_id is not None:
+            response_data["meeting_id"] = meeting_id
         
         # Incluir info de asistencia si se registro
         if attendance_registered and attendance_registered.get("registered"):

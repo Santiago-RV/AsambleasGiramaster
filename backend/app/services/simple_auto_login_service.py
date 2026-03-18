@@ -21,7 +21,8 @@ class SimpleAutoLoginService:
     def generate_auto_login_token(
         self,
         username: str,
-        expiration_hours: int = 24
+        expiration_hours: int = 24,
+        meeting_id: int = None
     ) -> str:
         """
         Genera un JWT temporal para auto-login
@@ -29,6 +30,7 @@ class SimpleAutoLoginService:
         Args:
             username: Nombre de usuario
             expiration_hours: Horas hasta expiración (default: 24)
+            meeting_id: ID de reunión presencial (opcional)
             
         Returns:
             str: JWT token codificado
@@ -51,9 +53,12 @@ class SimpleAutoLoginService:
                 "jti": token_id
             }
             
+            if meeting_id is not None:
+                payload["meeting_id"] = meeting_id
+            
             token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
             
-            logger.info(f"🔐 Token de auto-login generado para {username} (jti: {token_id})")
+            logger.info(f"🔐 Token de auto-login generado para {username} (jti: {token_id}, meeting_id: {meeting_id})")
             
             return token
             
@@ -71,7 +76,7 @@ class SimpleAutoLoginService:
             token: JWT token a decodificar
             
         Returns:
-            Dict con username y token_id si es válido, None si no
+            Dict con username, token_id y meeting_id (opcional) si es válido, None si no
         """
         try:
             payload = jwt.decode(
@@ -86,17 +91,23 @@ class SimpleAutoLoginService:
             
             username = payload.get("sub")
             token_id = payload.get("jti")
+            meeting_id = payload.get("meeting_id")
             
             if not username:
                 logger.warning("Token no contiene username")
                 return None
             
-            logger.info(f"✅ Token de auto-login válido para {username} (jti: {token_id})")
+            logger.info(f"✅ Token de auto-login válido para {username} (jti: {token_id}, meeting_id: {meeting_id})")
             
-            return {
+            result = {
                 "username": username,
                 "token_id": token_id
             }
+            
+            if meeting_id is not None:
+                result["meeting_id"] = meeting_id
+            
+            return result
             
         except JWTError as e:
             logger.warning(f"Token inválido o expirado: {str(e)}")
@@ -107,8 +118,8 @@ class SimpleAutoLoginService:
     
     async def upsert_user_token(self, db, token_id: str, user_id: int, ip_address: str = None, expires_at = None):
         """
-        Crea un nuevo token de auto-login para un usuario.
-        Permite múltiples tokens válidos por usuario (uno por cada QR generado).
+        Registra un token de auto-login para un usuario.
+        Si el token ya existe, no hace nada (evita errores de duplicado).
         
         Args:
             db: Sesión de base de datos
@@ -118,12 +129,22 @@ class SimpleAutoLoginService:
             expires_at: Fecha de expiración del token (si no se pasa, usa 24h por defecto)
         """
         from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
+        from sqlalchemy import select
         
-        # Calcular expiración si no se proporciona (24 horas por defecto)
+        result = await db.execute(
+            select(UsedAutoLoginTokenModel).where(
+                UsedAutoLoginTokenModel.token_id == token_id
+            )
+        )
+        existing_token = result.scalar_one_or_none()
+        
+        if existing_token:
+            logger.info(f"Token {token_id} ya existe para usuario {user_id}, no se re-inserta")
+            return
+        
         if expires_at is None:
             expires_at = datetime.now() + timedelta(hours=24)
         
-        # Crear nuevo registro (no actualiza los existentes)
         new_token = UsedAutoLoginTokenModel(
             token_id=token_id,
             user_id=user_id,
@@ -132,7 +153,7 @@ class SimpleAutoLoginService:
         )
         db.add(new_token)
         await db.commit()
-        logger.info(f"🔐 Nuevo token creado para usuario {user_id} (token_id: {token_id})")
+        logger.info(f"Token creado para usuario {user_id} (token_id: {token_id})")
     
     async def is_token_valid_for_user(self, db, token_id: str, user_id: int) -> bool:
         """

@@ -53,15 +53,31 @@ const AutoLogin = () => {
         const response = await publicAxios.get(`/auth/auto-login/${token}`);
 
         if (response.data.success) {
-          const { access_token, user, attendance_registered } = response.data.data;
+          const { access_token, user, attendance_registered, meeting_id } = response.data.data;
 
-          // Guardar token y datos del usuario en localStorage
           localStorage.setItem('access_token', access_token);
           localStorage.setItem('user', JSON.stringify(user));
 
           setStatus('success');
 
-          // Construir mensaje de asistencia si se registro automaticamente
+          if (meeting_id) {
+            await Swal.fire({
+              icon: 'success',
+              title: '¡Bienvenido!',
+              html: `
+                <div style="text-align: left;">
+                  <p style="margin-bottom: 8px;"><strong>Autenticación exitosa</strong></p>
+                  <p style="margin-bottom: 8px;">Serás redirigido a la votación presencial.</p>
+                </div>
+              `,
+              timer: 1500,
+              timerProgressBar: true,
+              showConfirmButton: false,
+            });
+            navigate(`/votacion-presencial/${meeting_id}`, { replace: true });
+            return;
+          }
+
           let attendanceHtml = '';
           if (attendance_registered && attendance_registered.registered) {
             if (attendance_registered.already_registered) {
@@ -89,7 +105,6 @@ const AutoLogin = () => {
             }
           }
 
-          // Mostrar mensaje de éxito
           await Swal.fire({
             icon: 'success',
             title: '¡Bienvenido!',
@@ -115,7 +130,6 @@ const AutoLogin = () => {
             showConfirmButton: false,
           });
 
-          // Redirigir según el rol del usuario
           const roleRoutes = {
             'Super Administrador': '/super-admin',
             'Administrador': '/admin',

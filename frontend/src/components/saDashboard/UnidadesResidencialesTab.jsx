@@ -246,13 +246,13 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			reverseButtons: true,
 			preConfirm: () => {
 				const inputElement = document.getElementById('confirmUnitName');
-				
+
 				// Prevenir pegado de texto
 				inputElement.onpaste = (e) => {
 					e.preventDefault();
 					return false;
 				};
-				
+
 				const inputValue = inputElement.value;
 				if (inputValue !== unidad.str_name) {
 					Swal.showValidationMessage('El nombre no coincide. Escribe exactamente: ' + unidad.str_name);
@@ -359,7 +359,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 					md:w-auto
 					flex items-center justify-center gap-2
 					px-6 py-3
-					bg-gradient-to-r from-[#3498db] to-[#2980b9]
+					bg-linear-to-r from-[#3498db] to-[#2980b9]
 					text-white
 					rounded-lg
 					hover:shadow-lg
@@ -451,7 +451,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 							className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all cursor-pointer relative"
 						>
 							<div className="flex items-start justify-between mb-4">
-								<div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shadow-lg">
+								<div className="w-14 h-14 rounded-lg bg-linear-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shadow-lg">
 									<Building2 size={28} />
 								</div>
 								<div className="flex items-center gap-2">
@@ -564,7 +564,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 									>
 										<td className="px-6 py-4">
 											<div className="flex items-center gap-3">
-												<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white flex-shrink-0">
+												<div className="w-10 h-10 rounded-lg bg-linear-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shrink-0">
 													<Building2 size={20} />
 												</div>
 												<div>
@@ -654,7 +654,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 						<form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
 
 							{/* SECCIÓN: Código Automático */}
-							<div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200 shadow-sm">
+							<div className="relative overflow-hidden bg-linear-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200 shadow-sm">
 								<div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full -mr-16 -mt-16 opacity-50"></div>
 								<div className="relative">
 									<div className="flex items-center gap-2 mb-3">
@@ -1140,7 +1140,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 								<button
 									type="submit"
 									disabled={isSubmitting}
-									className={`flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all duration-200 ${isSubmitting
+									className={`flex items-center gap-2 bg-linear-to-r from-emerald-500 to-emerald-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all duration-200 ${isSubmitting
 											? 'opacity-50 cursor-not-allowed'
 											: 'hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
 										}`}
