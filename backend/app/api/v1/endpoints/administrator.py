@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from sqlalchemy import and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -1187,32 +1188,46 @@ async def get_polls_report(
                     "text": opt.str_option_text,
                     "votes_count": 0,
                     "votes_weight": 0.0,
+                    "voters": [],        
                 }
                 for opt in options
             }
-            
+
             responses_result = await db.execute(
-                select(PollResponseModel, UserModel, DataUserModel)
+                select(PollResponseModel, UserModel, DataUserModel, MeetingInvitationModel)
                 .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .outerjoin(                                          #  join con invitación
+                    MeetingInvitationModel,
+                    and_(
+                        MeetingInvitationModel.int_meeting_id == meeting_id,
+                        MeetingInvitationModel.int_user_id == PollResponseModel.int_user_id
+                    )
+                )
                 .where(PollResponseModel.int_poll_id == poll.id)
             )
             responses = responses_result.all()
-            
+
             abstentions = []
-            for resp, user, data_user in responses:
+            for resp, user, data_user, inv in responses:    # desempacar 4 valores
                 voter_info = {
                     "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
-                    "voting_weight": float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0,
+                    "apartment": inv.str_apartment_number if inv else "—",
+                    "voting_weight": float(resp.dec_voting_weight),
+                    "voted_at": resp.dat_response_at.isoformat() if resp.dat_response_at else None,
+                    "is_delegation_vote": resp.str_ip_address == "delegation",
+                    # Para votos por delegación, aclarar que este peso fue cedido al delegado
+                    "weight_note": "Peso cedido al delegado" if resp.str_ip_address == "delegation" else None,
                 }
                 if resp.bln_is_abstention:
                     abstentions.append(voter_info)
                 elif resp.int_option_id in options_map:
                     options_map[resp.int_option_id]["votes_count"] += 1
                     options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
-            
+                    options_map[resp.int_option_id]["voters"].append(voter_info)  
+
             total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
-            
+
             polls_data.append({
                 "id": poll.id,
                 "title": poll.str_title,

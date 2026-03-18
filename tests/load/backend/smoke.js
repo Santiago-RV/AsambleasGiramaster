@@ -20,7 +20,7 @@ export const options = {
   },
 };
 
-const API_URL = __ENV.API_URL || 'http://localhost:8001';
+const API_URL = __ENV.API_URL || 'http://localhost:8005';
 const API_VERSION = __ENV.API_VERSION || '/api/v1';
 
 export default function () {

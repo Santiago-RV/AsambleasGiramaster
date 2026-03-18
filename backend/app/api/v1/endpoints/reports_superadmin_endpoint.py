@@ -196,19 +196,20 @@ async def get_polls_report(
 
         options_map = {
             opt.id: {
+                "id": opt.id,
                 "text": opt.str_option_text,
                 "votes_count": 0,
                 "votes_weight": 0.0,
-                "voters": []
+                "voters": [],        
             }
             for opt in options
         }
 
         responses_result = await db.execute(
-            select(PollResponseModel, DataUserModel, MeetingInvitationModel)
+            select(PollResponseModel, UserModel, DataUserModel, MeetingInvitationModel)
             .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-            .outerjoin(
+            .outerjoin(                                          # join con invitación
                 MeetingInvitationModel,
                 and_(
                     MeetingInvitationModel.int_meeting_id == meeting_id,
@@ -220,38 +221,37 @@ async def get_polls_report(
         responses = responses_result.all()
 
         abstentions = []
-        for resp, data_user, inv in responses:
+        for resp, user, data_user, inv in responses:    # desempacar 4 valores
             voter_info = {
                 "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
                 "apartment": inv.str_apartment_number if inv else "—",
                 "voting_weight": float(resp.dec_voting_weight),
-                "is_abstention": resp.bln_is_abstention,
+                "voted_at": resp.dat_response_at.isoformat() if resp.dat_response_at else None,
+                "is_delegation_vote": resp.str_ip_address == "delegation",
+                # Para votos por delegación, aclarar que este peso fue cedido al delegado
+                "weight_note": "Peso cedido al delegado" if resp.str_ip_address == "delegation" else None,
             }
             if resp.bln_is_abstention:
                 abstentions.append(voter_info)
             elif resp.int_option_id in options_map:
-                if float(resp.dec_voting_weight) > 0:
-                    options_map[resp.int_option_id]["votes_count"] += 1
-                    options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight)
-                    options_map[resp.int_option_id]["voters"].append(voter_info)
-                else:
-                    logger.warning(
-                        f"⚠️ Voto ignorado: user_id={resp.int_user_id} "
-                        f"votó con peso=0 en poll_id={poll.id}"
-                    )
+                options_map[resp.int_option_id]["votes_count"] += 1
+                options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
+                options_map[resp.int_option_id]["voters"].append(voter_info)  
 
-        total_real_voters = sum(opt["votes_count"] for opt in options_map.values()) + len(abstentions)
         total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
 
         polls_data.append({
             "id": poll.id,
             "title": poll.str_title,
+            "description": poll.str_description,
             "type": poll.str_poll_type,
             "status": poll.str_status,
-            "created_at": poll.created_at.isoformat() if poll.created_at else None,
+            "is_anonymous": poll.bln_is_anonymous,
+            "requires_quorum": poll.bln_requires_quorum,
+            "minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
             "options": list(options_map.values()),
             "abstentions": abstentions,
-            "total_voters": total_real_voters,
+            "total_voters": len(responses),
             "total_weight_voted": total_weight_voted,
         })
 

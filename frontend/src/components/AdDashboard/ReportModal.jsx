@@ -32,7 +32,7 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
         default:
           throw new Error('Tipo de reporte desconocido');
       }
-      
+
       if (response.success) {
         setData(response.data);
       } else {
@@ -64,10 +64,10 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      
+
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-          
+
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-t-2xl">
             <div className="flex items-center gap-3">
@@ -137,7 +137,7 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
 
 const AttendanceReportContent = ({ data }) => {
   const { summary, attended, absent } = data;
-  
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -181,6 +181,8 @@ const AttendanceReportContent = ({ data }) => {
               <tr>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Nombre</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Apartamento</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">Tipo</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">Fecha Ingreso</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">Peso Quórum</th>
               </tr>
             </thead>
@@ -189,14 +191,28 @@ const AttendanceReportContent = ({ data }) => {
                 <tr key={idx} className="border-t border-gray-100">
                   <td className="px-4 py-2">{person.full_name}</td>
                   <td className="px-4 py-2">{person.apartment}</td>
+                  <td className="px-4 py-2">
+                    {person.attendance_type === 'Delegado' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                        🤝 Por delegación
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                        ✓ Titular
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-500">
+                    {person.attended_at
+                      ? new Date(person.attended_at).toLocaleString('es-ES', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                      })
+                      : '—'}
+                  </td>
                   <td className="px-4 py-2 text-right">{person.quorum_base}</td>
                 </tr>
               ))}
-              {attended.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-gray-500">No hay asistentes registrados</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -240,7 +256,7 @@ const AttendanceReportContent = ({ data }) => {
 
 const QuorumReportContent = ({ data }) => {
   const { quorum_analysis, comparison } = data;
-  
+
   return (
     <div className="space-y-6">
       {/* Quorum Analysis Cards */}
@@ -269,7 +285,7 @@ const QuorumReportContent = ({ data }) => {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="font-semibold text-gray-800 mb-4">Progreso de Quórum</h3>
         <div className="relative h-8 bg-gray-200 rounded-full overflow-hidden">
-          <div 
+          <div
             className={`absolute left-0 top-0 h-full transition-all duration-500 ${quorum_analysis.quorum_reached ? 'bg-emerald-500' : 'bg-amber-500'}`}
             style={{ width: `${Math.min(quorum_analysis.quorum_percentage, 100)}%` }}
           />
@@ -295,7 +311,7 @@ const QuorumReportContent = ({ data }) => {
                 <span className="font-medium text-emerald-600">{comparison.quorum_weight.attended}</span>
               </div>
               <div className="h-2 bg-emerald-100 rounded-full">
-                <div 
+                <div
                   className="h-full bg-emerald-500 rounded-full"
                   style={{ width: `${(comparison.quorum_weight.attended / (comparison.quorum_weight.attended + comparison.quorum_weight.missing || 1)) * 100}%` }}
                 />
@@ -307,7 +323,7 @@ const QuorumReportContent = ({ data }) => {
                 <span className="font-medium text-red-500">{comparison.quorum_weight.missing}</span>
               </div>
               <div className="h-2 bg-red-100 rounded-full">
-                <div 
+                <div
                   className="h-full bg-red-400 rounded-full"
                   style={{ width: `${(comparison.quorum_weight.missing / (comparison.quorum_weight.attended + comparison.quorum_weight.missing || 1)) * 100}%` }}
                 />
@@ -336,7 +352,7 @@ const QuorumReportContent = ({ data }) => {
 
 const PollsReportContent = ({ data }) => {
   const { polls } = data;
-  
+
   if (!polls || polls.length === 0) {
     return (
       <div className="text-center py-12">
@@ -346,76 +362,183 @@ const PollsReportContent = ({ data }) => {
       </div>
     );
   }
-  
+
+  const fmtDate = (iso) => iso
+    ? new Date(iso).toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+    : '—';
+
+  // Colores por índice de opción
+  const optionColors = [
+    { bar: 'from-emerald-400 to-emerald-500', badge: 'bg-emerald-100 text-emerald-700', header: [22, 101, 52] },
+    { bar: 'from-red-400 to-red-500', badge: 'bg-red-100 text-red-700', header: [185, 28, 28] },
+    { bar: 'from-blue-400 to-blue-500', badge: 'bg-blue-100 text-blue-700', header: [29, 78, 216] },
+    { bar: 'from-amber-400 to-amber-500', badge: 'bg-amber-100 text-amber-700', header: [180, 83, 9] },
+    { bar: 'from-purple-400 to-purple-500', badge: 'bg-purple-100 text-purple-700', header: [109, 40, 217] },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {polls.map((poll) => (
-        <div key={poll.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <div className="flex items-center justify-between">
+        <div key={poll.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+
+          {/* Header encuesta */}
+          <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-4">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-gray-800">{poll.title}</h3>
-                {poll.description && <p className="text-sm text-gray-500">{poll.description}</p>}
+                <h3 className="font-bold text-white text-base">{poll.title}</h3>
+                {poll.description && (
+                  <p className="text-indigo-200 text-xs mt-0.5">{poll.description}</p>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  poll.status === 'closed' ? 'bg-gray-100 text-gray-600' :
-                  poll.status === 'active' ? 'bg-green-100 text-green-700' :
-                  'bg-blue-100 text-blue-700'
+              <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${poll.status === 'closed' ? 'bg-gray-200 text-gray-700' :
+                poll.status === 'active' ? 'bg-green-400 text-green-900' :
+                  'bg-blue-200 text-blue-800'
                 }`}>
-                  {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
-                </span>
+                {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
+              </span>
+            </div>
+
+            {/* Métricas resumen */}
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <div className="bg-white/15 rounded-lg p-2.5 text-center">
+                <p className="text-xl font-bold text-white">{poll.total_voters}</p>
+                <p className="text-xs text-indigo-200">Votantes</p>
+              </div>
+              <div className="bg-white/15 rounded-lg p-2.5 text-center">
+                <p className="text-xl font-bold text-white">
+                  {typeof poll.total_weight_voted === 'number'
+                    ? poll.total_weight_voted.toFixed(4)
+                    : poll.total_weight_voted}
+                </p>
+                <p className="text-xs text-indigo-200">Peso Total</p>
+              </div>
+              <div className="bg-white/15 rounded-lg p-2.5 text-center">
+                <p className="text-xl font-bold text-white">{poll.options.length}</p>
+                <p className="text-xs text-indigo-200">Opciones</p>
               </div>
             </div>
           </div>
-          
-          <div className="p-4">
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800">{poll.total_voters}</p>
-                <p className="text-xs text-gray-500">Votantes</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800">{poll.total_weight_voted}</p>
-                <p className="text-xs text-gray-500">Peso Total</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800">{poll.options.length}</p>
-                <p className="text-xs text-gray-500">Opciones</p>
-              </div>
-            </div>
-            
+
+          <div className="p-5 space-y-5">
+            {/* Opciones con barras + tabla de votantes */}
             {poll.options.map((option, optIdx) => {
-              const percentage = poll.total_weight_voted > 0 
-                ? (option.votes_weight / poll.total_weight_voted * 100) 
+              const color = optionColors[optIdx % optionColors.length];
+              const percentage = poll.total_weight_voted > 0
+                ? (option.votes_weight / poll.total_weight_voted * 100)
                 : 0;
+
               return (
-                <div key={optIdx} className="mb-3">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">{option.text}</span>
-                    <span className="font-medium">
-                      {option.votes_count} votos ({percentage.toFixed(1)}%)
-                    </span>
+                <div key={optIdx} className="space-y-2">
+                  {/* Barra de progreso */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold text-gray-800">{option.text}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color.badge}`}>
+                        {option.votes_count} {option.votes_count === 1 ? 'voto' : 'votos'}
+                      </span>
+                      <span className="text-gray-500 text-xs">{percentage.toFixed(1)}%</span>
+                    </div>
                   </div>
-                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all"
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r ${color.bar} rounded-full transition-all duration-500`}
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
+
+                  {/* Tabla de votantes de esta opción */}
+                  {option.voters && option.voters.length > 0 && (
+                    <div className="mt-2 rounded-lg border border-gray-100 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Tipo</th>
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
+                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {option.voters.map((voter, vIdx) => (
+                            <tr key={vIdx} className={`border-t border-gray-50 ${vIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                              <td className="px-3 py-2 font-medium text-gray-700">{voter.full_name}</td>
+                              <td className="px-3 py-2 text-gray-500">{voter.apartment || '—'}</td>
+                              <td className="px-3 py-2">
+                                {voter.is_delegation_vote ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                    🤝 Delegación
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                    ✓ Directo
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
+                              <td className="px-3 py-2 text-right font-mono text-gray-600">
+                                {voter.is_delegation_vote ? (
+                                  <div className="flex flex-col items-end">
+                                    <span>{parseFloat(voter.voting_weight).toFixed(4)}</span>
+                                    <span className="text-xs text-amber-600 font-normal">(peso cedido)</span>
+                                  </div>
+                                ) : (
+                                  parseFloat(voter.voting_weight).toFixed(4)
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {option.votes_count === 0 && (
+                    <p className="text-xs text-gray-400 italic pl-1">Sin votos en esta opción</p>
+                  )}
                 </div>
               );
             })}
-            
+
+            {/* Abstenciones */}
             {poll.abstentions && poll.abstentions.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-gray-100">
-                <p className="text-sm text-gray-500 mb-2">Abstenciones: {poll.abstentions.length}</p>
-                <div className="flex flex-wrap gap-1">
-                  {poll.abstentions.map((abs, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
-                      {abs.full_name}
-                    </span>
-                  ))}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-semibold text-gray-600 mb-2">
+                  Abstenciones ({poll.abstentions.length})
+                </p>
+                <div className="rounded-lg border border-gray-100 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {poll.abstentions.map((abs, idx) => (
+                        <tr key={idx} className={`border-t border-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                          <td className="px-3 py-2 font-medium text-gray-700">{abs.full_name}</td>
+                          <td className="px-3 py-2 text-gray-500">{abs.apartment || '—'}</td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(abs.voted_at)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-600">
+                            {voter.is_delegation_vote ? (
+                              <div className="flex flex-col items-end">
+                                <span>{parseFloat(voter.voting_weight).toFixed(4)}</span>
+                                <span className="text-xs text-amber-600 font-normal">(peso cedido)</span>
+                              </div>
+                            ) : (
+                              parseFloat(voter.voting_weight).toFixed(4)
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -428,7 +551,14 @@ const PollsReportContent = ({ data }) => {
 
 const DelegationsReportContent = ({ data }) => {
   const { summary, delegations } = data;
-  
+
+  const fmtDate = (iso) => iso
+    ? new Date(iso).toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+    : '—';
+
   if (!delegations || delegations.length === 0) {
     return (
       <div className="text-center py-12">
@@ -438,58 +568,90 @@ const DelegationsReportContent = ({ data }) => {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-          <p className="text-3xl font-bold text-blue-600">{summary.total_delegations}</p>
-          <p className="text-sm text-blue-700">Total de Poderes</p>
+        <div className="bg-violet-50 rounded-xl p-4 border border-violet-100">
+          <p className="text-3xl font-bold text-violet-600">{summary.total_delegations}</p>
+          <p className="text-sm text-violet-700">Total de Poderes</p>
         </div>
         <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-          <p className="text-3xl font-bold text-purple-600">{summary.total_delegated_weight}</p>
+          <p className="text-3xl font-bold text-purple-600">
+            {typeof summary.total_delegated_weight === 'number'
+              ? summary.total_delegated_weight.toFixed(4)
+              : summary.total_delegated_weight}
+          </p>
           <p className="text-sm text-purple-700">Peso Total Delegado</p>
         </div>
       </div>
 
-      {/* Delegations List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-800">Lista de Poderes ({delegations.length})</h3>
-        </div>
-        <div className="max-h-96 overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 sticky top-0">
-              <tr>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">Otorga Poder</th>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">Apartamento</th>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">Recibe Poder</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">Peso</th>
-              </tr>
-            </thead>
-            <tbody>
-              {delegations.map((delegation, idx) => (
-                <tr key={idx} className="border-t border-gray-100">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <UserX className="text-red-400" size={14} />
-                      <span>{delegation.delegator.full_name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">{delegation.delegator.apartment}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="text-emerald-400" size={14} />
-                      <span>{delegation.delegate.full_name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">{delegation.delegated_weight}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Cards de delegaciones */}
+      <div className="space-y-4">
+        {delegations.map((delegation, idx) => (
+          <div key={idx} className="bg-white rounded-xl border border-violet-100 overflow-hidden shadow-sm">
+            {/* Header de la card */}
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-3 flex items-center justify-between">
+              <span className="text-white font-semibold text-sm">
+                Poder #{idx + 1}
+              </span>
+              <div className="flex items-center gap-3">
+                {delegation.delegated_at && (
+                  <span className="text-violet-200 text-xs flex items-center gap-1">
+                    🕐 {fmtDate(delegation.delegated_at)}
+                  </span>
+                )}
+                <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  Peso: {typeof delegation.delegated_weight === 'number'
+                    ? delegation.delegated_weight.toFixed(4)
+                    : delegation.delegated_weight}
+                </span>
+              </div>
+            </div>
+
+            {/* Cuerpo */}
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Delegante */}
+              <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserX className="text-red-500" size={16} />
+                  <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Otorga el poder</span>
+                </div>
+                <p className="font-bold text-gray-800 text-sm">{delegation.delegator.full_name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Apto: {delegation.delegator.apartment}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{delegation.delegator.email}</p>
+                <div className="mt-2 bg-red-100 rounded px-2 py-1 inline-block">
+                  <span className="text-xs text-red-700 font-medium">
+                    Coef: {typeof delegation.delegator.original_weight === 'number'
+                      ? delegation.delegator.original_weight.toFixed(4)
+                      : delegation.delegated_weight}
+                  </span>
+                </div>
+              </div>
+
+              {/* Delegado */}
+              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserCheck className="text-emerald-500" size={16} />
+                  <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Recibe el poder</span>
+                </div>
+                <p className="font-bold text-gray-800 text-sm">{delegation.delegate.full_name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{delegation.delegate.email}</p>
+              </div>
+            </div>
+
+            {/* Descripción/notas si existe */}
+            {delegation.notes && (
+              <div className="px-4 pb-4">
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">📝 Descripción del poder</p>
+                  <p className="text-sm text-amber-900">{delegation.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
