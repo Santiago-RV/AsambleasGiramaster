@@ -136,13 +136,17 @@ const CoownerService = {
 	/**
 	 * Elimina múltiples copropietarios seleccionados
 	 * @param {number[]} coownerIds - Array de IDs de copropietarios
+	 * @param {number} unitId - ID de la unidad residencial (requerido para SuperAdmin)
 	 */
-	deleteCoownersBulk: async (coownerIds) => {
+	deleteCoownersBulk: async (coownerIds, unitId = null) => {
 		const response = await axiosInstance.delete(
 			'/admin/coowners/delete-bulk',
 			{
-				data: { user_ids: coownerIds },
-				timeout: 120000, // ← 2 minutos
+				data: { 
+					user_ids: coownerIds,
+					unit_id: unitId
+				},
+				timeout: 120000,
 			}
 		);
 		return response.data;

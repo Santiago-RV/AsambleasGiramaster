@@ -1,5 +1,5 @@
 # Variables
-RUN = npm run
+RUN = pnpm
 PROJECT_NAME = giramaster-frontend
 PORT = 3000
 

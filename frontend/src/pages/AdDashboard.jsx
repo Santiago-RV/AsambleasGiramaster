@@ -60,23 +60,12 @@ export default function AppAdmin() {
   const [showGuestModal, setShowGuestModal] = useState(false);
 
   // Verificar si es admin o superadmin
-  // Usar useMemo para que se recalcule cuando user cambie
   const isAdmin = useMemo(() => {
-    const result = user?.role === 'Super Administrador' || user?.role === 'Administrador';
-    console.log('useMemo isAdmin recalculado:', result, 'user:', user);
-    return result;
+    return user?.role === 'Super Administrador' || user?.role === 'Administrador';
   }, [user?.role]);
 
   // Hook para operaciones de invitados
   const { createGuestMutation } = useGuestOperations(residentialUnitId);
-
-
-  console.log('USER EN ADDASHBOARD:', user);
-  console.log('ROLE:', user?.role);
-  console.log('isAdmin:', user?.role === 'Super Administrador' || user?.role === 'Administrador');
-
-  console.log('localStorage user:', localStorage.getItem('user'));
-  console.log('localStorage token:', localStorage.getItem('access_token'));
 
   // Query para obtener invitados
   const { data: guestsData, refetch: refetchGuests } = useQuery({

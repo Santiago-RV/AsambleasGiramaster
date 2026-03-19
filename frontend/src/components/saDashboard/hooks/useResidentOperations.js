@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ResidentService } from '../../../services/api/ResidentService';
+import CoownerService from '../../../services/api/coownerService';
 import Swal from 'sweetalert2';
+import { showBulkDeleteWithLoading } from '../../common/BulkDeleteConfirmModal';
 
 export const useResidentOperations = (unitId) => {
 	const queryClient = useQueryClient();
@@ -239,9 +241,6 @@ export const useResidentOperations = (unitId) => {
               <strong>Usuario:</strong> ${resident.username}
             </p>
           </div>
-          <p class="text-xs text-gray-600 mt-3">
-            💡 La contraseña actual será reemplazada por una nueva contraseña temporal.
-          </p>
         </div>
       `,
 			icon: 'question',
@@ -365,10 +364,65 @@ export const useResidentOperations = (unitId) => {
 		}
 	};
 
+	// Mutación para eliminar residentes de forma masiva
+	const deleteBulkMutation = useMutation({
+		mutationFn: async (userIds) => {
+			Swal.fire({
+				title: 'Eliminando copropietarios...',
+				html: `Procesando <strong>${userIds.length}</strong> usuario(s), por favor espera.`,
+				allowOutsideClick: false,
+				allowEscapeKey: false,
+				didOpen: () => Swal.showLoading(),
+			});
+			return await CoownerService.deleteCoownersBulk(userIds);
+		},
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			const { successful, failed } = response.data || {};
+			Swal.fire({
+				icon: failed > 0 ? 'warning' : 'success',
+				title: failed > 0 ? 'Eliminación parcial' : '¡Eliminados!',
+				html: `
+					<div class="text-left">
+						<p class="text-green-700"><strong>Eliminados:</strong> ${successful}</p>
+						${failed > 0 ? `<p class="text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
+					</div>
+				`,
+				confirmButtonColor: '#3498db',
+			});
+		},
+		onError: (error) => {
+			const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+			Swal.fire({
+				icon: isTimeout ? 'warning' : 'error',
+				title: isTimeout ? 'Tiempo agotado' : 'Error al eliminar',
+				text: isTimeout
+					? 'El proceso tardó más de lo esperado, pero puede haberse completado. Verifica la lista.'
+					: (error.response?.data?.message || error.message),
+				confirmButtonColor: '#3498db',
+			});
+		},
+	});
+
+	// Handler para eliminar residentes de forma masiva
+	const handleBulkDelete = async (selectedIds, unitName = '') => {
+		if (selectedIds.length === 0) return;
+
+		await showBulkDeleteWithLoading({
+			count: selectedIds.length,
+			unitName: unitName,
+			deletePromise: () => CoownerService.deleteCoownersBulk(selectedIds, unitId),
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			},
+		});
+	};
+
 	return {
 		createResidentMutation,
 		updateResidentMutation,
 		deleteResidentMutation,
+		deleteBulkMutation,
 		sendBulkCredentialsMutation,
 		toggleAccessMutation,
 		toggleAccessBulkMutation,
@@ -376,5 +430,6 @@ export const useResidentOperations = (unitId) => {
 		handleDeleteResident,
 		handleToggleAccess,
 		handleBulkToggleAccess,
+		handleBulkDelete,
 	};
 };

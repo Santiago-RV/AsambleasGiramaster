@@ -68,6 +68,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 		handleDeleteResident,
 		handleToggleAccess,
 		handleBulkToggleAccess,
+		handleBulkDelete,
 	} = useResidentOperations(unitId);
 
 	// Operaciones de reuniones
@@ -386,10 +387,12 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 						isSendingBulk={sendBulkCredentialsMutation.isPending}
 						onToggleAccess={handleToggleAccess}
 						onBulkToggleAccess={handleBulkToggleAccess}
+						onBulkDelete={handleBulkDelete}
 						showSearch={true}
 						isSuperAdmin={true}
 						showInviteButton={true}
 						residentialUnitId={unitId}
+						residentialUnitName={unitData?.str_name || unitData?.str_residential_name || unitData?.name || 'Sin nombre'}
 						onInviteToMeeting={() => {}}
 					/>
 				</div>

@@ -10,7 +10,7 @@ class UsedAutoLoginTokenModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     token_id = Column(String(36), unique=True, index=True, nullable=False)
-    user_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     ip_address = Column(String(45), nullable=True)

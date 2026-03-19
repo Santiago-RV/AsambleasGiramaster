@@ -9,7 +9,7 @@ class UserSessionModel(Base):
     __tablename__ = "tbl_user_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("tbl_users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="CASCADE"), nullable=False, index=True)
     token_jti = Column(String(36), unique=True, index=True, nullable=False)
     device_info = Column(String(255), nullable=True)
     ip_address = Column(String(45), nullable=True)

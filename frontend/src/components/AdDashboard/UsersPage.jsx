@@ -4,6 +4,7 @@ import { Upload, Plus, UserPlus, Lightbulb, Mail, AlertTriangle, Headphones, Inf
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
 import MeetingsList from "../common/MeetingsList";
+import { showBulkDeleteWithLoading } from "../common/BulkDeleteConfirmModal";
 import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
@@ -18,7 +19,7 @@ const SVG_ICONS = {
 };
 
 
-export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest, onEditMeeting }) {
+export default function UsersPage({ residentialUnitId, unitName = '', onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest, onEditMeeting }) {
   const queryClient = useQueryClient();
 
   // Obtener los residentes de la unidad residencial
@@ -77,8 +78,30 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     }))
     : [];
 
-  // Mutación para eliminar residente
-  const deleteBulkMutation = useMutation({
+  // Mutación para eliminar residente individual
+  const deleteResidentMutation = useMutation({
+    mutationFn: ({ userId, unitId }) => ResidentService.deleteResident(unitId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+      Swal.fire({
+        icon: 'success',
+        title: '¡Eliminado!',
+        text: 'El copropietario ha sido eliminado exitosamente',
+        confirmButtonColor: '#3498db',
+      });
+    },
+    onError: (error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al eliminar',
+        text: error.response?.data?.message || error.message,
+        confirmButtonColor: '#3498db',
+      });
+    },
+  });
+
+  // Mutación para eliminar residentes de forma masiva
+  const deleteCoownersBulkMutation = useMutation({
     mutationFn: async (userIds) => {
       // Mostrar Swal de progreso ANTES de la petición
       Swal.fire({
@@ -118,49 +141,17 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
     },
   });
 
-  const deleteCoownersBulkMutation = useMutation({
-    mutationFn: (ids) => CoownerService.deleteCoownersBulk(ids),
-    onSuccess: (response) => {
-      const { successful, failed } = response.data;
-      refetch();
-      Swal.fire({
-        icon: failed > 0 ? 'warning' : 'success',
-        title: failed > 0 ? 'Eliminación parcial' : '¡Eliminados!',
-        html: `
-        <div class="text-left">
-          <p class="text-green-700"><strong>Eliminados:</strong> ${successful}</p>
-          ${failed > 0 ? `<p class="text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
-        </div>
-      `,
-        confirmButtonColor: '#3498db',
-      });
-    },
-    onError: (error) => {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error al eliminar',
-        text: error.response?.data?.message || error.message,
-        confirmButtonColor: '#3498db',
-      });
-    },
-  });
-
-  const handleBulkDelete = async (selectedIds) => {
+  const handleBulkDelete = async (selectedIds, unitName = '') => {
     if (selectedIds.length === 0) return;
 
-    const result = await Swal.fire({
-      icon: 'warning',
-      title: '¿Eliminar copropietarios?',
-      html: `<p>Se eliminarán <strong>${selectedIds.length}</strong> copropietario(s) de forma permanente.<br/>Esta acción <strong>no se puede deshacer</strong>.</p>`,
-      showCancelButton: true,
-      confirmButtonColor: '#e74c3c',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
+    await showBulkDeleteWithLoading({
+      count: selectedIds.length,
+      unitName: unitName,
+      deletePromise: () => CoownerService.deleteCoownersBulk(selectedIds, residentialUnitId),
+      onSuccess: () => {
+        refetch();
+      },
     });
-
-    if (result.isConfirmed) {
-      deleteCoownersBulkMutation.mutate(selectedIds); // ← Usa la mutación, NO await directo
-    }
   };
 
   // Mutación para el envío masivo de credenciales
@@ -637,6 +628,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             showSearch={true}
             title="Copropietarios"
             isSuperAdmin={false}
+            residentialUnitName={unitName}
             onSendBulkCredentials={(selectedResidents) => {
               if (selectedResidents.length === 0) {
                 Swal.fire({

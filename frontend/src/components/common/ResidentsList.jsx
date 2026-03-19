@@ -37,13 +37,13 @@ const ResidentsList = ({
 	onBulkToggleAccess,
 	onBulkDelete,
 	isBulkDeleting = false,
-	showSearch = false, // Nueva prop para mostrar/ocultar barra de búsqueda
-	title = "Residentes", // Título personalizable
-	isSuperAdmin = false, // Si es SuperAdmin puede gestionar acceso de todos
-	// Props para invitación a reuniones
-	showInviteButton = false, // Mostrar botón de invitación
-	residentialUnitId = null, // ID de la unidad residencial
-	onInviteToMeeting = null, // Función callback para invitar a reunión
+	showSearch = false,
+	title = "Residentes",
+	isSuperAdmin = false,
+	showInviteButton = false,
+	residentialUnitId = null,
+	onInviteToMeeting = null,
+	residentialUnitName: residentialUnitNameProp = null,
 }) => {
 	const [selectedResidents, setSelectedResidents] = useState([]);
 	const [selectAll, setSelectAll] = useState(false);
@@ -58,8 +58,9 @@ const ResidentsList = ({
 
 	// Estado para modal de invitación a reunión
 	const [showInviteModal, setShowInviteModal] = useState(false);
-	const [scheduledMeetings, setScheduledMeetings] = useState([]);
+	const [invitableMeetings, setInvitableMeetings] = useState([]);
 	const [selectedMeeting, setSelectedMeeting] = useState('');
+	const [selectedMeetingInfo, setSelectedMeetingInfo] = useState(null);
 	const [loadingMeetings, setLoadingMeetings] = useState(false);
 	const [inviting, setInviting] = useState(false);
 
@@ -74,8 +75,8 @@ const ResidentsList = ({
 		refetchOnWindowFocus: false
 	});
 
-	// Extraer nombre de la unidad residencial
-	const residentialUnitName = userData?.residential_unit?.str_name || 'Unidad Residencial';
+	// Extraer nombre de la unidad residencial (usar prop si está disponible)
+	const residentialUnitName = residentialUnitNameProp || userData?.residential_unit?.str_name || 'Unidad Residencial';
 
 	/**
 	 * Determina si se puede modificar el acceso de un residente
@@ -337,12 +338,9 @@ const ResidentsList = ({
 		try {
 			const token = localStorage.getItem('access_token');
 
-
 			if (!token) {
 				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
 			}
-
-			console.log('🔄 Generando PDF con QRs para:', selectedResidents.length, 'residentes');
 
 			// Mostrar progreso
 			Swal.fire({
@@ -399,7 +397,6 @@ const ResidentsList = ({
 				}
 
 				const data = await response.json();
-				console.log('✅ Respuesta del backend:', data);
 
 				// Procesar tokens recibidos
 				for (let i = 0; i < data.data.qr_tokens.length; i++) {
@@ -422,7 +419,6 @@ const ResidentsList = ({
 						});
 
 						successCount++;
-						console.log(`✅ QR generado para: ${tokenData.firstname} ${tokenData.lastname}`);
 					} catch (qrError) {
 						errorCount++;
 						errors.push(`${tokenData.firstname} ${tokenData.lastname}: Error generando imagen QR`);
@@ -557,8 +553,6 @@ const ResidentsList = ({
 				// Guardar PDF
 				const fileName = `QR_Residentes_${new Date().toISOString().split('T')[0]}.pdf`;
 				pdf.save(fileName);
-
-				console.log(`✅ PDF generado: ${fileName}`);
 			}
 
 			// Mostrar resultado
@@ -742,16 +736,19 @@ const ResidentsList = ({
 
 	// ========== FUNCIONES DE INVITACIÓN A REUNIONES ==========
 
-	// Cargar reuniones programadas
-	const loadScheduledMeetings = async () => {
+	// Cargar reuniones que permiten invitaciones (Programadas y En Curso)
+	const loadInvitableMeetings = async () => {
 		if (!residentialUnitId) return;
 
 		setLoadingMeetings(true);
 		try {
 			const response = await MeetingService.getMeetingsByResidentialUnit(residentialUnitId);
 			if (response.success && response.data) {
-				const programmed = response.data.filter((m) => m.str_status === 'Programada');
-				setScheduledMeetings(programmed);
+				// Incluir reuniones "Programada" y "En Curso"
+				const invitables = response.data.filter((m) => 
+					m.str_status === 'Programada' || m.str_status === 'En Curso'
+				);
+				setInvitableMeetings(invitables);
 			}
 		} catch (err) {
 			console.error('Error al cargar reuniones:', err);
@@ -763,14 +760,34 @@ const ResidentsList = ({
 	// Abrir modal de invitación
 	const handleOpenInviteModal = async () => {
 		setSelectedMeeting('');
-		await loadScheduledMeetings();
+		setSelectedMeetingInfo(null);
+		await loadInvitableMeetings();
 		setShowInviteModal(true);
+	};
+
+	// Manejar cambio de reunión seleccionada
+	const handleMeetingChange = (meetingId) => {
+		setSelectedMeeting(meetingId);
+		if (meetingId) {
+			const meeting = invitableMeetings.find(m => m.id === parseInt(meetingId));
+			setSelectedMeetingInfo(meeting || null);
+		} else {
+			setSelectedMeetingInfo(null);
+		}
 	};
 
 	// Cerrar modal de invitación
 	const handleCloseInviteModal = () => {
 		setShowInviteModal(false);
 		setSelectedMeeting('');
+		setSelectedMeetingInfo(null);
+	};
+
+	// Manejar clic en eliminar
+	const handleDeleteClick = () => {
+		if (onBulkDelete && selectedResidents.length > 0) {
+			onBulkDelete(selectedResidents, residentialUnitName);
+		}
 	};
 
 	// Enviar invitaciones
@@ -782,6 +799,33 @@ const ResidentsList = ({
 				text: 'Por favor seleccione una reunión y al menos un residente',
 			});
 			return;
+		}
+
+		// Verificar si la reunión está en curso
+		const isEnCurso = selectedMeetingInfo?.str_status === 'En Curso';
+
+		// Mostrar advertencia si la reunión está en curso
+		if (isEnCurso) {
+			const result = await Swal.fire({
+				icon: 'warning',
+				title: 'Reunión en Curso',
+				html: `
+					<div class="text-left">
+						<p class="mb-3">La reunión <strong>"${selectedMeetingInfo?.str_title}"</strong> ya está en curso.</p>
+						<p class="text-sm text-gray-600 mb-3">¿Está seguro de que desea enviar invitaciones ahora?</p>
+						<p class="text-xs text-gray-500">Los invitados recibirán la invitación por correo electrónico.</p>
+					</div>
+				`,
+				showCancelButton: true,
+				confirmButtonColor: '#f59e0b',
+				cancelButtonColor: '#6b7280',
+				confirmButtonText: 'Sí, enviar invitaciones',
+				cancelButtonText: 'Cancelar',
+			});
+
+			if (!result.isConfirmed) {
+				return;
+			}
 		}
 
 		setInviting(true);
@@ -846,12 +890,6 @@ const ResidentsList = ({
 			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 			const endpoint = `${apiUrl}/residents/generate-qr-simple`;
 
-
-			console.log('🔄 Making request to:', endpoint);
-			console.log('🔄 Request data:', { userId: resident.id });
-			console.log('🔄 Auth token:', token.substring(0, 20) + '...');
-
-
 			const response = await fetch(endpoint, {
 				method: 'POST',
 				headers: {
@@ -863,13 +901,8 @@ const ResidentsList = ({
 				})
 			});
 
-
-			console.log('🔄 Response status:', response.status);
-			console.log('🔄 Response headers:', Object.fromEntries(response.headers.entries()));
-
 			if (response.ok) {
 				const data = await response.json();
-				console.log('✅ Response from backend:', data);
 
 
 				if (!data.success) {
@@ -883,38 +916,21 @@ const ResidentsList = ({
 
 
 				const token = data.data.auto_login_token;
-				// ✅ Usar window.location.origin para obtener la URL del frontend
 				const frontendUrl = window.location.origin;
 				const url = `${frontendUrl}/auto-login/${token}`;
-
-
-				console.log('✅ QR URL generated:', url);
-				console.log('✅ Frontend URL:', frontendUrl);
-
 
 				setAutoLoginUrl(url);
 				setSelectedResidentForQR(resident);
 				setQrModalOpen(true);
 
-
 				Swal.close();
 			} else {
 				const errorData = await response.json().catch(() => ({}));
-				console.error('❌ Backend error response:', errorData);
 				throw new Error(errorData.message || `Error HTTP ${response.status}: ${response.statusText}`);
 			}
 		} catch (error) {
-			console.error('❌ Error generating QR:', error);
-			console.error('❌ Error details:', {
-				message: error.message,
-				stack: error.stack,
-				resident: resident
-			});
-
-
 			// Mostrar error más detallado
 			let errorMessage = 'No se pudo generar el código QR de acceso';
-
 
 			if (error.message) {
 				if (error.message.includes('403')) {
@@ -1117,9 +1133,9 @@ const ResidentsList = ({
 									</button>
 								)}
 
-								{onBulkDelete && (
+								{onBulkDelete && selectedResidents.length > 0 && (
 									<button
-										onClick={() => !isBulkDeleting && onBulkDelete(selectedResidents)}
+										onClick={handleDeleteClick}
 										disabled={isBulkDeleting}
 										className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed"
 									>
@@ -1368,34 +1384,56 @@ const ResidentsList = ({
 						{/* Selector de reunión */}
 						<div>
 							<label className="block text-sm font-semibold text-gray-700 mb-2">
-								Seleccionar Reunión Programada
+								Seleccionar Reunión
 							</label>
 							{loadingMeetings ? (
 								<div className="flex items-center justify-center py-4">
 									<div className="animate-spin h-5 w-5 border-2 border-[#3498db] border-t-transparent rounded-full"></div>
 									<span className="ml-2 text-gray-600 text-sm">Cargando reuniones...</span>
 								</div>
-							) : scheduledMeetings.length === 0 ? (
+							) : invitableMeetings.length === 0 ? (
 								<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
 									<p className="text-yellow-800 text-sm">
-										No hay reuniones programadas para esta unidad residencial.
+										No hay reuniones disponibles para enviar invitaciones en esta unidad residencial.
 									</p>
 								</div>
 							) : (
 								<select
 									value={selectedMeeting}
-									onChange={(e) => setSelectedMeeting(e.target.value)}
+									onChange={(e) => handleMeetingChange(e.target.value)}
 									className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent text-sm"
 								>
 									<option value="">-- Seleccione una reunión --</option>
-									{scheduledMeetings.map((meeting) => (
+									{invitableMeetings.map((meeting) => (
 										<option key={meeting.id} value={meeting.id}>
-											{meeting.str_title} - {new Date(meeting.dat_schedule_date).toLocaleString()}
+											{meeting.str_title} - {' '}
+											{meeting.str_status === 'En Curso' ? (
+												<span className="text-green-600 font-semibold">[EN CURSO]</span>
+											) : (
+												<span className="text-blue-600 font-semibold">[PROGRAMADA]</span>
+											)}{' - '}
+											{new Date(meeting.dat_schedule_date).toLocaleString()}
 										</option>
 									))}
 								</select>
 							)}
 						</div>
+
+						{/* Advertencia si la reunión está en curso */}
+						{selectedMeetingInfo?.str_status === 'En Curso' && (
+							<div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
+								<AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+								<div>
+									<p className="text-amber-800 text-sm font-medium">
+										Reunión en Curso
+									</p>
+									<p className="text-amber-700 text-xs mt-1">
+										Esta reunión ya está en curso. Los invitados recibirán un correo de invitación, 
+										pero no podrán unirse si la reunión ya ha finalizado.
+									</p>
+								</div>
+							</div>
+						)}
 
 						{/* Lista de residentes seleccionados */}
 						{selectedResidents.length > 0 && (
