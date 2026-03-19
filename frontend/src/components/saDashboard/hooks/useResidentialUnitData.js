@@ -47,28 +47,38 @@ export const useResidentialUnitData = (unitId) => {
 					0
 				);
 
-				// Filtrar solo reuniones del día actual o futuras
+				// Filtrar reuniones: incluir En Curso/Activa siempre, o del día actual/futuras
 				const reunionesFiltradas = response.data.filter((reunion) => {
 					const fechaReunion = new Date(reunion.dat_schedule_date);
-					return fechaReunion >= inicioDelDia;
+					const esEnCurso = reunion.str_status?.toLowerCase() === 'en curso' || 
+					                  reunion.str_status?.toLowerCase() === 'activa';
+					return esEnCurso || fechaReunion >= inicioDelDia;
 				});
 
 				return reunionesFiltradas.map((reunion) => {
-					const fechaObj = new Date(reunion.dat_schedule_date);
+					let fechaObj;
+					if (reunion.dat_schedule_date instanceof Date) {
+						fechaObj = reunion.dat_schedule_date;
+					} else if (typeof reunion.dat_schedule_date === 'string') {
+						fechaObj = new Date(reunion.dat_schedule_date);
+					} else {
+						fechaObj = new Date();
+					}
+					
+					const fechaStr = fechaObj.toISOString().split('T')[0];
+					
 					return {
 						...reunion,
 						id: reunion.id,
 						titulo: reunion.str_title,
-						fecha:
-							reunion.dat_schedule_date?.split('T')[0] ||
-							fechaObj.toISOString().split('T')[0],
+						fecha: fechaStr,
+						fechaCompleta: fechaObj,
 						hora: fechaObj.toLocaleTimeString('es-ES', {
 							hour: '2-digit',
 							minute: '2-digit',
 						}),
 						asistentes: reunion.int_total_invitated || 0,
 						estado: reunion.str_status || 'Programada',
-						fechaCompleta: fechaObj,
 						tipo: reunion.str_meeting_type,
 						descripcion: reunion.str_description,
 						codigo: reunion.str_meeting_code,
