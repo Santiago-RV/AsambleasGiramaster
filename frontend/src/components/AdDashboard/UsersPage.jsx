@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Plus, UserPlus, Lightbulb, Mail, AlertTriangle, Headphones } from 'lucide-react';
+import { Upload, Plus, UserPlus, Lightbulb, Mail, AlertTriangle, Headphones, Info } from 'lucide-react';
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
 import MeetingsList from "../common/MeetingsList";
@@ -9,6 +9,7 @@ import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
 import SupportModal from '../saDashboard/components/modals/SupportModal';
+import HelpModal from "../AdDashboard/HelpModal";
 
 const SVG_ICONS = {
   lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
@@ -35,6 +36,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
   });
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   // Extraer los residentes del response
   const residents = residentsData?.success && residentsData?.data ? residentsData.data : [];
@@ -608,6 +610,13 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             <Headphones size={18} />
             <span>Soporte Técnico</span>
           </button>
+
+          <button
+            onClick={() => setIsHelpModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:shadow-lg transition-all"
+          >
+            <Info size={18} />
+          </button>
         </div>
       </div>
 
@@ -624,7 +633,7 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
             onToggleAccess={handleToggleAccess}
             onBulkToggleAccess={handleBulkToggleAccess}
             onBulkDelete={handleBulkDelete}
-            isBulkDeleting={deleteCoownersBulkMutation.isPending} 
+            isBulkDeleting={deleteCoownersBulkMutation.isPending}
             showSearch={true}
             title="Copropietarios"
             isSuperAdmin={false}
@@ -693,6 +702,10 @@ export default function UsersPage({ residentialUnitId, onCreateUser, onEditUser,
         onClose={() => setIsSupportModalOpen(false)}
         unitId={residentialUnitId}
       />
+        <HelpModal
+          isOpen={isHelpModalOpen}
+          onClose={() => setIsHelpModalOpen(false)}
+        />
     </section>
   );
 }

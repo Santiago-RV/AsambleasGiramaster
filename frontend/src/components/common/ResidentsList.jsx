@@ -1247,32 +1247,7 @@ const ResidentsList = ({
 										</div>
 
 										{/* Botones de acción */}
-										<div className="flex items-center gap-2 shrink-0">
-
-											{/* Botón para enviar WhatsApp */}
-											<button
-												onClick={(e) => {
-													e.stopPropagation();
-
-													if (!resident?.phone) {
-														Swal.fire({
-															icon: 'error',
-															title: 'Sin número de WhatsApp',
-															text: 'Este usuario no posee un número de WhatsApp registrado.',
-															confirmButtonText: 'Cerrar',
-															confirmButtonColor: '#25D366',
-														});
-														return;
-													}
-
-													const phone = resident.phone.replace(/\D/g, "");
-													window.open(`https://wa.me/${phone}`, "_blank");
-												}}
-												className="p-2 hover:bg-green-100 rounded-lg transition-colors"
-												title="Enviar WhatsApp"
-											>
-												<img src="/Wpp.png" alt="WhatsApp" className="w-5 h-5" />
-											</button>
+										<div className="flex items-center gap-2 shrink-0">	
 
 											{/* Botón para generar QR */}
 											<button

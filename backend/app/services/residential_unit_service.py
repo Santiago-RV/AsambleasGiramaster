@@ -418,7 +418,8 @@ class ResidentialUnitService:
             
             # Crear instancia del servicio de notificaciones
             # notification_service = EmailNotificationService(self.db)
-
+            batch_size = 100
+            processed_in_batch = 0
             # Procesar cada fila
             for index, row in df.iterrows():
                 try:
@@ -610,6 +611,12 @@ class ResidentialUnitService:
                     #         )
 
                     results['successful'] += 1
+                    processed_in_batch += 1
+
+                    if processed_in_batch >= batch_size:
+                        await self.db.commit()
+                        processed_in_batch = 0
+                        logger.info(f"💾 Batch guardado de {batch_size} registros")
 
                 except Exception as e:
                     results['errors'].append({
@@ -622,8 +629,10 @@ class ResidentialUnitService:
                     logger.error(f"Error procesando fila {index + 2}: {e}")
 
             # Commit de todas las operaciones exitosas
-            if results['successful'] > 0:
-                await self.db.commit()
+            # Guardar lo que quedó pendiente
+                if processed_in_batch > 0:
+                    await self.db.commit()
+                    logger.info(f"💾 Último batch guardado: {processed_in_batch} registros")
                 logger.info(
                     f"Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
                     f"{results['users_created']} usuarios nuevos creados"
