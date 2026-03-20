@@ -1209,6 +1209,7 @@ async def get_polls_report(
             responses = responses_result.all()
 
             abstentions = []
+            option_direct_voters = {}  # opt_id -> [(user_id, voted_at), ...]
             for resp, user, data_user, inv in responses:    # desempacar 4 valores
                 voter_info = {
                     "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
@@ -1216,7 +1217,6 @@ async def get_polls_report(
                     "voting_weight": float(resp.dec_voting_weight),
                     "voted_at": resp.dat_response_at.isoformat() if resp.dat_response_at else None,
                     "is_delegation_vote": resp.str_ip_address == "delegation",
-                    # Para votos por delegación, aclarar que este peso fue cedido al delegado
                     "weight_note": "Peso cedido al delegado" if resp.str_ip_address == "delegation" else None,
                 }
                 if resp.bln_is_abstention:
@@ -1224,7 +1224,48 @@ async def get_polls_report(
                 elif resp.int_option_id in options_map:
                     options_map[resp.int_option_id]["votes_count"] += 1
                     options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
-                    options_map[resp.int_option_id]["voters"].append(voter_info)  
+                    options_map[resp.int_option_id]["voters"].append(voter_info)
+                    if resp.str_ip_address != "delegation":
+                        opt_id = resp.int_option_id
+                        if opt_id not in option_direct_voters:
+                            option_direct_voters[opt_id] = []
+                        option_direct_voters[opt_id].append((resp.int_user_id, voter_info["voted_at"]))
+
+            # Para encuestas activas, inyectar filas de delegantes
+            # (las encuestas cerradas ya tienen esas filas via _register_delegation_votes)
+            if poll.str_status != "closed" and option_direct_voters:
+                all_direct_voter_ids = list({uid for uids in option_direct_voters.values() for uid, _ in uids})
+                if all_direct_voter_ids:
+                    del_result = await db.execute(
+                        select(MeetingInvitationModel, UserModel, DataUserModel)
+                        .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
+                        .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                        .where(
+                            MeetingInvitationModel.int_meeting_id == meeting_id,
+                            MeetingInvitationModel.int_delegated_id.in_(all_direct_voter_ids)
+                        )
+                    )
+                    delegations = del_result.all()
+
+                    delegate_to_delegators: dict = {}
+                    for del_inv, del_user, del_data_user in delegations:
+                        delegate_id = del_inv.int_delegated_id
+                        if delegate_id not in delegate_to_delegators:
+                            delegate_to_delegators[delegate_id] = []
+                        delegate_to_delegators[delegate_id].append({
+                            "full_name": f"{del_data_user.str_firstname} {del_data_user.str_lastname}",
+                            "apartment": del_inv.str_apartment_number,
+                            "voting_weight": float(del_inv.dec_quorum_base) if del_inv.dec_quorum_base else 0.0,
+                            "is_delegation_vote": True,
+                            "weight_note": "Peso cedido al delegado",
+                        })
+
+                    for opt_id, direct_voters in option_direct_voters.items():
+                        for voter_id, voted_at in direct_voters:
+                            for delegator_info in delegate_to_delegators.get(voter_id, []):
+                                delegator_row = dict(delegator_info)
+                                delegator_row["voted_at"] = voted_at
+                                options_map[opt_id]["voters"].append(delegator_row)
 
             total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
 

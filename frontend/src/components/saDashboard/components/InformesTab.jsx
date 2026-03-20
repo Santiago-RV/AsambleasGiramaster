@@ -179,7 +179,7 @@ const generatePollsPDF = (data) => {
                 body: opt.voters.map(v => [
                     v.full_name,
                     v.apartment || '—',
-                    v.is_delegation_vote ? 'Por delegación' : 'Directo',
+                    v.is_delegation_vote ? 'Vía delegado' : 'Directo',
                     v.voted_at
                         ? new Date(v.voted_at).toLocaleString('es-ES', {
                             day: '2-digit', month: '2-digit', year: 'numeric',
