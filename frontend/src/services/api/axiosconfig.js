@@ -2,7 +2,7 @@ import axios from 'axios';
 import { AuthService } from './AuthService';
 
 // URL base del backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 
 // Instancia de Axios pública (sin token) - para login y register
 export const publicAxios = axios.create({

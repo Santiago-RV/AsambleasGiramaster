@@ -122,14 +122,18 @@ class VotingDelegationService:
         return float(weight) if weight else 1.0
 
     async def _check_user_has_voted(self, meeting_id: int, user_id: int) -> bool:
-        """Verifica si un usuario ya votó en alguna encuesta de la reunión"""
+        """
+        Verifica si el usuario votó en alguna encuesta ACTIVA de la reunión.
+        Las encuestas ya cerradas ('closed', 'draft') no bloquean delegaciones futuras.
+        """
         result = await self.db.execute(
             select(PollResponseModel)
             .join(PollModel, PollModel.id == PollResponseModel.int_poll_id)
             .where(
                 and_(
                     PollModel.int_meeting_id == meeting_id,
-                    PollResponseModel.int_user_id == user_id
+                    PollResponseModel.int_user_id == user_id,
+                    PollModel.str_status == 'active'   # ← solo encuestas en curso
                 )
             )
             .limit(1)
@@ -224,14 +228,8 @@ class VotingDelegationService:
         # 1. Verificar permisos de admin
         meeting = await self._verify_admin_permissions(meeting_id, admin_user_id)
 
-        # 2. Permitir delegaciones en cualquier momento
+        # 2. Permitir delegaciones en cualquier momento (incluso con encuestas activas)
         logger.info(f"✅ Delegación permitida en reunión con estado: {meeting.str_status}")
-
-        # 3. Verificar que NO haya encuestas activas (SOLO si la reunión está En vivo)
-        if meeting.str_status == "En vivo":
-            await self._verify_no_active_polls(meeting_id)
-        else:
-            logger.info(f"⏭️ Reunión no está en vivo, omitiendo validación de encuestas activas")
 
         # 4. Validar que todos los usuarios estén invitados
         logger.info(f"📋 Validando invitaciones...")
@@ -256,16 +254,7 @@ class VotingDelegationService:
                     error_code="ALREADY_DELEGATED"
                 )
 
-        # 6. Validar que los delegadores no hayan votado
-        logger.info(f"🗳️ Validando que delegadores no hayan votado...")
-        for delegator_id in delegator_ids:
-            has_voted = await self._check_user_has_voted(meeting_id, delegator_id)
-            if has_voted:
-                user_info = await self._get_user_info(delegator_id)
-                raise ValidationException(
-                    message=f"El usuario {user_info['str_firstname']} {user_info['str_lastname']} ya votó en esta reunión",
-                    error_code="ALREADY_VOTED"
-                )
+        # 6. (Permitido) delegadores pueden haber votado; la delegación aplica a la siguiente encuesta
 
         # 7. Validar que el delegado no haya delegado (no permitir cadenas)
         logger.info(f"🔗 Validando que delegado no haya delegado...")
@@ -358,11 +347,9 @@ class VotingDelegationService:
         logger.info(f"🔙 Revocando delegación de delegator_id={delegator_id}")
 
         # 1. Verificar permisos
-        meeting = await self._verify_admin_permissions(meeting_id, admin_user_id)
+        await self._verify_admin_permissions(meeting_id, admin_user_id)
 
-        # 2. Verificar que no haya encuestas activas (solo si está en vivo)
-        if meeting.str_status == "En vivo":
-            await self._verify_no_active_polls(meeting_id)
+        # 2. Permitir revocación en cualquier momento (aplica a la siguiente encuesta)
 
         # 3. Obtener invitación del delegador
         delegator_invitation = await self._get_invitation(meeting_id, delegator_id)

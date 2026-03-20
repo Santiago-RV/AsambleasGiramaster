@@ -17,6 +17,7 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
   const loadReportData = async () => {
     setLoading(true);
     setError(null);
+    setData(null);
     try {
       let response;
       switch (reportType) {
@@ -107,13 +108,13 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
 
             {!loading && !error && data && (
               <>
-                {reportType === 'participation' && (
+                {reportType === 'participation' && data.summary && (
                   <AttendanceReportContent data={data} />
                 )}
-                {reportType === 'voting' && (
+                {reportType === 'voting' && data.polls && (
                   <PollsReportContent data={data} />
                 )}
-                {reportType === 'powers' && (
+                {reportType === 'powers' && data.delegations && (
                   <DelegationsReportContent data={data} />
                 )}
               </>
@@ -470,7 +471,7 @@ const PollsReportContent = ({ data }) => {
                               <td className="px-3 py-2">
                                 {voter.is_delegation_vote ? (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                    🤝 Delegación
+                                    🤝 Vía delegado
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
@@ -480,14 +481,7 @@ const PollsReportContent = ({ data }) => {
                               </td>
                               <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
                               <td className="px-3 py-2 text-right font-mono text-gray-600">
-                                {voter.is_delegation_vote ? (
-                                  <div className="flex flex-col items-end">
-                                    <span>{parseFloat(voter.voting_weight).toFixed(4)}</span>
-                                    <span className="text-xs text-amber-600 font-normal">(peso cedido)</span>
-                                  </div>
-                                ) : (
-                                  parseFloat(voter.voting_weight).toFixed(4)
-                                )}
+                                {parseFloat(voter.voting_weight).toFixed(4)}
                               </td>
                             </tr>
                           ))}
@@ -526,14 +520,7 @@ const PollsReportContent = ({ data }) => {
                           <td className="px-3 py-2 text-gray-500">{abs.apartment || '—'}</td>
                           <td className="px-3 py-2 text-gray-500">{fmtDate(abs.voted_at)}</td>
                           <td className="px-3 py-2 text-right font-mono text-gray-600">
-                            {voter.is_delegation_vote ? (
-                              <div className="flex flex-col items-end">
-                                <span>{parseFloat(voter.voting_weight).toFixed(4)}</span>
-                                <span className="text-xs text-amber-600 font-normal">(peso cedido)</span>
-                              </div>
-                            ) : (
-                              parseFloat(voter.voting_weight).toFixed(4)
-                            )}
+                            {parseFloat(abs.voting_weight).toFixed(4)}
                           </td>
                         </tr>
                       ))}
