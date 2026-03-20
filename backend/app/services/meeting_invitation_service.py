@@ -29,7 +29,12 @@ class MeetingInvitationService:
         Crea una invitación individual.
         
         IMPORTANTE: Inicializa dec_quorum_base y dec_voting_weight con el mismo valor.
+        
+        Si el usuario está inactivo (bln_allow_entry=False), se activará automáticamente
+        para que pueda recibir las notificaciones.
         """
+        from app.models.user_model import UserModel
+        
         try:
             invitation = MeetingInvitationModel(
                 int_meeting_id=invitation_data.int_meeting_id,
@@ -49,12 +54,27 @@ class MeetingInvitationService:
             )
             
             self.db.add(invitation)
+            await self.db.flush()
+            
+            # Verificar si el usuario está inactivo y activarlo
+            user_result = await self.db.execute(
+                select(UserModel).where(UserModel.id == invitation_data.int_user_id)
+            )
+            user = user_result.scalar_one_or_none()
+            
+            user_activated = False
+            if user and user.bln_allow_entry == False:
+                user.bln_allow_entry = True
+                user_activated = True
+                logger.info(f"🔓 Usuario {user.id} ({user.str_username}) activado automáticamente al recibir invitación individual")
+            
             await self.db.commit()
             await self.db.refresh(invitation)
             
             logger.info(
                 f"✅ Invitación creada - User: {invitation_data.int_user_id}, "
                 f"Quorum base: {invitation_data.dec_voting_weight}"
+                + (f", Usuario activado: Sí" if user_activated else "")
             )
             
             return invitation
@@ -306,14 +326,19 @@ class MeetingInvitationService:
         
         Obtiene automáticamente el voting_weight y apartment_number desde
         UserResidentialUnitModel basado en la unidad residencial de la reunión.
+        
+        Si algún usuario está inactivo (bln_allow_entry=False), se activará
+        automáticamente para que pueda recibir las notificaciones.
         """
         from app.models.meeting_model import MeetingModel
+        from app.models.user_model import UserModel
         
         results = {
             "successful": 0,
             "failed": 0,
             "errors": [],
-            "invitations_created": 0
+            "invitations_created": 0,
+            "activated_users": 0
         }
         
         try:
@@ -336,6 +361,9 @@ class MeetingInvitationService:
                 )
             )
             user_units = {unit.int_user_id: unit for unit in units_result.scalars().all()}
+            
+            # Trackear usuarios invitados exitosamente para luego activar inactivos
+            successfully_invited_ids = []
             
             # Crear invitaciones para cada usuario
             for user_id in user_ids:
@@ -380,6 +408,7 @@ class MeetingInvitationService:
                     self.db.add(invitation)
                     results["successful"] += 1
                     results["invitations_created"] += 1
+                    successfully_invited_ids.append(user_id)
                     
                     logger.info(f"✅ Invitación creada para usuario {user_id}: Peso={user_unit.dec_default_voting_weight}, Apto={user_unit.str_apartment_number}")
                     
@@ -391,6 +420,21 @@ class MeetingInvitationService:
             
             # Commit de todas las invitaciones
             await self.db.commit()
+            
+            # Activar usuarios inactivos que fueron invitados exitosamente
+            if successfully_invited_ids:
+                for user_id in successfully_invited_ids:
+                    user_result = await self.db.execute(
+                        select(UserModel).where(UserModel.id == user_id)
+                    )
+                    user = user_result.scalar_one_or_none()
+                    
+                    if user and user.bln_allow_entry == False:
+                        user.bln_allow_entry = True
+                        results["activated_users"] += 1
+                        logger.info(f"🔓 Usuario {user_id} ({user.str_username}) activado automáticamente al recibir invitación a reunión {meeting_id}")
+                
+                await self.db.commit()
             
             # Actualizar contador de invitados en la reunión
             meeting = await self.db.get(MeetingModel, meeting_id)
@@ -424,7 +468,8 @@ class MeetingInvitationService:
             
             logger.info(
                 f"📊 Batch completado - Total: {len(user_ids)}, "
-                f"Exitosas: {results['successful']}, Fallidas: {results['failed']}"
+                f"Exitosas: {results['successful']}, Fallidas: {results['failed']}, "
+                f"Activados: {results['activated_users']}"
             )
             
             return results

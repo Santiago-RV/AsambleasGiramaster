@@ -836,15 +836,30 @@ const ResidentsList = ({
 			);
 
 			if (response.success) {
+				const activatedUsers = response.data?.activated_users || 0;
+				
 				Swal.fire({
 					icon: 'success',
 					title: 'Invitaciones Enviadas',
 					html: `
 						<div class="text-center">
 							<p class="mb-2">Se crearon <strong>${response.data?.invitations_created || 0}</strong> invitaciones</p>
-							${response.data?.failed > 0 ? `<p class="text-red-500">Fallidas: ${response.data.failed}</p>` : ''}
+							${response.data?.failed > 0 ? `<p class="text-red-500 mb-2">Fallidas: ${response.data.failed}</p>` : ''}
+							${activatedUsers > 0 ? `
+								<div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+									<p class="text-blue-700 text-sm">
+										<strong>${activatedUsers}</strong> usuario(s) inactivo(s) fueron activados automáticamente
+									</p>
+								</div>
+							` : ''}
 						</div>
 					`,
+					confirmButtonColor: '#27ae60',
+					timer: activatedUsers > 0 ? 5000 : 3000,
+					timerProgressBar: true,
+					showConfirmButton: false,
+					allowOutsideClick: false,
+					allowEscapeKey: false,
 				});
 				handleCloseInviteModal();
 				if (onInviteToMeeting) {
