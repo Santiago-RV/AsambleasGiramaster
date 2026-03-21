@@ -671,7 +671,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
             isSendingBulk={sendBulkCredentialsMutation.isPending}
             showInviteButton={true}
             residentialUnitId={residentialUnitId}
-            onInviteToMeeting={() => { }}
+            onInviteToMeeting={() => queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] })}
           />
         </div>
 
