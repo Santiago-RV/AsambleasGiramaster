@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Swal from 'sweetalert2';
 import { ReportsService } from '../../../services/api/ReportsService';
+import { Chart } from 'chart.js/auto';
 
 // ─── Helpers PDF ────────────────────────────────────────────────────────────
 
@@ -58,22 +59,115 @@ const addFooter = (doc) => {
     }
 };
 
+// ─── PDF Graphics ────────────────────────────────────────────────────────────
+
+const generatePieChartImage = (attendedCount, absentCount) => {
+    return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 500;
+        canvas.height = 500;
+
+        const ctx = canvas.getContext('2d');
+
+        const chart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Asistentes', 'Ausentes'],
+                datasets: [{
+                    data: [attendedCount, absentCount],
+                    backgroundColor: ['#16a34a', '#dc2626']
+                }]
+            },
+            options: {
+                responsive: false,
+                animation: false 
+            }
+        });
+
+        try {
+            chart.update();
+            setTimeout(() => {
+                try {
+                    const image = canvas.toDataURL('image/png');
+                    chart.destroy();
+
+                    if (!image || image.length < 1000) {
+                        throw new Error('Imagen vacía');
+                    }
+
+                    resolve(image);
+                } catch (err) {
+                    reject(err);
+                }
+            }, 100);
+
+        } catch (err) {
+            reject(err);
+        }
+    });
+};
+
+const generatePollChartImage = async (poll) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 800;
+
+    const ctx = canvas.getContext('2d');
+
+    const labels = poll.options.map(opt => opt.text);
+    const dataValues = poll.options.map(opt => opt.votes_weight); // 🔥 usa peso
+
+    const colors = [
+        '#4f46e5', '#16a34a', '#dc2626', '#f59e0b',
+        '#0ea5e9', '#9333ea', '#14b8a6'
+    ];
+
+    const chart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels,
+            datasets: [{
+                data: dataValues,
+                backgroundColor: colors
+            }]
+        },
+        options: {
+            animation: false,
+            responsive: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    chart.update();
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const image = canvas.toDataURL('image/png');
+    chart.destroy();
+
+    return image;
+};
+
 // ─── Generadores PDF ─────────────────────────────────────────────────────────
 
-const generateAttendancePDF = (data) => {
+const generateAttendancePDF = async (data) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, summary, attended, absent } = data;
 
     let y = addHeader(doc, 'INFORME DE ASISTENCIA', meeting.title, meeting.residential_unit, meeting.scheduled_date);
 
-    // Resumen
+    // RESUMEN
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 58, 138);
     doc.text('RESUMEN GENERAL', 14, y + 4);
     y += 8;
 
-    // Asistentes
+    // ASISTENTES
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(22, 101, 52);
@@ -87,25 +181,56 @@ const generateAttendancePDF = (data) => {
             p.full_name,
             p.apartment,
             p.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
-            p.attended_at ? new Date(p.attended_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
+            p.attended_at
+                ? new Date(p.attended_at).toLocaleString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+                : '—',
             p.quorum_base.toFixed(4)
         ]),
-        didParseCell: (hookData) => {
-            if (hookData.section === 'body' && attended[hookData.row.index]?.attendance_type === 'Delegado') {
-                hookData.cell.styles.fillColor = [254, 243, 199];
-                hookData.cell.styles.textColor = [120, 53, 15];
-            }
-        },
         styles: { fontSize: 8.5 },
         headStyles: { fillColor: [22, 101, 52] },
         alternateRowStyles: { fillColor: [240, 253, 244] },
         margin: { left: 14, right: 14 },
     });
-    y = doc.lastAutoTable.finalY + 10;
 
-    // Ausentes
+    y = doc.lastAutoTable.finalY + 10;
+    // GRAFICO
+    const chartImage = await generatePieChartImage(attended.length, absent.length);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const imgWidth = 120;
+    const x = (pageWidth - imgWidth) / 2;
+
+    if (!chartImage || !chartImage.startsWith('data:image/png')) {
+        throw new Error('Error generando gráfico');
+    }
+
+    if (y > 150) {
+        doc.addPage();
+        y = 20;
+    }
+
+    // Título
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 58, 138);
+    doc.text('GRÁFICO DE ASISTENCIA', 14, y);
+    y += 6;
+
+    doc.addImage(chartImage, 'PNG', x, y, imgWidth, 100);
+    y += 110;
+
+    // AUSENTES 
     if (absent.length > 0) {
-        if (y > 230) { doc.addPage(); y = 20; }
+        if (y > 230) {
+            doc.addPage();
+            y = 20;
+        }
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(185, 28, 28);
@@ -115,7 +240,12 @@ const generateAttendancePDF = (data) => {
         autoTable(doc, {
             startY: y,
             head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Coeficiente']],
-            body: absent.map(p => [p.full_name, p.apartment, '—', p.quorum_base.toFixed(4)]),
+            body: absent.map(p => [
+                p.full_name,
+                p.apartment,
+                '—',
+                p.quorum_base.toFixed(4)
+            ]),
             styles: { fontSize: 8.5 },
             headStyles: { fillColor: [185, 28, 28] },
             alternateRowStyles: { fillColor: [254, 242, 242] },
@@ -123,13 +253,17 @@ const generateAttendancePDF = (data) => {
         });
     }
 
+ 
     addFooter(doc);
     doc.save(`Asistencia_${meeting.title.replace(/\s/g, '_')}.pdf`);
 };
 
-const generatePollsPDF = (data) => {
+const generatePollsPDF = async (data) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, polls } = data;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const imgWidth = 120;
+    const x = (pageWidth - imgWidth) / 2;
 
     let y = addHeader(doc, 'INFORME DE ENCUESTAS Y VOTACIONES', meeting.title, meeting.residential_unit, meeting.scheduled_date);
 
@@ -138,8 +272,8 @@ const generatePollsPDF = (data) => {
     doc.text(`Total de encuestas: ${polls.length}`, 14, y);
     y += 8;
 
-    polls.forEach((poll, idx) => {
-        if (y > 240) { doc.addPage(); y = 20; }
+    for (let idx = 0; idx < polls.length; idx++) {
+        const poll = polls[idx];
 
         // Título encuesta
         doc.setFillColor(238, 242, 255);
@@ -161,7 +295,7 @@ const generatePollsPDF = (data) => {
             tableWidth: 'auto',
         });
         y = doc.lastAutoTable.finalY + 4;
-
+          
         // Resultados por opción
         poll.options.forEach(opt => {
             if (opt.voters.length === 0) return;
@@ -227,10 +361,30 @@ const generatePollsPDF = (data) => {
                 margin: { left: 20, right: 14 },
             });
             y = doc.lastAutoTable.finalY + 4;
+            
+        }
+        //GRAFICO
+         const chartImage = await generatePollChartImage(poll);
+
+        if (y > 160) {
+            doc.addPage();
+            y = 20;
         }
 
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(30, 58, 138);
+        doc.text('Resultados de votación', 14, y);
         y += 6;
-    });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const imgWidth = 140;
+        const x = (pageWidth - imgWidth) / 2;
+
+        doc.addImage(chartImage, 'PNG', x, y, imgWidth, 100);
+        y += 110;
+        
+    };
 
     addFooter(doc);
     doc.save(`Encuestas_${meeting.title.replace(/\s/g, '_')}.pdf`);
@@ -270,7 +424,7 @@ const generateDelegationsPDF = (data) => {
                 typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
                 d.delegate.full_name,
                 fmtDate(d.delegated_at),
-                d.notes || '—',
+                //d.notes || '—',
             ]),
             styles: { fontSize: 8, cellPadding: 3 },
             headStyles: { fillColor: [124, 58, 237], fontSize: 8, fontStyle: 'bold' },

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, Loader2, ShieldOff, UserCheck, UserX, Search, QrCode, Calendar, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, Loader2, ShieldOff, UserCheck, UserX, Search, Info , QrCode, Calendar, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
@@ -1022,6 +1022,12 @@ const ResidentsList = ({
 						<UsersIcon size={24} />
 						{title} ({filteredResidents?.length || 0})
 					</h2>
+					<button
+						onClick={() => setIsHelpModalCoproOpen(true)}
+						className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:shadow-lg transition-all"
+					>
+						<Info size={18} />
+					</button>
 
 					{/* Barra de acciones masivas - solo visible cuando hay selección */}
 					{selectedResidents.length > 0 && (
