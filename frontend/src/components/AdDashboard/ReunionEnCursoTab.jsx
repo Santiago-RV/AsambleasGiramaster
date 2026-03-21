@@ -249,7 +249,7 @@ const ReunionEnCursoTab = () => {
         </div>
       </div>
 
-      {/* Polls */}
+      {/* Polls
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <BarChart3 size={20} />
@@ -299,12 +299,12 @@ const ReunionEnCursoTab = () => {
         </div>
       </div>
 
-      {/* Poll Details Modal */}
-      <PollDetailsModal
+      {/* Poll Details Modal */
+      /* <PollDetailsModal
         poll={selectedPoll}
         isOpen={!!selectedPoll}
         onClose={() => setSelectedPoll(null)}
-      />
+      />  */}
     </div>
   );
 };
