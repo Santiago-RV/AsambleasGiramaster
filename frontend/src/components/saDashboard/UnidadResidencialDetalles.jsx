@@ -111,7 +111,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 		}
 
 		Swal.fire({
-			title: '¿Enviar Credenciales?',
+			title: '¿Reenviar Credenciales?',
 			html: `
 			<div class="text-left">
 				<p class="mb-3">Se enviarán credenciales por correo electrónico a:</p>
@@ -121,7 +121,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 					</p>
 				</div>
 				<p class="text-xs text-gray-600 mt-3">
-					💡 Cada copropietario recibirá un correo con su contraseña temporal.
+					💡 Cada copropietario recibirá un enlace para acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 24 horas.
 				</p>
 			</div>
 		`,
@@ -147,27 +147,54 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 
 	// Submit handlers
 	const handleSubmitMeeting = (data, { isEditing, meetingId, onSuccess }) => {
-		const meetingData = {
-			int_id_residential_unit: parseInt(unitId),
-			str_title: data.str_title,
-			str_description: data.str_description || '',
-			str_meeting_type: data.str_meeting_type,
-			bln_allow_delegates: data.bln_allow_delegates,
-			int_estimated_duration: 0,
-			int_meeting_leader_id: parseInt(data.int_meeting_leader_id),
-			dat_schedule_date: data.dat_schedule_start,
-			str_modality: meetingMode,
-			int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
-		};
+		let meetingData;
 
 		if (isEditing && meetingId) {
-			MeetingService.updateMeeting(meetingId, meetingData).then(() => {
-				queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
-				onSuccess?.();
-				setIsMeetingModalOpen(false);
-				setMeetingToEdit(null);
-			});
+			meetingData = {
+				str_title: data.str_title,
+				str_description: data.str_description || '',
+				str_meeting_type: data.str_meeting_type,
+				bln_allow_delegates: data.bln_allow_delegates,
+				dat_schedule_date: data.dat_schedule_start,
+			};
+			MeetingService.updateMeeting(meetingId, meetingData)
+				.then(() => {
+					queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
+					Swal.fire({
+						icon: 'success',
+						title: '¡Reunión Actualizada!',
+						text: 'Los cambios se han guardado correctamente',
+						toast: true,
+						position: 'top-end',
+						showConfirmButton: false,
+						timer: 3000,
+						backdrop: false,
+					});
+					onSuccess?.();
+					setIsMeetingModalOpen(false);
+					setMeetingToEdit(null);
+				})
+				.catch((error) => {
+					Swal.fire({
+						icon: 'error',
+						title: 'Error al actualizar',
+						text: error.response?.data?.message || error.message || 'No se pudo actualizar la reunión',
+						confirmButtonColor: '#ef4444',
+					});
+				});
 		} else {
+			meetingData = {
+				int_id_residential_unit: parseInt(unitId),
+				str_title: data.str_title,
+				str_description: data.str_description || '',
+				str_meeting_type: data.str_meeting_type,
+				bln_allow_delegates: data.bln_allow_delegates,
+				int_estimated_duration: 0,
+				int_meeting_leader_id: parseInt(data.int_meeting_leader_id),
+				dat_schedule_date: data.dat_schedule_start,
+				str_modality: meetingMode,
+				int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id ? parseInt(data.int_zoom_account_id) : null,
+			};
 			createMeetingMutation.mutate(meetingData, {
 				onSuccess: () => {
 					onSuccess?.();
@@ -393,7 +420,16 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 						showInviteButton={true}
 						residentialUnitId={unitId}
 						residentialUnitName={unitData?.str_name || unitData?.str_residential_name || unitData?.name || 'Sin nombre'}
-						onInviteToMeeting={() => {}}
+					onInviteToMeeting={() => {
+						queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
+						queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
+						queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+						queryClient.refetchQueries({ 
+							queryKey: ['residents', unitId],
+							type: 'active',
+							throwOnError: false
+						});
+					}}
 					/>
 				</div>
 

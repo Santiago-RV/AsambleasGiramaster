@@ -477,7 +477,7 @@ export class ResidentialUnitService {
           lastname: 'García',
           phone: '+57 300 222 3333',
           apartment_number: '102',
-          voting_weight: 0.30
+          voting_weight: 1
         }
       ]);
 

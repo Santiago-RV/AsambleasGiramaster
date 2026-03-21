@@ -81,10 +81,9 @@ const ResidentModal = ({
                 phone: data.phone || null,
                 apartment_number: data.apartment_number,
                 is_active: data.is_active,
-                password: data.password || 'Temporal123!',
                 voting_weight: data.voting_weight || 0.0,
             };
-            onSubmit(residentData, null, () => reset());  // Agregar null como segundo parámetro
+            onSubmit(residentData, null, () => reset());
         } else {
             // Modo editar - solo enviar campos modificados
             const residentData = {};
@@ -130,6 +129,25 @@ const ResidentModal = ({
             size="lg"
         >
             <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+                {mode === 'create' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-blue-100 rounded-lg shrink-0">
+                                <Lightbulb size={20} className="text-blue-600" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-blue-800 mb-1">
+                                    Contraseña de acceso
+                                </p>
+                                <p className="text-xs text-blue-700">
+                                    La contraseña se genera automáticamente al crear el copropietario. 
+                                    Se enviará por correo electrónico junto con un enlace de acceso directo.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
                     {/* Nombre */}
                     <div>
@@ -274,69 +292,47 @@ const ResidentModal = ({
                     </label>
                     <input
                         type="number"
-                        step="0.01"
+                        step="any"
                         min="0"
-                        max="1"
                         {...register('voting_weight')}
-                        placeholder="Ej: 0.25 (25%)"
+                        placeholder="Ej: 0.25 o 1"
                         className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
                     />
-                    <p className="text-sm text-gray-500 mt-1">
-                        <Lightbulb size={14} className="inline mr-1" />
-                        Coeficiente de copropiedad (ej: 0.25 = 25%). Dejar vacío para 0.0
-                    </p>
                 </div>
 
-                {/* Contraseña */}
-                <div>
-                    <label className="block mb-2 font-semibold text-gray-700">
-                        {mode === 'create'
-                            ? 'Contraseña *'
-                            : 'Nueva Contraseña (opcional)'}
-                    </label>
-                    <input
-                        type="password"
-                        {...register('password', {
-                            validate: (value) => {
-                                // En modo edición, la contraseña es opcional
-                                if (mode === 'edit') {
+                {/* Contraseña - Solo en modo editar */}
+                {mode === 'edit' && (
+                    <div>
+                        <label className="block mb-2 font-semibold text-gray-700">
+                            Nueva Contraseña (opcional)
+                        </label>
+                        <input
+                            type="password"
+                            {...register('password', {
+                                validate: (value) => {
                                     if (!value || value.trim() === '') {
-                                        return true; // Válido si está vacío
+                                        return true;
                                     }
                                     if (value.length < 8) {
                                         return 'La contraseña debe tener mínimo 8 caracteres';
                                     }
                                     return true;
-                                }
-                                // En modo crear, la contraseña es obligatoria
-                                if (!value || value.trim() === '') {
-                                    return 'La contraseña es obligatoria';
-                                }
-                                if (value.length < 8) {
-                                    return 'La contraseña debe tener mínimo 8 caracteres';
-                                }
-                                return true;
-                            },
-                        })}
-                        placeholder={
-                            mode === 'create'
-                                ? 'Contraseña inicial del copropietario'
-                                : 'Dejar en blanco para mantener la actual'
-                        }
-                        className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
-                    />
-                    {errors.password && (
-                        <span className="text-red-500 text-sm">
-                            {errors.password.message}
-                        </span>
-                    )}
-                    <p className="text-sm text-gray-500 mt-1">
-                        <Lightbulb size={14} className="inline mr-1" />
-                        {mode === 'create'
-                            ? 'Si no especificas una contraseña, se usará: Temporal123!'
-                            : 'Solo se actualizará si proporcionas una nueva contraseña'}
-                    </p>
-                </div>
+                                },
+                            })}
+                            placeholder="Dejar en blanco para mantener la actual"
+                            className="w-full p-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-[#3498db]"
+                        />
+                        {errors.password && (
+                            <span className="text-red-500 text-sm">
+                                {errors.password.message}
+                            </span>
+                        )}
+                        <p className="text-sm text-gray-500 mt-1">
+                            <Lightbulb size={14} className="inline mr-1" />
+                            Solo se actualizará si proporcionas una nueva contraseña
+                        </p>
+                    </div>
+                )}
 
                 {/* Estado activo */}
                 <div>

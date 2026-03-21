@@ -164,7 +164,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
 
       Swal.fire({
         icon: successful === total_processed ? 'success' : 'warning',
-        title: successful === total_processed ? '¡Credenciales Enviadas!' : 'Envío Parcial',
+        title: successful === total_processed ? '¡Enlaces Enviados!' : 'Envío Parcial',
         html: `
           <div class="text-left">
             <div class="bg-blue-50 p-3 rounded-lg mb-3">
@@ -196,8 +196,8 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
     onError: (error) => {
       Swal.fire({
         icon: 'error',
-        title: 'Error al Enviar Credenciales',
-        text: error.response?.data?.message || error.message || 'Error al enviar credenciales masivamente',
+        title: 'Error al Enviar Enlace',
+        text: error.response?.data?.message || error.message || 'Error al enviar el enlace de acceso',
         confirmButtonColor: '#e74c3c',
       });
     },
@@ -405,10 +405,10 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
   // Función para reenviar credenciales individuales
   const handleResendCredentials = async (resident) => {
     const result = await Swal.fire({
-      title: '¿Enviar credenciales?',
+      title: '¿Reenviar credenciales?',
       html: `
         <div class="text-left">
-          <p class="mb-3">Se generará una nueva contraseña temporal y se enviará por correo a:</p>
+          <p class="mb-3">Se enviará un enlace de acceso directo por correo a:</p>
           <div class="bg-blue-50 p-3 rounded-lg">
             <p class="font-semibold text-blue-800">${resident.firstname} ${resident.lastname}</p></p>
             <p class="text-sm text-blue-700 mt-1">
@@ -419,7 +419,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">
-            ${SVG_ICONS.lightbulb} La contraseña actual será reemplazada por una nueva contraseña temporal.
+            💡 Podrá acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 24 horas.
           </p>
         </div>
       `,
@@ -447,10 +447,10 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
     if (result.isConfirmed && result.value?.success) {
       Swal.fire({
         icon: 'success',
-        title: '¡Credenciales Enviadas!',
+        title: '¡Enlace Enviado!',
         html: `
           <div class="text-left">
-            <p class="mb-2">Las credenciales han sido enviadas exitosamente a:</p>
+            <p class="mb-2">El enlace de acceso ha sido enviado exitosamente a:</p>
             <div class="bg-green-50 p-3 rounded-lg">
               <p class="text-sm text-green-700">
                 <strong>Email:</strong> ${resident.email}
@@ -460,7 +460,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
               </p>
             </div>
             <p class="text-xs text-gray-600 mt-3">
-              ${SVG_ICONS.mail} El copropietario recibirá un correo con su nueva contraseña temporal.
+              💡 Recibirá un enlace para acceder directamente al sistema sin contraseña. Vigencia de 24 horas.
             </p>
           </div>
         `,
@@ -641,7 +641,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
               }
 
               Swal.fire({
-                title: '¿Enviar Credenciales?',
+                title: '¿Reenviar Credenciales?',
                 html: `
                   <div class="text-left">
                     <p class="mb-3">Se enviarán credenciales por correo electrónico a:</p>
@@ -651,7 +651,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
                       </p>
                     </div>
                     <p class="text-xs text-gray-600 mt-3">
-                      ${SVG_ICONS.lightbulb} Cada copropietario recibirá un correo con su contraseña temporal.
+                      💡 Cada copropietario recibirá un enlace para acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 24 horas.
                     </p>
                   </div>
                 `,
@@ -671,7 +671,16 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
             isSendingBulk={sendBulkCredentialsMutation.isPending}
             showInviteButton={true}
             residentialUnitId={residentialUnitId}
-            onInviteToMeeting={() => { }}
+            onInviteToMeeting={() => {
+              queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
+              queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+              queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+              queryClient.refetchQueries({ 
+                queryKey: ['residential-unit-residents', residentialUnitId],
+                type: 'active',
+                throwOnError: false
+              });
+            }}
           />
         </div>
 

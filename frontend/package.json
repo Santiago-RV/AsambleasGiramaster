@@ -19,6 +19,7 @@
     "@zoom/meetingsdk": "^4.1.0",
     "axios": "^1.12.2",
     "biome": "^0.3.3",
+    "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
     "exceljs": "^4.1.1",
     "html5-qrcode": "^2.3.8",

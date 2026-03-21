@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invitación a Reunión - GIRAMASTER</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a1a2e;
+      background-color: #eef2ff;
+      padding: 20px 0;
+    }
+
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(99, 58, 162, 0.15);
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #6B4C9A 0%, #4F35A3 60%, #3B28CC 100%);
+      padding: 16px 40px 14px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 50%;
+    }
+
+    .header::after {
+      content: "";
+      position: absolute;
+      bottom: -15px;
+      left: -8px;
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 50%;
+    }
+
+    .logo {
+      max-width: 200px;
+      height: auto;
+      margin: 0 auto 10px;
+      display: block;
+      position: relative;
+      z-index: 1;
+      filter: brightness(0) invert(1);
+    }
+
+    .header-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 5px 16px;
+      border-radius: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Greeting ────────────────────────────────────────────────────────── */
+    .greeting-bar {
+      background: linear-gradient(90deg, #f0ebff, #e8f4ff);
+      border-left: 4px solid #6B4C9A;
+      padding: 18px 40px;
+    }
+
+    .greeting-bar p {
+      color: #3d2b6b;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .greeting-bar strong {
+      color: #4F35A3;
+      font-size: 17px;
+    }
+
+    /* ── Texto Introductorio ─────────────────────────────────────────────── */
+    .intro-text {
+      background: linear-gradient(90deg, #f0ebff, #e8f4ff);
+      border-left: 4px solid #6B4C9A;
+      padding: 18px 40px;
+      margin-bottom: 24px;
+    }
+
+    .intro-text p {
+      color: #3d2b6b;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    /* ── Contenido principal ─────────────────────────────────────────────── */
+    .content {
+      padding: 32px 40px;
+    }
+
+    /* ── Tarjeta de Detalles ─────────────────────────────────────────────── */
+    .meeting-details {
+      background: linear-gradient(135deg, #4F35A3 0%, #6B4C9A 50%, #8B5CF6 100%);
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(79, 53, 163, 0.35);
+    }
+
+    .meeting-title {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      line-height: 1.3;
+      color: #ffffff;
+    }
+
+    .detail-row {
+      display: flex;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      font-size: 14px;
+      font-weight: 600;
+      min-width: 160px;
+      opacity: 0.9;
+    }
+
+    .detail-value {
+      font-size: 14px;
+      flex: 1;
+      color: #ffffff;
+    }
+
+    .meeting-description {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .description-label {
+      font-size: 14px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 10px;
+      opacity: 0.9;
+    }
+
+    .description-text {
+      font-size: 14px;
+      line-height: 1.7;
+      color: #ffffff;
+      opacity: 0.95;
+    }
+
+    /* ── Acceso Virtual (Zoom) ───────────────────────────────────────────── */
+    .zoom-access {
+      background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%);
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(30, 64, 175, 0.3);
+    }
+
+    .zoom-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .zoom-info {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .zoom-info-label {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .zoom-info-value {
+      font-size: 18px;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+    }
+
+    .zoom-password-value {
+      background-color: rgba(255, 255, 255, 0.25);
+      padding: 6px 14px;
+      border-radius: 6px;
+      display: inline-block;
+      font-family: 'Courier New', monospace;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .zoom-button-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .zoom-button {
+      display: inline-block;
+      background-color: #8BC53F;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      transition: background-color 0.3s ease;
+    }
+
+    .zoom-button:hover {
+      background-color: #7AB32F;
+    }
+
+    /* ── Acceso Directo (Auto-login) ────────────────────────────────────── */
+    .quick-access {
+      background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+      color: #ffffff;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(5, 150, 105, 0.3);
+    }
+
+    .quick-access-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .access-button {
+      display: inline-block;
+      background-color: #ffffff;
+      color: #059669;
+      text-decoration: none;
+      padding: 14px 40px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .access-button:hover {
+      background-color: #f0fdf4;
+      transform: translateY(-2px);
+    }
+
+    .quick-access-note {
+      font-size: 13px;
+      margin-top: 16px;
+      opacity: 0.9;
+      line-height: 1.6;
+    }
+
+    .token-validity {
+      font-size: 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      opacity: 0.8;
+    }
+
+    /* ── Notas Importantes ───────────────────────────────────────────────── */
+    .important-notes {
+      background-color: #FEF3C7;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .notes-title {
+      color: #92400E;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    .notes-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .notes-list li {
+      color: #92400E;
+      font-size: 14px;
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+      line-height: 1.6;
+    }
+
+    .notes-list li:before {
+      content: "•";
+      position: absolute;
+      left: 8px;
+      font-weight: bold;
+    }
+
+    /* ── Nota Final ──────────────────────────────────────────────────────── */
+    .final-note {
+      color: #6B7280;
+      font-size: 14px;
+      line-height: 1.6;
+      text-align: center;
+      padding-top: 20px;
+      border-top: 1px solid #E5E7EB;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    .footer {
+      background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%);
+      color: #ffffff;
+      padding: 30px 40px;
+      text-align: center;
+    }
+
+    .footer-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .footer-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-bottom: 15px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      opacity: 0.7;
+      line-height: 1.6;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media only screen and (max-width: 600px) {
+      body {
+        padding: 0;
+      }
+
+      .email-container {
+        border-radius: 0;
+      }
+
+      .header,
+      .content,
+      .footer {
+        padding: 25px 20px;
+      }
+
+      .logo {
+        max-width: 200px;
+      }
+
+      .meeting-details,
+      .zoom-access,
+      .quick-access,
+      .important-notes {
+        padding: 20px;
+      }
+
+      .detail-label {
+        min-width: 120px;
+        font-size: 13px;
+      }
+
+      .detail-value {
+        font-size: 13px;
+      }
+
+      .zoom-button,
+      .access-button {
+        padding: 12px 24px;
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="email-container">
+
+    <!-- Header con Logo -->
+    <div class="header">
+      <img src="cid:logo" alt="GIRAMASTER" class="logo">
+      <span class="header-badge">INVITACIÓN</span>
+    </div>
+
+    <!-- Greeting -->
+    <div class="greeting-bar">
+      <p>Estimado(a) <strong>{{user_name}}</strong>,</p>
+    </div>
+
+    <!-- Texto Introductorio -->
+    <div class="intro-text">
+      <p>Ha sido invitado(a) a participar en la siguiente reunión de su unidad residencial:</p>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="content">
+
+      <!-- Detalles de la Reunión -->
+      <div class="meeting-details">
+        <div class="meeting-title">{{meeting_title}}</div>
+
+        <div class="detail-row">
+          <span class="detail-label">Unidad Residencial </span>
+          <span class="detail-value">{{residential_unit}}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Fecha</span>
+          <span class="detail-value">{{meeting_date}}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Hora</span>
+          <span class="detail-value">{{meeting_time}}</span>
+        </div>
+
+        {% if duration and duration != "0" and duration != "None" %}
+        <div class="detail-row">
+          <span class="detail-label">Duración</span>
+          <span class="detail-value">{{duration}} minutos</span>
+        </div>
+        {% endif %}
+
+        <div class="detail-row">
+          <span class="detail-label">Modalidad</span>
+          <span class="detail-value">{% if str_modality == 'virtual' %}Virtual{% else %}Presencial{% endif %}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Tipo</span>
+          <span class="detail-value">{{meeting_type}}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Organizador</span>
+          <span class="detail-value">{{organizer_name}}</span>
+        </div>
+
+        {% if meeting_description %}
+        <div class="meeting-description">
+          <span class="description-label">Descripción</span>
+          <p class="description-text">{{meeting_description}}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Acceso a Zoom (solo si es virtual) -->
+      {% if str_modality == 'virtual' and zoom_meeting_id %}
+      <div class="zoom-access">
+        <div class="zoom-title">Acceso a la Reunión Virtual</div>
+
+        <div class="zoom-info">
+          <div class="zoom-info-label">ID de la reunión</div>
+          <div class="zoom-info-value">{{zoom_meeting_id}}</div>
+        </div>
+
+        {% if zoom_password %}
+        <div class="zoom-info">
+          <div class="zoom-info-label">Contraseña</div>
+          <div>
+            <span class="zoom-password-value">{{zoom_password}}</span>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="zoom-button-container">
+          <a href="{{zoom_join_url}}" class="zoom-button">UNIRSE A LA REUNIÓN</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Acceso Directo (Auto-login) -->
+      {% if auto_login_url %}
+      <div class="quick-access">
+        <div class="quick-access-title">Acceso Directo al Sistema</div>
+        <a href="{{auto_login_url}}" class="access-button">ACCEDER AHORA</a>
+        <p class="quick-access-note">
+          Haga clic en el botón para acceder directamente a la reunión.<br>
+          No necesita escribir credenciales.
+        </p>
+        <div class="token-validity">⏱ Válido por 24 horas.</div>
+      </div>
+      {% endif %}
+
+      <!-- Notas Importantes -->
+      <div class="important-notes">
+        <div class="notes-title">Notas Importantes</div>
+        <ul class="notes-list">
+          {% if str_modality == 'virtual' %}
+          <li>Le recomendamos unirse 5 minutos antes del inicio</li>
+          <li>Asegúrese de tener una conexión estable a internet</li>
+          <li>Tenga lista su cámara y micrófono para participar</li>
+          {% else %}
+          <li>Puntualidad: llegada 10 minutos antes</li>
+          <li>Lleve documento de identidad</li>
+          <li>Asegúrese de recibir la convocatoria con anticipación</li>
+          {% endif %}
+          <li>Su asistencia es importante para alcanzar el quórum requerido</li>
+        </ul>
+      </div>
+
+      <!-- Nota Final -->
+      <div class="final-note">
+        Si tiene alguna pregunta o dificultad para acceder, por favor contacte al organizador.
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-title">GIRAMASTER</div>
+      <div class="footer-subtitle">Sistema de Gestión de Asambleas Residenciales</div>
+      <div class="footer-note">
+        Este es un correo automático generado por el Sistema GIRAMASTER<br>
+        © {{current_year}} GIRAMASTER - Todos los derechos reservados
+      </div>
+    </div>
+
+  </div>
+</body>
+
+</html>

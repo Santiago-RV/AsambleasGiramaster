@@ -1052,7 +1052,7 @@ const ResidentsList = ({
 									onClick={handleSendBulkCredentials}
 									disabled={isSendingBulk}
 									className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-xs font-medium disabled:opacity-50"
-									title="Enviar credenciales por correo"
+									title="Reenviar credenciales por correo"
 								>
 									{isSendingBulk ? (
 										<svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1305,7 +1305,7 @@ const ResidentsList = ({
 													onResendCredentials(resident);
 												}}
 												className="p-2 hover:bg-blue-100 rounded-lg transition-colors group"
-												title="Enviar credenciales por correo"
+												title="Reenviar credenciales por correo"
 											>
 												<Mail size={20} className="text-blue-600 group-hover:text-blue-700" />
 											</button>

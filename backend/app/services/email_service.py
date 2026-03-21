@@ -203,34 +203,11 @@ class EmailService:
     
     def _render_template(self, template: str, data: dict) -> str:
         """
-        Renderiza una plantilla con los datos proporcionados.
-        Implementación simple de reemplazo de placeholders.
+        Renderiza una plantilla con los datos proporcionados usando Jinja2.
+        Soporta condicionales {% if %}, bucles {% for %}, y filtros de Jinja2.
         """
-        rendered = template
-        
-        for key, value in data.items():
-            placeholder = f"{{{{{key}}}}}"
-            rendered = rendered.replace(placeholder, str(value) if value is not None else "")
-        
-        # Manejar condicionales simples {{#if field}}...{{/if}}
-        # Para una implementación completa, considera usar Jinja2
-        import re
-        
-        # Eliminar bloques condicionales si el campo está vacío
-        conditional_pattern = r'\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}'
-        matches = re.finditer(conditional_pattern, rendered, re.DOTALL)
-        
-        for match in matches:
-            field_name = match.group(1)
-            content = match.group(2)
-            full_match = match.group(0)
-            
-            if field_name in data and data[field_name]:
-                rendered = rendered.replace(full_match, content)
-            else:
-                rendered = rendered.replace(full_match, "")
-        
-        return rendered
+        template_obj = Template(template)
+        return template_obj.render(**data)
     
     async def send_meeting_invitation(
         self,
@@ -295,8 +272,7 @@ class EmailService:
                     UserModel.id == UserResidentialUnitModel.int_user_id
                 ).where(
                     UserResidentialUnitModel.int_residential_unit_id == meeting.int_id_residential_unit,
-                    UserModel.id.in_(user_ids),
-                    UserModel.bln_allow_entry == True
+                    UserModel.id.in_(user_ids)
                 )
             else:
                 # Enviar a todos los usuarios de la unidad residencial
@@ -307,8 +283,7 @@ class EmailService:
                     UserResidentialUnitModel,
                     UserModel.id == UserResidentialUnitModel.int_user_id
                 ).where(
-                    UserResidentialUnitModel.int_residential_unit_id == meeting.int_id_residential_unit,
-                    UserModel.bln_allow_entry == True
+                    UserResidentialUnitModel.int_residential_unit_id == meeting.int_id_residential_unit
                 )
             
             result = await db.execute(query)
@@ -319,7 +294,7 @@ class EmailService:
                 return {"error": "No se encontraron usuarios"}
             
             # Cargar plantilla
-            template = self._load_template("meeting_invitation_email.html")
+            template = self._load_template("email_meeting_invitation.html")
             
             # Formatear fecha y hora
             meeting_date, meeting_time = self._format_datetime(meeting.dat_schedule_date)
@@ -347,15 +322,33 @@ class EmailService:
                     "residential_unit": residential_unit.str_name if residential_unit else "No especificada",
                     "meeting_date": meeting_date,
                     "meeting_time": meeting_time,
-                    "duration": str(meeting.int_estimated_duration),
+                    "duration": str(meeting.int_estimated_duration) if meeting.int_estimated_duration else "0",
                     "meeting_type": meeting.str_meeting_type,
                     "organizer_name": organizer_name,
                     "meeting_description": meeting.str_description or "",
-                    "zoom_meeting_id": str(meeting.int_zoom_meeting_id),
+                    "zoom_meeting_id": str(meeting.int_zoom_meeting_id) if meeting.int_zoom_meeting_id else "",
                     "zoom_password": meeting.str_zoom_password or "",
-                    "zoom_join_url": meeting.str_zoom_join_url,
-                    "current_year": str(datetime.now().year)
+                    "zoom_join_url": meeting.str_zoom_join_url or "",
+                    "str_modality": meeting.str_modality or "presencial",
+                    "current_year": str(datetime.now().year),
+                    "auto_login_url": None,
+                    "auto_login_token": None,
                 }
+                
+                # Generar token de auto-login
+                from app.services.simple_auto_login_service import SimpleAutoLoginService
+                auto_login_service = SimpleAutoLoginService()
+                auto_login_token = auto_login_service.generate_auto_login_token(
+                    username=user.str_username,
+                    expiration_hours=24
+                )
+                if auto_login_token:
+                    frontend_url = "https://app.giramaster.com"
+                    template_data["auto_login_url"] = f"{frontend_url}/auto-login/{auto_login_token}"
+                    template_data["auto_login_token"] = auto_login_token
+                    logger.info(f"Auto-login generado para {data_user.str_email}")
+                else:
+                    logger.warning(f"No se pudo generar auto-login token para {data_user.str_email}")
                 
                 # Renderizar plantilla
                 html_content = self._render_template(template, template_data)
@@ -460,7 +453,7 @@ class EmailService:
         """
         try:
             # Cargar el template HTML
-            template_path = self.templates_dir / "admin_invitation.html"
+            template_path = self.templates_dir / "email_admin_credentials.html"
             
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
@@ -527,7 +520,7 @@ class EmailService:
         # ────────────────────────────────────────────────────────────────────────
     ) -> bool:
         try:
-            template_path = self.templates_dir / "welcome_coproprietario.html"
+            template_path = self.templates_dir / "email_coproprietario_credentials.html"
 
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
@@ -604,7 +597,7 @@ class EmailService:
         """
         try:
             # Cargar template
-            template_path = self.templates_dir / "welcome_guest.html"
+            template_path = self.templates_dir / "email_guest_credentials.html"
             
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()

@@ -3,6 +3,7 @@ import { ResidentService } from '../../../services/api/ResidentService';
 import CoownerService from '../../../services/api/coownerService';
 import Swal from 'sweetalert2';
 import { showBulkDeleteWithLoading } from '../../common/BulkDeleteConfirmModal';
+import { Mail } from 'lucide-react';
 
 export const useResidentOperations = (unitId) => {
 	const queryClient = useQueryClient();
@@ -181,7 +182,7 @@ export const useResidentOperations = (unitId) => {
 				icon: successful === total_processed ? 'success' : 'warning',
 				title:
 					successful === total_processed
-						? '¡Credenciales Enviadas!'
+						? '¡Enlaces Enviados!'
 						: 'Envío Parcial',
 				html: `
           <div class="text-left">
@@ -228,10 +229,10 @@ export const useResidentOperations = (unitId) => {
 	// Handler para reenviar credenciales individuales
 	const handleResendCredentials = async (resident) => {
 		const result = await Swal.fire({
-			title: '¿Enviar credenciales?',
+			title: '¿Reenviar credenciales?',
 			html: `
         <div class="text-left">
-          <p class="mb-3">Se generará una nueva contraseña temporal y se enviará por correo a:</p>
+          <p class="mb-3">Se enviará un enlace de acceso directo por correo a:</p>
           <div class="bg-blue-50 p-3 rounded-lg">
             <p class="font-semibold text-blue-800">${resident.firstname} ${resident.lastname}</p>
             <p class="text-sm text-blue-700 mt-1">
@@ -241,6 +242,9 @@ export const useResidentOperations = (unitId) => {
               <strong>Usuario:</strong> ${resident.username}
             </p>
           </div>
+          <p class="text-xs text-gray-600 mt-3">
+            💡 Podrá acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 24 horas.
+          </p>
         </div>
       `,
 			icon: 'question',
@@ -272,10 +276,10 @@ export const useResidentOperations = (unitId) => {
 		if (result.isConfirmed && result.value?.success) {
 			Swal.fire({
 				icon: 'success',
-				title: '¡Credenciales Enviadas!',
+				title: '¡Enlace Enviado!',
 				html: `
           <div class="text-left">
-            <p class="mb-2">Las credenciales han sido enviadas exitosamente a:</p>
+            <p class="mb-2">El enlace de acceso ha sido enviado exitosamente a:</p>
             <div class="bg-green-50 p-3 rounded-lg">
               <p class="text-sm text-green-700">
                 <strong>Email:</strong> ${resident.email}
@@ -285,7 +289,7 @@ export const useResidentOperations = (unitId) => {
               </p>
             </div>
             <p class="text-xs text-gray-600 mt-3">
-              📧 El copropietario recibirá un correo con su nueva contraseña temporal.
+              💡 Recibirá un enlace para acceder directamente al sistema sin contraseña. Vigencia de 24 horas.
             </p>
           </div>
         `,

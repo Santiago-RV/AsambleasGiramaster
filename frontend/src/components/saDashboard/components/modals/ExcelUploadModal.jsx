@@ -229,8 +229,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 									<strong>apartment_number</strong> - Número de apartamento
 								</li>
 								<li>
-									<strong>voting_weight</strong> - Peso de votación (ej: 0.25,
-									0.30, 0.15)
+									<strong>voting_weight</strong> - Peso de votación (ej: 0.25, 1, 6)
 								</li>
 							</ul>
 						</div>
@@ -277,7 +276,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 										<td className="px-2">González</td>
 										<td className="px-2">3003213232</td>
 										<td className="px-2">102</td>
-										<td className="px-2 font-bold text-purple-600">0.30</td>
+										<td className="px-2 font-bold text-purple-600">1</td>
 									</tr>
 								</tbody>
 							</table>

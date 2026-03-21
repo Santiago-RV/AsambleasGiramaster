@@ -313,30 +313,53 @@ export default function AppAdmin() {
 
   // Handler para enviar el formulario de reunión
   const handleSubmitMeeting = (data, { isEditing, meetingId, onSuccess }) => {
-    const meetingData = {
-      int_id_residential_unit: parseInt(residentialUnitId),
-      str_title: data.str_title,
-      str_description: data.str_description || '',
-      str_meeting_type: data.str_meeting_type,
-      bln_allow_delegates: data.bln_allow_delegates,
-      int_estimated_duration: 0,
-      dat_schedule_date: data.dat_schedule_start,
-      str_modality: meetingMode,
-      int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id
-        ? parseInt(data.int_zoom_account_id) : null,
-    };
-
     if (isEditing && meetingId) {
-      // Actualizar reunión existente
-      MeetingService.updateMeeting(meetingId, meetingData).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
-        onSuccess?.();
-        setShowMeetingModal(false);
-        setMeetingToEdit(null);
-      });
+      const updateData = {
+        str_title: data.str_title,
+        str_description: data.str_description || '',
+        str_meeting_type: data.str_meeting_type,
+        bln_allow_delegates: data.bln_allow_delegates,
+        dat_schedule_date: data.dat_schedule_start,
+      };
+      MeetingService.updateMeeting(meetingId, updateData)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+          Swal.fire({
+            icon: 'success',
+            title: '¡Reunión Actualizada!',
+            text: 'Los cambios se han guardado correctamente',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            backdrop: false,
+          });
+          onSuccess?.();
+          setShowMeetingModal(false);
+          setMeetingToEdit(null);
+        })
+        .catch((error) => {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error al actualizar',
+            text: error.response?.data?.message || error.message || 'No se pudo actualizar la reunión',
+            confirmButtonColor: '#ef4444',
+          });
+        });
     } else {
-      // Crear nueva reunión
-      createMeetingMutation.mutate(meetingData, {
+      const createData = {
+        int_id_residential_unit: parseInt(residentialUnitId),
+        str_title: data.str_title,
+        str_description: data.str_description || '',
+        str_meeting_type: data.str_meeting_type,
+        bln_allow_delegates: data.bln_allow_delegates,
+        int_estimated_duration: 0,
+        dat_schedule_date: data.dat_schedule_start,
+        str_modality: meetingMode,
+        int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id
+          ? parseInt(data.int_zoom_account_id) : null,
+      };
+      createMeetingMutation.mutate(createData, {
         onSuccess: () => {
           onSuccess?.();
           setShowMeetingModal(false);

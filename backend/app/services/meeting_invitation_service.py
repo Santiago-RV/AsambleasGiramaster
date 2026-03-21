@@ -77,6 +77,9 @@ class MeetingInvitationService:
                 + (f", Usuario activado: Sí" if user_activated else "")
             )
             
+            # NOTA: El envío de email se maneja en create_batch_invitations()
+            # para evitar duplicación y conflictos de transacciones
+            
             return invitation
         except Exception as e:
             await self.db.rollback()

@@ -3,6 +3,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 import pandas as pd
+import secrets
+import string
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
 from sqlalchemy.exc import IntegrityError
@@ -34,6 +36,34 @@ logger = logging.getLogger(__name__)
 class ResidentialUnitService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    def _generate_secure_password(firstname: str, lastname: str = None, identifier: str = None) -> str:
+        """
+        Genera una contraseña segura basada en el nombre del usuario.
+        Formato: 2 letras nombre + 2 letras apellido + 4 dígitos + !@
+        Ejemplo: "Juan Pérez" → "jupe1234!@"
+        
+        Args:
+            firstname: Primer nombre del usuario
+            lastname: Apellido del usuario (opcional)
+            identifier: Identificador adicional (ej: número de apartamento)
+        
+        Returns:
+            Contraseña segura de 10 caracteres
+        """
+        name_part = firstname[:2].lower() if firstname else "us"
+        lastname_part = lastname[:2].lower() if lastname else "ua"
+        digits = ''.join(secrets.choice(string.digits) for _ in range(4))
+        
+        password = f"{name_part}{lastname_part}{digits}!@"
+        
+        if identifier and len(identifier) >= 2:
+            id_part = ''.join(c for c in identifier[:4] if c.isalnum()).lower()
+            if id_part:
+                password = f"{name_part}{id_part}{digits}!@"
+        
+        return password
 
     async def get_residential_units(self) -> List[ResidentialUnitModel]:
         """Obtiene todas las unidades residenciales"""
@@ -431,7 +461,11 @@ class ResidentialUnitService:
                     lastname = str(row_dict['lastname']).strip()
                     apartment_number = str(row_dict['apartment_number']).strip()
                     phone = str(row_dict.get('phone', '')).strip() if pd.notna(row_dict.get('phone')) else None
-                    password = str(row_dict.get('password', 'Temporal123!')).strip()
+                    password_from_excel = str(row_dict.get('password', '')).strip()
+                    if password_from_excel and len(password_from_excel) >= 8:
+                        password = password_from_excel
+                    else:
+                        password = self._generate_secure_password(firstname, lastname, apartment_number)
                     
                     # Validar y convertir voting_weight
                     try:
@@ -439,7 +473,7 @@ class ResidentialUnitService:
                         if voting_weight <= 0 or voting_weight > 100:
                             raise ValueError("El peso de votación debe estar entre 0 y 100")
                     except (ValueError, TypeError) as e:
-                        raise ValueError(f"Peso de votación inválido: {row_dict.get('voting_weight')}. Debe ser un número decimal (ej: 0.25)")
+                        raise ValueError(f"Peso de votación inválido: {row_dict.get('voting_weight')}. Debe ser un número (ej: 0.25 o 1)")
 
                     # Validaciones básicas
                     if len(firstname) < 2:
@@ -671,7 +705,7 @@ class ResidentialUnitService:
             email = resident_data.get('email', '').strip().lower()
             phone = resident_data.get('phone', '').strip() if resident_data.get('phone') else None
             apartment_number = resident_data.get('apartment_number', '').strip()
-            password = resident_data.get('password', 'Temporal123!')
+            password = self._generate_secure_password(firstname, lastname, apartment_number)
             is_active = resident_data.get('is_active', False)  # Por defecto deshabilitado
             voting_weight = resident_data.get('voting_weight', Decimal('0.0'))
             
@@ -868,7 +902,7 @@ class ResidentialUnitService:
         """
         try:
             # Leer template HTML
-            template_path = Path(__file__).parent.parent / "templates" / "welcome_coproprietario.html"
+            template_path = Path(__file__).parent.parent / "templates" / "email_coproprietario_credentials.html"
             
             if not template_path.exists():
                 logger.error(f"Template de email no encontrado: {template_path}")
@@ -880,26 +914,27 @@ class ResidentialUnitService:
             # Convertir voting_weight a porcentaje para mostrar
             voting_weight_percent = float(voting_weight) * 100
             
-            # Reemplazar variables en el template
-            html_content = html_template.replace('{{user_name}}', user_name)
-            html_content = html_content.replace('{{residential_unit_name}}', residential_unit_name)
-            html_content = html_content.replace('{{apartment_number}}', apartment_number)
-            html_content = html_content.replace('{{user_email}}', user_email)
-            html_content = html_content.replace('{{username}}', username)
-            html_content = html_content.replace('{{password}}', password)
-            html_content = html_content.replace('{{voting_weight}}', f"{voting_weight_percent:.2f}")
-            html_content = html_content.replace('{{current_year}}', str(datetime.now().year))
-            html_content = html_content.replace('{{login_url}}', 'http://localhost:5173/login')
+            # Separar nombre completo en firstname y lastname
+            name_parts = user_name.split(' ', 1)
+            firstname = name_parts[0] if name_parts else user_name
+            lastname = name_parts[1] if len(name_parts) > 1 else ''
             
-            # Manejar teléfono opcional
-            if phone:
-                html_content = html_content.replace('{{#if phone}}', '')
-                html_content = html_content.replace('{{/if}}', '')
-                html_content = html_content.replace('{{phone}}', phone)
-            else:
-                # Remover sección de teléfono si no existe
-                import re
-                html_content = re.sub(r'{{#if phone}}.*?{{/if}}', '', html_content, flags=re.DOTALL)
+            # Usar Jinja2 para renderizar el template correctamente
+            from jinja2 import Template
+            template = Template(html_template)
+            html_content = template.render(
+                firstname=firstname,
+                lastname=lastname,
+                username=username,
+                password=password,
+                residential_unit_name=residential_unit_name,
+                apartment_number=apartment_number,
+                voting_weight=f"{voting_weight_percent:.2f}",
+                user_email=user_email,
+                phone=phone,
+                current_year=str(datetime.now().year),
+                auto_login_url=None
+            )
             
             # Enviar email usando credenciales de DB
             from app.utils.email_sender import EmailSender

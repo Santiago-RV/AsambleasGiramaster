@@ -68,7 +68,7 @@ class MeetingUpdateRequest(BaseModel):
     str_description: Optional[str] = Field(None, max_length=1000, description="Descripción de la reunión")
     str_meeting_type: Optional[str] = Field(None, description="Tipo de reunión")
     dat_schedule_date: Optional[datetime] = Field(None, description="Fecha y hora programada")
-    int_estimated_duration: Optional[int] = Field(None, ge=15, le=480, description="Duración estimada en minutos")
+    int_estimated_duration: Optional[int] = Field(None, ge=0, le=480, description="Duración estimada en minutos (0 = indefinida)")
     bln_allow_delegates: Optional[bool] = Field(None, description="Permite delegados")
     str_status: Optional[str] = Field(None, description="Estado de la reunión")
 
