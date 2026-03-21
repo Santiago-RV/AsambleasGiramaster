@@ -73,6 +73,7 @@ const generatePieChartImage = (attendedCount, absentCount) => {
             type: 'pie',
             data: {
                 labels: ['Asistentes', 'Ausentes'],
+                position: 'right',
                 datasets: [{
                     data: [attendedCount, absentCount],
                     backgroundColor: ['#16a34a', '#dc2626']
@@ -109,8 +110,8 @@ const generatePieChartImage = (attendedCount, absentCount) => {
 
 const generatePollChartImage = async (poll) => {
     const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 800;
+    canvas.width = 500;
+    canvas.height = 500;
 
     const ctx = canvas.getContext('2d');
 
@@ -136,7 +137,12 @@ const generatePollChartImage = async (poll) => {
             responsive: false,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14
+                            },
+                        }   
                 }
             }
         }
@@ -199,30 +205,7 @@ const generateAttendancePDF = async (data) => {
     });
 
     y = doc.lastAutoTable.finalY + 10;
-    // GRAFICO
-    const chartImage = await generatePieChartImage(attended.length, absent.length);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const imgWidth = 120;
-    const x = (pageWidth - imgWidth) / 2;
 
-    if (!chartImage || !chartImage.startsWith('data:image/png')) {
-        throw new Error('Error generando gráfico');
-    }
-
-    if (y > 150) {
-        doc.addPage();
-        y = 20;
-    }
-
-    // Título
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(30, 58, 138);
-    doc.text('GRÁFICO DE ASISTENCIA', 14, y);
-    y += 6;
-
-    doc.addImage(chartImage, 'PNG', x, y, imgWidth, 100);
-    y += 110;
 
     // AUSENTES 
     if (absent.length > 0) {
@@ -252,7 +235,30 @@ const generateAttendancePDF = async (data) => {
             margin: { left: 14, right: 14 },
         });
     }
+    // GRAFICO
+    const chartImage = await generatePieChartImage(attended.length, absent.length);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const imgWidth = 120;
+    const x = (pageWidth - imgWidth) / 2;
 
+    if (!chartImage || !chartImage.startsWith('data:image/png')) {
+        throw new Error('Error generando gráfico');
+    }
+
+    if (y > 150) {
+        doc.addPage();
+        y = 20;
+    }
+    y += 30;
+    // Título
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 58, 138);
+    doc.text('GRÁFICO DE ASISTENCIA', 14, y);
+    y += 25;
+
+    doc.addImage(chartImage, 'PNG', x, y, imgWidth, 100);
+    y += 120 + 10;
  
     addFooter(doc);
     doc.save(`Asistencia_${meeting.title.replace(/\s/g, '_')}.pdf`);

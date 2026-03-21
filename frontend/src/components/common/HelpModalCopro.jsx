@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, QrCode, Mail, UserCheck, UserX, MoreVertical,Eye,SquarePen, Trash2 } from "lucide-react";
 export default function HelpModalCopro({ isOpen, onClose }) {
 
   if (!isOpen) return null;
@@ -19,17 +19,20 @@ export default function HelpModalCopro({ isOpen, onClose }) {
           Guía de uso
         </h2>
 
-        <ol className="list-decimal pl-5 space-y-2 text-gray-700">
-          <li>Usa <b>Cargar Excel</b> para adjuntar un archivo con el formato sugerido para cargar una lista de residentes. </li>
-          <li>Usa <b>Agregar Copropietario</b> para registrar un nuevo residente. </li>
-          <li>Usa <b>Agregar Invitado</b> para registrar visitantes. </li>
-          <li>Usa <b>Soporte Tecnico</b> para asignar, modificar o eliminar el contacto de soporte tecnico de la unidad residencial. </li>
-          <li>Usa <b>Escanear Qr</b> para abrir la aplicacion de camara y escanear qr de asistencia. </li>
-          <li>Usa <b>Nueva Reunión</b> para crear una asamblea. </li>
-          <li>Selecciona el tipo de asamblea (Virtual o presencial)</li>
-          <li>Ingresa la información de la asamblea</li>
-          <li><b>Recuerde:</b> Una vez creada la asamblea esta se puede iniciar, modificar o cancelar, además solo los usuarios activos recibirán la invitación</li>
-          
+        <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 list-decimal pl-5 text-gray-700">
+
+          <li>Usa <b>La barra de busqueda</b> para filtrar los residentes segun el criterio de busqueda. </li>
+          <li>Usa <b>Seleccionar todos</b> para relizar una acccion sobre todos los residentes. </li>
+          <li>Usa <b>La seleccion individual</b> para relizar una acccion sobre los residentes seleccionados. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><QrCode className="w-4 h-4"/></b> para ver las opciones para compartir el acceso a la plataforma. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><Mail className="w-4 h-4"/></b> para enviar las crendeciales de acceso al correo registrado del residente. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><UserCheck className="w-4 h-4"/></b> para desabilitar el acceso del residente seleccionado. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><UserX className="w-4 h-4"/></b> para habilitar el acceso del residente seleccionado. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><MoreVertical className="w-4 h-4"/></b> para ver las opciones adicionales. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><Eye className="w-4 h-4"/></b> para ver los detalles del residente seleccionado. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><SquarePen className="w-4 h-4"/></b> para editar la informacion del residente seleccionado. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><QrCode className="w-4 h-4"/></b> para ver las opciones para compartir el acceso a la plataforma. </li>
+          <li>Usa <b className="inline-flex items-center gap-1"><Trash2 className="w-4 h-4"/></b> para eliminar el residente seleccionado </li>
         </ol>
       </div>
     </div>
