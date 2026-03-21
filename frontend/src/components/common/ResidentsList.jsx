@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import logoGiramaster from '../../assets/logo-giramaster.jpeg';
+import HelpModalCopro from "./HelpModalCopro";
 
 const SVG_ICONS = {
 	checkCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
@@ -55,7 +56,7 @@ const ResidentsList = ({
 	const [autoLoginUrl, setAutoLoginUrl] = useState('');
 	const [isSendingQRs, setIsSendingQRs] = useState(false);
 	const menuButtonRefs = useRef({});
-
+  	const [isHelpModalCopro, setIsHelpModalCoproOpen] = useState(false);
 	// Estado para modal de invitación a reunión
 	const [showInviteModal, setShowInviteModal] = useState(false);
 	const [invitableMeetings, setInvitableMeetings] = useState([]);
@@ -1509,6 +1510,10 @@ const ResidentsList = ({
 					</div>
 				</Modal>
 			)}
+					<HelpModalCopro
+					  isOpen={isHelpModalCopro}
+					  onClose={() => setIsHelpModalCoproOpen(false)}
+					/>
 		</div>
 	);
 };
