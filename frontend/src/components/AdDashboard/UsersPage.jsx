@@ -675,7 +675,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
               queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
               queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
               queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
-              queryClient.refetchQueries({ 
+              queryClient.refetchQueries({
                 queryKey: ['residential-unit-residents', residentialUnitId],
                 type: 'active',
                 throwOnError: false

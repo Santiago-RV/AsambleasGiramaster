@@ -1522,7 +1522,7 @@ class ResidentialUnitService:
         
         try:
             # ============================================
-            # PASO 1: Validar que el email no exista
+            # PASO 1: Buscar DataUser existente por email o crear uno nuevo
             # ============================================
             query_email_check = select(DataUserModel).where(
                 DataUserModel.str_email == admin_data.str_email
@@ -1531,28 +1531,24 @@ class ResidentialUnitService:
             existing_email = result_email.scalar_one_or_none()
 
             if existing_email:
-                raise ValueError(
-                    f"Ya existe un usuario con el email {admin_data.str_email}. "
-                    "Por favor utiliza otro email o asigna ese usuario existente como administrador."
+                # Reutilizar el DataUser existente (misma persona, múltiples unidades)
+                data_user = existing_email
+                logger.info(f"Email {admin_data.str_email} ya existe, reutilizando DataUser ID {data_user.id}")
+            else:
+                # ============================================
+                # PASO 2: Crear registro en tbl_data_users
+                # ============================================
+                data_user = DataUserModel(
+                    str_firstname=admin_data.str_firstname,
+                    str_lastname=admin_data.str_lastname,
+                    str_email=admin_data.str_email,
+                    str_phone=admin_data.str_phone,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
                 )
-
-            logger.info(f"Email {admin_data.str_email} disponible para nuevo administrador")
-
-            # ============================================
-            # PASO 2: Crear registro en tbl_data_users
-            # ============================================
-            data_user = DataUserModel(
-                str_firstname=admin_data.str_firstname,
-                str_lastname=admin_data.str_lastname,
-                str_email=admin_data.str_email,
-                str_phone=admin_data.str_phone,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
-            self.db.add(data_user)
-            await self.db.flush()
-
-            logger.info(f"DataUser creado: ID {data_user.id}")
+                self.db.add(data_user)
+                await self.db.flush()
+                logger.info(f"DataUser creado: ID {data_user.id}")
 
             # ============================================
             # PASO 3: Generar username y contraseña

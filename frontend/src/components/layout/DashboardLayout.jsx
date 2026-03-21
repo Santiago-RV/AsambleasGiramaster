@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { Menu } from 'lucide-react';
+import { Menu, RefreshCw } from 'lucide-react';
 
 const DashboardLayout = ({
   title,
@@ -105,6 +105,15 @@ const DashboardLayout = ({
           <div className="flex-1 min-w-0 overflow-hidden">
             {header}
           </div>
+
+          {/* Botón refrescar */}
+          <button
+            onClick={() => window.location.reload()}
+            title="Refrescar"
+            className="flex-shrink-0 p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <RefreshCw size={18} />
+          </button>
         </header>
 
 
