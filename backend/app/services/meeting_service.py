@@ -618,6 +618,12 @@ class MeetingService:
                 }
             else:
                 logger.info(f"ℹ️ Usuario {user_id} ya registrado en reunión {meeting_id} desde {invitation.dat_joined_at}")
+                # Si el admin cerró la sesión y el usuario re-ingresa, limpiar dat_left_at
+                if invitation.dat_left_at is not None:
+                    invitation.dat_left_at = None
+                    invitation.updated_at = datetime.now()
+                    await self.db.commit()
+                    logger.info(f"✅ dat_left_at limpiado: usuario {user_id} re-ingresó a reunión {meeting_id}")
                 return {
                     "success": True,
                     "message": "Usuario ya registrado previamente",
@@ -964,6 +970,16 @@ class MeetingService:
                     f"Auto-attendance: Usuario {user_id} ya registrado en reunion "
                     f"{active_meeting.id} desde {invitation.dat_joined_at}"
                 )
+                # Si el admin cerró la sesión (dat_left_at set) y el usuario re-ingresa,
+                # limpiar dat_left_at para que vuelva a aparecer como conectado
+                if invitation.dat_left_at is not None:
+                    invitation.dat_left_at = None
+                    invitation.updated_at = datetime.now()
+                    await self.db.commit()
+                    logger.info(
+                        f"Auto-attendance: dat_left_at limpiado para usuario {user_id} "
+                        f"que re-ingresó a reunión {active_meeting.id}"
+                    )
                 return {
                     "registered": True,
                     "already_registered": True,

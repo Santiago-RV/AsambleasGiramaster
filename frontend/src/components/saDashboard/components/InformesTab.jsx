@@ -177,7 +177,7 @@ const generateAttendancePDF = async (data) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(22, 101, 52);
-    doc.text(`✔ ASISTENTES (${attended.length})`, 14, y);
+    doc.text(`>> ASISTENTES (${attended.length})`, 14, y);
     y += 4;
 
     autoTable(doc, {
@@ -217,7 +217,7 @@ const generateAttendancePDF = async (data) => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(185, 28, 28);
-        doc.text(`✘ AUSENTES (${absent.length})`, 14, y);
+        doc.text(`XX AUSENTES (${absent.length})`, 14, y);
         y += 4;
 
         autoTable(doc, {
@@ -238,8 +238,8 @@ const generateAttendancePDF = async (data) => {
     // GRAFICO
     const chartImage = await generatePieChartImage(attended.length, absent.length);
     const pageWidth = doc.internal.pageSize.getWidth();
-    const imgWidth = 120;
-    const x = (pageWidth - imgWidth) / 2;
+    const imgSize = 110;
+    const x = (pageWidth - imgSize) / 2;
 
     if (!chartImage || !chartImage.startsWith('data:image/png')) {
         throw new Error('Error generando gráfico');
@@ -254,11 +254,11 @@ const generateAttendancePDF = async (data) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(30, 58, 138);
-    doc.text('GRÁFICO DE ASISTENCIA', 14, y);
+    doc.text('GRAFICO DE ASISTENCIA', 14, y);
     y += 25;
 
-    doc.addImage(chartImage, 'PNG', x, y, imgWidth, 100);
-    y += 120 + 10;
+    doc.addImage(chartImage, 'PNG', x, y, imgSize, imgSize);
+    y += imgSize + 10;
  
     addFooter(doc);
     doc.save(`Asistencia_${meeting.title.replace(/\s/g, '_')}.pdf`);
@@ -384,11 +384,11 @@ const generatePollsPDF = async (data) => {
         y += 6;
 
         const pageWidth = doc.internal.pageSize.getWidth();
-        const imgWidth = 140;
-        const x = (pageWidth - imgWidth) / 2;
+        const imgSize = 110;
+        const x = (pageWidth - imgSize) / 2;
 
-        doc.addImage(chartImage, 'PNG', x, y, imgWidth, 100);
-        y += 110;
+        doc.addImage(chartImage, 'PNG', x, y, imgSize, imgSize);
+        y += imgSize + 10;
         
     };
 
