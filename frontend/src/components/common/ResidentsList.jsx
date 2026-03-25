@@ -652,7 +652,8 @@ const ResidentsList = ({
 				},
 				body: JSON.stringify({
 					user_ids: selectedResidents,
-					expiration_hours: 48
+					expiration_hours: 48,
+					frontend_url: window.location.origin
 				})
 			});
 

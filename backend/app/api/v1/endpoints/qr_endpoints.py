@@ -97,6 +97,7 @@ class BulkQRSimpleRequest(BaseModel):
     """Request para generar tokens QR simples en masa (sin imágenes)"""
     user_ids: List[int]
     expiration_hours: int = 48
+    frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
 
 
 class QRTokenData(BaseModel):
@@ -626,7 +627,10 @@ async def generate_qr_bulk_simple(
                     )
                 
                 # Construir URL de auto-login
-                frontend_url = os.getenv("FRONTEND_URL", "https://asambleas.giramaster.co")
+                if request.frontend_url:
+                    frontend_url = request.frontend_url
+                else:
+                    frontend_url = os.getenv("FRONTEND_URL", "https://asambleas.giramaster.co")
                 auto_login_url = f"{frontend_url}/auto-login/{token}"
                 
                 # Añadir a resultados exitosos
