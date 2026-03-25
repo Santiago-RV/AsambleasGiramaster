@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { X, Save, TestTube, Eye, EyeOff, HelpCircle, Server, Key, Settings as SettingsIcon, Mail, Monitor, AlertTriangle } from 'lucide-react';
+import { X, Save, TestTube, Eye, EyeOff, HelpCircle, Server, Key, Settings as SettingsIcon, Mail, Monitor, AlertTriangle, CheckCircle } from 'lucide-react';
 import Modal from '../../common/Modal';
 import Swal from 'sweetalert2';
 import SystemConfigService from '../../../services/api/SystemConfigService';
@@ -9,23 +9,62 @@ const SMTPConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
     const [activeTab, setActiveTab] = useState('server');
     const [showPassword, setShowPassword] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
+    const [passwordConfigured, setPasswordConfigured] = useState(false);
+
+    // Función para verificar si la contraseña está enmascarada
+    const isPasswordMasked = (value) => {
+        return value && value.startsWith('***');
+    };
+
+    // Efecto para actualizar el estado de contraseña configurada
+    useEffect(() => {
+        if (currentConfig?.smtp_password) {
+            setPasswordConfigured(isPasswordMasked(currentConfig.smtp_password));
+        } else {
+            setPasswordConfigured(false);
+        }
+    }, [currentConfig]);
 
     const {
         register,
         handleSubmit,
         getValues,
+        reset,
         formState: { errors }
     } = useForm({
         defaultValues: {
-            smtp_host: currentConfig?.smtp_host || '',
-            smtp_port: currentConfig?.smtp_port || 587,
-            smtp_user: currentConfig?.smtp_user || '',
-            smtp_password: currentConfig?.smtp_password || '',
-            smtp_from_email: currentConfig?.smtp_from_email || '',
-            smtp_from_name: currentConfig?.smtp_from_name || 'GIRAMASTER - Sistema de Asambleas',
-            email_enabled: currentConfig?.email_enabled !== undefined ? currentConfig.email_enabled : true
+            smtp_host: '',
+            smtp_port: 587,
+            smtp_user: '',
+            smtp_password: '',
+            smtp_from_email: '',
+            smtp_from_name: 'GIRAMASTER - Sistema de Asambleas',
+            email_enabled: true
         }
     });
+
+    // Efecto para resetear el formulario cuando cambia currentConfig
+    useEffect(() => {
+        if (isOpen && currentConfig) {
+            reset({
+                smtp_host: currentConfig?.smtp_host || '',
+                smtp_port: currentConfig?.smtp_port || 587,
+                smtp_user: currentConfig?.smtp_user || '',
+                smtp_password: '', // Siempre vacío al abrir (la contraseña real no se puede obtener)
+                smtp_from_email: currentConfig?.smtp_from_email || '',
+                smtp_from_name: currentConfig?.smtp_from_name || 'GIRAMASTER - Sistema de Asambleas',
+                email_enabled: currentConfig?.email_enabled !== undefined ? currentConfig.email_enabled : true
+            });
+            // Actualizar estado de contraseña configurada
+            if (currentConfig?.smtp_password && currentConfig.smtp_password.startsWith('***')) {
+                setPasswordConfigured(true);
+            } else if (currentConfig?.smtp_password) {
+                setPasswordConfigured(true);
+            } else {
+                setPasswordConfigured(false);
+            }
+        }
+    }, [isOpen, currentConfig, reset]);
 
     const toggleShowPassword = () => {
         setShowPassword(prev => !prev);
@@ -34,15 +73,21 @@ const SMTPConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
     const handleTestConnection = async () => {
         const values = getValues();
         
-        // Validar campos requeridos
-        const requiredFields = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password'];
+        // Validar campos requeridos (la contraseña es opcional si ya está configurada)
+        const requiredFields = ['smtp_host', 'smtp_port', 'smtp_user'];
         const allFilled = requiredFields.every(field => values[field] && String(values[field]).trim());
         
-        if (!allFilled) {
+        // La contraseña es requerida solo si no hay una configurada previamente
+        const needsPassword = !passwordConfigured;
+        const hasPassword = values.smtp_password && String(values.smtp_password).trim();
+        
+        if (!allFilled || (needsPassword && !hasPassword)) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Campos Incompletos',
-                text: 'Por favor completa los campos obligatorios (Servidor, Puerto, Usuario y Contraseña) antes de probar la conexión'
+                text: needsPassword 
+                    ? 'Por favor completa todos los campos obligatorios (Servidor, Puerto, Usuario y Contraseña)'
+                    : 'Por favor completa los campos obligatorios (Servidor, Puerto y Usuario)'
             });
             return;
         }
@@ -98,14 +143,28 @@ const SMTPConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
 
     const sanitizeData = (data) => {
         const sanitized = { ...data };
+        
+        // Función para detectar valores enmascarados
+        const isMasked = (value) => value && value.startsWith('***');
+        
         // Convertir cadenas vacías a null en campos opcionales
-        // para evitar error de validación EmailStr en el backend
-        if (!sanitized.smtp_from_email || sanitized.smtp_from_email.trim() === '') {
+        if (!sanitized.smtp_from_email || sanitized.smtp_from_email.trim() === '' || isMasked(sanitized.smtp_from_email)) {
             sanitized.smtp_from_email = null;
         }
-        if (!sanitized.smtp_from_name || sanitized.smtp_from_name.trim() === '') {
+        if (!sanitized.smtp_from_name || sanitized.smtp_from_name.trim() === '' || isMasked(sanitized.smtp_from_name)) {
             sanitized.smtp_from_name = null;
         }
+        
+        // Si smtp_user está vacío o enmascarado, no enviarlo (conservar el existente)
+        if (!sanitized.smtp_user || sanitized.smtp_user.trim() === '' || isMasked(sanitized.smtp_user)) {
+            delete sanitized.smtp_user;
+        }
+        
+        // Si la contraseña está vacía o enmascarada, no enviarla (conservar la existente)
+        if (!sanitized.smtp_password || sanitized.smtp_password.trim() === '' || isMasked(sanitized.smtp_password)) {
+            delete sanitized.smtp_password;
+        }
+        
         return sanitized;
     };
 
@@ -292,7 +351,7 @@ const SMTPConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                                             required: 'La contraseña es obligatoria',
                                             minLength: { value: 1, message: 'La contraseña no puede estar vacía' }
                                         })}
-                                        placeholder="Ingresa tu contraseña o App Password"
+                                        placeholder={passwordConfigured ? "Nueva contraseña (dejar vacío para mantener)" : "Ingresa tu contraseña o App Password"}
                                         className={`w-full p-3 pr-12 border-2 rounded-lg font-mono text-sm focus:outline-none focus:border-orange-500 ${
                                             errors.smtp_password ? 'border-red-500' : 'border-gray-300'
                                         }`}
@@ -310,6 +369,12 @@ const SMTPConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                                         {errors.smtp_password.message}
                                     </span>
                                 )}
+                                {passwordConfigured && (
+                                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                                        <CheckCircle size={16} className="text-green-600" />
+                                        <span className="text-sm text-green-700">Contraseña configurada. Deja vacío para mantener la actual.</span>
+                                    </div>
+                                )}
                                 <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                                     <p className="text-xs text-yellow-800 flex items-start gap-1.5">
                                         <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
@@ -321,6 +386,18 @@ const SMTPConfigModal = ({ isOpen, onClose, currentConfig, onSave, isSaving }) =
                                         <li>Contraseñas de aplicaciones → Generar</li>
                                     </ol>
                                 </div>
+                            </div>
+
+                            {/* Nota informativa de encriptación */}
+                            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                <p className="text-xs text-slate-600 flex items-start gap-2">
+                                    <Key size={14} className="mt-0.5 flex-shrink-0 text-slate-500" />
+                                    <span>
+                                        <strong>Seguridad:</strong> El correo electrónico y la contraseña se almacenan 
+                                        <strong> encriptados</strong> en la base de datos mediante AES-256. 
+                                        Solo tú puedes ver y modificar estas credenciales.
+                                    </span>
+                                </p>
                             </div>
                         </div>
                     )}

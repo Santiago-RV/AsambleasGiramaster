@@ -385,7 +385,7 @@ const ResidentsList = ({
 						await Swal.fire({
 							icon: 'warning',
 							title: 'Límite de solicitudes alcanzado',
-							html: `Por favor, espera <strong>${minutes}</strong> minuto(s) antes de intentar nuevamente.`,
+							html: `Has realizado demasiadas solicitudes. Por favor, espera <strong>${minutes}</strong> minuto(s) antes de intentar nuevamente.`,
 							confirmButtonColor: '#3498db'
 						});
 
@@ -394,7 +394,7 @@ const ResidentsList = ({
 					}
 
 					const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }));
-					throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+					throw new Error(errorData.detail || errorData.message || `HTTP error! status: ${response.status}`);
 				}
 
 				const data = await response.json();
@@ -595,10 +595,30 @@ const ResidentsList = ({
 
 		} catch (error) {
 			console.error('❌ Error generando PDF:', error);
+			
+			let errorTitle = 'Error al generar PDF';
+			let errorMessage = error.message || 'Ocurrió un error inesperado al intentar generar el documento PDF.';
+			
+			if (error.message) {
+				if (error.message.includes('400') && error.message.includes('500')) {
+					errorTitle = 'Límite de residentes excedido';
+					errorMessage = error.message;
+				} else if (error.message.includes('401') || error.message.includes('Token')) {
+					errorTitle = 'Sesión expirada';
+					errorMessage = 'Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciar.';
+				} else if (error.message.includes('403')) {
+					errorTitle = 'Sin permisos';
+					errorMessage = 'No tienes permisos para generar códigos QR.';
+				} else if (error.message.includes('500')) {
+					errorTitle = 'Error del servidor';
+					errorMessage = 'Ocurrió un error en el servidor. Por favor, intenta más tarde.';
+				}
+			}
+			
 			await Swal.fire({
 				icon: 'error',
-				title: 'Error al generar PDF',
-				text: error.message || 'Ocurrió un error inesperado al intentar generar el documento PDF.',
+				title: errorTitle,
+				html: `<p>${errorMessage}</p>`,
 				confirmButtonColor: '#e74c3c',
 			});
 		} finally {
@@ -659,13 +679,13 @@ const ResidentsList = ({
 
 			if (!response.ok) {
 				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.detail || `Error HTTP ${response.status}`);
+				throw new Error(errorData.detail || errorData.message || `Error HTTP ${response.status}`);
 			}
 
 			const data = await response.json();
 			const tokens = data.data?.qr_tokens || [];
 
-			if (!tokens.length) throw new Error('No se obtuvieron datos del servidor.');
+			if (!tokens.length) throw new Error('No se obtuvo ningún token. Verifica que los residentes seleccionados estén activos en el sistema.');
 
 			// Crear workbook con ExcelJS
 			const workbook = new ExcelJS.Workbook();
@@ -727,10 +747,30 @@ const ResidentsList = ({
 
 		} catch (error) {
 			console.error('❌ Error al generar Excel:', error);
+			
+			let errorTitle = 'Error al generar Excel';
+			let errorMessage = error.message || 'Ocurrió un error inesperado al generar el archivo Excel.';
+			
+			if (error.message) {
+				if (error.message.includes('400') && error.message.includes('500')) {
+					errorTitle = 'Límite de residentes excedido';
+					errorMessage = error.message;
+				} else if (error.message.includes('401') || error.message.includes('Token')) {
+					errorTitle = 'Sesión expirada';
+					errorMessage = 'Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciar.';
+				} else if (error.message.includes('403')) {
+					errorTitle = 'Sin permisos';
+					errorMessage = 'No tienes permisos para realizar esta acción.';
+				} else if (error.message.includes('500')) {
+					errorTitle = 'Error del servidor';
+					errorMessage = 'Ocurrió un error en el servidor. Por favor, intenta más tarde.';
+				}
+			}
+			
 			Swal.fire({
 				icon: 'error',
-				title: 'Error al generar Excel',
-				text: error.message || 'Ocurrió un error inesperado.',
+				title: errorTitle,
+				html: `<p>${errorMessage}</p>`,
 				confirmButtonColor: '#e74c3c'
 			});
 		}
@@ -943,33 +983,39 @@ const ResidentsList = ({
 				Swal.close();
 			} else {
 				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.message || `Error HTTP ${response.status}: ${response.statusText}`);
+				throw new Error(errorData.message || errorData.detail || `Error HTTP ${response.status}: ${response.statusText}`);
 			}
 		} catch (error) {
-			// Mostrar error más detallado
 			let errorMessage = 'No se pudo generar el código QR de acceso';
+			let errorDetail = '';
 
 			if (error.message) {
 				if (error.message.includes('403')) {
-					errorMessage = 'No tienes permisos para generar códigos QR';
+					errorMessage = 'Sin permisos para generar QR';
+					errorDetail = 'No tienes los permisos necesarios para generar códigos QR. Contacta al administrador del sistema.';
 				} else if (error.message.includes('404')) {
 					errorMessage = 'Usuario no encontrado';
+					errorDetail = 'El residente seleccionado no existe o fue eliminado del sistema.';
 				} else if (error.message.includes('500')) {
-					errorMessage = 'Error interno del servidor. Revisa la consola para más detalles.';
+					errorMessage = 'Error interno del servidor';
+					errorDetail = 'Ocurrió un error inesperado en el servidor. Por favor, intenta más tarde o contacta a soporte técnico.';
+				} else if (error.message.includes('400')) {
+					errorMessage = 'Solicitud inválida';
+					errorDetail = error.message;
+				} else if (error.message.includes('401') || error.message.includes('Token')) {
+					errorMessage = 'Sesión expirada';
+					errorDetail = 'Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciar.';
 				} else {
-					errorMessage = `Error: ${error.message}`;
+					errorMessage = 'Error al generar QR';
+					errorDetail = error.message;
 				}
 			}
 
-
 			Swal.fire({
 				icon: 'error',
-				title: 'Error al generar QR',
+				title: errorMessage,
 				html: `
-					<p>${errorMessage}</p>
-					<p style="font-size: 12px; color: #666; margin-top: 10px;">
-						Abre la consola del navegador (F12) para ver más detalles del error.
-					</p>
+					<p>${errorDetail}</p>
 				`,
 				confirmButtonColor: '#e74c3c'
 			});

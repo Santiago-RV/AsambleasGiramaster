@@ -91,26 +91,47 @@ class SMTPCredentialsResponse(BaseModel):
     last_updated: Optional[str] = None
 
 class SMTPCredentialsUpdateRequest(BaseModel):
-    smtp_host: str = Field(..., description="Dirección del servidor SMTP (ej: smtp.gmail.com)")
-    smtp_port: int = Field(..., ge=1, le=65535, description="Puerto SMTP (común: 587 para TLS, 465 para SSL)")
-    smtp_user: EmailStr = Field(..., description="Correo electrónico para autenticación SMTP")
-    smtp_password: str = Field(..., min_length=1, description="Contraseña SMTP o App Password")
-    smtp_from_email: Optional[EmailStr] = Field(None, description="Correo del remitente (opcional)")
+    smtp_host: Optional[str] = Field(None, description="Dirección del servidor SMTP (ej: smtp.gmail.com)")
+    smtp_port: Optional[int] = Field(None, ge=1, le=65535, description="Puerto SMTP (común: 587 para TLS, 465 para SSL)")
+    smtp_user: Optional[str] = Field(None, description="Correo electrónico para autenticación SMTP")
+    smtp_password: Optional[str] = Field(None, min_length=1, description="Contraseña SMTP o App Password (opcional)")
+    smtp_from_email: Optional[str] = Field(None, description="Correo del remitente (opcional)")
     smtp_from_name: Optional[str] = Field(None, max_length=100, description="Nombre visible del remitente")
-    email_enabled: bool = Field(True, description="Activar/desactivar envío de correos del sistema")
+    email_enabled: Optional[bool] = Field(True, description="Activar/desactivar envío de correos del sistema")
 
-    @validator('smtp_from_email', pre=True, always=True)
-    def empty_string_to_none_email(cls, v):
-        """Convierte cadenas vacías a None para campos opcionales de email"""
+    @validator('smtp_host', 'smtp_user', 'smtp_password', 'smtp_from_email', 'smtp_from_name', pre=True, always=True)
+    def empty_string_to_none(cls, v):
+        """Convierte cadenas vacías a None"""
         if isinstance(v, str) and v.strip() == '':
+            return None
+        # Detectar valores enmascarados y convertirlos a None para mantener los existentes
+        if isinstance(v, str) and v.startswith('***'):
             return None
         return v
 
-    @validator('smtp_from_name', pre=True, always=True)
-    def empty_string_to_none_name(cls, v):
-        """Convierte cadenas vacías a None para campos opcionales de texto"""
-        if isinstance(v, str) and v.strip() == '':
+    @validator('smtp_from_email', pre=True, always=True)
+    def validate_from_email(cls, v):
+        """Valida que sea un email válido si se proporciona"""
+        if v is None:
             return None
+        if isinstance(v, str):
+            if v.strip() == '' or v.startswith('***'):
+                return None
+            # Validar formato de email
+            if '@' not in v or '.' not in v.split('@')[-1]:
+                raise ValueError('Debe ser un correo electrónico válido')
+        return v
+
+    @validator('smtp_user', pre=True, always=True)
+    def validate_smtp_user(cls, v):
+        """Valida que sea un email válido si se proporciona"""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            if v.strip() == '' or v.startswith('***'):
+                return None
+            if '@' not in v or '.' not in v.split('@')[-1]:
+                raise ValueError('Debe ser un correo electrónico válido')
         return v
 
 class SMTPTestConnectionResponse(BaseModel):

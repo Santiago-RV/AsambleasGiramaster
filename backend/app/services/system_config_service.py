@@ -518,12 +518,20 @@ class SystemConfigService:
             logger.error(f"Error al obtener todas las configuraciones: {str(e)}")
             raise ServiceException(f"Error al obtener configuraciones: {str(e)}")
     
-    async def get_smtp_credentials(self) -> Dict[str, any]:
+    async def get_smtp_credentials(
+        self,
+        decrypt: bool = True,
+        check_active: bool = True
+    ) -> Dict[str, any]:
         """
-        Obtiene todas las credenciales SMTP desencriptadas y enmascaradas
+        Obtiene todas las credenciales SMTP
         
+        Args:
+            decrypt: Si True, desencripta valores encriptados
+            check_active: Si True, solo retorna configuraciones activas
+            
         Returns:
-            Diccionario con credenciales SMTP (valores sensibles enmascarados)
+            Diccionario con credenciales SMTP
         """
         keys = [
             "SMTP_HOST",
@@ -537,27 +545,44 @@ class SystemConfigService:
         
         credentials = {}
         for key in keys:
-            value = await self.get_config(key, decrypt=True)
+            value = await self.get_config(key, decrypt=decrypt, silent=True)
             if value:
                 credentials[key] = value
-            else:
-                logger.debug(f"Credencial SMTP no encontrada: {key}")
+            elif not check_active:
+                # Si no está activo, intentar obtener sin verificar activo
+                stmt = select(SystemConfigModel.str_config_value, SystemConfigModel.bln_is_encrypted).where(
+                    SystemConfigModel.str_config_key == key
+                )
+                result = await self.db.execute(stmt)
+                config = result.scalar_one_or_none()
+                
+                if config:
+                    if config.bln_is_encrypted and decrypt:
+                        try:
+                            value = encryption_service.decrypt(config.str_config_value)
+                        except:
+                            value = None
+                    else:
+                        value = config.str_config_value
+                    
+                    if value:
+                        credentials[key] = value
         
         return credentials
     
     async def update_smtp_credentials(
         self,
-        smtp_host: str,
-        smtp_port: int,
-        smtp_user: str,
-        smtp_password: str,
+        smtp_host: Optional[str] = None,
+        smtp_port: Optional[int] = None,
+        smtp_user: Optional[str] = None,
+        smtp_password: Optional[str] = None,
         smtp_from_email: Optional[str] = None,
         smtp_from_name: Optional[str] = None,
-        email_enabled: bool = True,
+        email_enabled: Optional[bool] = None,
         updated_by: Optional[int] = None
     ) -> Dict[str, bool]:
         """
-        Actualiza credenciales SMTP
+        Actualiza credenciales SMTP. Solo actualiza los campos proporcionados.
         
         Returns:
             Diccionario con estado de actualización de cada credencial
@@ -565,47 +590,51 @@ class SystemConfigService:
         results = {}
         
         # SMTP Host (sin encriptar)
-        await self.set_config(
-            "SMTP_HOST",
-            smtp_host,
-            encrypt=False,
-            description="Dirección del servidor SMTP",
-            updated_by=updated_by
-        )
-        results["SMTP_HOST"] = True
+        if smtp_host is not None:
+            await self.set_config(
+                "SMTP_HOST",
+                smtp_host,
+                encrypt=False,
+                description="Dirección del servidor SMTP",
+                updated_by=updated_by
+            )
+            results["SMTP_HOST"] = True
         
         # SMTP Port (sin encriptar)
-        await self.set_config(
-            "SMTP_PORT",
-            str(smtp_port),
-            encrypt=False,
-            description="Puerto del servidor SMTP",
-            updated_by=updated_by
-        )
-        results["SMTP_PORT"] = True
+        if smtp_port is not None:
+            await self.set_config(
+                "SMTP_PORT",
+                str(smtp_port),
+                encrypt=False,
+                description="Puerto del servidor SMTP",
+                updated_by=updated_by
+            )
+            results["SMTP_PORT"] = True
         
         # SMTP User (encriptado)
-        await self.set_config(
-            "SMTP_USER",
-            smtp_user,
-            encrypt=True,
-            description="Usuario para autenticación SMTP",
-            updated_by=updated_by
-        )
-        results["SMTP_USER"] = True
+        if smtp_user is not None:
+            await self.set_config(
+                "SMTP_USER",
+                smtp_user,
+                encrypt=True,
+                description="Usuario para autenticación SMTP",
+                updated_by=updated_by
+            )
+            results["SMTP_USER"] = True
         
         # SMTP Password (encriptado)
-        await self.set_config(
-            "SMTP_PASSWORD",
-            smtp_password,
-            encrypt=True,
-            description="Contraseña para autenticación SMTP",
-            updated_by=updated_by
-        )
-        results["SMTP_PASSWORD"] = True
+        if smtp_password is not None:
+            await self.set_config(
+                "SMTP_PASSWORD",
+                smtp_password,
+                encrypt=True,
+                description="Contraseña para autenticación SMTP",
+                updated_by=updated_by
+            )
+            results["SMTP_PASSWORD"] = True
         
         # SMTP From Email (sin encriptar, opcional)
-        if smtp_from_email:
+        if smtp_from_email is not None:
             await self.set_config(
                 "SMTP_FROM_EMAIL",
                 smtp_from_email,
@@ -616,7 +645,7 @@ class SystemConfigService:
             results["SMTP_FROM_EMAIL"] = True
         
         # SMTP From Name (sin encriptar, opcional)
-        if smtp_from_name:
+        if smtp_from_name is not None:
             await self.set_config(
                 "SMTP_FROM_NAME",
                 smtp_from_name,
@@ -627,14 +656,15 @@ class SystemConfigService:
             results["SMTP_FROM_NAME"] = True
         
         # Email Enabled (sin encriptar)
-        await self.set_config(
-            "EMAIL_ENABLED",
-            str(email_enabled).lower(),
-            encrypt=False,
-            description="Activar/desactivar envío de correos",
-            updated_by=updated_by
-        )
-        results["EMAIL_ENABLED"] = True
+        if email_enabled is not None:
+            await self.set_config(
+                "EMAIL_ENABLED",
+                str(email_enabled).lower(),
+                encrypt=False,
+                description="Activar/desactivar envío de correos",
+                updated_by=updated_by
+            )
+            results["EMAIL_ENABLED"] = True
         
         logger.info(f"Credenciales SMTP actualizadas: {list(results.keys())}")
         return results

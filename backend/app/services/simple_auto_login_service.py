@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from app.core.config import settings
 from app.core.logging_config import get_logger
 
@@ -66,6 +66,57 @@ class SimpleAutoLoginService:
             raise
         except Exception as e:
             logger.error(f"Error al generar token de auto-login: {str(e)}")
+            raise
+    
+    def generate_auto_login_token_with_id(
+        self,
+        username: str,
+        token_id: str,
+        expiration_hours: int = 24,
+        meeting_id: int = None
+    ) -> str:
+        """
+        Genera un JWT temporal para auto-login usando un token_id existente.
+        Esto permite reutilizar tokens sin crear nuevos registros en la BD.
+        
+        Args:
+            username: Nombre de usuario
+            token_id: UUID del token existente a reutilizar
+            expiration_hours: Horas hasta expiración (default: 24)
+            meeting_id: ID de reunión presencial (opcional)
+            
+        Returns:
+            str: JWT token codificado
+        """
+        try:
+            now = datetime.utcnow()
+            expire = now + timedelta(hours=expiration_hours)
+            
+            if expire <= now:
+                logger.error(f"Error: La expiración calculada ({expire}) es menor que la hora actual ({now})")
+                raise ValueError("La expiración del token no puede ser en el pasado")
+            
+            payload = {
+                "sub": username,
+                "exp": expire,
+                "type": "auto_login",
+                "iat": now,
+                "jti": token_id
+            }
+            
+            if meeting_id is not None:
+                payload["meeting_id"] = meeting_id
+            
+            token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
+            
+            logger.info(f"♻️ Token de auto-login regenerado para {username} (jti: {token_id}, reutilizado)")
+            
+            return token
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error al regenerar token de auto-login: {str(e)}")
             raise
     
     def decode_auto_login_token(self, token: str) -> Optional[Dict[str, str]]:
@@ -154,6 +205,41 @@ class SimpleAutoLoginService:
         db.add(new_token)
         await db.commit()
         logger.info(f"Token creado para usuario {user_id} (token_id: {token_id})")
+    
+    async def get_valid_tokens_for_users(self, db, user_ids: List[int]) -> Dict[int, Optional[Dict]]:
+        """
+        Obtiene los tokens válidos (no expirados) para una lista de usuarios.
+        
+        Args:
+            db: Sesión de base de datos
+            user_ids: Lista de IDs de usuarios
+            
+        Returns:
+            Dict: {user_id: {"token_id": str, "expires_at": datetime} o None}
+        """
+        from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
+        from sqlalchemy import select
+        
+        now = datetime.now()
+        
+        result = await db.execute(
+            select(UsedAutoLoginTokenModel).where(
+                UsedAutoLoginTokenModel.user_id.in_(user_ids),
+                UsedAutoLoginTokenModel.expires_at > now
+            )
+        )
+        tokens = result.scalars().all()
+        
+        # Convertir a diccionario por user_id
+        user_tokens = {}
+        for token in tokens:
+            if token.user_id not in user_tokens or token.expires_at > user_tokens[token.user_id]["expires_at"]:
+                user_tokens[token.user_id] = {
+                    "token_id": token.token_id,
+                    "expires_at": token.expires_at
+                }
+        
+        return user_tokens
     
     async def is_token_valid_for_user(self, db, token_id: str, user_id: int) -> bool:
         """

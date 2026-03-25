@@ -3,8 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from datetime import timedelta
-from app.auth.auth import create_access_token, create_refresh_token, verify_refresh_token, get_current_user, get_token_jti, ACCESS_TOKEN_EXPIRE_MINUTES
-from datetime import timedelta
+from app.auth.auth import create_access_token, create_refresh_token, verify_refresh_token, get_current_user, get_token_jti, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from app.schemas.auth_token_schema import Token
 
 from app.schemas.responses_schema import SuccessResponse, ErrorResponse
@@ -187,7 +186,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         expires_delta=access_token_expires,
     )
     
-    refresh_token_expires = timedelta(days=7)
+    refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     refresh_token = create_refresh_token(
         data={"sub": exists_user.str_username},
         expires_delta=refresh_token_expires,

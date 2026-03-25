@@ -14,7 +14,7 @@ Fecha: 2026-01-26
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Dict
 from datetime import datetime
 import logging
@@ -575,16 +575,16 @@ async def generate_qr_bulk_simple(
         _check_admin_permissions(current_user)
         
         # Validar número de usuarios
-        if len(request.user_ids) > 100:
+        if len(request.user_ids) > 500:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No se pueden procesar más de 100 usuarios a la vez"
+                detail=f"Has seleccionado {len(request.user_ids)} residentes. El límite máximo es de 500. Por favor, selecciona menos residentes e intenta nuevamente."
             )
         
         if not request.user_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Debe proporcionar al menos un user_id"
+                detail="No has seleccionado ningún residente. Por favor, selecciona al menos un residente para generar los códigos QR."
             )
         
         logger.info(f"🔄 Generando tokens QR para {len(request.user_ids)} usuarios")
@@ -607,30 +607,51 @@ async def generate_qr_bulk_simple(
         qr_tokens = []
         failed_users = []
         
+        # Obtener tokens válidos existentes de los usuarios
+        user_ids = [user.id for user, _, _ in users_data]
+        existing_tokens = await simple_auto_login_service.get_valid_tokens_for_users(db, user_ids)
+        logger.info(f"📋 Tokens válidos existentes encontrados: {len(existing_tokens)}")
+        
+        # Determinar frontend_url
+        if request.frontend_url:
+            frontend_url = request.frontend_url
+        else:
+            frontend_url = os.getenv("FRONTEND_URL", "https://asambleas.giramaster.co")
+        
         # Procesar cada usuario
         for target_user, target_data_user, user_residential_unit in users_data:
             try:
-                # Generar token de auto-login (sin contraseña)
-                token = simple_auto_login_service.generate_auto_login_token(
-                    username=target_user.str_username,
-                    expiration_hours=request.expiration_hours if request.expiration_hours else 24
-                )
+                # Verificar si ya existe un token válido para este usuario
+                existing_token_data = existing_tokens.get(target_user.id)
                 
-                # Guardar el token para el usuario (invalidar anteriores)
-                token_payload = simple_auto_login_service.decode_auto_login_token(token)
-                if token_payload and token_payload.get("token_id"):
-                    await simple_auto_login_service.upsert_user_token(
-                        db, 
-                        token_payload["token_id"], 
-                        target_user.id, 
-                        None
+                if existing_token_data:
+                    # Reutilizar el token_id existente y generar nuevo JWT
+                    token_id = existing_token_data["token_id"]
+                    token = simple_auto_login_service.generate_auto_login_token_with_id(
+                        username=target_user.str_username,
+                        token_id=token_id,
+                        expiration_hours=request.expiration_hours if request.expiration_hours else 24
                     )
+                    logger.info(f"♻️ Token reutilizado para usuario {target_user.id}: {token_id}")
+                else:
+                    # Generar nuevo token de auto-login
+                    token = simple_auto_login_service.generate_auto_login_token(
+                        username=target_user.str_username,
+                        expiration_hours=request.expiration_hours if request.expiration_hours else 24
+                    )
+                    
+                    # Guardar el token para el usuario
+                    token_payload = simple_auto_login_service.decode_auto_login_token(token)
+                    if token_payload and token_payload.get("token_id"):
+                        await simple_auto_login_service.upsert_user_token(
+                            db, 
+                            token_payload["token_id"], 
+                            target_user.id, 
+                            None
+                        )
+                    logger.info(f"✅ Token generado para usuario {target_user.id}: {target_user.str_username}")
                 
                 # Construir URL de auto-login
-                if request.frontend_url:
-                    frontend_url = request.frontend_url
-                else:
-                    frontend_url = os.getenv("FRONTEND_URL", "https://asambleas.giramaster.co")
                 auto_login_url = f"{frontend_url}/auto-login/{token}"
                 
                 # Añadir a resultados exitosos
@@ -642,8 +663,6 @@ async def generate_qr_bulk_simple(
                     lastname=target_data_user.str_lastname,
                     apartment_number=user_residential_unit.str_apartment_number if user_residential_unit else "N/A"
                 ))
-                
-                logger.info(f"✅ Token generado para usuario {target_user.id}: {target_user.str_username}")
                 
             except Exception as user_error:
                 logger.error(f"❌ Error procesando usuario {target_user.id}: {str(user_error)}")

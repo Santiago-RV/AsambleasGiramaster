@@ -549,17 +549,22 @@ async def check_smtp_config_exists(
     """
     Verifica si existen credenciales SMTP configuradas
     NO requiere autenticación para permitir wizard inicial
+    Solo verifica que las claves existan en la base de datos
     """
     try:
-        config_service = SystemConfigService(db)
-        credentials = await config_service.get_smtp_credentials()
+        from sqlalchemy import select
+        from app.models.system_config_model import SystemConfigModel
         
-        has_all_credentials = all([
-            credentials.get("SMTP_HOST"),
-            credentials.get("SMTP_PORT"),
-            credentials.get("SMTP_USER"),
-            credentials.get("SMTP_PASSWORD")
-        ])
+        # Consulta directa que NO verifica bln_is_active ni desencripta
+        required_keys = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"]
+        
+        stmt = select(SystemConfigModel.str_config_key).where(
+            SystemConfigModel.str_config_key.in_(required_keys)
+        )
+        result = await db.execute(stmt)
+        configured_keys = {row[0] for row in result.all()}
+        
+        has_all_credentials = all(k in configured_keys for k in required_keys)
         
         return SuccessResponse(
             success=True,
@@ -567,10 +572,10 @@ async def check_smtp_config_exists(
             message="Estado de configuración SMTP obtenido",
             data={
                 "configured": has_all_credentials,
-                "partial": len(credentials) > 0 and not has_all_credentials,
+                "partial": len(configured_keys) > 0 and not has_all_credentials,
                 "missing_fields": [
-                    k for k in ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"]
-                    if k not in credentials
+                    k for k in required_keys
+                    if k not in configured_keys
                 ]
             }
         )
@@ -642,20 +647,40 @@ async def update_smtp_config(
 ):
     """
     Actualiza las credenciales SMTP.
-    Todos los campos son requeridos para asegurar configuración completa.
+    Los campos no proporcionados mantendrán su valor actual.
+    Los valores enmascarados (***) se ignoran para mantener los existentes.
     """
     try:
         config_service = SystemConfigService(db)
         
+        # Construir diccionario solo con campos no nulos
+        update_data = {}
+        if credentials.smtp_host is not None:
+            update_data['smtp_host'] = credentials.smtp_host
+        if credentials.smtp_port is not None:
+            update_data['smtp_port'] = credentials.smtp_port
+        if credentials.smtp_user is not None:
+            update_data['smtp_user'] = credentials.smtp_user
+        if credentials.smtp_password is not None:
+            update_data['smtp_password'] = credentials.smtp_password
+        if credentials.smtp_from_email is not None:
+            update_data['smtp_from_email'] = credentials.smtp_from_email
+        if credentials.smtp_from_name is not None:
+            update_data['smtp_from_name'] = credentials.smtp_from_name
+        if credentials.email_enabled is not None:
+            update_data['email_enabled'] = credentials.email_enabled
+        
+        if not update_data:
+            return SuccessResponse(
+                success=True,
+                status_code=status.HTTP_200_OK,
+                message="No se proporcionaron datos para actualizar",
+                data={"updated_fields": []}
+            )
+        
         results = await config_service.update_smtp_credentials(
-            smtp_host=credentials.smtp_host,
-            smtp_port=credentials.smtp_port,
-            smtp_user=credentials.smtp_user,
-            smtp_password=credentials.smtp_password,
-            smtp_from_email=credentials.smtp_from_email,
-            smtp_from_name=credentials.smtp_from_name,
-            email_enabled=credentials.email_enabled,
-            updated_by=user.id
+            updated_by=user.id,
+            **update_data
         )
         
         return SuccessResponse(

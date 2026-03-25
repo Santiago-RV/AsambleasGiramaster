@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { User, Lock, AlertCircle, ArrowRight, Eye, EyeOff, Mail, Video } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -11,12 +12,29 @@ import { AuthService } from '../services/api/AuthService';
 import SystemConfigService from '../services/api/SystemConfigService';
 
 const Login = () => {
+	const navigate = useNavigate();
 	const [showPassword, setShowPassword] = useState(false);
 	const [showMeetingModal, setShowMeetingModal] = useState(false);
 	const [activeMeeting, setActiveMeeting] = useState(null);
 	const [isRegisteringParticipation, setIsRegisteringParticipation] = useState(false);
 	const [loggedInUser, setLoggedInUser] = useState(null);
 	const [isCheckingConfig, setIsCheckingConfig] = useState(false);
+
+	// Validar si ya hay sesión activa al cargar el componente
+	useEffect(() => {
+		if (AuthService.isAuthenticated()) {
+			const user = JSON.parse(localStorage.getItem('user') || '{}');
+			const role = user?.role; // El rol ya es un string directo
+			
+			if (role === 'Super Administrador') {
+				navigate('/super-admin', { replace: true });
+			} else if (role === 'Administrador') {
+				navigate('/admin', { replace: true });
+			} else {
+				navigate('/dashboard', { replace: true });
+			}
+		}
+	}, [navigate]);
 
 	const {
 		register,
@@ -96,13 +114,17 @@ const Login = () => {
 				SystemConfigService.checkZoomConfigStatus(),
 			]);
 
+			const smtpData = smtpStatus?.data || {};
+			const zoomData = zoomStatus?.data || {};
+
 			return {
-				smtpConfigured: smtpStatus?.success && smtpStatus?.configured,
-				zoomConfigured: zoomStatus?.success && zoomStatus?.configured,
+				smtpConfigured: smtpStatus?.success && smtpData?.configured,
+				smtpMissingFields: smtpData?.missing_fields || [],
+				zoomConfigured: zoomStatus?.success && zoomData?.configured,
 			};
 		} catch (error) {
 			console.error('Error al verificar configuración:', error);
-			return { smtpConfigured: false, zoomConfigured: false };
+			return { smtpConfigured: false, smtpMissingFields: [], zoomConfigured: false };
 		}
 	};
 
@@ -111,10 +133,22 @@ const Login = () => {
 		const missingConfigs = [];
 		
 		if (!configStatus.smtpConfigured) {
+			const missingFields = configStatus.smtpMissingFields || [];
+			const fieldLabels = {
+				'SMTP_HOST': 'Servidor SMTP',
+				'SMTP_PORT': 'Puerto SMTP',
+				'SMTP_USER': 'Usuario SMTP',
+				'SMTP_PASSWORD': 'Contraseña SMTP'
+			};
+			const fieldsText = missingFields.length > 0 
+				? `<span class="text-sm text-gray-500">(${missingFields.map(f => fieldLabels[f] || f).join(', ')})</span>`
+				: '';
+				
 			missingConfigs.push({
 				name: 'Correo SMTP',
 				icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
 				color: 'text-red-500',
+				fields: fieldsText
 			});
 		}
 		
@@ -127,9 +161,12 @@ const Login = () => {
 		}
 
 		const configList = missingConfigs.map(c => 
-			`<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+			`<div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
 				<span class="${c.color}">${c.icon}</span>
-				<span class="font-medium">${c.name}</span>
+				<div class="flex flex-col">
+					<span class="font-medium">${c.name}</span>
+					${c.fields || ''}
+				</div>
 			</div>`
 		).join('');
 

@@ -25,8 +25,8 @@ class Settings(BaseSettings):
   SECRET_KEY: str = "ffgkpMfbwwWA&n!smJt=Q)-2%fQq2yLI-jFtQd&JR84IeO$itqSU!CCxrqR_s*Fz"
   REFRESH_SECRET_KEY: str = "T7C0jU!!My$3E5hz%-=&#fwWrs*w#PF%)EN%&c5VUjc-i@*W"
   ALGORITHM: str = "HS256"
-  ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-  REFRESH_TOKEN_EXPIRE_MINUTES: int = 60
+  ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 días (7 * 24 * 60)
+  REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 días
   REFRESH_TOKEN_EXPIRE_DAYS: int = 7
   
   # CORS
