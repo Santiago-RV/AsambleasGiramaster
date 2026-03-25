@@ -17,7 +17,7 @@ spec:
       containers:
         - name: frontend
           image: arwendev97/giramaster-frontend:1.0.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always #IfNotPresent
           ports:
             - containerPort: 80
               name: http

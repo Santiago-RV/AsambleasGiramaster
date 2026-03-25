@@ -213,7 +213,8 @@ class EmailService:
         self,
         db: AsyncSession,
         meeting_id: int,
-        user_ids: Optional[List[int]] = None
+        user_ids: Optional[List[int]] = None,
+        frontend_url: Optional[str] = None
     ) -> dict:
         """
         Envía invitaciones por correo a usuarios de una reunión.
@@ -224,6 +225,7 @@ class EmailService:
             db: Sesión de base de datos
             meeting_id: ID de la reunión
             user_ids: Lista opcional de IDs de usuarios específicos
+            frontend_url: URL base del frontend para construir auto-login URL
             
         Returns:
             dict: Estadísticas del envío con notificaciones registradas
@@ -343,7 +345,9 @@ class EmailService:
                     expiration_hours=24
                 )
                 if auto_login_token:
-                    frontend_url = "https://app.giramaster.com"
+                    if not frontend_url:
+                        from app.core.config import settings
+                        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://asambleas.giramaster.co')
                     template_data["auto_login_url"] = f"{frontend_url}/auto-login/{auto_login_token}"
                     template_data["auto_login_token"] = auto_login_token
                     logger.info(f"Auto-login generado para {data_user.str_email}")
@@ -434,7 +438,8 @@ class EmailService:
         username: str,
         password: str,
         residential_unit_name: str,
-        auto_login_token: Optional[str] = None
+        auto_login_token: Optional[str] = None,
+        frontend_url: Optional[str] = None
     ) -> bool:
         """
         Envía un email con las credenciales de acceso para un nuevo administrador.
@@ -447,22 +452,22 @@ class EmailService:
             password: Contraseña temporal
             residential_unit_name: Nombre de la unidad residencial
             auto_login_token: Token JWT para auto-login (opcional)
+            frontend_url: URL base del frontend para construir auto-login URL
 
         Returns:
             bool: True si se envió exitosamente, False en caso contrario
         """
         try:
-            # Cargar el template HTML
             template_path = self.templates_dir / "email_admin_credentials.html"
             
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
             
-            # Construir URL de auto-login si hay JWT
             auto_login_url = None
             if auto_login_token:
-                from app.core.config import settings
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                if not frontend_url:
+                    from app.core.config import settings
+                    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                 auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
             
             # Renderizar el template con los datos usando Jinja2
@@ -513,11 +518,10 @@ class EmailService:
         voting_weight: float,
         phone: Optional[str] = None,
         auto_login_token: Optional[str] = None,
-        # ── Nuevos parámetros de soporte técnico ────────────────────────────────
         support_name: Optional[str] = None,
         support_email: Optional[str] = None,
         support_phone: Optional[str] = None,
-        # ────────────────────────────────────────────────────────────────────────
+        frontend_url: Optional[str] = None,
     ) -> bool:
         try:
             template_path = self.templates_dir / "email_coproprietario_credentials.html"
@@ -527,8 +531,9 @@ class EmailService:
 
             auto_login_url = None
             if auto_login_token:
-                from app.core.config import settings
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                if not frontend_url:
+                    from app.core.config import settings
+                    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                 auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                 logger.info(f"🔗 URL de auto-login generada para {to_email}")
 
@@ -581,7 +586,8 @@ class EmailService:
         username: str,
         password: str,
         residential_unit_name: str,
-        auto_login_token: Optional[str] = None
+        auto_login_token: Optional[str] = None,
+        frontend_url: Optional[str] = None
     ) -> bool:
         """
         Envía email de bienvenida con credenciales para un invitado.
@@ -594,19 +600,19 @@ class EmailService:
             password: Contraseña temporal
             residential_unit_name: Nombre de la unidad residencial
             auto_login_token: Token JWT para auto-login (opcional)
+            frontend_url: URL base del frontend para construir auto-login URL
         """
         try:
-            # Cargar template
             template_path = self.templates_dir / "email_guest_credentials.html"
             
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
             
-            # Construir URL de auto-login
             auto_login_url = None
             if auto_login_token:
-                from app.core.config import settings
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                if not frontend_url:
+                    from app.core.config import settings
+                    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                 auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                 logger.info(f"🔗 URL de auto-login generada para invitado {to_email}")
             

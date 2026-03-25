@@ -4,6 +4,7 @@ Endpoints para gestión de copropietarios desde el Dashboard del Administrador
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from app.core.database import get_db
 from app.auth.auth import get_current_user 
@@ -16,6 +17,10 @@ from app.core.exceptions import ServiceException, ResourceNotFoundException
 import logging
 
 from app.schemas.email_notification_schema import BulkSendCredentialsRequest
+
+
+class ResendCredentialsRequest(BaseModel):
+    frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
 
 logger = logging.getLogger(__name__)
 
@@ -408,6 +413,7 @@ async def enable_all_coowners(
 )
 async def resend_coowner_credentials(
     coowner_id: int,
+    request: ResendCredentialsRequest,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -433,10 +439,10 @@ async def resend_coowner_credentials(
                 detail="No se encontró una unidad residencial asignada"
             )
         
-        # Reenviar credenciales
         result = await residential_service.resend_resident_credentials(
             user_id=coowner_id,
-            unit_id=admin_unit['id']
+            unit_id=admin_unit['id'],
+            frontend_url=request.frontend_url
         )
         
         return SuccessResponse(
@@ -507,11 +513,12 @@ async def send_bulk_credentials(
         errors = []
         sent_to = []
         
-        for user_id in request_data.resident_ids:  # ← Usar resident_ids aquí
+        for user_id in request_data.resident_ids:
             try:
                 result = await residential_service.resend_resident_credentials(
                     user_id=user_id,
-                    unit_id=admin_unit['id']
+                    unit_id=admin_unit['id'],
+                    frontend_url=request_data.frontend_url
                 )
                 
                 successful += 1

@@ -99,7 +99,8 @@ const CoownerService = {
 	 */
 	resendCredentials: async (coownerId) => {
 		const response = await axiosInstance.post(
-			`/admin/coowners/${coownerId}/resend-credentials`
+			`/admin/coowners/${coownerId}/resend-credentials`,
+			{ frontend_url: window.location.origin }
 		);
 		return response.data;
 	},
@@ -113,7 +114,8 @@ const CoownerService = {
 		const response = await axiosInstance.post(
 			'/admin/coowners/send-bulk-credentials',
 			{
-				resident_ids: coownerIds  // ← Cambiar de user_ids a resident_ids
+				resident_ids: coownerIds,
+				frontend_url: window.location.origin
 			}
 		);
 		return response.data;

@@ -1258,7 +1258,8 @@ class ResidentialUnitService:
         self, 
         user_id: int, 
         unit_id: int,
-        auto_commit: bool = True
+        auto_commit: bool = True,
+        frontend_url: Optional[str] = None
     ) -> dict:
         """
         Reenvía las credenciales de acceso por correo electrónico a un copropietario.
@@ -1268,6 +1269,7 @@ class ResidentialUnitService:
             user_id: ID del usuario copropietario
             unit_id: ID de la unidad residencial
             auto_commit: Si True, hace commit automático. Si False, solo flush (para operaciones bulk)
+            frontend_url: URL base del frontend para construir auto-login URL
         
         Returns:
             Dict con información del envío:
@@ -1397,6 +1399,7 @@ class ResidentialUnitService:
                     support_name=support_data["str_support_name"] if support_data else None,
                     support_email=support_data["str_support_email"] if support_data else None,
                     support_phone=support_data["str_support_phone"] if support_data else None,
+                    frontend_url=frontend_url,
                 )
                 
                 # ============================================

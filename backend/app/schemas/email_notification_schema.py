@@ -20,3 +20,4 @@ class EmailNotificationUpdate(EmailNotificationBase):
 class BulkSendCredentialsRequest(BaseModel):
     """Schema para envío masivo de credenciales"""
     resident_ids: List[int]
+    frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")

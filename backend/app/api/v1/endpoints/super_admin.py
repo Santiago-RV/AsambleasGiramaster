@@ -380,11 +380,11 @@ async def send_credentials_bulk(
         # Procesar cada copropietario
         for resident_id in request_data.resident_ids:
             try:
-                #Pasar auto_commit=False para NO cerrar la sesión
                 await residential_service.resend_resident_credentials(
                     user_id=resident_id,
                     unit_id=unit_id,
-                    auto_commit=False  # ⚠️ IMPORTANTE
+                    auto_commit=False,
+                    frontend_url=request_data.frontend_url
                 )
                 results['successful'] += 1
                 

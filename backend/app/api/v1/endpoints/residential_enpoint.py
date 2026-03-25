@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field
+from typing import Optional
 
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
@@ -12,6 +14,10 @@ from app.schemas.resident_update_schema import ResidentUpdate
 from app.core.exceptions import ResourceNotFoundException
 from app.auth.auth import get_current_user
 from app.services.user_service import UserService
+
+
+class ResendCredentialsRequest(BaseModel):
+    frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
 
 
 router = APIRouter()
@@ -331,12 +337,12 @@ async def create_resident(
 async def resend_credentials(
     unit_id: int,
     user_id: int,
+    request: ResendCredentialsRequest,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Reenvía las credenciales de acceso por correo"""
     try:
-        # Verificar permisos
         user_service = UserService(db)
         current_user_data = await user_service.get_user_by_username(current_user)
         
@@ -348,10 +354,10 @@ async def resend_credentials(
         
         residential_unit_service = ResidentialUnitService(db)
         
-        # Enviar credenciales
         result = await residential_unit_service.resend_resident_credentials(
             user_id=user_id,
-            unit_id=unit_id
+            unit_id=unit_id,
+            frontend_url=request.frontend_url
         )
         
         return SuccessResponse(

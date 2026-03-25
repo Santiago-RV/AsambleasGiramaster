@@ -2,7 +2,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.exceptions import ServiceException, ResourceNotFoundException
@@ -22,6 +22,7 @@ from app.services.user_service import UserService
 class SendInvitationRequest(BaseModel):
     """Request para enviar invitaciones por correo"""
     user_ids: Optional[List[int]] = None  # Si es None, se envía a todos los usuarios de la unidad
+    frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
 
 
 router = APIRouter()
@@ -507,7 +508,8 @@ async def send_meeting_invitations(
         stats = await email_svc.send_meeting_invitation(
             db=db,
             meeting_id=meeting_id,
-            user_ids=request.user_ids
+            user_ids=request.user_ids,
+            frontend_url=request.frontend_url
         )
         
         if "error" in stats:

@@ -37,7 +37,8 @@ export class ResidentService {
     static async resendCredentials(unitId, userId) {
         try {
             const response = await axiosInstance.post(
-                `/residential/units/${unitId}/residents/${userId}/resend-credentials`
+                `/residential/units/${unitId}/residents/${userId}/resend-credentials`,
+                { frontend_url: window.location.origin }
             );
             return response.data;
         } catch (error) {
@@ -65,8 +66,8 @@ export class ResidentService {
         }
 
         const response = await axiosInstance.post(
-            `/super-admin/residential-units/${unitId}/residents/send-credentials-bulk`,  //Correcto
-            { resident_ids: residentIds },
+            `/super-admin/residential-units/${unitId}/residents/send-credentials-bulk`,
+            { resident_ids: residentIds, frontend_url: window.location.origin },
             {
                 headers: {
                     'Authorization': `Bearer ${token}`
