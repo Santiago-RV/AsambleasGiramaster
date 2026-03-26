@@ -351,8 +351,215 @@ const QuorumReportContent = ({ data }) => {
   );
 };
 
+const fmtDate = (iso) => iso
+  ? new Date(iso).toLocaleString('es-ES', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  })
+  : '—';
+
+const optionColors = [
+  { bar: 'from-emerald-400 to-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
+  { bar: 'from-red-400 to-red-500', badge: 'bg-red-100 text-red-700' },
+  { bar: 'from-blue-400 to-blue-500', badge: 'bg-blue-100 text-blue-700' },
+  { bar: 'from-amber-400 to-amber-500', badge: 'bg-amber-100 text-amber-700' },
+  { bar: 'from-purple-400 to-purple-500', badge: 'bg-purple-100 text-purple-700' },
+];
+
+const PollDetailView = ({ poll }) => (
+  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+
+    {/* Header encuesta */}
+    <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-white text-base">{poll.title}</h3>
+          {poll.description && (
+            <p className="text-indigo-200 text-xs mt-0.5">{poll.description}</p>
+          )}
+        </div>
+        <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${
+          poll.status === 'closed' ? 'bg-gray-200 text-gray-700' :
+          poll.status === 'active' ? 'bg-green-400 text-green-900' :
+          'bg-blue-200 text-blue-800'
+        }`}>
+          {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
+        </span>
+      </div>
+
+      {/* Métricas resumen */}
+      <div className="grid grid-cols-3 gap-3 mt-4">
+        <div className="bg-white/15 rounded-lg p-2.5 text-center">
+          <p className="text-xl font-bold text-white">{poll.total_voters}</p>
+          <p className="text-xs text-indigo-200">Votantes</p>
+        </div>
+        <div className="bg-white/15 rounded-lg p-2.5 text-center">
+          <p className="text-xl font-bold text-white">
+            {typeof poll.total_weight_voted === 'number'
+              ? poll.total_weight_voted.toFixed(4)
+              : poll.total_weight_voted}
+          </p>
+          <p className="text-xs text-indigo-200">Peso Total</p>
+        </div>
+        <div className="bg-white/15 rounded-lg p-2.5 text-center">
+          <p className="text-xl font-bold text-white">{poll.options.length}</p>
+          <p className="text-xs text-indigo-200">Opciones</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="p-5 space-y-5">
+      {/* Opciones con barras + tabla de votantes */}
+      {poll.options.map((option, optIdx) => {
+        const color = optionColors[optIdx % optionColors.length];
+        const percentage = poll.total_weight_voted > 0
+          ? (option.votes_weight / poll.total_weight_voted * 100)
+          : 0;
+
+        return (
+          <div key={optIdx} className="space-y-2">
+            {/* Barra de progreso */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-gray-800">{option.text}</span>
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color.badge}`}>
+                  {option.votes_count} {option.votes_count === 1 ? 'voto' : 'votos'}
+                </span>
+                <span className="text-gray-500 text-xs">{percentage.toFixed(1)}%</span>
+              </div>
+            </div>
+            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full bg-gradient-to-r ${color.bar} rounded-full transition-all duration-500`}
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+
+            {/* Tabla de votantes de esta opción */}
+            {option.voters && option.voters.length > 0 && (
+              <div className="mt-2 rounded-lg border border-gray-100 overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-500">Tipo</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
+                      <th className="text-right px-3 py-2 font-semibold text-gray-500">Q. Real</th>
+                      <th className="text-right px-3 py-2 font-semibold text-gray-500">Q. Cedido</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {option.voters.map((voter, vIdx) => {
+                      const qReal = voter.quorum_base ?? voter.voting_weight;
+                      const qCedido = Math.max(0, (voter.voting_weight || 0) - (voter.quorum_base ?? voter.voting_weight ?? 0));
+                      return (
+                        <tr key={vIdx} className={`border-t border-gray-50 ${vIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                          <td className="px-3 py-2 font-medium text-gray-700">{voter.full_name}</td>
+                          <td className="px-3 py-2 text-gray-500">{voter.apartment || '—'}</td>
+                          <td className="px-3 py-2">
+                            {voter.is_delegation_vote ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                🤝 Vía delegado
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                ✓ Directo
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-600">
+                            {parseFloat(qReal).toFixed(4)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-600">
+                            {parseFloat(qCedido).toFixed(4)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {option.votes_count === 0 && (
+              <p className="text-xs text-gray-400 italic pl-1">Sin votos en esta opción</p>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Abstenciones */}
+      {poll.abstentions && poll.abstentions.length > 0 && (
+        <div className="border-t border-gray-100 pt-4">
+          <p className="text-sm font-semibold text-gray-600 mb-2">
+            Abstenciones ({poll.abstentions.length})
+          </p>
+          <div className="rounded-lg border border-gray-100 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
+                  <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
+                </tr>
+              </thead>
+              <tbody>
+                {poll.abstentions.map((abs, idx) => (
+                  <tr key={idx} className={`border-t border-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                    <td className="px-3 py-2 font-medium text-gray-700">{abs.full_name}</td>
+                    <td className="px-3 py-2 text-gray-500">{abs.apartment || '—'}</td>
+                    <td className="px-3 py-2 text-gray-500">{fmtDate(abs.voted_at)}</td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-600">
+                      {parseFloat(abs.voting_weight).toFixed(4)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* No votaron */}
+      {poll.non_voters && poll.non_voters.length > 0 && (
+        <div className="border-t border-gray-100 pt-4">
+          <p className="text-sm font-semibold text-gray-500 mb-2">
+            No votaron ({poll.non_voters.length})
+          </p>
+          <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
+                  <th className="text-right px-3 py-2 font-semibold text-gray-500">Q. Real</th>
+                </tr>
+              </thead>
+              <tbody>
+                {poll.non_voters.map((nv, idx) => (
+                  <tr key={idx} className={`border-t border-gray-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                    <td className="px-3 py-2 text-gray-600">{nv.full_name}</td>
+                    <td className="px-3 py-2 text-gray-500">{nv.apartment || '—'}</td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-500">
+                      {parseFloat(nv.quorum_base || 0).toFixed(4)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
 const PollsReportContent = ({ data }) => {
   const { polls } = data;
+  const [selectedPollId, setSelectedPollId] = useState(polls && polls.length > 0 ? polls[0].id : null);
 
   if (!polls || polls.length === 0) {
     return (
@@ -364,174 +571,46 @@ const PollsReportContent = ({ data }) => {
     );
   }
 
-  const fmtDate = (iso) => iso
-    ? new Date(iso).toLocaleString('es-ES', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    })
-    : '—';
-
-  // Colores por índice de opción
-  const optionColors = [
-    { bar: 'from-emerald-400 to-emerald-500', badge: 'bg-emerald-100 text-emerald-700', header: [22, 101, 52] },
-    { bar: 'from-red-400 to-red-500', badge: 'bg-red-100 text-red-700', header: [185, 28, 28] },
-    { bar: 'from-blue-400 to-blue-500', badge: 'bg-blue-100 text-blue-700', header: [29, 78, 216] },
-    { bar: 'from-amber-400 to-amber-500', badge: 'bg-amber-100 text-amber-700', header: [180, 83, 9] },
-    { bar: 'from-purple-400 to-purple-500', badge: 'bg-purple-100 text-purple-700', header: [109, 40, 217] },
-  ];
+  const selectedPoll = polls.find((p) => p.id === selectedPollId) || polls[0];
 
   return (
-    <div className="space-y-8">
-      {polls.map((poll) => (
-        <div key={poll.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-
-          {/* Header encuesta */}
-          <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-bold text-white text-base">{poll.title}</h3>
-                {poll.description && (
-                  <p className="text-indigo-200 text-xs mt-0.5">{poll.description}</p>
-                )}
-              </div>
-              <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${poll.status === 'closed' ? 'bg-gray-200 text-gray-700' :
-                poll.status === 'active' ? 'bg-green-400 text-green-900' :
-                  'bg-blue-200 text-blue-800'
-                }`}>
-                {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
-              </span>
-            </div>
-
-            {/* Métricas resumen */}
-            <div className="grid grid-cols-3 gap-3 mt-4">
-              <div className="bg-white/15 rounded-lg p-2.5 text-center">
-                <p className="text-xl font-bold text-white">{poll.total_voters}</p>
-                <p className="text-xs text-indigo-200">Votantes</p>
-              </div>
-              <div className="bg-white/15 rounded-lg p-2.5 text-center">
-                <p className="text-xl font-bold text-white">
-                  {typeof poll.total_weight_voted === 'number'
-                    ? poll.total_weight_voted.toFixed(4)
-                    : poll.total_weight_voted}
-                </p>
-                <p className="text-xs text-indigo-200">Peso Total</p>
-              </div>
-              <div className="bg-white/15 rounded-lg p-2.5 text-center">
-                <p className="text-xl font-bold text-white">{poll.options.length}</p>
-                <p className="text-xs text-indigo-200">Opciones</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-5 space-y-5">
-            {/* Opciones con barras + tabla de votantes */}
-            {poll.options.map((option, optIdx) => {
-              const color = optionColors[optIdx % optionColors.length];
-              const percentage = poll.total_weight_voted > 0
-                ? (option.votes_weight / poll.total_weight_voted * 100)
-                : 0;
-
-              return (
-                <div key={optIdx} className="space-y-2">
-                  {/* Barra de progreso */}
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold text-gray-800">{option.text}</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color.badge}`}>
-                        {option.votes_count} {option.votes_count === 1 ? 'voto' : 'votos'}
-                      </span>
-                      <span className="text-gray-500 text-xs">{percentage.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full bg-gradient-to-r ${color.bar} rounded-full transition-all duration-500`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-
-                  {/* Tabla de votantes de esta opción */}
-                  {option.voters && option.voters.length > 0 && (
-                    <div className="mt-2 rounded-lg border border-gray-100 overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Tipo</th>
-                            <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
-                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {option.voters.map((voter, vIdx) => (
-                            <tr key={vIdx} className={`border-t border-gray-50 ${vIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                              <td className="px-3 py-2 font-medium text-gray-700">{voter.full_name}</td>
-                              <td className="px-3 py-2 text-gray-500">{voter.apartment || '—'}</td>
-                              <td className="px-3 py-2">
-                                {voter.is_delegation_vote ? (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                    🤝 Vía delegado
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                    ✓ Directo
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
-                              <td className="px-3 py-2 text-right font-mono text-gray-600">
-                                {parseFloat(voter.voting_weight).toFixed(4)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {option.votes_count === 0 && (
-                    <p className="text-xs text-gray-400 italic pl-1">Sin votos en esta opción</p>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Abstenciones */}
-            {poll.abstentions && poll.abstentions.length > 0 && (
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-sm font-semibold text-gray-600 mb-2">
-                  Abstenciones ({poll.abstentions.length})
-                </p>
-                <div className="rounded-lg border border-gray-100 overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
-                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
-                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
-                        <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {poll.abstentions.map((abs, idx) => (
-                        <tr key={idx} className={`border-t border-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                          <td className="px-3 py-2 font-medium text-gray-700">{abs.full_name}</td>
-                          <td className="px-3 py-2 text-gray-500">{abs.apartment || '—'}</td>
-                          <td className="px-3 py-2 text-gray-500">{fmtDate(abs.voted_at)}</td>
-                          <td className="px-3 py-2 text-right font-mono text-gray-600">
-                            {parseFloat(abs.voting_weight).toFixed(4)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+    <div className="space-y-5">
+      {/* Poll selector panel */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Preguntas de la reunión</p>
         </div>
-      ))}
+        <ul className="divide-y divide-gray-100">
+          {polls.map((poll) => {
+            const isSelected = poll.id === selectedPollId;
+            return (
+              <li
+                key={poll.id}
+                onClick={() => setSelectedPollId(poll.id)}
+                className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors
+                  ${isSelected
+                    ? 'border-l-4 border-indigo-500 bg-indigo-50'
+                    : 'border-l-4 border-transparent hover:bg-gray-50'
+                  }`}
+              >
+                <span className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>
+                  {poll.title}
+                </span>
+                <span className={`ml-3 shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  poll.status === 'closed' ? 'bg-gray-200 text-gray-600' :
+                  poll.status === 'active' ? 'bg-green-100 text-green-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>
+                  {poll.status === 'active' ? 'Activa' : poll.status === 'closed' ? 'Cerrada' : 'Borrador'}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* Detail of the selected poll */}
+      {selectedPoll && <PollDetailView poll={selectedPoll} />}
     </div>
   );
 };

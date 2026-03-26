@@ -273,11 +273,11 @@ const generatePollsPDF = async (data) => {
     const imgWidth = 120;
     const x = (pageWidth - imgWidth) / 2;
 
-    let y = addHeader(doc, 'INFORME DE ENCUESTAS Y VOTACIONES', meeting.title, meeting.residential_unit, meeting.scheduled_date);
+    let y = addHeader(doc, 'INFORME DE VOTACIÓN', meeting.title, meeting.residential_unit, meeting.scheduled_date);
 
     doc.setFontSize(9);
     doc.setTextColor(80);
-    doc.text(`Total de encuestas: ${polls.length}`, 14, y);
+    doc.text(`Pregunta: ${polls[0]?.title || ''}`, 14, y);
     y += 8;
 
     for (let idx = 0; idx < polls.length; idx++) {
@@ -419,7 +419,7 @@ const generatePollsPDF = async (data) => {
     };
 
     addFooter(doc);
-    doc.save(`Encuestas_${meeting.title.replace(/\s/g, '_')}.pdf`);
+    doc.save(`Votacion_${(polls[0]?.title?.replace(/\s/g, '_') || meeting.title.replace(/\s/g, '_'))}.pdf`);
 };
 
 const generateDelegationsPDF = (data) => {
@@ -536,7 +536,43 @@ const InformesTab = () => {
         setLoadingReport(report.id);
         try {
             const response = await report.fetcher(selectedMeeting);
-            report.generator(response.data);
+            const data = response.data;
+
+            if (report.id === 'polls') {
+                const polls = data?.polls || [];
+                if (polls.length === 0) {
+                    Swal.fire({ icon: 'info', title: 'Sin encuestas', text: 'Esta reunión no tiene encuestas registradas.', confirmButtonColor: '#6366f1' });
+                    return;
+                }
+                if (polls.length === 1) {
+                    report.generator({ ...data, polls: [polls[0]] });
+                    return;
+                }
+                const inputOptions = polls.reduce((acc, p, idx) => {
+                    acc[idx] = `${p.title} (${p.status === 'closed' ? 'Cerrada' : p.status === 'active' ? 'Activa' : 'Borrador'})`;
+                    return acc;
+                }, {});
+                const { value: selectedIdx, isConfirmed } = await Swal.fire({
+                    title: 'Selecciona la pregunta',
+                    text: 'Elige la pregunta para la cual deseas generar el informe.',
+                    input: 'select',
+                    inputOptions,
+                    inputPlaceholder: '— Elige una pregunta —',
+                    showCancelButton: true,
+                    confirmButtonText: 'Generar PDF',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#6366f1',
+                    cancelButtonColor: '#6b7280',
+                    inputValidator: (value) => {
+                        if (value === '') return 'Debes seleccionar una pregunta';
+                    },
+                });
+                if (!isConfirmed) return;
+                const selectedPoll = polls[Number(selectedIdx)];
+                report.generator({ ...data, polls: [selectedPoll] });
+            } else {
+                report.generator(data);
+            }
         } catch (err) {
             console.error(err);
             Swal.fire({ icon: 'error', title: 'Error al generar informe', text: err.response?.data?.detail || 'Ocurrió un error inesperado.', confirmButtonColor: '#dc2626' });
