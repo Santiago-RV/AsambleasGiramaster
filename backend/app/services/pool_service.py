@@ -595,9 +595,10 @@ class PollService:
             )
             self.db.add(voto_delegante)
 
-            # 5. Actualizar estadísticas de la opción con el peso del delegante
-            if voto_delegado.int_option_id:
-                await self._update_option_stats(voto_delegado.int_option_id, peso_delegante)
+            # 5. NO actualizar estadísticas de la opción aquí:
+            # el delegado ya votó con dec_voting_weight que incluye el peso delegado,
+            # por lo tanto _update_option_stats ya fue llamado con el total correcto.
+            # Llamarlo de nuevo con peso_delegante causaría doble conteo.
 
             votos_registrados += 1
             logger.info(

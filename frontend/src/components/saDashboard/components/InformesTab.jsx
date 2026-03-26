@@ -182,7 +182,7 @@ const generateAttendancePDF = async (data) => {
 
     autoTable(doc, {
         startY: y,
-        head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Coeficiente']],
+        head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
         body: attended.map(p => [
             p.full_name,
             p.apartment,
@@ -196,7 +196,8 @@ const generateAttendancePDF = async (data) => {
                     minute: '2-digit'
                 })
                 : '—',
-            p.quorum_base.toFixed(4)
+            p.quorum_base.toFixed(4),
+            Math.max(0, (p.voting_weight || 0) - p.quorum_base).toFixed(4),
         ]),
         styles: { fontSize: 8.5 },
         headStyles: { fillColor: [22, 101, 52] },
@@ -222,12 +223,13 @@ const generateAttendancePDF = async (data) => {
 
         autoTable(doc, {
             startY: y,
-            head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Coeficiente']],
+            head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
             body: absent.map(p => [
                 p.full_name,
                 p.apartment,
                 '—',
-                p.quorum_base.toFixed(4)
+                p.quorum_base.toFixed(4),
+                '0.0000',
             ]),
             styles: { fontSize: 8.5 },
             headStyles: { fillColor: [185, 28, 28] },
@@ -315,7 +317,7 @@ const generatePollsPDF = async (data) => {
 
             autoTable(doc, {
                 startY: y,
-                head: [['Copropietario', 'Apto', 'Tipo', 'Fecha y Hora del Voto', 'Peso']],
+                head: [['Copropietario', 'Apto', 'Tipo', 'Fecha y Hora del Voto', 'Q. Real', 'Q. Cedido']],
                 body: opt.voters.map(v => [
                     v.full_name,
                     v.apartment || '—',
@@ -326,7 +328,8 @@ const generatePollsPDF = async (data) => {
                             hour: '2-digit', minute: '2-digit'
                         })
                         : '—',
-                    parseFloat(v.voting_weight).toFixed(4),
+                    parseFloat(v.quorum_base || 0).toFixed(4),
+                    Math.max(0, (v.voting_weight || 0) - (v.quorum_base || 0)).toFixed(4),
                 ]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [67, 56, 202] },
@@ -338,11 +341,12 @@ const generatePollsPDF = async (data) => {
                     }
                 },
                 columnStyles: {
-                    0: { cellWidth: 60 },
+                    0: { cellWidth: 52 },
                     1: { cellWidth: 12 },
-                    2: { cellWidth: 28 },
-                    3: { cellWidth: 40 },
-                    4: { cellWidth: 20 },
+                    2: { cellWidth: 22 },
+                    3: { cellWidth: 37 },
+                    4: { cellWidth: 18 },
+                    5: { cellWidth: 18 },
                 },
                 margin: { left: 20, right: 14 },
             });
@@ -367,8 +371,30 @@ const generatePollsPDF = async (data) => {
                 margin: { left: 20, right: 14 },
             });
             y = doc.lastAutoTable.finalY + 4;
-            
+
         }
+
+        // NO VOTARON
+        if (poll.non_voters && poll.non_voters.length > 0) {
+            if (y > 240) { doc.addPage(); y = 20; }
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(9);
+            doc.setTextColor(107, 114, 128);
+            doc.text(`No votaron: ${poll.non_voters.length}`, 16, y);
+            y += 4;
+
+            autoTable(doc, {
+                startY: y,
+                head: [['Copropietario', 'Apartamento', 'Q. Real']],
+                body: poll.non_voters.map(v => [v.full_name, v.apartment, parseFloat(v.quorum_base || 0).toFixed(4)]),
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [209, 213, 219], textColor: 60 },
+                alternateRowStyles: { fillColor: [249, 250, 251] },
+                margin: { left: 20, right: 14 },
+            });
+            y = doc.lastAutoTable.finalY + 4;
+        }
+
         //GRAFICO
          const chartImage = await generatePollChartImage(poll);
 
