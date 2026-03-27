@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  labels:
+    app: celery-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+    spec:
+      containers:
+        - name: celery
+          image: arwendev97/giramaster-celery:1.0.0
+          imagePullPolicy: Always
+          command: ["celery", "-A", "app.celery_app", "worker", "-Q", "email_tasks", "-l", "info", "--concurrency=4"]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secret
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - celery -A app.celery_app inspect ping || exit 1
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+      restartPolicy: Always

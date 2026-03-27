@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './providers/AppProvider';
+import { ProgressNotificationProvider } from './contexts/ProgressNotificationContext';
+import ProgressNotificationToast from './components/common/ProgressNotificationToast';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { RoleBasedRoute } from './components/Auth/RoleBasedRoute';
 import AutoLogin from './components/Auth/AutoLogin';
@@ -15,63 +17,66 @@ import './App.css';
 function App() {
 	return (
 		
-		<AppProvider>
-			<div className="w-full min-h-screen overflow-x-hidden">
-				<Routes>
-					{/* ========================================== */}
-					{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
-					{/* ========================================== */}
-					
-					{/* Ruta pública - Login */}
-					<Route path="/login" element={<Login />} />
-					
-					{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
-					<Route path="/auto-login/:token" element={<AutoLogin />} />
-					
-					{/* ✅ Ruta pública - Votación Presencial (no requiere autenticación previa) */}
-					<Route path="/votacion-presencial/:meetingId" element={<PresencialVotingPage />} />
+		<ProgressNotificationProvider>
+			<ProgressNotificationToast />
+			<AppProvider>
+				<div className="w-full min-h-screen overflow-x-hidden">
+					<Routes>
+						{/* ========================================== */}
+						{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
+						{/* ========================================== */}
+						
+						{/* Ruta pública - Login */}
+						<Route path="/login" element={<Login />} />
+						
+						{/* ✅ Ruta pública - Auto-Login (DEBE ESTAR AQUÍ, NO DENTRO DE ProtectedRoute) */}
+						<Route path="/auto-login/:token" element={<AutoLogin />} />
+						
+						{/* ✅ Ruta pública - Votación Presencial (no requiere autenticación previa) */}
+						<Route path="/votacion-presencial/:meetingId" element={<PresencialVotingPage />} />
 
-					{/* ========================================== */}
-					{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
-					{/* ========================================== */}
-					
-					<Route path="/" element={<ProtectedRoute />}>
-						{/* Ruta para Super Administrador */}
-						<Route
-							path="super-admin"
-							element={
-								<RoleBasedRoute allowedRoles={['Super Administrador']}>
-									<HomeSA />
-								</RoleBasedRoute>
-							}
-						/>
-
+						{/* ========================================== */}
+						{/* RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) */}
+						{/* ========================================== */}
+						
+						<Route path="/" element={<ProtectedRoute />}>
+							{/* Ruta para Super Administrador */}
 							<Route
-								path="admin"
+								path="super-admin"
 								element={
-									<RoleBasedRoute allowedRoles={['Administrador']}>
-										<AppAdmin />
+									<RoleBasedRoute allowedRoles={['Super Administrador']}>
+										<HomeSA />
 									</RoleBasedRoute>
 								}
 							/>
 
-						{/* Ruta para Copropietario/Usuario */}
-						<Route
-							path="copropietario"
-							element={
-								<RoleBasedRoute allowedRoles={['Usuario']}>
-									<AppCopropietario />
-								</RoleBasedRoute>
-							}
-						/>
+								<Route
+									path="admin"
+									element={
+										<RoleBasedRoute allowedRoles={['Administrador']}>
+											<AppAdmin />
+										</RoleBasedRoute>
+									}
+								/>
 
-							<Route index element={<Navigate to="/login" replace />} />
-						</Route>
+							{/* Ruta para Copropietario/Usuario */}
+							<Route
+								path="copropietario"
+								element={
+									<RoleBasedRoute allowedRoles={['Usuario']}>
+										<AppCopropietario />
+									</RoleBasedRoute>
+								}
+							/>
 
-						<Route path="*" element={<NotFound />} />
-				</Routes>
-			</div>
-		</AppProvider>
+								<Route index element={<Navigate to="/login" replace />} />
+							</Route>
+
+							<Route path="*" element={<NotFound />} />
+					</Routes>
+				</div>
+			</AppProvider>
+		</ProgressNotificationProvider>
 	);
 }
 

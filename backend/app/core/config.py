@@ -49,6 +49,17 @@ class Settings(BaseSettings):
   REDIS_CACHE_TTL: int = 60 * 60 * 1
   REDIS_SESSION_TTL: int = 60 * 60 * 24 * 7
 
+  # Async Database URL
+  @property
+  def ASYNC_DATABASE_URL(self) -> str:
+    return f"mysql+aiomysql://{self.USER_DB}:{self.PASSWORD_DB}@{self.HOST_DB}:{self.PORT_DB}/{self.NAME_DB}"
+
+  # Celery Configuration
+  CELERY_RESULT_BACKEND: str = ""
+  @property
+  def CELERY_RESULT_URL(self) -> str:
+    return self.CELERY_RESULT_BACKEND or self.REDIS_URL
+
   # API
   @property
   def API_URL(self) -> str:

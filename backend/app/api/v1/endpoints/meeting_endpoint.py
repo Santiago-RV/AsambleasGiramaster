@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from pydantic import BaseModel, Field
+import uuid
+import logging
 
 from app.core.database import get_db
 from app.core.exceptions import ServiceException, ResourceNotFoundException
@@ -17,6 +19,10 @@ from app.services.meeting_service import MeetingService
 from app.services.email_service import EmailService
 from app.auth.auth import get_current_user
 from app.services.user_service import UserService
+from app.celery_app import celery_app
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class SendInvitationRequest(BaseModel):
@@ -144,11 +150,17 @@ async def create_meeting(
             modality=meeting_data.str_modality
         )
 
+        meeting_data_response = MeetingResponse.from_orm(new_meeting).dict()
+        
+        task_id = getattr(new_meeting, '_task_id', None)
+        if task_id:
+            meeting_data_response['invitation_task_id'] = task_id
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_201_CREATED,
             message="Reunión creada exitosamente",
-            data=MeetingResponse.from_orm(new_meeting).dict()
+            data=meeting_data_response
         )
     except Exception as e:
         raise ServiceException(
@@ -487,49 +499,64 @@ async def register_leave(
 @router.post(
     "/{meeting_id}/send-invitations",
     response_model=SuccessResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_202_ACCEPTED,
     summary="Enviar invitaciones por correo",
-    description="Envía invitaciones por correo electrónico a los usuarios de la unidad residencial de la reunión"
+    description="Envía invitaciones por correo electrónico a los usuarios de la unidad residencial de la reunión usando Celery"
 )
 async def send_meeting_invitations(
     meeting_id: int,
     request: SendInvitationRequest,
     db: AsyncSession = Depends(get_db),
-    # current_user: str = Depends(get_current_user)  # Comentado temporalmente para pruebas
 ):
     """
     Envía invitaciones por correo electrónico a los usuarios de una reunión.
     
     Si no se especifican user_ids, se envía a todos los usuarios de la unidad residencial.
     Solo se envía a usuarios activos que pertenecen a la misma unidad residencial de la reunión.
+    
+    Usa Celery para enviar en background y retorna inmediatamente.
     """
     try:
-        email_svc = EmailService(db)
-        stats = await email_svc.send_meeting_invitation(
-            db=db,
-            meeting_id=meeting_id,
-            user_ids=request.user_ids,
-            frontend_url=request.frontend_url
-        )
+        from app.services.meeting_service import MeetingService
+        meeting_service = MeetingService(db)
         
-        if "error" in stats:
+        meeting = await meeting_service.get_meeting_by_id(meeting_id)
+        if not meeting:
             raise ServiceException(
-                message=stats["error"],
+                message="Reunión no encontrada",
                 details={"meeting_id": meeting_id}
             )
         
+        task_id = str(uuid.uuid4())
+        frontend_url = request.frontend_url or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+        
+        logger.info(f"📧 Creando tarea Celery para invitaciones de reunión {meeting_id}, task_id={task_id}")
+        
+        celery_app.send_task(
+            'app.tasks.email_tasks.send_meeting_invitations',
+            args=[meeting_id, task_id, frontend_url, request.user_ids],
+            task_id=task_id,
+            queue='email_tasks'
+        )
+        
+        total = request.user_ids if request.user_ids else meeting.int_total_invitated or 0
+        
+        logger.info(f"✅ Tarea Celery creada para invitaciones de reunión {meeting_id} con task_id={task_id}")
+        
         return SuccessResponse(
             success=True,
-            status_code=status.HTTP_200_OK,
-            message=f"Invitaciones procesadas: {stats['exitosos']} exitosos, {stats['fallidos']} fallidos",
+            status_code=status.HTTP_202_ACCEPTED,
+            message="Invitaciones enviadas a Celery para procesamiento",
             data={
                 "meeting_id": meeting_id,
-                "statistics": stats
+                "task_id": task_id,
+                "total_invited": total
             }
         )
     except ServiceException:
         raise
     except Exception as e:
+        logger.error(f"Error al crear tarea de invitaciones: {str(e)}")
         raise ServiceException(
             message=f"Error al enviar invitaciones: {str(e)}",
             details={"original_error": str(e), "meeting_id": meeting_id}

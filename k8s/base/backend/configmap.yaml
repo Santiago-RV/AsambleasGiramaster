@@ -12,3 +12,5 @@ data:
   HOST_DB: "mysql"
   PORT_DB: "3306"
   NAME_DB: "db_giramaster"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"

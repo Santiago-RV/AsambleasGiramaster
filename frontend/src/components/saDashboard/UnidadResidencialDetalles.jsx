@@ -211,6 +211,19 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 		setIsMeetingModalOpen(true);
 	};
 
+	// Handler para eliminar una reunión
+	const handleDeleteMeeting = async (meetingId) => {
+		await MeetingService.deleteMeeting(meetingId);
+		queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
+		
+		Swal.fire({
+			icon: 'success',
+			title: '¡Reunión Eliminada!',
+			text: 'La reunión ha sido eliminada exitosamente',
+			confirmButtonColor: '#27ae60',
+		});
+	};
+
 	// Handler para cerrar el modal de reunión
 	const handleCloseMeetingModal = () => {
 		setIsMeetingModalOpen(false);
@@ -453,6 +466,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 							onStartMeeting={onStartMeeting}
 							onEndMeeting={handleEndMeeting}
 							onEditMeeting={handleEditMeeting}
+							onDeleteMeeting={handleDeleteMeeting}
 						/>
 					</div>
 				</div>

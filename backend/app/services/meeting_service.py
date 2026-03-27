@@ -20,6 +20,8 @@ from app.core.exceptions import ResourceNotFoundException, ServiceException
 from app.services.zoom_api_service import ZoomAPIService
 from app.core.logging_config import get_logger
 from app.models.poll_model import PollModel
+from app.celery_app import celery_app
+from app.core.config import settings
 
 logger = get_logger(__name__)
 
@@ -295,6 +297,11 @@ class MeetingService:
             await self.db.commit()
             logger.info(f"✅ {invitations_created} invitaciones creadas en base de datos")
 
+            # Obtener los user_ids de las invitaciones creadas
+            invited_user_ids = [user.id for user, user_residential_unit in copropietarios_data]
+            
+            logger.info(f"📧 User IDs a invitar: {invited_user_ids}")
+
             # Recargar con la relación residential_unit
             result = await self.db.execute(
                 select(MeetingModel).options(
@@ -303,30 +310,30 @@ class MeetingService:
             )
             meeting_with_relations = result.scalar_one()
 
-            # Enviar invitaciones por correo automáticamente
+            # Enviar invitaciones por correo usando Celery (async)
+            task_id = None
             try:
-                from app.services.email_service import EmailService
-                email_svc = EmailService(self.db)
-                logger.info(f"📧 Enviando invitaciones automáticas para reunión ID {meeting_with_relations.id}")
-
-                email_stats = await email_svc.send_meeting_invitation(
-                    db=self.db,
-                    meeting_id=meeting_with_relations.id,
-                    user_ids=None  # Enviar a todos los usuarios de la unidad residencial
+                import uuid
+                from app.core.config import settings
+                
+                task_id = str(uuid.uuid4())
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                
+                logger.info(f"📧 Creando tarea Celery para invitaciones de reunión ID {meeting_with_relations.id}")
+                
+                celery_app.send_task(
+                    'app.tasks.email_tasks.send_meeting_invitations',
+                    args=[meeting_with_relations.id, task_id, frontend_url, invited_user_ids],
+                    task_id=task_id,
+                    queue='email_tasks'
                 )
-
-                if "error" in email_stats:
-                    logger.warning(f"Error al enviar invitaciones: {email_stats['error']}")
-                else:
-                    logger.info(
-                        f"Invitaciones enviadas: {email_stats.get('exitosos', 0)} exitosos, "
-                        f"{email_stats.get('fallidos', 0)} fallidos"
-                    )
+                
+                logger.info(f"✅ Tarea Celery creada con task_id={task_id} en cola email_tasks")
+                
             except Exception as email_error:
-                # No fallar la creación de la reunión si falla el envío de emails
-                logger.error(f"Error al enviar invitaciones (no crítico): {str(email_error)}")
+                logger.error(f"Error al crear tarea de invitaciones: {str(email_error)}")
 
-            # Refrescar el objeto después del envío de emails para evitar MissingGreenlet
+            # Refrescar el objeto
             await self.db.refresh(meeting_with_relations)
 
             # Recargar completamente con todas las relaciones necesarias
@@ -336,6 +343,10 @@ class MeetingService:
                 ).where(MeetingModel.id == meeting_with_relations.id)
             )
             final_meeting = result.scalar_one()
+            
+            # Agregar task_id al meeting para retornarlo
+            if task_id:
+                final_meeting._task_id = task_id
 
             return final_meeting
             
@@ -397,11 +408,22 @@ class MeetingService:
             )
 
     async def delete_meeting(self, meeting_id: int) -> None:
-        """Elimina una reunión"""
+        """Elimina una reunión y todas sus invitaciones asociadas"""
         try:
             meeting = await self.get_meeting_by_id(meeting_id)
             
             # TODO: Cancelar reunión en Zoom
+            
+            # Forzar carga de relaciones para cascade
+            await self.db.refresh(meeting, attribute_names=['invitations'])
+            
+            # Eliminar las invitaciones explícitamente antes de la reunión
+            # Esto asegura que el cascade funcione correctamente
+            for invitation in list(meeting.invitations):
+                await self.db.delete(invitation)
+            
+            # Flush para asegurar que se ejecuten los deletes
+            await self.db.flush()
             
             await self.db.delete(meeting)
             await self.db.commit()

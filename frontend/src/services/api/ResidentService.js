@@ -106,4 +106,17 @@ export class ResidentService {
         return response.data;
     }
 
+    static async getEmailTaskStatus(taskId) {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const response = await axiosInstance.get(
+            `/admin/coowners/email-task-status/${taskId}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
+        return response.data;
+    }
+
 }

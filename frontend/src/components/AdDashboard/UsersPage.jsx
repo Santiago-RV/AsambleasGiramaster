@@ -11,6 +11,7 @@ import { MeetingService } from "../../services/api/MeetingService";
 import CoownerService from "../../services/api/coownerService";
 import SupportModal from '../saDashboard/components/modals/SupportModal';
 import HelpModalAdmin from "./HelpModalAdmin";
+import { useProgressNotification } from '../../contexts/ProgressNotificationContext';
 
 const SVG_ICONS = {
   lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
@@ -21,6 +22,7 @@ const SVG_ICONS = {
 
 export default function UsersPage({ residentialUnitId, unitName = '', onCreateUser, onEditUser, onUploadExcel, onCreateMeeting, onJoinMeeting, onCreateGuest, onEditMeeting }) {
   const queryClient = useQueryClient();
+  const { startProgress, updateProgress, finishProgress } = useProgressNotification();
 
   // Obtener los residentes de la unidad residencial
   const {
@@ -160,38 +162,57 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       return await CoownerService.sendBulkCredentials(residentIds);
     },
     onSuccess: (response) => {
-      const { successful, failed, total_processed } = response.data;
+      const { successful, total_processed, task_id } = response.data;
 
-      Swal.fire({
-        icon: successful === total_processed ? 'success' : 'warning',
-        title: successful === total_processed ? '¡Enlaces Enviados!' : 'Envío Parcial',
-        html: `
-          <div class="text-left">
-            <div class="bg-blue-50 p-3 rounded-lg mb-3">
-              <p class="text-sm text-blue-700">
-                <strong>Total procesados:</strong> ${total_processed}
-              </p>
-              <p class="text-sm text-green-700">
-                <strong>Exitosos:</strong> ${successful}
-              </p>
-              ${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
-            </div>
-            ${response.data.errors && response.data.errors.length > 0
-            ? `
-                <div class="bg-red-50 p-3 rounded-lg max-h-32 overflow-y-auto">
-                  <p class="font-semibold text-red-800 mb-2">Errores:</p>
-                  <ul class="text-sm text-red-700 space-y-1">
-                    ${response.data.errors.map((err) => `<li>ID ${err.resident_id}: ${err.error}</li>`).join('')}
-                  </ul>
-                </div>
-              `
-            : ''
+      if (task_id) {
+        const total = response.data.total || total_processed;
+        
+        startProgress({
+          title: 'Enviando Credenciales',
+          message: `Enviando enlaces de acceso (0/${total})`,
+          total: total,
+          type: 'info'
+        });
+
+        const pollingInterval = setInterval(async () => {
+          try {
+            const statusResponse = await ResidentService.getEmailTaskStatus(task_id);
+            const current = statusResponse.data?.current || 0;
+            const progress = statusResponse.data?.progress || 0;
+            const status = statusResponse.data?.status || 'processing';
+
+            updateProgress({
+              current,
+              total,
+              message: `Enviando enlaces de acceso (${current}/${total})`,
+              status,
+              progress
+            });
+
+            if (status === 'completed' || status === 'failed') {
+              clearInterval(pollingInterval);
+              
+              const successCount = statusResponse.data?.successful || successful;
+              
+              finishProgress({
+                status: status === 'completed' ? 'completed' : 'failed',
+                message: status === 'completed'
+                  ? `Credenciales enviadas a ${successCount} copropietario(s)`
+                  : 'Error al enviar credenciales'
+              });
+            }
+          } catch (error) {
+            console.error('Error polling credentials progress:', error);
+            clearInterval(pollingInterval);
+            finishProgress({
+              status: 'failed',
+              message: 'Error al obtener progreso'
+            });
           }
-          </div>
-        `,
-        confirmButtonColor: '#27ae60',
-        width: '500px',
-      });
+        }, 1500);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+      }
     },
     onError: (error) => {
       Swal.fire({
@@ -337,6 +358,19 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
     }
   };
 
+  // Handler para eliminar reunión
+  const handleDeleteMeeting = async (meetingId) => {
+    await MeetingService.deleteMeeting(meetingId);
+    queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+    
+    Swal.fire({
+      icon: 'success',
+      title: '¡Reunión Eliminada!',
+      text: 'La reunión ha sido eliminada exitosamente',
+      confirmButtonColor: '#27ae60',
+    });
+  };
+
   // Mutación para toggle access individual
   const toggleAccessMutation = useMutation({
     mutationFn: async ({ userId, enabled }) => {
@@ -467,6 +501,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
         confirmButtonColor: '#27ae60',
         width: '500px',
       });
+      queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
     }
   };
 
@@ -694,6 +729,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
             onStartMeeting={handleStartMeeting}
             onEndMeeting={handleEndMeeting}
             onEditMeeting={onEditMeeting}
+            onDeleteMeeting={handleDeleteMeeting}
             variant="admin"
           />
         </div>

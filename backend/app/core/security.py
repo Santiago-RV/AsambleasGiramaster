@@ -210,7 +210,6 @@ class RateLimiter:
     endpoint_limits = {
       # Auth
       "/api/v1/auth/login": {"max_requests": 10000, "window_minutes": 1},
-      "/api/v1/auth/register": {"max_requests": 10000, "window_minutes": 1},
       "/api/v1/auth/register-participation": {"max_requests": 10000, "window_minutes": 1},
       
       # Residents / QR

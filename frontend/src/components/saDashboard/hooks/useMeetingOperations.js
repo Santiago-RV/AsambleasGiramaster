@@ -1,29 +1,48 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MeetingService } from '../../../services/api/MeetingService';
+import { ResidentService } from '../../../services/api/ResidentService';
 import Swal from 'sweetalert2';
+import { showMeetingInvitationProgressModal } from '../../common/BulkDeleteConfirmModal';
+import { useProgressNotification } from '../../../contexts/ProgressNotificationContext';
 
 export const useMeetingOperations = (unitId) => {
 	const queryClient = useQueryClient();
+	const { startProgress, updateProgress, finishProgress } = useProgressNotification();
 
 	// Mutación para crear reunión
 	const createMeetingMutation = useMutation({
 		mutationFn: MeetingService.createMeeting,
-		onSuccess: (response) => {
+		onSuccess: async (response) => {
 			queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
-			Swal.fire({
-				icon: 'success',
-				title: '¡Reunión Creada Exitosamente!',
-				text:
-					'La reunión se creó correctamente y las invitaciones han sido enviadas',
-				showConfirmButton: true,
-				confirmButtonColor: '#3498db',
-			});
+			
+			const taskId = response.data?.invitation_task_id;
+			const meetingTitle = response.data?.str_title || 'Reunión';
+			const totalInvited = response.data?.int_total_invitated || 0;
+			
+			if (taskId) {
+				showMeetingInvitationProgressModal({
+					meetingTitle: meetingTitle,
+					total: totalInvited,
+					pollProgressFn: () => ResidentService.getEmailTaskStatus(taskId),
+					startProgress,
+					updateProgress,
+					finishProgress
+				});
+			} else {
+				Swal.fire({
+					icon: 'success',
+					title: '¡Reunión Creada Exitosamente!',
+					text: 'La reunión se creó correctamente',
+					showConfirmButton: true,
+					confirmButtonColor: '#3498db',
+				});
+			}
 		},
 		onError: (error) => {
 			Swal.fire({
 				icon: 'error',
 				title: 'Error',
-				text: error.message || 'Error al crear la reunión',
+				text: error.response?.data?.message || error.message || 'Error al crear la reunión',
 			});
 		},
 	});

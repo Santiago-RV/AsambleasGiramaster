@@ -88,40 +88,28 @@ export class MeetingService {
   }
 
   /**
-   * Registrar asistencia a una reunión
-   * Se llama cuando un usuario entra a la reunión
+   * Obtener estado de tarea de envío de invitaciones
    */
-  static async registerAttendance(meetingId) {
-    const response = await axiosInstance.post(
-      `/meetings/${meetingId}/register-attendance`
-    );
-    return response.data;
-  }
-
-  /**
-   * Registrar salida de una reunión
-   * Se llama cuando un usuario sale de la reunión
-   */
-  static async registerLeave(meetingId) {
-    const response = await axiosInstance.post(
-      `/meetings/${meetingId}/register-leave`
-    );
-    return response.data;
-  }
-
-  /**
-   * Obtener invitaciones de una reunión
-   * Retorna la lista de todos los invitados con su información
-   */
-  static async getMeetingInvitations(meetingId) {
+  static async getInvitationTaskStatus(taskId) {
     const response = await axiosInstance.get(
-      `/meeting-invitations/meeting/${meetingId}`
+      `/admin/coowners/email-task-status/${taskId}`
     );
     return response.data;
   }
 
   /**
-   * Crear múltiples invitaciones a una reunión
+   * Enviar invitaciones con progress (usa Celery)
+   */
+  static async sendInvitationsWithProgress(meetingId, userIds = null) {
+    const response = await axiosInstance.post(
+      `/meetings/${meetingId}/send-invitations`,
+      { user_ids: userIds }
+    );
+    return response.data;
+  }
+
+  /**
+   * Crear invitaciones en batch (sin envío de email)
    * @param {number} meetingId - ID de la reunión
    * @param {number[]} userIds - Lista de IDs de usuarios a invitar
    */

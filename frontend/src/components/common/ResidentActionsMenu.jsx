@@ -1,32 +1,26 @@
 import React from 'react';
 import { Eye, Edit, Trash2, QrCode } from 'lucide-react';
-import Swal from 'sweetalert2';
+import { showSingleDeleteConfirmModal } from './BulkDeleteConfirmModal';
 
 const ResidentActionsMenu = ({
 	resident,
 	position,
-	onView,
 	onEdit,
 	onDelete,
 	onGenerateQR,
 	onClose,
+	onShowDetails,
+	residentialUnitName,
 }) => {
-	const handleView = () => {
+	const handleView = (e) => {
+		if (e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
 		onClose();
-		Swal.fire({
-			title: 'Detalles del Residente',
-			html: `
-				<div class="text-left">
-					<p><strong>Nombre:</strong> ${resident.firstname} ${resident.lastname}</p>
-					<p><strong>Usuario:</strong> ${resident.username}</p>
-					<p><strong>Email:</strong> ${resident.email}</p>
-					${resident.phone ? `<p><strong>Teléfono:</strong> ${resident.phone}</p>` : ''}
-					<p><strong>Apartamento:</strong> ${resident.apartment_number}</p>
-					<p><strong>Estado:</strong> ${resident.bln_allow_entry ? 'Activo' : 'Inactivo'}</p>
-				</div>
-			`,
-			confirmButtonColor: '#3498db',
-		});
+		if (onShowDetails) {
+			onShowDetails(resident);
+		}
 	};
 
 	const handleEdit = () => {
@@ -34,13 +28,24 @@ const ResidentActionsMenu = ({
 		onEdit(resident);
 	};
 
-	const handleDelete = () => {
+	const handleDelete = async () => {
 		onClose();
-		onDelete(
-			resident.id,
-			`${resident.firstname} ${resident.lastname}`,
-			resident.apartment_number === 'ADMIN'
-		);
+		
+		const name = `${resident.firstname} ${resident.lastname}`;
+		const apartment = resident.apartment_number || 'N/A';
+		
+		await showSingleDeleteConfirmModal({
+			name,
+			apartment,
+			unitName: residentialUnitName,
+			onConfirm: async () => {
+				await onDelete(
+					resident.id,
+					name,
+					resident.apartment_number === 'ADMIN'
+				);
+			}
+		});
 	};
 
 	const handleGenerateQR = () => {

@@ -48,6 +48,7 @@ class DataUserRegister(DataUserBase):
         _type_: _description_
     """
     password: str = Field(..., min_length=8, description="Contraseña del usuario")
+    frontend_url: Optional[str] = Field(None, description="URL del frontend para construir auto-login")
 
 
 class DataUserUpdate(DataUserBase):

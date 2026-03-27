@@ -8,7 +8,7 @@ from app.schemas.auth_token_schema import Token
 
 from app.schemas.responses_schema import SuccessResponse, ErrorResponse
 from app.schemas.user_schema import UserCreate
-from app.schemas.data_user_schema import DataUserCreate, DataUserResponse, DataUserRegister
+from app.schemas.data_user_schema import DataUserCreate, DataUserResponse
 from app.services.user_service import UserService
 from app.services.session_service import SessionService
 from app.core.security import security_manager, rate_limiter
@@ -17,9 +17,6 @@ from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.data_user_model import DataUserModel
 from app.core.logging_config import get_logger
 from app.core.exceptions import (
-    UserAlreadyExistsException,
-    UserValidationException,
-    ServiceException,
     RateLimitException,
     InvalidCredentialsException,
     UserNotFoundException,
@@ -29,80 +26,6 @@ from app.core.exceptions import (
 router = APIRouter()
 
 logger = get_logger(__name__)
-
-# Endpoint de registro de nuevos usuarios
-@router.post(
-    "/register", 
-    response_model=SuccessResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Registro de nuevos usuarios",
-    description="Registra un nuevo usuario en la base de datos"
-    )
-async def register_user(request: Request, user_data: DataUserRegister, db: AsyncSession = Depends(get_db)):
-    """
-        Endpoint para registro de nuevos usuarios
-        Args:
-        request (Request): La solicitud HTTP
-        user_data (DataUserRegister): Los datos del usuario a registrar
-    """
-    try: 
-        # Crear instancia del servicio de usuarios
-        user_service = UserService(db)
-
-        # Rate limit
-        client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
-        if not rate_limiter.is_allowed(f"register:{client_ip}", max_requests=10, window_minutes=60):
-            raise RateLimitException()
-
-        # Verificar si el usuario ya existe
-        exists_user = await user_service.get_user_by_username(user_data.str_email)
-        if exists_user:
-            raise UserAlreadyExistsException(
-                message="El usuario ya existe",
-                error_code="USER_ALREADY_EXISTS"
-            )
-
-        # Crear objeto DataUserCreate sin la contraseña
-        data_user_data = DataUserCreate(
-            str_firstname=user_data.str_firstname,
-            str_lastname=user_data.str_lastname,
-            str_email=user_data.str_email,
-            str_phone=user_data.str_phone
-        )
-
-        # Registrar datos del usuario
-        data_user = await user_service.create_data_user(data_user_data)
-
-        # Hashear la contraseña
-        hashed_password = security_manager.create_password_hash(user_data.password)
-
-        user = UserCreate(
-            str_username=data_user.str_email.lower().strip(),
-            str_password_hash=hashed_password,
-            int_data_user_id=data_user.id,
-            int_id_rol=1
-        )
-
-        # Crear el usuario
-        user_created = await user_service.create_user(user)
-
-        return SuccessResponse(
-            success=True,
-            status_code=status.HTTP_201_CREATED,
-            message="Usuario creado correctamente",
-            data=user_created
-        )
-    except UserAlreadyExistsException as e:
-        raise e
-    except UserValidationException as e:
-        raise e
-    except ServiceException as e:
-        raise e
-    except Exception as e:
-        raise ServiceException(
-            message=f"Error inesperado al registrar el usuario: {str(e)}",
-            details={"original_error": str(e)}
-        )
 
 
 # Endpoint de login

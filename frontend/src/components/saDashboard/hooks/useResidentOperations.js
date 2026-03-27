@@ -2,11 +2,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ResidentService } from '../../../services/api/ResidentService';
 import CoownerService from '../../../services/api/coownerService';
 import Swal from 'sweetalert2';
-import { showBulkDeleteWithLoading } from '../../common/BulkDeleteConfirmModal';
+import { showBulkDeleteWithLoading, showBulkSendProgressModal } from '../../common/BulkDeleteConfirmModal';
+import { useProgressNotification } from '../../../contexts/ProgressNotificationContext';
 import { Mail } from 'lucide-react';
 
 export const useResidentOperations = (unitId) => {
 	const queryClient = useQueryClient();
+	const { startProgress, updateProgress, finishProgress } = useProgressNotification();
 
 	// Mutación para crear residente
 	const createResidentMutation = useMutation({
@@ -173,45 +175,32 @@ export const useResidentOperations = (unitId) => {
 	// Mutación para el envío masivo de credenciales
 	const sendBulkCredentialsMutation = useMutation({
 		mutationFn: async (residentIds) => {
-			return await ResidentService.sendBulkCredentials(unitId, residentIds);
-		},
-		onSuccess: (response) => {
-			const { successful, failed, total_processed } = response.data;
+			const ids = Array.isArray(residentIds) ? residentIds : [residentIds];
+			const response = await ResidentService.sendBulkCredentials(unitId, ids);
+			const taskId = response.data?.task_id;
+			const total = response.data?.total || ids.length;
 
-			Swal.fire({
-				icon: successful === total_processed ? 'success' : 'warning',
-				title:
-					successful === total_processed
-						? '¡Enlaces Enviados!'
-						: 'Envío Parcial',
-				html: `
-          <div class="text-left">
-            <div class="bg-blue-50 p-3 rounded-lg mb-3">
-              <p class="text-sm text-blue-700">
-                <strong>Total procesados:</strong> ${total_processed}
-              </p>
-              <p class="text-sm text-green-700">
-                <strong>Exitosos:</strong> ${successful}
-              </p>
-              ${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
-            </div>
-            ${
-							response.data.errors && response.data.errors.length > 0
-								? `
-                <div class="bg-red-50 p-3 rounded-lg max-h-32 overflow-y-auto">
-                  <p class="font-semibold text-red-800 mb-2">Errores:</p>
-                  <ul class="text-sm text-red-700 space-y-1">
-                    ${response.data.errors.map((err) => `<li>ID ${err.resident_id}: ${err.error}</li>`).join('')}
-                  </ul>
-                </div>
-              `
-								: ''
-						}
-          </div>
-        `,
-				confirmButtonColor: '#27ae60',
-				width: '500px',
-			});
+			if (taskId) {
+				await showBulkSendProgressModal({
+					total: total,
+					pollProgressFn: () => ResidentService.getEmailTaskStatus(taskId),
+					startProgress,
+					updateProgress,
+					finishProgress
+				});
+
+				const finalStatus = await ResidentService.getEmailTaskStatus(taskId);
+				return {
+					...response,
+					finalStatus: finalStatus.data
+				};
+			}
+
+			return response;
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', unitId] });
 		},
 		onError: (error) => {
 			Swal.fire({
@@ -296,6 +285,7 @@ export const useResidentOperations = (unitId) => {
 				confirmButtonColor: '#27ae60',
 				width: '500px',
 			});
+			queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
 		}
 	};
 

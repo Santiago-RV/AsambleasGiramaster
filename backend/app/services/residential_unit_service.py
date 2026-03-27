@@ -24,14 +24,13 @@ from app.services.email_notification_service import EmailNotificationService
 from app.services.simple_auto_login_service import simple_auto_login_service
 
 from app.models.email_notification_model import EmailNotificationModel
+from app.models.meeting_invitation_model import MeetingInvitationModel
+from app.models.meeting_model import MeetingModel
 from app.services.email_service import EmailService
-from sqlalchemy import select
-from datetime import datetime
-import logging
-
 from app.services.support_service import SupportService
+from app.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class ResidentialUnitService:
     def __init__(self, db: AsyncSession):
@@ -267,16 +266,67 @@ class ResidentialUnitService:
     async def get_residents_by_residential_unit(self, residential_unit_id: int):
         """Obtiene los residentes de una unidad residencial específica"""
         try:
-            # Consulta para obtener usuarios con sus datos personales y número de apartamento
+            from sqlalchemy import func
+            
+            # Subquery para obtener la última notificación de credenciales por usuario
+            notification_subquery = (
+                select(
+                    EmailNotificationModel.int_user_id,
+                    func.max(EmailNotificationModel.created_at).label('max_created_at')
+                )
+                .where(
+                    EmailNotificationModel.str_template.in_(['welcome', 'resend_credentials'])
+                )
+                .group_by(EmailNotificationModel.int_user_id)
+                .subquery()
+            )
+            
+            # Subquery para obtener la última invitación a reunión por usuario
+            invitation_subquery = (
+                select(
+                    MeetingInvitationModel.int_user_id,
+                    func.max(MeetingInvitationModel.dat_sent_at).label('max_sent_at')
+                )
+                .group_by(MeetingInvitationModel.int_user_id)
+                .subquery()
+            )
+            
+            # Query principal con JOIN a notificaciones e invitaciones
             query = (
                 select(
                     UserModel,
                     DataUserModel,
                     UserResidentialUnitModel.str_apartment_number,
-                    UserResidentialUnitModel.dec_default_voting_weight
+                    UserResidentialUnitModel.dec_default_voting_weight,
+                    EmailNotificationModel,
+                    MeetingInvitationModel,
+                    MeetingModel
                 )
                 .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
                 .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                .outerjoin(
+                    notification_subquery,
+                    notification_subquery.c.int_user_id == UserModel.id
+                )
+                .outerjoin(
+                    EmailNotificationModel,
+                    (EmailNotificationModel.int_user_id == UserModel.id) &
+                    (EmailNotificationModel.str_template.in_(['welcome', 'resend_credentials'])) &
+                    (EmailNotificationModel.created_at == notification_subquery.c.max_created_at)
+                )
+                .outerjoin(
+                    invitation_subquery,
+                    invitation_subquery.c.int_user_id == UserModel.id
+                )
+                .outerjoin(
+                    MeetingInvitationModel,
+                    (MeetingInvitationModel.int_user_id == UserModel.id) &
+                    (MeetingInvitationModel.dat_sent_at == invitation_subquery.c.max_sent_at)
+                )
+                .outerjoin(
+                    MeetingModel,
+                    MeetingInvitationModel.int_meeting_id == MeetingModel.id
+                )
                 .where(UserResidentialUnitModel.int_residential_unit_id == residential_unit_id)
             )
             
@@ -285,7 +335,25 @@ class ResidentialUnitService:
             
             # Formatear la respuesta
             residents = []
-            for user, data_user, apartment_number, voting_weight  in residents_data:
+            for row in residents_data:
+                user, data_user, apartment_number, voting_weight, notification, invitation, meeting = row
+                last_notification = None
+                if notification:
+                    last_notification = {
+                        "template": notification.str_template,
+                        "sent_at": notification.created_at.isoformat() if notification.created_at else None,
+                        "status": notification.str_status
+                    }
+                
+                last_invitation = None
+                if invitation and meeting:
+                    last_invitation = {
+                        "meeting_title": meeting.str_title if meeting else None,
+                        "meeting_status": meeting.str_status if meeting else None,
+                        "sent_at": invitation.dat_sent_at.isoformat() if invitation.dat_sent_at else None,
+                        "status": invitation.str_invitation_status
+                    }
+                
                 residents.append({
                     "id": user.id,
                     "username": user.str_username,
@@ -297,10 +365,12 @@ class ResidentialUnitService:
                     "voting_weight": float(voting_weight) if voting_weight else 0.0,
                     "is_external_delegate": user.bln_is_external_delegate,
                     "user_temporary": user.bln_user_temporary,
-                    "is_active": user.bln_allow_entry,  # ← CAMBIO: usar bln_allow_entry
+                    "is_active": user.bln_allow_entry,
                     "bln_allow_entry": user.bln_allow_entry,
-                    "int_id_rol": user.int_id_rol,  # 1: SuperAdmin, 2: Admin, 3: Copropietario, 4: Invitado
+                    "int_id_rol": user.int_id_rol,
                     "created_at": user.created_at,
+                    "last_credential_notification": last_notification,
+                    "last_meeting_invitation": last_invitation,
                 })
             
             return residents
@@ -441,6 +511,7 @@ class ResidentialUnitService:
                 'successful': 0,
                 'failed': 0,
                 'users_created': 0,
+                'user_ids': [],
                 # 'emails_sent': 0,
                 # 'emails_failed': 0,
                 'errors': []
@@ -485,64 +556,72 @@ class ResidentialUnitService:
                     if len(apartment_number) == 0:
                         raise ValueError("Número de apartamento requerido")
 
-                    # Verificar si el usuario ya existe por email
-                    existing_user = await self._get_user_by_email(email)
+                    # SIEMPRE crear nuevos registros - no buscar por email existente
                     user_was_created = False
-                    # password_to_send = password  # Guardar contraseña antes de hashear
                     
-                    if not existing_user:
-                        # ============================================
-                        # PASO 1: Crear registro en tbl_data_users
-                        # ============================================
-                        data_user = DataUserModel(
-                            str_firstname=firstname,
-                            str_lastname=lastname,
-                            str_email=email,
-                            str_phone=phone,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
-                        )
-                        
-                        self.db.add(data_user)
-                        await self.db.flush()
-                        
-                        logger.info(f"📝 DataUser creado: {email} (ID: {data_user.id})")
+                    # ============================================
+                    # PASO 1: Crear registro en tbl_data_users
+                    # ============================================
+                    data_user = DataUserModel(
+                        str_firstname=firstname,
+                        str_lastname=lastname,
+                        str_email=email,
+                        str_phone=phone,
+                        created_at=datetime.now(),
+                        updated_at=datetime.now()
+                    )
+                    
+                    self.db.add(data_user)
+                    await self.db.flush()
+                    
+                    logger.info(f"📝 DataUser creado: {email} (ID: {data_user.id})")
 
-                        # ============================================
-                        # PASO 2: Crear registro en tbl_users
-                        # ============================================
-                        # Generar username como nombre.apellido.nroapartamento
-                        username = f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", "")
-                        
-                        # Hashear contraseña
-                        hashed_password = security_manager.create_password_hash(password)
-
-                        # Crear User con rol 3 (copropietario) y acceso DESHABILITADO
-                        user = UserModel(
-                            int_data_user_id=data_user.id,
-                            str_username=username,
-                            str_password_hash=hashed_password,
-                            int_id_rol=3,  # 3: Copropietario (FIJO)
-                            bln_allow_entry=False,  # Acceso deshabilitado (0)
-                            bln_is_external_delegate=False,
-                            bln_user_temporary=False,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
+                    # ============================================
+                    # PASO 2: Crear registro en tbl_users
+                    # ============================================
+                    # Generar username como nombre.apellido.nroapartamento
+                    base_username = f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", "")
+                    
+                    # Verificar si el username ya existe y generar uno único si es necesario
+                    username = base_username
+                    counter = 0
+                    while True:
+                        from sqlalchemy import select
+                        result_username = await self.db.execute(
+                            select(UserModel).where(UserModel.str_username == username)
                         )
+                        existing_username = result_username.scalar_one_or_none()
+                        if not existing_username:
+                            break
+                        counter += 1
+                        username = f"{base_username}.{counter}"
+                    
+                    # Hashear contraseña
+                    hashed_password = security_manager.create_password_hash(password)
 
-                        self.db.add(user)
-                        await self.db.flush()
-                        
-                        user_was_created = True
-                        results['users_created'] += 1
-                        logger.info(
-                            f"👤 Usuario creado: {username} - Email: {email} - "
-                            f"Rol: 3 (Copropietario) - Acceso: Deshabilitado"
-                        )
-                    else:
-                        user = existing_user
-                        username = user.str_username
-                        logger.info(f"ℹ️ Usuario ya existe: {email} (ID: {user.id})")
+                    # Crear User con rol 3 (copropietario) y acceso DESHABILITADO
+                    user = UserModel(
+                        int_data_user_id=data_user.id,
+                        str_username=username,
+                        str_password_hash=hashed_password,
+                        int_id_rol=3,  # 3: Copropietario (FIJO)
+                        bln_allow_entry=False,  # Acceso deshabilitado (0)
+                        bln_is_external_delegate=False,
+                        bln_user_temporary=False,
+                        created_at=datetime.now(),
+                        updated_at=datetime.now()
+                    )
+
+                    self.db.add(user)
+                    await self.db.flush()
+                    
+                    user_was_created = True
+                    results['users_created'] += 1
+                    results['user_ids'].append(user.id)
+                    logger.info(
+                        f"👤 Usuario creado: {username} - Email: {email} - "
+                        f"Rol: 3 (Copropietario) - Acceso: Deshabilitado"
+                    )
 
                     # ============================================
                     # PASO 3: Crear/actualizar registro en tbl_user_residential_units
@@ -822,7 +901,17 @@ class ResidentialUnitService:
             await self.db.refresh(data_user)
             await self.db.refresh(user_unit)
             
-            # 10. Enviar correo de bienvenida (opcional)
+            # 10. Generar token de auto-login
+            from app.services.simple_auto_login_service import simple_auto_login_service
+            from app.core.config import settings
+            
+            auto_login_token = simple_auto_login_service.generate_auto_login_token(
+                username=username,
+                expiration_hours=24
+            )
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+            
+            # 11. Enviar correo de bienvenida (opcional)
             try:
                 email_sent = await self._send_welcome_email(
                     user_email=email,
@@ -832,18 +921,33 @@ class ResidentialUnitService:
                     residential_unit_name=residential_unit.str_name,
                     apartment_number=apartment_number,
                     voting_weight=voting_weight,
-                    phone=phone
+                    phone=phone,
+                    auto_login_token=auto_login_token,
+                    frontend_url=frontend_url
                 )
                 
                 if email_sent:
                     logger.info(f"Correo de bienvenida enviado a {email}")
+                    
+                    # Registrar notificación en BD
+                    try:
+                        notification_service = EmailNotificationService(self.db)
+                        await notification_service.create_notification(
+                            user_id=user.id,
+                            template="welcome",
+                            status="sent"
+                        )
+                        await self.db.commit()
+                        logger.info(f"Notificación registrada en BD para usuario {username}")
+                    except Exception as e:
+                        logger.warning(f"No se pudo crear notificación: {str(e)}")
                 else:
                     logger.warning(f"No se pudo enviar correo de bienvenida a {email}")
             except Exception as e:
                 # No fallar si el correo falla, solo registrar
                 logger.error(f"Error al enviar correo de bienvenida: {str(e)}")
             
-            # 11. Retornar los datos del residente creado
+            # 12. Retornar los datos del residente creado
             logger.info(f"Copropietario creado exitosamente: {username}")
             
             return {
@@ -879,7 +983,9 @@ class ResidentialUnitService:
         residential_unit_name: str,
         apartment_number: str,
         voting_weight: Decimal,
-        phone: Optional[str] = None
+        phone: Optional[str] = None,
+        auto_login_token: Optional[str] = None,
+        frontend_url: Optional[str] = None
     ) -> bool:
         """
         Envía correo de bienvenida al copropietario con sus credenciales.
@@ -896,6 +1002,8 @@ class ResidentialUnitService:
             apartment_number: Número de apartamento
             voting_weight: Peso de votación (coeficiente)
             phone: Teléfono (opcional)
+            auto_login_token: Token JWT para auto-login (opcional)
+            frontend_url: URL base del frontend para construir auto-login URL (opcional)
         
         Returns:
             bool: True si el envío fue exitoso, False en caso contrario
@@ -919,6 +1027,14 @@ class ResidentialUnitService:
             firstname = name_parts[0] if name_parts else user_name
             lastname = name_parts[1] if len(name_parts) > 1 else ''
             
+            # Construir URL de auto-login si hay token
+            auto_login_url = None
+            if auto_login_token:
+                if not frontend_url:
+                    from app.core.config import settings
+                    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
+            
             # Usar Jinja2 para renderizar el template correctamente
             from jinja2 import Template
             template = Template(html_template)
@@ -933,17 +1049,15 @@ class ResidentialUnitService:
                 user_email=user_email,
                 phone=phone,
                 current_year=str(datetime.now().year),
-                auto_login_url=None
+                auto_login_url=auto_login_url
             )
             
             # Enviar email usando credenciales de DB
             from app.utils.email_sender import EmailSender
             db_email_sender = EmailSender(self.db)
-            success = await db_email_sender.send_email_async(
-                to_emails=[user_email],
-                subject=f"Bienvenido a GIRAMASTER - {residential_unit_name}",
-                html_content=html_content,
-                text_content=f"""
+            
+            # Construir texto alternativo con auto-login si aplica
+            text_content = f"""
     Estimado(a) {user_name},
 
     Se ha creado exitosamente su cuenta como copropietario de {residential_unit_name}.
@@ -956,7 +1070,19 @@ class ResidentialUnitService:
     - Apartamento: {apartment_number}
     - Email: {user_email}
     - Peso de votación: {voting_weight_percent:.2f}%
+"""
+            if auto_login_url:
+                text_content += f"""
+    ACCESO DIRECTO:
+    - URL: {auto_login_url}
+    - Válido por 24 horas
 
+"""
+            else:
+                text_content += """
+"""
+
+            text_content += """
     IMPORTANTE: Su cuenta ha sido creada con acceso DESHABILITADO por motivos de seguridad.
     El Super Administrador debe habilitar su acceso antes de que pueda iniciar sesión.
 
@@ -964,7 +1090,13 @@ class ResidentialUnitService:
 
     Saludos,
     Sistema GIRAMASTER
-                """
+            """
+            
+            success = await db_email_sender.send_email_async(
+                to_emails=[user_email],
+                subject=f"Bienvenido a GIRAMASTER - {residential_unit_name}",
+                html_content=html_content,
+                text_content=text_content
             )
             
             if success:
@@ -980,13 +1112,14 @@ class ResidentialUnitService:
 
 
     async def _get_user_by_email(self, email: str):
-        """Helper para obtener usuario por email"""
+        """Helper para obtener usuario por email - devuelve el primero si hay duplicados"""
         from sqlalchemy import select
         
         result = await self.db.execute(
             select(UserModel)
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
             .where(DataUserModel.str_email == email)
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -1259,7 +1392,8 @@ class ResidentialUnitService:
         user_id: int, 
         unit_id: int,
         auto_commit: bool = True,
-        frontend_url: Optional[str] = None
+        frontend_url: Optional[str] = None,
+        send_email: bool = True
     ) -> dict:
         """
         Reenvía las credenciales de acceso por correo electrónico a un copropietario.
@@ -1385,27 +1519,74 @@ class ResidentialUnitService:
                 # PASO 7: Enviar correo con credenciales y JWT
                 # ============================================
                 email_svc = EmailService(self.db)
-                email_sent = await email_svc.send_coproprietor_credentials_email(
-                    to_email=data_user.str_email,
-                    firstname=data_user.str_firstname,
-                    lastname=data_user.str_lastname,
-                    username=user.str_username,
-                    password=None,
-                    residential_unit_name=residential_unit.str_name,
-                    apartment_number=user_unit.str_apartment_number,
-                    voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
-                    phone=data_user.str_phone,
-                    auto_login_token=auto_login_token,
-                    support_name=support_data["str_support_name"] if support_data else None,
-                    support_email=support_data["str_support_email"] if support_data else None,
-                    support_phone=support_data["str_support_phone"] if support_data else None,
-                    frontend_url=frontend_url,
-                )
+                email_data = None
+                email_sent = False
+                
+                if send_email:
+                    email_sent = await email_svc.send_coproprietor_credentials_email(
+                        to_email=data_user.str_email,
+                        firstname=data_user.str_firstname,
+                        lastname=data_user.str_lastname,
+                        username=user.str_username,
+                        password=None,
+                        residential_unit_name=residential_unit.str_name,
+                        apartment_number=user_unit.str_apartment_number,
+                        voting_weight=user_unit.dec_default_voting_weight or Decimal('0.0'),
+                        phone=data_user.str_phone,
+                        auto_login_token=auto_login_token,
+                        support_name=support_data["str_support_name"] if support_data else None,
+                        support_email=support_data["str_support_email"] if support_data else None,
+                        support_phone=support_data["str_support_phone"] if support_data else None,
+                        frontend_url=frontend_url,
+                    )
+                else:
+                    auto_login_url = None
+                    if auto_login_token:
+                        if not frontend_url:
+                            from app.core.config import settings
+                            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                        auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
+                    
+                    try:
+                        template_path = Path(__file__).parent.parent / "templates" / "email_coproprietario_credentials.html"
+                        with open(template_path, 'r', encoding='utf-8') as file:
+                            template_content = file.read()
+                        
+                        from jinja2 import Template
+                        template = Template(template_content)
+                        html_content = template.render(
+                            firstname=data_user.str_firstname,
+                            lastname=data_user.str_lastname,
+                            username=user.str_username,
+                            password=None,
+                            residential_unit_name=residential_unit.str_name,
+                            apartment_number=user_unit.str_apartment_number,
+                            voting_weight=float(user_unit.dec_default_voting_weight or Decimal('0.0')),
+                            user_email=data_user.str_email,
+                            phone=data_user.str_phone,
+                            auto_login_url=auto_login_url,
+                            support_name=support_data["str_support_name"] if support_data else None,
+                            support_email=support_data["str_support_email"] if support_data else None,
+                            support_phone=support_data["str_support_phone"] if support_data else None,
+                        )
+                        subject = f"Credenciales de Acceso - {residential_unit.str_name}"
+                        email_data = {
+                            "subject": subject,
+                            "html_content": html_content,
+                            "text_content": None
+                        }
+                        email_sent = False  # No enviar ahora, Celery lo hará después
+                    except Exception as e:
+                        logger.error(f"Error preparing email data: {e}")
                 
                 # ============================================
                 # PASO 8: Actualizar estado de la notificación según resultado
                 # ============================================
-                status = "sent" if email_sent else "failed"
+                # Si send_email=False, dejar en "pending" para que Celery actualice después
+                if send_email:
+                    status = "sent" if email_sent else "failed"
+                else:
+                    status = "pending"  # Celery actualizará a "sent" después de enviar
                 await notification_service.update_status(
                     notification_id=notification.id,
                     status=status,
@@ -1415,17 +1596,22 @@ class ResidentialUnitService:
                 # ============================================
                 # PASO 9: Retornar resultado
                 # ============================================
-                if email_sent:
+                # Si send_email=False, siempre retornar email_data (Celery lo usará)
+                # Si send_email=True, solo retornar si el email se envió correctamente
+                should_send = send_email and email_sent
+                
+                if email_data is not None:
                     logger.info(
-                        f"Credenciales reenviadas exitosamente a {data_user.str_email} "
+                        f"Credenciales {'enviadas' if should_send else 'preparadas'} para {data_user.str_email} "
                         f"- Notificación ID: {notification.id} registrada como '{status}'"
                     )
                     return {
                         "email": data_user.str_email,
                         "username": user.str_username,
-                        "email_sent": True,
+                        "email_sent": should_send,
                         "notification_id": notification.id,
-                        "message": f"Credenciales enviadas a {data_user.str_email}"
+                        "message": f"Credenciales {'enviadas' if should_send else 'preparadas'} para {data_user.str_email}",
+                        "email_data": email_data
                     }
                 else:
                     logger.warning(
@@ -2194,8 +2380,6 @@ class ResidentialUnitService:
             guest_id: ID del usuario invitado
         """
         try:
-            from app.models.email_notification_model import EmailNotificationModel
-            
             # 1. Verificar que el usuario existe y es invitado (rol 4)
             query = (
                 select(UserModel)
