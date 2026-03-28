@@ -523,12 +523,8 @@ class ActiveMeetingService:
         disconnected_count = len(disconnected_users_data)
         total_invited = connected_count + disconnected_count
         
-        llamados = meeting.json_llamados or {}
-        llamados_status = {
-            "1": {"registered": "1" in llamados, "timestamp": llamados["1"]["timestamp"] if "1" in llamados else None},
-            "2": {"registered": "2" in llamados, "timestamp": llamados["2"]["timestamp"] if "2" in llamados else None},
-            "3": {"registered": "3" in llamados, "timestamp": llamados["3"]["timestamp"] if "3" in llamados else None},
-        }
+        llamados_result = await self.get_all_llamados(meeting.id)
+        llamados_status = llamados_result["llamados"]
 
         return {
             "meeting_id": meeting.id,
@@ -622,109 +618,146 @@ class ActiveMeetingService:
 
     async def take_llamado_snapshot(self, meeting_id: int, numero: int) -> dict:
         """
-        Toma un snapshot de asistencia para el llamado N (1, 2 o 3).
-
-        - Registra quiénes están presentes y ausentes en ese momento.
-        - Si el delegado de alguien está presente, el delegante también aparece como presente.
-        - Guarda el resultado en json_llamados del meeting.
-        - Si el llamado ya existe, lo sobreescribe.
+        Registra el llamado N (1, 2 o 3).
+        Actualiza json_llamados de cada invitación con {str(numero): true/false}.
+          true  = presente (directo o por delegación)
+          false = ausente
+        Si el llamado ya fue tomado, lo sobreescribe.
         """
         if numero not in (1, 2, 3):
             return {"success": False, "message": "El número de llamado debe ser 1, 2 o 3"}
 
-        query = select(MeetingModel).where(MeetingModel.id == meeting_id)
-        result = await self.db.execute(query)
-        meeting = result.scalar_one_or_none()
-
-        if not meeting:
+        meeting_q = select(MeetingModel.id).where(MeetingModel.id == meeting_id)
+        meeting_exists = (await self.db.execute(meeting_q)).scalar_one_or_none()
+        if not meeting_exists:
             return {"success": False, "message": "Reunión no encontrada"}
 
         connected_users = await self._get_connected_users(meeting_id)
-        disconnected_users = await self._get_disconnected_users(meeting_id)
+        connected_ids = {u.user_id for u in connected_users}
 
-        total_quorum = sum(
-            float(u.voting_weight or 0) for u in connected_users
-        ) + sum(
-            float(u.get("voting_weight") or 0) for u in disconnected_users
+        key = str(numero)
+
+        inv_q = select(MeetingInvitationModel).where(
+            and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != "ADMIN"
+            )
         )
-        connected_quorum = sum(float(u.voting_weight or 0) for u in connected_users)
-        quorum_percentage = round((connected_quorum / total_quorum * 100) if total_quorum > 0 else 0, 2)
+        invitations = (await self.db.execute(inv_q)).scalars().all()
 
-        present_list = [
-            {
-                "user_id": u.user_id,
-                "full_name": u.full_name,
-                "apartment_number": u.apartment_number,
-                "quorum_base": float(u.voting_weight or 0),
-                "attendance_type": u.attendance_type,
-            }
-            for u in connected_users
-        ]
+        for inv in invitations:
+            current = dict(inv.json_llamados) if inv.json_llamados else {}
+            current[key] = inv.int_user_id in connected_ids
+            await self.db.execute(
+                sa_update(MeetingInvitationModel)
+                .where(MeetingInvitationModel.id == inv.id)
+                .values(json_llamados=current)
+            )
 
-        absent_list = [
-            {
-                "user_id": u["user_id"],
-                "full_name": u["full_name"],
-                "apartment_number": u["apartment_number"],
-                "quorum_base": float(u.get("voting_weight") or 0),
-                "has_delegated": u.get("has_delegated", False),
-            }
-            for u in disconnected_users
-        ]
-
-        snapshot = {
-            "timestamp": datetime.now().isoformat(),
-            "present": present_list,
-            "absent": absent_list,
-            "connected_quorum": connected_quorum,
-            "total_quorum": total_quorum,
-            "quorum_percentage": quorum_percentage,
-        }
-
-        llamados = dict(meeting.json_llamados) if meeting.json_llamados else {}
-        llamados[str(numero)] = snapshot
-
-        await self.db.execute(
-            sa_update(MeetingModel)
-            .where(MeetingModel.id == meeting_id)
-            .values(json_llamados=llamados)
-        )
         await self.db.commit()
 
+        present_count = sum(1 for inv in invitations if inv.int_user_id in connected_ids)
         return {
             "success": True,
             "message": f"Llamado {numero} registrado exitosamente",
             "llamado": numero,
-            "snapshot": snapshot,
+            "present_count": present_count,
+            "absent_count": len(invitations) - present_count,
         }
 
     async def get_llamado_data(self, meeting_id: int, numero: int) -> dict:
-        """Retorna el snapshot guardado para el llamado N de una reunión."""
-        query = select(MeetingModel.json_llamados).where(MeetingModel.id == meeting_id)
-        result = await self.db.execute(query)
-        json_llamados = result.scalar_one_or_none()
+        """
+        Retorna presentes/ausentes del llamado N con quórum calculado,
+        leyendo directamente desde tbl_meeting_invitations.json_llamados.
+        """
+        key = str(numero)
 
-        if not json_llamados:
-            return {"success": False, "message": "No hay llamados registrados para esta reunión"}
+        query = (
+            select(
+                UserModel.id,
+                DataUserModel.str_firstname,
+                DataUserModel.str_lastname,
+                MeetingInvitationModel.str_apartment_number,
+                MeetingInvitationModel.dec_quorum_base,
+                MeetingInvitationModel.int_delegated_id,
+                MeetingInvitationModel.json_llamados,
+            )
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .join(
+                MeetingInvitationModel,
+                and_(
+                    MeetingInvitationModel.int_user_id == UserModel.id,
+                    MeetingInvitationModel.int_meeting_id == meeting_id
+                )
+            )
+            .where(MeetingInvitationModel.str_apartment_number != "ADMIN")
+            .order_by(DataUserModel.str_lastname, DataUserModel.str_firstname)
+        )
+        rows = (await self.db.execute(query)).all()
 
-        snapshot = json_llamados.get(str(numero))
-        if not snapshot:
+        if not rows:
+            return {"success": False, "message": "No hay invitados en esta reunión"}
+
+        # Verificar que el llamado fue registrado (al menos una invitación tiene la key)
+        if not any(key in (row.json_llamados or {}) for row in rows):
             return {"success": False, "message": f"El llamado {numero} aún no ha sido registrado"}
+
+        present, absent = [], []
+        total_quorum = 0.0
+        connected_quorum = 0.0
+
+        for row in rows:
+            quorum = float(row.dec_quorum_base or 0)
+            total_quorum += quorum
+            is_present = (row.json_llamados or {}).get(key, False)
+            person = {
+                "user_id": row.id,
+                "full_name": f"{row.str_firstname} {row.str_lastname}".strip(),
+                "apartment_number": row.str_apartment_number,
+                "quorum_base": quorum,
+                "has_delegated": row.int_delegated_id is not None,
+            }
+            if is_present:
+                connected_quorum += quorum
+                present.append(person)
+            else:
+                absent.append(person)
+
+        snapshot = {
+            "present": present,
+            "absent": absent,
+            "connected_quorum": connected_quorum,
+            "total_quorum": total_quorum,
+            "quorum_percentage": round((connected_quorum / total_quorum * 100) if total_quorum > 0 else 0, 2),
+        }
 
         return {"success": True, "llamado": numero, "snapshot": snapshot}
 
     async def get_all_llamados(self, meeting_id: int) -> dict:
-        """Retorna todos los llamados registrados para una reunión."""
-        query = select(MeetingModel.json_llamados).where(MeetingModel.id == meeting_id)
-        result = await self.db.execute(query)
-        json_llamados = result.scalar_one_or_none()
+        """
+        Retorna cuáles llamados han sido registrados, leyendo una invitación de muestra.
+        True = registrado, False = pendiente.
+        """
+        sample_q = (
+            select(MeetingInvitationModel.json_llamados)
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.str_apartment_number != "ADMIN"
+                )
+            )
+            .limit(1)
+        )
+        sample = (await self.db.execute(sample_q)).scalar_one_or_none() or {}
 
-        llamados_status = {
-            "1": json_llamados.get("1") if json_llamados else None,
-            "2": json_llamados.get("2") if json_llamados else None,
-            "3": json_llamados.get("3") if json_llamados else None,
+        return {
+            "success": True,
+            "llamados": {
+                "1": {"registered": "1" in sample},
+                "2": {"registered": "2" in sample},
+                "3": {"registered": "3" in sample},
+            },
         }
-        return {"success": True, "llamados": llamados_status}
 
     async def close_user_session(
         self, 

@@ -8,10 +8,11 @@ type: project
 
 Implementado 2026-03-28.
 
-## Almacenamiento
-- Columna `json_llamados JSONB` en `tbl_meetings`
+## Almacenamiento (diseño final)
+- **`tbl_meetings.json_llamados`** → solo metadatos: `{"1": {timestamp, quorum_percentage, connected_quorum, total_quorum, present_count, absent_count}, "2": null, "3": null}`
+- **`tbl_meeting_invitations.json_llamados`** → presencia por usuario: `{"1": true, "2": false}` (true=presente, false=ausente, clave ausente=llamado no tomado)
+- GIN index en `tbl_meeting_invitations(json_llamados)` para búsquedas eficientes
 - Migración en `backend/migrations/add_json_llamados_to_meetings.sql`
-- Estructura: `{ "1": {timestamp, present:[...], absent:[...], connected_quorum, total_quorum, quorum_percentage}, "2": {...}, "3": {...} }`
 
 ## Backend
 - `MeetingModel.json_llamados` — JSON column

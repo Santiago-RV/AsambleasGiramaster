@@ -434,7 +434,7 @@ async def get_llamado_report(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Retorna los datos del llamado N para que el superadmin genere el PDF.
+    Retorna los datos del llamado N reconstruidos desde tbl_meeting_invitations.
     Incluye nombre de la unidad y datos de la reunión para encabezado del PDF.
     """
     await _verify_superadmin(current_user, db)
@@ -453,13 +453,12 @@ async def get_llamado_report(
 
     meeting, residential_unit = row
 
-    if not meeting.json_llamados or str(numero) not in meeting.json_llamados:
-        raise HTTPException(
-            status_code=404,
-            detail=f"El llamado {numero} aún no ha sido registrado para esta reunión"
-        )
+    from app.services.active_meeting_service import ActiveMeetingService
+    svc = ActiveMeetingService(db)
+    llamado_result = await svc.get_llamado_data(meeting_id, numero)
 
-    snapshot = meeting.json_llamados[str(numero)]
+    if not llamado_result["success"]:
+        raise HTTPException(status_code=404, detail=llamado_result["message"])
 
     return SuccessResponse(
         success=True,
@@ -477,7 +476,7 @@ async def get_llamado_report(
                 "nit": residential_unit.str_nit,
             },
             "llamado": numero,
-            "snapshot": snapshot,
+            "snapshot": llamado_result["snapshot"],
         }
     )
 
@@ -501,7 +500,10 @@ async def get_all_llamados_report(
         raise HTTPException(status_code=404, detail="Reunión no encontrada")
 
     meeting, residential_unit = row
-    llamados = meeting.json_llamados or {}
+
+    from app.services.active_meeting_service import ActiveMeetingService
+    svc = ActiveMeetingService(db)
+    llamados_result = await svc.get_all_llamados(meeting_id)
 
     return SuccessResponse(
         success=True,
@@ -517,10 +519,6 @@ async def get_all_llamados_report(
                 "name": residential_unit.str_name,
                 "nit": residential_unit.str_nit,
             },
-            "llamados": {
-                "1": llamados.get("1"),
-                "2": llamados.get("2"),
-                "3": llamados.get("3"),
-            },
+            "llamados": llamados_result["llamados"],
         }
     )

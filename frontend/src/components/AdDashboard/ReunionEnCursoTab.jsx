@@ -324,11 +324,6 @@ const ReunionEnCursoTab = () => {
             const nombreLlamado = ["Primer", "Segundo", "Tercer"][num - 1];
             const status = data?.data?.llamados_status?.[String(num)];
             const registrado = status?.registered;
-            const timestamp = status?.timestamp
-              ? new Date(status.timestamp).toLocaleString("es-CO", {
-                  day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true,
-                })
-              : null;
 
             return (
               <div
@@ -349,9 +344,6 @@ const ReunionEnCursoTab = () => {
                     {nombreLlamado} Llamado
                   </span>
                 </div>
-                {registrado && timestamp && (
-                  <p className="text-xs text-indigo-500 mb-3">{timestamp}</p>
-                )}
                 {!registrado && (
                   <p className="text-xs text-gray-400 mb-3">Sin registrar</p>
                 )}

@@ -313,15 +313,9 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 								</h3>
 								<div className="space-y-3">
 									{[1, 2, 3].map((num) => {
-										const snapshot = llamados[String(num)];
-										const registrado = !!snapshot;
+										const llamadoInfo = llamados[String(num)];
+										const registrado = llamadoInfo?.registered ?? false;
 										const nombreLlamado = NOMBRES_LLAMADO[num - 1];
-										const timestamp = snapshot?.timestamp
-											? new Date(snapshot.timestamp).toLocaleString('es-CO', {
-													day: '2-digit', month: 'short', year: 'numeric',
-													hour: '2-digit', minute: '2-digit', hour12: true,
-												})
-											: null;
 										const expandido = llamadoExpandido === num;
 
 										return (
@@ -345,9 +339,6 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 															<span className="font-semibold text-sm">
 																{nombreLlamado} Llamado
 															</span>
-															{registrado && timestamp && (
-																<p className="text-xs text-indigo-500">{timestamp}</p>
-															)}
 															{!registrado && (
 																<p className="text-xs text-gray-400">Sin registrar</p>
 															)}
