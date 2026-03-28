@@ -422,3 +422,105 @@ async def get_delegations_report(
             "delegations": delegations,
         }
     )
+
+
+# ─── LLAMADOS DE ASISTENCIA ───────────────────────────────────────────────────
+
+@router.get("/meetings/{meeting_id}/llamado/{numero}", response_model=SuccessResponse)
+async def get_llamado_report(
+    meeting_id: int,
+    numero: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retorna los datos del llamado N para que el superadmin genere el PDF.
+    Incluye nombre de la unidad y datos de la reunión para encabezado del PDF.
+    """
+    await _verify_superadmin(current_user, db)
+
+    if numero not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="El número de llamado debe ser 1, 2 o 3")
+
+    result = await db.execute(
+        select(MeetingModel, ResidentialUnitModel)
+        .join(ResidentialUnitModel, MeetingModel.int_id_residential_unit == ResidentialUnitModel.id)
+        .where(MeetingModel.id == meeting_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Reunión no encontrada")
+
+    meeting, residential_unit = row
+
+    if not meeting.json_llamados or str(numero) not in meeting.json_llamados:
+        raise HTTPException(
+            status_code=404,
+            detail=f"El llamado {numero} aún no ha sido registrado para esta reunión"
+        )
+
+    snapshot = meeting.json_llamados[str(numero)]
+
+    return SuccessResponse(
+        success=True,
+        status_code=200,
+        message=f"Datos del llamado {numero}",
+        data={
+            "meeting": {
+                "id": meeting.id,
+                "title": meeting.str_title,
+                "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+                "status": meeting.str_status,
+            },
+            "residential_unit": {
+                "name": residential_unit.str_name,
+                "nit": residential_unit.str_nit,
+            },
+            "llamado": numero,
+            "snapshot": snapshot,
+        }
+    )
+
+
+@router.get("/meetings/{meeting_id}/llamados", response_model=SuccessResponse)
+async def get_all_llamados_report(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retorna el estado de los 3 llamados para una reunión (para mostrar en el modal del SA)."""
+    await _verify_superadmin(current_user, db)
+
+    result = await db.execute(
+        select(MeetingModel, ResidentialUnitModel)
+        .join(ResidentialUnitModel, MeetingModel.int_id_residential_unit == ResidentialUnitModel.id)
+        .where(MeetingModel.id == meeting_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Reunión no encontrada")
+
+    meeting, residential_unit = row
+    llamados = meeting.json_llamados or {}
+
+    return SuccessResponse(
+        success=True,
+        status_code=200,
+        message="Llamados de la reunión",
+        data={
+            "meeting": {
+                "id": meeting.id,
+                "title": meeting.str_title,
+                "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+            },
+            "residential_unit": {
+                "name": residential_unit.str_name,
+                "nit": residential_unit.str_nit,
+            },
+            "llamados": {
+                "1": llamados.get("1"),
+                "2": llamados.get("2"),
+                "3": llamados.get("3"),
+            },
+        }
+    )

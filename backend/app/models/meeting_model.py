@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -47,6 +47,12 @@ class MeetingModel(Base):
     int_total_confirmed = Column(Integer, nullable=False, default=0)
     dat_actual_start_time = Column(DateTime, nullable=True)
     dat_actual_end_time = Column(DateTime, nullable=True)
+    json_llamados = Column(
+        JSON,
+        nullable=True,
+        default=None,
+        comment="Snapshots de asistencia para los 3 llamados de lista. Keys: '1','2','3'"
+    )
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

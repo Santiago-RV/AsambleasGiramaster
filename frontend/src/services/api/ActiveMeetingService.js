@@ -130,6 +130,91 @@ export const formatAttendanceType = (attendanceType) => {
 	return types[attendanceType] || attendanceType || 'Titular';
 };
 
+// ─── LLAMADOS DE ASISTENCIA ───────────────────────────────────────────────────
+
+/**
+ * Registra un llamado de asistencia (snapshot del estado actual)
+ * @param {number} meetingId
+ * @param {number} numero - 1, 2 o 3
+ */
+export const registrarLlamado = async (meetingId, numero) => {
+	try {
+		const response = await axiosInstance.post(
+			`/administrator/meeting/${meetingId}/llamado/${numero}`
+		);
+		return response.data;
+	} catch (error) {
+		console.error(`Error al registrar llamado ${numero}:`, error);
+		throw error;
+	}
+};
+
+/**
+ * Obtiene los datos de un llamado específico (admin)
+ * @param {number} meetingId
+ * @param {number} numero - 1, 2 o 3
+ */
+export const getLlamado = async (meetingId, numero) => {
+	try {
+		const response = await axiosInstance.get(
+			`/administrator/meeting/${meetingId}/llamado/${numero}`
+		);
+		return response.data;
+	} catch (error) {
+		console.error(`Error al obtener llamado ${numero}:`, error);
+		throw error;
+	}
+};
+
+/**
+ * Obtiene el estado de los 3 llamados de una reunión (admin)
+ * @param {number} meetingId
+ */
+export const getAllLlamados = async (meetingId) => {
+	try {
+		const response = await axiosInstance.get(
+			`/administrator/meeting/${meetingId}/llamados`
+		);
+		return response.data;
+	} catch (error) {
+		console.error('Error al obtener llamados:', error);
+		throw error;
+	}
+};
+
+/**
+ * Obtiene los datos de un llamado para PDF (superadmin)
+ * @param {number} meetingId
+ * @param {number} numero - 1, 2 o 3
+ */
+export const getLlamadoReportSA = async (meetingId, numero) => {
+	try {
+		const response = await axiosInstance.get(
+			`/super-admin/reports/meetings/${meetingId}/llamado/${numero}`
+		);
+		return response.data;
+	} catch (error) {
+		console.error(`Error al obtener reporte de llamado ${numero}:`, error);
+		throw error;
+	}
+};
+
+/**
+ * Obtiene todos los llamados de una reunión para el SA
+ * @param {number} meetingId
+ */
+export const getAllLlamadosSA = async (meetingId) => {
+	try {
+		const response = await axiosInstance.get(
+			`/super-admin/reports/meetings/${meetingId}/llamados`
+		);
+		return response.data;
+	} catch (error) {
+		console.error('Error al obtener llamados SA:', error);
+		throw error;
+	}
+};
+
 /**
  * Obtiene las iniciales de un nombre completo
  * @param {string} fullName - Nombre completo

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown, Calendar, Building2 } from 'lucide-react';
+import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown, Calendar, Building2, Bell } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Swal from 'sweetalert2';
 import { ReportsService } from '../../../services/api/ReportsService';
+import { getLlamadoReportSA } from '../../../services/api/ActiveMeetingService';
 import { Chart } from 'chart.js/auto';
 
 // ─── Helpers PDF ────────────────────────────────────────────────────────────
@@ -478,6 +479,99 @@ const generateDelegationsPDF = (data) => {
     doc.save(`Poderes_${meeting.title.replace(/\s/g, '_')}.pdf`);
 };
 
+// ─── PDF Llamados ─────────────────────────────────────────────────────────────
+
+const NOMBRES_LLAMADO = ['Primer', 'Segundo', 'Tercer'];
+
+const generateLlamadoPDF = (data) => {
+    const { meeting, residential_unit, llamado, snapshot } = data;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const nombreLlamado = NOMBRES_LLAMADO[llamado - 1];
+
+    const timestamp = snapshot.timestamp
+        ? new Date(snapshot.timestamp).toLocaleString('es-ES', {
+              day: '2-digit', month: 'long', year: 'numeric',
+              hour: '2-digit', minute: '2-digit', hour12: true,
+          })
+        : '—';
+
+    let y = addHeader(doc, `${nombreLlamado.toUpperCase()} LLAMADO DE ASISTENCIA`, meeting.title, residential_unit.name, meeting.scheduled_date);
+
+    // Info del llamado
+    doc.setFontSize(9);
+    doc.setTextColor(80);
+    doc.text(`Llamado registrado: ${timestamp}`, 14, y);
+    y += 8;
+
+    // Caja resumen quórum
+    doc.setFillColor(238, 242, 255);
+    doc.roundedRect(14, y, 182, 18, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(79, 70, 229);
+    doc.text('Resumen de Quórum al momento del llamado', 18, y + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(50, 50, 50);
+    doc.text(
+        `Presentes: ${snapshot.present?.length || 0}   ·   Ausentes: ${snapshot.absent?.length || 0}   ·   Quórum activo: ${Number(snapshot.connected_quorum || 0).toFixed(4)}   ·   Quórum total: ${Number(snapshot.total_quorum || 0).toFixed(4)}   ·   %: ${snapshot.quorum_percentage || 0}%`,
+        18, y + 13
+    );
+    y += 24;
+
+    // Tabla presentes
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(22, 101, 52);
+    doc.text(`>> PRESENTES (${snapshot.present?.length || 0})`, 14, y);
+    y += 4;
+
+    autoTable(doc, {
+        startY: y,
+        head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Tipo']],
+        body: (snapshot.present || []).map((u, i) => [
+            i + 1,
+            u.full_name,
+            u.apartment_number,
+            Number(u.quorum_base || 0).toFixed(4),
+            u.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
+        ]),
+        styles: { fontSize: 8.5 },
+        headStyles: { fillColor: [22, 163, 74] },
+        alternateRowStyles: { fillColor: [240, 253, 244] },
+        margin: { left: 14, right: 14 },
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+
+    // Tabla ausentes
+    if (y > 230) { doc.addPage(); y = 20; }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(185, 28, 28);
+    doc.text(`XX AUSENTES (${snapshot.absent?.length || 0})`, 14, y);
+    y += 4;
+
+    autoTable(doc, {
+        startY: y,
+        head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Observación']],
+        body: (snapshot.absent || []).map((u, i) => [
+            i + 1,
+            u.full_name,
+            u.apartment_number,
+            Number(u.quorum_base || 0).toFixed(4),
+            u.has_delegated ? 'Cedió poder' : '—',
+        ]),
+        styles: { fontSize: 8.5 },
+        headStyles: { fillColor: [220, 38, 38] },
+        alternateRowStyles: { fillColor: [254, 242, 242] },
+        margin: { left: 14, right: 14 },
+    });
+
+    addFooter(doc);
+    doc.save(`Llamado_${llamado}_${meeting.title.replace(/\s+/g, '_')}.pdf`);
+};
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 const REPORT_TYPES = [
@@ -514,6 +608,17 @@ const REPORT_TYPES = [
         generator: generateDelegationsPDF,
         fetcher: ReportsService.getDelegations,
     },
+    {
+        id: 'llamados',
+        label: 'Informe de Llamados',
+        description: 'Snapshot de asistencia y % de quórum para cada uno de los 3 llamados de lista.',
+        icon: Bell,
+        color: 'from-indigo-500 to-indigo-600',
+        border: 'border-indigo-200',
+        bg: 'bg-indigo-50',
+        generator: generateLlamadoPDF,
+        fetcher: null, // manejo especial en handleDownload
+    },
 ];
 
 const InformesTab = () => {
@@ -530,6 +635,40 @@ const InformesTab = () => {
     const handleDownload = async (report) => {
         if (!selectedMeeting) {
             Swal.fire({ icon: 'warning', title: 'Selecciona una reunión', text: 'Debes elegir una reunión antes de descargar el informe.', confirmButtonColor: '#6366f1' });
+            return;
+        }
+
+        // Caso especial: informe de llamados
+        if (report.id === 'llamados') {
+            const { value: numeroStr, isConfirmed } = await Swal.fire({
+                title: 'Selecciona el llamado',
+                input: 'select',
+                inputOptions: {
+                    '1': 'Primer Llamado',
+                    '2': 'Segundo Llamado',
+                    '3': 'Tercer Llamado',
+                },
+                inputPlaceholder: '— Elige un llamado —',
+                showCancelButton: true,
+                confirmButtonText: 'Generar PDF',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#6366f1',
+                cancelButtonColor: '#6b7280',
+                inputValidator: (v) => !v && 'Debes seleccionar un llamado',
+            });
+            if (!isConfirmed) return;
+
+            setLoadingReport('llamados');
+            try {
+                const response = await getLlamadoReportSA(Number(selectedMeeting), Number(numeroStr));
+                if (!response.success) throw new Error(response.message);
+                generateLlamadoPDF(response.data);
+            } catch (err) {
+                const msg = err.response?.data?.detail || err.message || 'Ocurrió un error inesperado.';
+                Swal.fire({ icon: 'error', title: 'Error al generar informe', text: msg, confirmButtonColor: '#dc2626' });
+            } finally {
+                setLoadingReport(null);
+            }
             return;
         }
 
@@ -628,7 +767,7 @@ const InformesTab = () => {
             {/* Tarjetas de informes */}
             <div>
                 <p className="text-sm font-semibold text-gray-600 mb-4">2. Descarga el informe deseado</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {REPORT_TYPES.map((report) => {
                         const Icon = report.icon;
                         const isLoading = loadingReport === report.id;

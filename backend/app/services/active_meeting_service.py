@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, update as sa_update
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import selectinload, aliased
@@ -523,6 +523,13 @@ class ActiveMeetingService:
         disconnected_count = len(disconnected_users_data)
         total_invited = connected_count + disconnected_count
         
+        llamados = meeting.json_llamados or {}
+        llamados_status = {
+            "1": {"registered": "1" in llamados, "timestamp": llamados["1"]["timestamp"] if "1" in llamados else None},
+            "2": {"registered": "2" in llamados, "timestamp": llamados["2"]["timestamp"] if "2" in llamados else None},
+            "3": {"registered": "3" in llamados, "timestamp": llamados["3"]["timestamp"] if "3" in llamados else None},
+        }
+
         return {
             "meeting_id": meeting.id,
             "title": meeting.str_title,
@@ -539,13 +546,14 @@ class ActiveMeetingService:
             "quorum_reached": meeting.bln_quorum_reached or False,
             "connected_users": connected_users_data,
             "disconnected_users": disconnected_users_data,
-            "polls": polls
+            "polls": polls,
+            "llamados_status": llamados_status,
         }
 
     async def _get_disconnected_users(self, meeting_id: int) -> List[dict]:
         """Obtiene usuarios invitados que no están conectados.
         Excluye delegantes cuyo delegado esté actualmente presente."""
-        
+
         DelegadoInv = aliased(MeetingInvitationModel)
 
         query = (
@@ -554,7 +562,7 @@ class ActiveMeetingService:
                 DataUserModel.str_firstname,
                 DataUserModel.str_lastname,
                 DataUserModel.str_email,
-                UserResidentialUnitModel.str_apartment_number,
+                MeetingInvitationModel.str_apartment_number,
                 MeetingInvitationModel.dec_voting_weight,
                 MeetingInvitationModel.dec_quorum_base,
                 MeetingInvitationModel.dat_joined_at,
@@ -562,10 +570,6 @@ class ActiveMeetingService:
                 MeetingInvitationModel.int_delegated_id,
             )
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-            .join(
-                UserResidentialUnitModel,
-                UserResidentialUnitModel.int_user_id == UserModel.id
-            )
             .join(
                 MeetingInvitationModel,
                 and_(
@@ -615,6 +619,112 @@ class ActiveMeetingService:
             }
             for user in users
         ]
+
+    async def take_llamado_snapshot(self, meeting_id: int, numero: int) -> dict:
+        """
+        Toma un snapshot de asistencia para el llamado N (1, 2 o 3).
+
+        - Registra quiénes están presentes y ausentes en ese momento.
+        - Si el delegado de alguien está presente, el delegante también aparece como presente.
+        - Guarda el resultado en json_llamados del meeting.
+        - Si el llamado ya existe, lo sobreescribe.
+        """
+        if numero not in (1, 2, 3):
+            return {"success": False, "message": "El número de llamado debe ser 1, 2 o 3"}
+
+        query = select(MeetingModel).where(MeetingModel.id == meeting_id)
+        result = await self.db.execute(query)
+        meeting = result.scalar_one_or_none()
+
+        if not meeting:
+            return {"success": False, "message": "Reunión no encontrada"}
+
+        connected_users = await self._get_connected_users(meeting_id)
+        disconnected_users = await self._get_disconnected_users(meeting_id)
+
+        total_quorum = sum(
+            float(u.voting_weight or 0) for u in connected_users
+        ) + sum(
+            float(u.get("voting_weight") or 0) for u in disconnected_users
+        )
+        connected_quorum = sum(float(u.voting_weight or 0) for u in connected_users)
+        quorum_percentage = round((connected_quorum / total_quorum * 100) if total_quorum > 0 else 0, 2)
+
+        present_list = [
+            {
+                "user_id": u.user_id,
+                "full_name": u.full_name,
+                "apartment_number": u.apartment_number,
+                "quorum_base": float(u.voting_weight or 0),
+                "attendance_type": u.attendance_type,
+            }
+            for u in connected_users
+        ]
+
+        absent_list = [
+            {
+                "user_id": u["user_id"],
+                "full_name": u["full_name"],
+                "apartment_number": u["apartment_number"],
+                "quorum_base": float(u.get("voting_weight") or 0),
+                "has_delegated": u.get("has_delegated", False),
+            }
+            for u in disconnected_users
+        ]
+
+        snapshot = {
+            "timestamp": datetime.now().isoformat(),
+            "present": present_list,
+            "absent": absent_list,
+            "connected_quorum": connected_quorum,
+            "total_quorum": total_quorum,
+            "quorum_percentage": quorum_percentage,
+        }
+
+        llamados = dict(meeting.json_llamados) if meeting.json_llamados else {}
+        llamados[str(numero)] = snapshot
+
+        await self.db.execute(
+            sa_update(MeetingModel)
+            .where(MeetingModel.id == meeting_id)
+            .values(json_llamados=llamados)
+        )
+        await self.db.commit()
+
+        return {
+            "success": True,
+            "message": f"Llamado {numero} registrado exitosamente",
+            "llamado": numero,
+            "snapshot": snapshot,
+        }
+
+    async def get_llamado_data(self, meeting_id: int, numero: int) -> dict:
+        """Retorna el snapshot guardado para el llamado N de una reunión."""
+        query = select(MeetingModel.json_llamados).where(MeetingModel.id == meeting_id)
+        result = await self.db.execute(query)
+        json_llamados = result.scalar_one_or_none()
+
+        if not json_llamados:
+            return {"success": False, "message": "No hay llamados registrados para esta reunión"}
+
+        snapshot = json_llamados.get(str(numero))
+        if not snapshot:
+            return {"success": False, "message": f"El llamado {numero} aún no ha sido registrado"}
+
+        return {"success": True, "llamado": numero, "snapshot": snapshot}
+
+    async def get_all_llamados(self, meeting_id: int) -> dict:
+        """Retorna todos los llamados registrados para una reunión."""
+        query = select(MeetingModel.json_llamados).where(MeetingModel.id == meeting_id)
+        result = await self.db.execute(query)
+        json_llamados = result.scalar_one_or_none()
+
+        llamados_status = {
+            "1": json_llamados.get("1") if json_llamados else None,
+            "2": json_llamados.get("2") if json_llamados else None,
+            "3": json_llamados.get("3") if json_llamados else None,
+        }
+        return {"success": True, "llamados": llamados_status}
 
     async def close_user_session(
         self, 
