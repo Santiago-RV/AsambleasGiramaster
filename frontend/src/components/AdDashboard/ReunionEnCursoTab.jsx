@@ -1,13 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axiosInstance from "../../services/api/axiosconfig";
-import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Loader2 } from "lucide-react";
+import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Loader2, Bell, CheckCircle2 } from "lucide-react";
 import Swal from "sweetalert2";
 import PollDetailsModal from "./PollDetailsModal";
+import LlamadoModal from "./LlamadoModal";
+import { registrarLlamado, getLlamado } from "../../services/api/ActiveMeetingService";
 
 const ReunionEnCursoTab = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedPoll, setSelectedPoll] = useState(null);
+  const [llamadoModalOpen, setLlamadoModalOpen] = useState(false);
+  const [selectedLlamado, setSelectedLlamado] = useState(null);
+  const [selectedLlamadoSnapshot, setSelectedLlamadoSnapshot] = useState(null);
+  const [loadingLlamado, setLoadingLlamado] = useState(null);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["meetingInProgress", refreshKey],
@@ -17,6 +23,64 @@ const ReunionEnCursoTab = () => {
     },
     refetchInterval: 30000,
   });
+
+  const handleRegistrarLlamado = async (numero) => {
+    if (!data?.data?.meeting_id) return;
+
+    const nombreLlamado = ["Primer", "Segundo", "Tercer"][numero - 1];
+    const yaRegistrado = data?.data?.llamados_status?.[String(numero)]?.registered;
+
+    const confirmText = yaRegistrado
+      ? `El ${nombreLlamado} llamado ya fue registrado. ¿Deseas sobreescribirlo?`
+      : `¿Registrar el ${nombreLlamado} Llamado ahora? Se tomará una foto del estado actual de asistencia.`;
+
+    const result = await Swal.fire({
+      title: `${nombreLlamado} Llamado`,
+      text: confirmText,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#4f46e5",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Sí, registrar",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      setLoadingLlamado(numero);
+      await registrarLlamado(data.data.meeting_id, numero);
+      Swal.fire({
+        icon: "success",
+        title: `${nombreLlamado} llamado registrado`,
+        text: "El snapshot de asistencia fue guardado exitosamente.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      setRefreshKey((k) => k + 1);
+    } catch {
+      Swal.fire("Error", "No se pudo registrar el llamado.", "error");
+    } finally {
+      setLoadingLlamado(null);
+    }
+  };
+
+  const handleVerLlamado = async (numero) => {
+    if (!data?.data?.meeting_id) return;
+    try {
+      setLoadingLlamado(numero);
+      const response = await getLlamado(data.data.meeting_id, numero);
+      if (response.success) {
+        setSelectedLlamado(numero);
+        setSelectedLlamadoSnapshot(response.data.snapshot);
+        setLlamadoModalOpen(true);
+      }
+    } catch {
+      Swal.fire("Error", "No se pudo obtener los datos del llamado.", "error");
+    } finally {
+      setLoadingLlamado(null);
+    }
+  };
 
   const handleCloseSession = async (userId, userName) => {
     if (!data?.data?.meeting_id) return;
@@ -248,6 +312,79 @@ const ReunionEnCursoTab = () => {
           </div>
         </div>
       </div>
+
+      {/* Llamados de Asistencia */}
+      <div className="bg-white rounded-lg shadow p-5">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Bell size={20} className="text-indigo-600" />
+          Llamados de Asistencia
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[1, 2, 3].map((num) => {
+            const nombreLlamado = ["Primer", "Segundo", "Tercer"][num - 1];
+            const status = data?.data?.llamados_status?.[String(num)];
+            const registrado = status?.registered;
+
+            return (
+              <div
+                key={num}
+                className={`rounded-xl border-2 p-4 ${
+                  registrado
+                    ? "border-indigo-300 bg-indigo-50"
+                    : "border-gray-200 bg-gray-50"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {registrado ? (
+                    <CheckCircle2 size={18} className="text-indigo-600 shrink-0" />
+                  ) : (
+                    <Bell size={18} className="text-gray-400 shrink-0" />
+                  )}
+                  <span className="font-semibold text-sm">
+                    {nombreLlamado} Llamado
+                  </span>
+                </div>
+                {!registrado && (
+                  <p className="text-xs text-gray-400 mb-3">Sin registrar</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleRegistrarLlamado(num)}
+                    disabled={loadingLlamado === num}
+                    className="flex-1 py-1.5 px-2 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  >
+                    {loadingLlamado === num ? (
+                      <Loader2 size={13} className="animate-spin mx-auto" />
+                    ) : registrado ? (
+                      "Re-registrar"
+                    ) : (
+                      "Registrar"
+                    )}
+                  </button>
+                  {registrado && (
+                    <button
+                      onClick={() => handleVerLlamado(num)}
+                      disabled={loadingLlamado === num}
+                      className="flex-1 py-1.5 px-2 text-xs font-medium rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Eye size={13} />
+                      Ver
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Llamado Modal */}
+      <LlamadoModal
+        isOpen={llamadoModalOpen}
+        onClose={() => { setLlamadoModalOpen(false); setSelectedLlamadoSnapshot(null); }}
+        llamadoNumero={selectedLlamado}
+        snapshot={selectedLlamadoSnapshot}
+      />
 
       {/* Polls
       <div className="bg-white rounded-lg shadow p-6">

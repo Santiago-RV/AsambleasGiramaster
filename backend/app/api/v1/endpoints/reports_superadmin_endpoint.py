@@ -226,6 +226,7 @@ async def get_polls_report(
             voter_info = {
                 "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
                 "apartment": inv.str_apartment_number if inv else "—",
+                "quorum_base": float(inv.dec_quorum_base) if inv and inv.dec_quorum_base else 0.0,
                 "voting_weight": float(resp.dec_voting_weight),
                 "voted_at": resp.dat_response_at.isoformat() if resp.dat_response_at else None,
                 "is_delegation_vote": resp.str_ip_address == "delegation",
@@ -235,7 +236,11 @@ async def get_polls_report(
                 abstentions.append(voter_info)
             elif resp.int_option_id in options_map:
                 options_map[resp.int_option_id]["votes_count"] += 1
-                options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
+                # Los votos por delegación (sentinel "delegation") son filas informativas:
+                # el delegado ya votó con su dec_voting_weight que incluye el peso cedido.
+                # Sumarlos causaría doble conteo, por eso se excluyen del peso total.
+                if resp.str_ip_address != "delegation":
+                    options_map[resp.int_option_id]["votes_weight"] += float(resp.dec_voting_weight) if resp.dec_voting_weight else 0.0
                 options_map[resp.int_option_id]["voters"].append(voter_info)
                 if resp.str_ip_address != "delegation":
                     opt_id = resp.int_option_id
@@ -267,6 +272,7 @@ async def get_polls_report(
                     delegate_to_delegators[delegate_id].append({
                         "full_name": f"{del_data_user.str_firstname} {del_data_user.str_lastname}",
                         "apartment": del_inv.str_apartment_number,
+                        "quorum_base": float(del_inv.dec_quorum_base) if del_inv.dec_quorum_base else 0.0,
                         "voting_weight": float(del_inv.dec_quorum_base) if del_inv.dec_quorum_base else 0.0,
                         "is_delegation_vote": True,
                         "weight_note": "Peso cedido al delegado",
@@ -281,6 +287,40 @@ async def get_polls_report(
 
         total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
 
+        voted_user_ids = {resp.int_user_id for resp, user, data_user, inv in responses}
+        # For active polls, also mark delegators whose delegate voted as "voted" (they delegated)
+        if poll.str_status != "closed" and voted_user_ids:
+            delegators_voted_result = await db.execute(
+                select(MeetingInvitationModel.int_user_id)
+                .where(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.int_delegated_id.in_(voted_user_ids),
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
+            for row in delegators_voted_result.all():
+                voted_user_ids.add(row[0])
+
+        non_voters_result = await db.execute(
+            select(MeetingInvitationModel, UserModel, DataUserModel)
+            .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .where(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                ~MeetingInvitationModel.int_user_id.in_(voted_user_ids) if voted_user_ids else True
+            )
+            .order_by(DataUserModel.str_lastname)
+        )
+        non_voters = [
+            {
+                "full_name": f"{du.str_firstname} {du.str_lastname}",
+                "apartment": inv_nv.str_apartment_number,
+                "quorum_base": float(inv_nv.dec_quorum_base) if inv_nv.dec_quorum_base else 0.0,
+            }
+            for inv_nv, user_nv, du in non_voters_result.all()
+        ]
+
         polls_data.append({
             "id": poll.id,
             "title": poll.str_title,
@@ -292,6 +332,7 @@ async def get_polls_report(
             "minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
             "options": list(options_map.values()),
             "abstentions": abstentions,
+            "non_voters": non_voters,
             "total_voters": len(responses),
             "total_weight_voted": total_weight_voted,
         })
@@ -379,5 +420,105 @@ async def get_delegations_report(
             },
             "total_delegations": len(delegations),
             "delegations": delegations,
+        }
+    )
+
+
+# ─── LLAMADOS DE ASISTENCIA ───────────────────────────────────────────────────
+
+@router.get("/meetings/{meeting_id}/llamado/{numero}", response_model=SuccessResponse)
+async def get_llamado_report(
+    meeting_id: int,
+    numero: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retorna los datos del llamado N reconstruidos desde tbl_meeting_invitations.
+    Incluye nombre de la unidad y datos de la reunión para encabezado del PDF.
+    """
+    await _verify_superadmin(current_user, db)
+
+    if numero not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="El número de llamado debe ser 1, 2 o 3")
+
+    result = await db.execute(
+        select(MeetingModel, ResidentialUnitModel)
+        .join(ResidentialUnitModel, MeetingModel.int_id_residential_unit == ResidentialUnitModel.id)
+        .where(MeetingModel.id == meeting_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Reunión no encontrada")
+
+    meeting, residential_unit = row
+
+    from app.services.active_meeting_service import ActiveMeetingService
+    svc = ActiveMeetingService(db)
+    llamado_result = await svc.get_llamado_data(meeting_id, numero)
+
+    if not llamado_result["success"]:
+        raise HTTPException(status_code=404, detail=llamado_result["message"])
+
+    return SuccessResponse(
+        success=True,
+        status_code=200,
+        message=f"Datos del llamado {numero}",
+        data={
+            "meeting": {
+                "id": meeting.id,
+                "title": meeting.str_title,
+                "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+                "status": meeting.str_status,
+            },
+            "residential_unit": {
+                "name": residential_unit.str_name,
+                "nit": residential_unit.str_nit,
+            },
+            "llamado": numero,
+            "snapshot": llamado_result["snapshot"],
+        }
+    )
+
+
+@router.get("/meetings/{meeting_id}/llamados", response_model=SuccessResponse)
+async def get_all_llamados_report(
+    meeting_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retorna el estado de los 3 llamados para una reunión (para mostrar en el modal del SA)."""
+    await _verify_superadmin(current_user, db)
+
+    result = await db.execute(
+        select(MeetingModel, ResidentialUnitModel)
+        .join(ResidentialUnitModel, MeetingModel.int_id_residential_unit == ResidentialUnitModel.id)
+        .where(MeetingModel.id == meeting_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Reunión no encontrada")
+
+    meeting, residential_unit = row
+
+    from app.services.active_meeting_service import ActiveMeetingService
+    svc = ActiveMeetingService(db)
+    llamados_result = await svc.get_all_llamados(meeting_id)
+
+    return SuccessResponse(
+        success=True,
+        status_code=200,
+        message="Llamados de la reunión",
+        data={
+            "meeting": {
+                "id": meeting.id,
+                "title": meeting.str_title,
+                "scheduled_date": meeting.dat_schedule_date.isoformat() if meeting.dat_schedule_date else None,
+            },
+            "residential_unit": {
+                "name": residential_unit.str_name,
+                "nit": residential_unit.str_nit,
+            },
+            "llamados": llamados_result["llamados"],
         }
     )

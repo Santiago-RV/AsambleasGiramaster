@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, DECIMAL
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, DECIMAL, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -69,6 +69,12 @@ class MeetingInvitationModel(Base):
     bln_actually_attended = Column(Boolean, default=False)
     dat_joined_at = Column(DateTime, nullable=True)
     dat_left_at = Column(DateTime, nullable=True)
+    json_llamados = Column(
+        JSON,
+        nullable=True,
+        default=None,
+        comment="Presencia por llamado: {'1': true/false, '2': true/false, '3': true/false}. null = llamado no tomado aún"
+    )
 
     # === AUDITORÍA ===
     created_at = Column(DateTime, default=datetime.now)
