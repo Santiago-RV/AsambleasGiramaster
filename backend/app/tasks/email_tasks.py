@@ -531,8 +531,8 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                                 int_delivery_attemps=1,
                                 bln_will_attend=False,
                                 bln_actually_attended=False,
-                                created_by=meeting.int_created_by,
-                                updated_by=meeting.int_created_by
+                                created_by=meeting.created_by,
+                                updated_by=meeting.created_by
                             )
                             db.add(invitation)
                     else:
