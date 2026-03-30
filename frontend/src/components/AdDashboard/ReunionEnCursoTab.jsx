@@ -162,12 +162,12 @@ const ReunionEnCursoTab = () => {
             <h2 className="text-2xl font-bold">{meeting.title}</h2>
             <p className="text-blue-100 mt-1">{meeting.description}</p>
             <div className="flex gap-4 mt-4 text-sm">
-              <span className="flex items-center gap-1">
-                <Users size={16} />
+              <span className="flex items-center gap-1 text-lg">
+                <Users size={25} />
                 Invitados: {meeting.total_invited}
               </span>
-              <span className="flex items-center gap-1">
-                <BarChart3 size={16} />
+              <span className="flex items-center gap-1 text-lg">
+                <BarChart3 size={25} />
                 Quórum: {meeting.connected_quorum} / {meeting.total_quorum} ({meeting.quorum_percentage}%)
               </span>
               <span className={`px-2 py-0.5 rounded text-xs ${meeting.quorum_reached ? 'bg-green-500' : 'bg-red-500'}`}>

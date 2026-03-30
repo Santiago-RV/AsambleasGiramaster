@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, Users, Vote, PieChart, BarChart3, Loader2, AlertCircle, CheckCircle, UserCheck, UserX, TrendingUp } from 'lucide-react';
 import { ReportsService } from '../../services/api/ReportsService';
 import { MeetingService } from '../../services/api/MeetingService';
+import AttendanceChart from "./AttendanceGraphics";
+import PollChart  from "./PollGraphics";
 
 const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) => {
   const [loading, setLoading] = useState(true);
@@ -137,7 +139,8 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
 };
 
 const AttendanceReportContent = ({ data }) => {
-  const { summary, attended, absent } = data;
+const { summary, attended, absent } = data;
+
 
   return (
     <div className="space-y-6">
@@ -160,7 +163,13 @@ const AttendanceReportContent = ({ data }) => {
           <p className="text-sm text-purple-700">% Participación</p>
         </div>
       </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+          Distribución de Asistencia
+        </h3>
 
+        <AttendanceChart summary={summary} />
+      </div>
       {/* Quorum Info */}
       <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
         <div className="flex items-center gap-2 mb-2">
@@ -407,7 +416,16 @@ const PollDetailView = ({ poll }) => (
         </div>
       </div>
     </div>
+    {/* 📊 GRÁFICO */}
+    <div className="p-5 pb-0">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">
+        Resultados de la votación
+      </h3>
 
+      <PollChart poll={poll} />
+    </div>
+
+<div className="p-5 space-y-5"></div>
     <div className="p-5 space-y-5">
       {/* Opciones con barras + tabla de votantes */}
       {poll.options.map((option, optIdx) => {
