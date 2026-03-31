@@ -32,7 +32,7 @@ const ReunionEnCursoTab = () => {
 
     const confirmText = yaRegistrado
       ? `El ${nombreLlamado} llamado ya fue registrado. ¿Deseas sobreescribirlo?`
-      : `¿Registrar el ${nombreLlamado} Llamado ahora? Se tomará una foto del estado actual de asistencia.`;
+      : `¿Registrar el ${nombreLlamado} Llamado ahora? Se registrará la asistencia con el listado actual.`;
 
     const result = await Swal.fire({
       title: `${nombreLlamado} Llamado`,
