@@ -25,15 +25,18 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 
 ## 1. Build de Imágenes Docker
 
-### 1.1 Backend
+### 1.1 Imagen Unificada (Backend + Celery)
 
 ```bash
-# Build imagen
-docker build -t backend:latest ./backend
+# Build imagen unificada
+docker build -t giramaster:latest ./backend
 
-# Tag para registry (si usa uno privado)
-docker tag backend:latest tu-registry/backend:latest
-docker push tu-registry/backend:latest
+# Tag para registry
+docker tag giramaster:latest tu-registry/giramaster:latest
+docker push tu-registry/giramaster:latest
+
+# Importante: La misma imagen se usa para backend y celery
+# K8s selecciona el servicio mediante variable SERVICE
 ```
 
 ### 1.2 Frontend
@@ -153,8 +156,14 @@ kubectl logs -l app=frontend -f
 # Logs del backend
 kubectl logs -l app=backend -f
 
+# Logs de Celery
+kubectl logs -l app=celery-worker -f
+
 # Logs de MySQL
 kubectl logs -l app=mysql -f
+
+# Logs de Redis
+kubectl logs -l app=redis -f
 
 # Ver eventos
 kubectl get events --sort-by='.lastTimestamp'
@@ -184,17 +193,19 @@ kubectl scale deployment backend --replicas=2
 
 ```bash
 # Rebuild imagen
-docker build -t backend:latest ./backend
+docker build -t giramaster:latest ./backend
 
 # Tag y push (si usa registry)
-docker tag backend:latest tu-registry/backend:latest
-docker push tu-registry/backend:latest
+docker tag giramaster:latest tu-registry/giramaster:latest
+docker push tu-registry/giramaster:latest
 
-# Restart pods
+# Restart pods (backend y celery usan la misma imagen)
 kubectl rollout restart deployment/backend
+kubectl rollout restart deployment/celery-worker
 
 # Ver estado
 kubectl rollout status deployment/backend
+kubectl rollout status deployment/celery-worker
 ```
 
 ### Actualizar Frontend
@@ -250,8 +261,50 @@ docker rmi backend:latest frontend:latest
 | Componente | Réplicas | Recursos |
 |------------|----------|----------|
 | Frontend | 2 | 64Mi-128Mi RAM, 100m-200m CPU |
-| Backend | 1 | 256Mi-512Mi RAM, 250m-500m CPU |
+| Backend | 2 | 256Mi-512Mi RAM, 250m-500m CPU |
+| Celery Worker | 2 | 256Mi-512Mi RAM, 250m-500m CPU |
 | MySQL | 1 | 512Mi-1Gi RAM, 250m-500m CPU |
+| Redis | 1 | 128Mi-256Mi RAM, 100m-200m CPU |
+
+---
+
+## 10. Celery (Workers)
+
+### 10.1 Verificar que Celery está funcionando
+
+```bash
+# Ver pods de celery
+kubectl get pods -l app=celery-worker
+
+# Ver logs
+kubectl logs -l app=celery-worker -f
+
+# Ver cola de tareas
+kubectl exec -it <celery-pod> -- celery -A app.celery_app inspect active
+
+# Probar ping
+kubectl exec -it <celery-pod> -- celery -A app.celery_app inspect ping
+```
+
+### 10.2 Escalar workers
+
+```bash
+# Escalar workers
+kubectl scale deployment celery-worker --replicas=4
+```
+
+### 10.3 Depuración de tareas
+
+```bash
+# Ver tareas pendientes
+kubectl exec -it <celery-pod> -- celery -A app.celery_app inspect scheduled
+
+# Ver tareas reservdas
+kubectl exec -it <celery-pod> -- celery -A app.celery_app inspect reserved
+
+# Forzarpurga de cola
+kubectl exec -it <celery-pod> -- celery -A app.celery_app purge
+```
 
 ---
 
