@@ -8,7 +8,7 @@ import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
@@ -503,5 +503,118 @@ class EmailSender:
             f"📊 Envío masivo async completado: "
             f"{stats['exitosos']} exitosos, {stats['fallidos']} fallidos de {stats['total']} total"
         )
+        
+        return stats
+
+    async def send_batch_optimized(
+        self,
+        emails_data: List[Dict[str, Any]],
+        batch_size: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Envía correos electrónicos en batches usando UNA conexión SMTP reutilizable.
+        Mucho más rápido que enviar uno por uno.
+        
+        Args:
+            emails_data: Lista de diccionarios con datos de cada email
+            batch_size: Cantidad de emails por batch (default: 100)
+            
+        Returns:
+            Dict con estadísticas y detalles de cada email
+        """
+        stats = {
+            "total": len(emails_data),
+            "exitosos": 0,
+            "fallidos": 0,
+            "detalles": []
+        }
+        
+        if not emails_data:
+            return stats
+        
+        await self._ensure_credentials_loaded()
+        
+        email_enabled = self._credentials.get('email_enabled', False)
+        smtp_user = self._credentials.get('smtp_user')
+        smtp_password = self._credentials.get('smtp_password')
+        
+        if not email_enabled:
+            logger.warning("El envío de emails está deshabilitado")
+            return stats
+        
+        if not smtp_user or not smtp_password:
+            logger.error("Credenciales de email no configuradas")
+            return stats
+        
+        smtp_host = self._credentials.get('smtp_host')
+        smtp_port = self._credentials.get('smtp_port')
+        from_email = self._credentials.get('from_email')
+        from_name = self._credentials.get('from_name')
+        
+        logo_data = None
+        if self.logo_path.exists():
+            try:
+                with open(self.logo_path, 'rb') as img_file:
+                    logo_data = img_file.read()
+            except Exception as e:
+                logger.warning(f"No se pudo cargar el logo: {e}")
+        
+        context = ssl.create_default_context()
+        
+        try:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.ehlo()
+                server.starttls(context=context)
+                server.ehlo()
+                server.login(smtp_user, smtp_password)
+                logger.info(f"✅ Conexión SMTP establecida, enviando {len(emails_data)} emails...")
+                
+                for idx, email_data in enumerate(emails_data):
+                    try:
+                        to_emails = email_data.get('to_emails', [])
+                        subject = email_data.get('subject', '')
+                        html_content = email_data.get('html_content', '')
+                        text_content = email_data.get('text_content')
+                        
+                        message = MIMEMultipart("related")
+                        message["Subject"] = subject
+                        message["From"] = f"{from_name} <{from_email}>"
+                        message["To"] = ", ".join(to_emails)
+                        
+                        msg_alternative = MIMEMultipart("alternative")
+                        message.attach(msg_alternative)
+                        
+                        if text_content:
+                            part1 = MIMEText(text_content, "plain", "utf-8")
+                            msg_alternative.attach(part1)
+                        
+                        part2 = MIMEText(html_content, "html", "utf-8")
+                        msg_alternative.attach(part2)
+                        
+                        if logo_data:
+                            img = MIMEImage(logo_data)
+                            img.add_header('Content-ID', '<logo>')
+                            img.add_header('Content-Disposition', 'inline', filename='LogoGira.gif')
+                            message.attach(img)
+                        
+                        all_recipients = to_emails.copy()
+                        server.sendmail(from_email, all_recipients, message.as_string())
+                        stats["exitosos"] += 1
+                        stats["detalles"].append({"to": to_emails, "status": "exitoso"})
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Error enviando a {email_data.get('to_emails')}: {str(e)}")
+                        stats["fallidos"] += 1
+                        stats["detalles"].append({
+                            "to": email_data.get('to_emails', []),
+                            "status": "error",
+                            "error": str(e)
+                        })
+                
+                logger.info(f"📊 Batch completado: {stats['exitosos']} exitosos, {stats['fallidos']} fallidos")
+                
+        except Exception as e:
+            logger.error(f"❌ Error en conexión SMTP: {str(e)}")
+            stats["fallidos"] = stats["total"]
         
         return stats

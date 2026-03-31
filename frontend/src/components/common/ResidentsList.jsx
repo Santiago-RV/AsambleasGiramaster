@@ -4,6 +4,7 @@ import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
 import Modal from './Modal';
+import ResidentDetailsModal from './ResidentDetailsModal';
 import { jsPDF } from 'jspdf';
 import QRCodeLib from 'qrcode';
 import { useQuery } from '@tanstack/react-query';
@@ -11,6 +12,8 @@ import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import logoGiramaster from '../../assets/logo-giramaster.jpeg';
 import HelpModalCopro from "./HelpModalCopro";
+import { showMeetingInvitationProgressModal } from '../common/BulkDeleteConfirmModal';
+import { useProgressNotification } from '../../contexts/ProgressNotificationContext';
 
 const SVG_ICONS = {
 	checkCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
@@ -57,6 +60,9 @@ const ResidentsList = ({
 	const [isSendingQRs, setIsSendingQRs] = useState(false);
 	const menuButtonRefs = useRef({});
   	const [isHelpModalCopro, setIsHelpModalCoproOpen] = useState(false);
+	// Estado para modal de detalles del residente
+	const [showDetailsModal, setShowDetailsModal] = useState(false);
+	const [selectedResidentForDetails, setSelectedResidentForDetails] = useState(null);
 	// Estado para modal de invitación a reunión
 	const [showInviteModal, setShowInviteModal] = useState(false);
 	const [invitableMeetings, setInvitableMeetings] = useState([]);
@@ -64,6 +70,8 @@ const ResidentsList = ({
 	const [selectedMeetingInfo, setSelectedMeetingInfo] = useState(null);
 	const [loadingMeetings, setLoadingMeetings] = useState(false);
 	const [inviting, setInviting] = useState(false);
+
+	const { startProgress, updateProgress, finishProgress } = useProgressNotification();
 
 	// Obtener datos del usuario actual para nombre de unidad residencial
 	const { data: userData } = useQuery({
@@ -595,10 +603,10 @@ const ResidentsList = ({
 
 		} catch (error) {
 			console.error('❌ Error generando PDF:', error);
-			
+
 			let errorTitle = 'Error al generar PDF';
 			let errorMessage = error.message || 'Ocurrió un error inesperado al intentar generar el documento PDF.';
-			
+
 			if (error.message) {
 				if (error.message.includes('400') && error.message.includes('500')) {
 					errorTitle = 'Límite de residentes excedido';
@@ -614,7 +622,7 @@ const ResidentsList = ({
 					errorMessage = 'Ocurrió un error en el servidor. Por favor, intenta más tarde.';
 				}
 			}
-			
+
 			await Swal.fire({
 				icon: 'error',
 				title: errorTitle,
@@ -747,10 +755,10 @@ const ResidentsList = ({
 
 		} catch (error) {
 			console.error('❌ Error al generar Excel:', error);
-			
+
 			let errorTitle = 'Error al generar Excel';
 			let errorMessage = error.message || 'Ocurrió un error inesperado al generar el archivo Excel.';
-			
+
 			if (error.message) {
 				if (error.message.includes('400') && error.message.includes('500')) {
 					errorTitle = 'Límite de residentes excedido';
@@ -766,7 +774,7 @@ const ResidentsList = ({
 					errorMessage = 'Ocurrió un error en el servidor. Por favor, intenta más tarde.';
 				}
 			}
-			
+
 			Swal.fire({
 				icon: 'error',
 				title: errorTitle,
@@ -787,7 +795,7 @@ const ResidentsList = ({
 			const response = await MeetingService.getMeetingsByResidentialUnit(residentialUnitId);
 			if (response.success && response.data) {
 				// Incluir reuniones "Programada" y "En Curso"
-				const invitables = response.data.filter((m) => 
+				const invitables = response.data.filter((m) =>
 					m.str_status === 'Programada' || m.str_status === 'En Curso'
 				);
 				setInvitableMeetings(invitables);
@@ -872,79 +880,79 @@ const ResidentsList = ({
 
 		setInviting(true);
 		try {
-			const response = await MeetingService.createBatchInvitations(
+			// Asegurar que selectedResidents sea un array
+			const residentIds = Array.isArray(selectedResidents) ? selectedResidents : [selectedResidents];
+
+			const response = await MeetingService.sendInvitationsWithProgress(
 				parseInt(selectedMeeting),
-				selectedResidents
+				residentIds
 			);
 
 			if (response.success) {
-				const activatedUsers = response.data?.activated_users || 0;
-				
-				Swal.fire({
-					icon: 'success',
-					title: 'Invitaciones Enviadas',
-					html: `
-						<div class="text-center">
-							<p class="mb-2">Se crearon <strong>${response.data?.invitations_created || 0}</strong> invitaciones</p>
-							${response.data?.failed > 0 ? `<p class="text-red-500 mb-2">Fallidas: ${response.data.failed}</p>` : ''}
-							${activatedUsers > 0 ? `
-								<div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-									<p class="text-blue-700 text-sm">
-										<strong>${activatedUsers}</strong> usuario(s) inactivo(s) fueron activados automáticamente
-									</p>
-								</div>
-							` : ''}
-						</div>
-					`,
-					confirmButtonColor: '#27ae60',
-					timer: activatedUsers > 0 ? 5000 : 3000,
-					timerProgressBar: true,
-					showConfirmButton: false,
-					allowOutsideClick: false,
-					allowEscapeKey: false,
-				});
-				handleCloseInviteModal();
-				if (onInviteToMeeting) {
-					onInviteToMeeting();
+				const taskId = response.data?.task_id;
+				const totalInvited = residentIds.length;
+
+				if (taskId) {
+					const wrappedFinishProgress = (params) => {
+						if (params.status === 'completed' && onInviteToMeeting) {
+							onInviteToMeeting();
+						}
+						if (finishProgress) {
+							finishProgress(params);
+						}
+					};
+					
+					showMeetingInvitationProgressModal({
+						meetingTitle: selectedMeetingInfo?.str_title || 'Reunión',
+						total: totalInvited,
+						pollProgressFn: () => MeetingService.getInvitationTaskStatus(taskId),
+						startProgress,
+						updateProgress,
+						finishProgress: wrappedFinishProgress
+					});
+					
+					setShowInviteModal(false);
+					setSelectedMeeting('');
+					setSelectedMeetingInfo(null);
+				} else {
+					throw new Error('No se recibió task_id de la tarea');
 				}
 			} else {
 				throw new Error(response.message || 'Error al enviar invitaciones');
 			}
-		} catch (err) {
-			console.error('Error al enviar invitaciones:', err);
-			Swal.fire({
-				icon: 'error',
-				title: 'Error',
-				text: err.response?.data?.message || err.message || 'Error al enviar invitaciones',
-			});
-		} finally {
-			setInviting(false);
-		}
-	};
-
-	const handleGenerateQR = async (resident) => {
-		try {
-			// Mostrar loading
-			Swal.fire({
-				title: 'Generando acceso...',
-				html: 'Creando enlace de acceso directo',
-				allowOutsideClick: false,
-				allowEscapeKey: false,
-				didOpen: () => {
-					Swal.showLoading();
-				},
-			});
-
-			// Llamar a la API para generar el token de auto-login (endpoint simple)
-			const token = localStorage.getItem('access_token');
-
-
-			if (!token) {
-				throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
+			} catch (err) {
+				console.error('Error al enviar invitaciones:', err);
+				Swal.fire({
+					icon: 'error',
+					title: 'Error',
+					text: err.response?.data?.message || err.message || 'Error al enviar invitaciones',
+				});
+			} finally {
+				setInviting(false);
 			}
+		};
+
+		const handleGenerateQR = async (resident) => {
+			try {
+				Swal.fire({
+					title: 'Generando acceso...',
+					html: 'Creando enlace de acceso directo',
+					allowOutsideClick: false,
+					allowEscapeKey: false,
+					didOpen: () => {
+						Swal.showLoading();
+					},
+				});
+
+				const token = localStorage.getItem('access_token');
 
 
-			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
+				if (!token) {
+					throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
+				}
+
+
+				const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 			const endpoint = `${apiUrl}/residents/generate-qr-simple`;
 
 			const response = await fetch(endpoint, {
@@ -1295,7 +1303,7 @@ const ResidentsList = ({
 									key={resident.id}
 									className="p-4 hover:bg-gray-50 transition-colors relative"
 								>
-									<div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
+									<div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
 
 										{/* Checkbox individual */}
 										<input
@@ -1303,36 +1311,75 @@ const ResidentsList = ({
 											checked={selectedResidents.includes(resident.id)}
 											onChange={() => handleSelectResident(resident.id)}
 											onClick={(e) => e.stopPropagation()}
-											className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer shrink-0"
+											className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer shrink-0 mt-1"
 										/>
 
-										{/* Información del residente */}
+										{/* Información del residente - Primera línea */}
 										<div className="flex-1 min-w-0">
-											<p className="font-semibold text-gray-800 truncate">
-												{resident.firstname} {resident.lastname}
-											</p>
-											<p className="text-sm text-gray-600 mt-1">
-												Apt. {resident.apartment_number}
-											</p>
-											{resident.email && (
-												<p className="text-xs text-gray-500 truncate">
-													{resident.email}
+											<div className="flex flex-wrap items-center gap-2">
+												{/* Nombre */}
+												<p className="font-semibold text-gray-800 truncate">
+													{resident.firstname} {resident.lastname}
 												</p>
-											)}
-										</div>
 
-										{/* Indicador de estado */}
-										<div className="shrink-0 mr-2">
-											<span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${resident.bln_allow_entry
-												? 'bg-green-100 text-green-700'
-												: 'bg-red-100 text-red-700'
+												{/* Badge de estado */}
+												<span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${resident.bln_allow_entry
+													? 'bg-green-100 text-green-700'
+													: 'bg-red-100 text-red-700'
 												}`}>
-												{resident.bln_allow_entry ? 'Activo' : 'Inactivo'}
-											</span>
+													{resident.bln_allow_entry ? 'Habilitado' : 'Inhabilitado'}
+												</span>
+											</div>
+
+											{/* Segunda línea: Apartamento y Email */}
+											<div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-600">
+												<span className="font-medium">Apt. {resident.apartment_number}</span>
+												{resident.email && (
+													<span className="truncate">{resident.email}</span>
+												)}
+											</div>
+
+											{/* Tercera línea: Estado de credenciales e invitación a reunión */}
+											<div className="mt-2 flex gap-4 text-xs">
+												{resident.last_credential_notification ? (
+													<span className="text-green-700">
+														<CheckCircle size={12} className="inline mr-1" />
+														Credenciales enviadas: {new Date(resident.last_credential_notification.sent_at).toLocaleString('es-ES', {
+															day: '2-digit',
+															month: '2-digit',
+															year: 'numeric',
+														})}
+													</span>
+												) : (
+													<span className="text-amber-700">
+														<AlertTriangle size={12} className="inline mr-1" />
+														Sin credenciales enviadas
+													</span>
+												)}
+
+												{resident.last_meeting_invitation?.meeting_title &&
+												 (resident.last_meeting_invitation.meeting_status === 'Programada' ||
+												  resident.last_meeting_invitation.meeting_status === 'En Curso') ? (
+													<span className="text-blue-700">
+														<Mail size={12} className="inline mr-1" />
+														Invitación: {resident.last_meeting_invitation.meeting_title?.substring(0, 20)}
+														{resident.last_meeting_invitation.meeting_title?.length > 20 ? '...' : ''} - {new Date(resident.last_meeting_invitation.sent_at).toLocaleString('es-ES', {
+															day: '2-digit',
+															month: '2-digit',
+															year: 'numeric'
+														})}
+													</span>
+												) : (
+													<span className="text-gray-500">
+														<Mail size={12} className="inline mr-1" />
+														Sin Invitaciones a reuniones
+													</span>
+												)}
+											</div>
 										</div>
 
 										{/* Botones de acción */}
-										<div className="flex items-center gap-2 shrink-0">	
+										<div className="flex items-center gap-1 shrink-0">
 
 											{/* Botón para generar QR */}
 											<button
@@ -1366,7 +1413,7 @@ const ResidentsList = ({
 														onToggleAccess(resident);
 													}}
 													className={`p-2 rounded-lg transition-colors group ${resident.bln_allow_entry ? 'hover:bg-red-100' : 'hover:bg-green-100'
-														}`}
+													}`}
 													title={resident.bln_allow_entry ? 'Deshabilitar acceso' : 'Habilitar acceso'}
 												>
 													{resident.bln_allow_entry ? (
@@ -1417,6 +1464,23 @@ const ResidentsList = ({
 					onDelete={onDeleteResident}
 					onGenerateQR={handleGenerateQR}
 					onClose={() => setSelectedResidentMenu(null)}
+					onShowDetails={(resident) => {
+						setSelectedResidentForDetails(resident);
+						setShowDetailsModal(true);
+					}}
+					residentialUnitName={residentialUnitName}
+				/>
+			)}
+
+			{/* Modal de Detalles del Residente */}
+			{showDetailsModal && selectedResidentForDetails && (
+				<ResidentDetailsModal
+					resident={selectedResidentForDetails}
+					isOpen={showDetailsModal}
+					onClose={() => {
+						setShowDetailsModal(false);
+						setSelectedResidentForDetails(null);
+					}}
 				/>
 			)}
 
@@ -1497,7 +1561,7 @@ const ResidentsList = ({
 										Reunión en Curso
 									</p>
 									<p className="text-amber-700 text-xs mt-1">
-										Esta reunión ya está en curso. Los invitados recibirán un correo de invitación, 
+										Esta reunión ya está en curso. Los invitados recibirán un correo de invitación,
 										pero no podrán unirse si la reunión ya ha finalizado.
 									</p>
 								</div>
@@ -1557,10 +1621,11 @@ const ResidentsList = ({
 					</div>
 				</Modal>
 			)}
-					<HelpModalCopro
-					  isOpen={isHelpModalCopro}
-					  onClose={() => setIsHelpModalCoproOpen(false)}
-					/>
+
+			<HelpModalCopro
+				isOpen={isHelpModalCopro}
+				onClose={() => setIsHelpModalCoproOpen(false)}
+			/>
 		</div>
 	);
 };

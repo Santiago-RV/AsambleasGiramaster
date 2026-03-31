@@ -12,37 +12,44 @@ import { Chart } from 'chart.js/auto';
 
 const addHeader = (doc, title, meetingTitle, unitName, date) => {
     const pw = doc.internal.pageSize.getWidth();
+    const logo = '/src/assets/logo-giramaster.jpeg'; 
+
     doc.setFillColor(30, 58, 138);
     doc.rect(0, 0, pw, 32, 'F');
+
+
+    doc.addImage(logo, 'jpeg', 10, 6, 50, 20); 
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('GIRAMASTER — Sistema de Gestión de Asambleas', pw / 2, 11, { align: 'center' });
+
+    doc.text('GIRAMASTER — Sistema de Gestión de Asambleas', pw / 2 + 10, 11, { align: 'center' });
 
     doc.setFontSize(15);
-    doc.text(title, pw / 2, 21, { align: 'center' });
-
+    doc.text(title, pw / 2 + 10, 21, { align: 'center' });
     doc.setFillColor(245, 247, 255);
     doc.rect(0, 32, pw, 20, 'F');
     doc.setTextColor(40, 40, 80);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
+
     doc.text(`Reunión: ${meetingTitle}`, 14, 40);
     doc.text(`Unidad Residencial: ${unitName}`, 14, 47);
 
     const fmtDate = new Date(date).toLocaleDateString('es-ES', {
         day: '2-digit', month: 'long', year: 'numeric',
     });
+
     doc.text(`Fecha: ${fmtDate}`, pw - 14, 40, { align: 'right' });
     doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, pw - 14, 47, { align: 'right' });
-
     doc.setDrawColor(200, 200, 220);
     doc.setLineWidth(0.3);
     doc.line(14, 52, pw - 14, 52);
 
     doc.setTextColor(0, 0, 0);
-    return 58; // y start
+
+    return 58;
 };
 
 const addFooter = (doc) => {
@@ -238,27 +245,25 @@ const generateAttendancePDF = async (data) => {
             margin: { left: 14, right: 14 },
         });
     }
+    y = doc.lastAutoTable.finalY + 10;
     // GRAFICO
     const chartImage = await generatePieChartImage(attended.length, absent.length);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const imgSize = 110;
-    const x = (pageWidth - imgSize) / 2;
 
-    if (!chartImage || !chartImage.startsWith('data:image/png')) {
-        throw new Error('Error generando gráfico');
-    }
-
-    if (y > 150) {
+    if (y > 160) {
         doc.addPage();
         y = 20;
     }
-    y += 30;
+
     // Título
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(30, 58, 138);
     doc.text('GRAFICO DE ASISTENCIA', 14, y);
-    y += 25;
+    y += 6;
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const imgSize = 65;
+    const x = (pageWidth - imgSize) / 2;
 
     doc.addImage(chartImage, 'PNG', x, y, imgSize, imgSize);
     y += imgSize + 10;
@@ -397,7 +402,7 @@ const generatePollsPDF = async (data) => {
         }
 
         //GRAFICO
-         const chartImage = await generatePollChartImage(poll);
+        const chartImage = await generatePollChartImage(poll);
 
         if (y > 160) {
             doc.addPage();
@@ -411,7 +416,7 @@ const generatePollsPDF = async (data) => {
         y += 6;
 
         const pageWidth = doc.internal.pageSize.getWidth();
-        const imgSize = 110;
+        const imgSize = 65;
         const x = (pageWidth - imgSize) / 2;
 
         doc.addImage(chartImage, 'PNG', x, y, imgSize, imgSize);

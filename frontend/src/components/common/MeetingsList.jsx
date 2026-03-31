@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle, StopCircle, MapPin, ScanLine, Edit } from 'lucide-react';
+import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle, ChevronRight, AlertTriangle, PlayCircle, StopCircle, MapPin, ScanLine, Edit, Trash2 } from 'lucide-react';
 import QRScannerModal from './QRScannerModal';
+import { showDeleteMeetingConfirmModal } from './BulkDeleteConfirmModal';
+import Swal from 'sweetalert2';
 
 /**
  * Componente unificado para mostrar lista de reuniones
@@ -16,6 +18,7 @@ const MeetingsList = ({
 	onStartMeeting,
 	onEndMeeting,
 	onEditMeeting,
+	onDeleteMeeting,
 	variant = 'compact',
 }) => {
 	const [activeTab, setActiveTab] = useState('upcoming');
@@ -280,15 +283,55 @@ const MeetingsList = ({
 									>
 										{/* Status badge and time until */}
 										<div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-											{onEditMeeting && (
+											<div className="flex gap-2">
+												{/* Botón editar */}
+												{onEditMeeting && (
+													<button
+														onClick={() => onEditMeeting(meeting)}
+														className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+														title="Editar reunión"
+													>
+														<Edit size={16} className="text-gray-600" />
+													</button>
+												)}
+												
+												{/* Botón eliminar */}
+												{onDeleteMeeting && (
+													meeting.estado?.toLowerCase() === 'en curso' || meeting.estado?.toLowerCase() === 'activa' ? (
+														<button
+															disabled
+															className="p-2 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed opacity-50"
+															title="No se puede eliminar una reunión en curso"
+														>
+															<Trash2 size={16} className="text-gray-400" />
+														</button>
+													) : (
 												<button
-													onClick={() => onEditMeeting(meeting)}
-													className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-													title="Editar reunión"
-												>
-													<Edit size={16} className="text-gray-600" />
-												</button>
-											)}
+															onClick={async () => {
+																await showDeleteMeetingConfirmModal({
+																	meetingTitle: meeting.titulo,
+																	onConfirm: async () => {
+																		try {
+																			await onDeleteMeeting(meeting.id);
+																		} catch (error) {
+																			Swal.fire({
+																				icon: 'error',
+																				title: 'Error',
+																				text: error.response?.data?.message || error.message || 'Error al eliminar la reunión',
+																				confirmButtonColor: '#3498db',
+																			});
+																		}
+																	}
+																});
+															}}
+															className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all shadow-sm"
+															title="Eliminar reunión"
+														>
+															<Trash2 size={16} className="text-red-600" />
+														</button>
+													)
+												)}
+											</div>
 											<span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.badgeClass}`}>
 												<StatusIcon size={14} />
 												{statusInfo.text}
@@ -653,15 +696,52 @@ const MeetingsList = ({
 												</span>
 											</div>
 										</div>
-										{onEditMeeting && (
-											<button
-												onClick={() => onEditMeeting(reunion)}
-												className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all"
-												title="Editar reunión"
-											>
-												<Edit size={14} className="text-gray-600" />
-											</button>
-										)}
+										<div className="flex gap-1">
+											{onEditMeeting && (
+												<button
+													onClick={() => onEditMeeting(reunion)}
+													className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all"
+													title="Editar reunión"
+												>
+													<Edit size={14} className="text-gray-600" />
+												</button>
+											)}
+											{onDeleteMeeting && (
+												reunion.estado?.toLowerCase() === 'en curso' || reunion.estado?.toLowerCase() === 'activa' ? (
+													<button
+														disabled
+														className="p-1.5 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed opacity-50"
+														title="No se puede eliminar una reunión en curso"
+													>
+														<Trash2 size={14} className="text-gray-400" />
+													</button>
+												) : (
+													<button
+														onClick={async () => {
+															await showDeleteMeetingConfirmModal({
+																meetingTitle: reunion.titulo,
+																onConfirm: async () => {
+																	try {
+																		await onDeleteMeeting(reunion.id);
+																	} catch (error) {
+																		Swal.fire({
+																			icon: 'error',
+																			title: 'Error',
+																			text: error.response?.data?.message || error.message || 'Error al eliminar la reunión',
+																			confirmButtonColor: '#3498db',
+																		});
+																	}
+																}
+															});
+														}}
+														className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all"
+														title="Eliminar reunión"
+													>
+														<Trash2 size={14} className="text-red-600" />
+													</button>
+												)
+											)}
+										</div>
 									</div>
 
 									<div className="space-y-2 mb-3">

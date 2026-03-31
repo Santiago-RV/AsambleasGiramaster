@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import Modal from '../../../common/Modal';
 import { FileSpreadsheet, Upload, Download, X, BarChart3, XCircle, Lightbulb, FileText, Edit, AlertTriangle } from 'lucide-react';
 import { ResidentialUnitService } from '../../../../services/api/ResidentialUnitService';
+import { ResidentService } from '../../../../services/api/ResidentService';
 import Swal from 'sweetalert2';
+import { useProgressNotification } from '../../../../contexts/ProgressNotificationContext';
 
 const SVG_ICONS = {
 	barChart3: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
@@ -13,6 +15,7 @@ const SVG_ICONS = {
 const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 	const [selectedFile, setSelectedFile] = useState(null);
 	const [isUploading, setIsUploading] = useState(false);
+	const { startProgress, updateProgress, finishProgress } = useProgressNotification();
 
 	const handleFileSelect = (e) => {
 		const file = e.target.files[0];
@@ -70,11 +73,59 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 		try {
 			const response = await ResidentialUnitService.uploadResidentsExcel(unitId, selectedFile);
 
-			const { total_rows, successful, failed, users_created, errors } =
+			const { total_rows, successful, failed, users_created, task_id, errors } =
 				response.data;
 
 			setSelectedFile(null);
 			setIsUploading(false);
+
+			if (task_id) {
+				const total = response.data.user_ids?.length || successful;
+				
+				startProgress({
+					title: 'Enviando Credenciales',
+					message: `Enviando enlaces de acceso (0/${total})`,
+					total: total,
+					type: 'info'
+				});
+
+				const pollingInterval = setInterval(async () => {
+					try {
+						const statusResponse = await ResidentService.getEmailTaskStatus(task_id);
+						const current = statusResponse.data?.current || 0;
+						const progress = statusResponse.data?.progress || 0;
+						const status = statusResponse.data?.status || 'processing';
+
+						updateProgress({
+							current,
+							total,
+							message: `Enviando enlaces de acceso (${current}/${total})`,
+							status,
+							progress
+						});
+
+						if (status === 'completed' || status === 'failed') {
+							clearInterval(pollingInterval);
+							
+							const successCount = statusResponse.data?.successful || successful;
+							
+							finishProgress({
+								status: status === 'completed' ? 'completed' : 'failed',
+								message: status === 'completed'
+									? `Credenciales enviadas a ${successCount} copropietario(s)`
+									: 'Error al enviar credenciales'
+							});
+						}
+					} catch (error) {
+						console.error('Error polling credentials progress:', error);
+						clearInterval(pollingInterval);
+						finishProgress({
+							status: 'failed',
+							message: 'Error al obtener progreso'
+						});
+					}
+				}, 1500);
+			}
 
 			let htmlContent = `
 			<div class="text-left space-y-3">

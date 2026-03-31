@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+import uuid
+import logging
 
 from app.auth.auth import get_current_user
 from app.schemas.responses_schema import SuccessResponse, ErrorResponse
@@ -17,7 +19,8 @@ from app.schemas.active_meeting_schema import (
     ActiveMeetingsListResponse,
     ActiveMeetingDetailsSchema
 )
-import logging
+from app.celery_app import celery_app
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +41,7 @@ async def upload_residents_excel(
 ):
     """
     Carga masiva de copropietarios desde Excel para una unidad residencial.
-    
+
     El Excel debe contener las siguientes columnas:
     - firstname: Nombre del copropietario (requerido)
     - lastname: Apellido del copropietario (requerido)
@@ -46,9 +49,9 @@ async def upload_residents_excel(
     - phone: Teléfono del copropietario (opcional)
     - apartment_number: Número de apartamento (requerido)
     - password: Contraseña inicial (opcional, default: Temporal123!)
-    
+
     Solo usuarios Super Admin pueden usar este endpoint.
-    
+
     Returns:
         SuccessResponse con estadísticas de la carga:
         - total_rows: Total de filas procesadas
@@ -60,7 +63,7 @@ async def upload_residents_excel(
         # Verificar que el usuario actual sea super admin
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
-        
+
         if not user or user.int_id_rol not in [1, 2]:  # 1: Super Admin, 2: Administrator
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -70,7 +73,7 @@ async def upload_residents_excel(
         # Validar que la unidad residencial exista
         residential_service = ResidentialUnitService(db)
         unit = await residential_service.get_residential_unit_by_id(unit_id)
-        
+
         if not unit:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -94,6 +97,22 @@ async def upload_residents_excel(
             created_by=user.id
         )
 
+        task_id = None
+        user_ids = results.get('user_ids', [])
+
+        # Enviar credenciales con Celery si hay usuarios creados
+        if user_ids and len(user_ids) > 0:
+            task_id = str(uuid.uuid4())
+            celery_app.send_task(
+                'app.tasks.email_tasks.send_bulk_emails',
+                args=[user_ids, unit_id, task_id, None, 'email_coproprietario_credentials'],
+                task_id=task_id,
+                queue='email_tasks'
+            )
+            logger.info(
+                f"📧 Tarea de envío de credenciales creada para {len(user_ids)} usuarios: task_id={task_id}"
+            )
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_201_CREATED,
@@ -103,6 +122,8 @@ async def upload_residents_excel(
                 "successful": results['successful'],
                 "failed": results['failed'],
                 "users_created": results['users_created'],
+                "user_ids": user_ids,
+                "task_id": task_id,
                 "errors": results['errors']
             }
         )
@@ -180,7 +201,7 @@ async def get_unit_administrator(
             message=f"Error al obtener el administrador: {str(e)}",
             details={"original_error": str(e)}
         )
-        
+
 @router.post(
     "/residential-units/{unit_id}/administrator/manual",
     response_model=SuccessResponse,
@@ -331,9 +352,9 @@ async def change_unit_administrator(
 @router.post(
     "/residential-units/{unit_id}/residents/send-credentials-bulk",
     response_model=SuccessResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_202_ACCEPTED,
     summary="Enviar credenciales a múltiples copropietarios",
-    description="Envía credenciales por correo a múltiples copropietarios seleccionados"
+    description="Envía credenciales por correo a múltiples copropietarios seleccionados usando Celery"
 )
 async def send_credentials_bulk(
     unit_id: int,
@@ -345,85 +366,61 @@ async def send_credentials_bulk(
         # Verificar que el usuario actual sea Super Admin
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
-        
+
         if not user or user.int_id_rol != 1:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para realizar esta acción. Solo Super Admin puede enviar credenciales."
             )
-        
+
         # Validar que la unidad residencial exista
         residential_service = ResidentialUnitService(db)
         unit = await residential_service.get_residential_unit_by_id(unit_id)
-        
+
         if not unit:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"La unidad residencial con ID {unit_id} no existe"
             )
-        
+
         # Validar que se hayan enviado IDs
         if not request_data.resident_ids or len(request_data.resident_ids) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Debe proporcionar al menos un ID de copropietario"
             )
-        
-        # Inicializar contadores
-        results = {
-            'total': len(request_data.resident_ids),
-            'successful': 0,
-            'failed': 0,
-            'errors': []
-        }
-        
-        # Procesar cada copropietario
-        for resident_id in request_data.resident_ids:
-            try:
-                await residential_service.resend_resident_credentials(
-                    user_id=resident_id,
-                    unit_id=unit_id,
-                    auto_commit=False,
-                    frontend_url=request_data.frontend_url
-                )
-                results['successful'] += 1
-                
-            except Exception as e:
-                results['failed'] += 1
-                results['errors'].append({
-                    'resident_id': resident_id,
-                    'error': str(e)
-                })
-                logger.error(f"Error enviando credenciales a resident_id {resident_id}: {str(e)}")
-        
-        #UN SOLO COMMIT al final
-        await db.commit()
-        
-        # Preparar mensaje de respuesta
-        if results['successful'] == results['total']:
-            message = f"✅ Credenciales enviadas exitosamente a {results['successful']} copropietarios"
-        elif results['successful'] > 0:
-            message = f"⚠️ Proceso completado: {results['successful']} exitosos, {results['failed']} fallidos"
-        else:
-            message = f"❌ No se pudo enviar credenciales a ningún copropietario"
-        
+
+        # Generar task_id único
+        task_id = str(uuid.uuid4())
+
+        # Pasar resident_ids y unit_id a Celery - Él hace todo el trabajo
+        celery_app.send_task(
+            'app.tasks.email_tasks.send_bulk_emails',
+            args=[request_data.resident_ids, unit_id, task_id, request_data.frontend_url, 'email_copropietarios_credentials'],
+            task_id=task_id,
+            queue='email_tasks'
+        )
+
+        logger.info(
+            f"📧 SuperAdmin {current_user} envió tarea de credenciales masivas en unit_id={unit_id}: "
+            f"{len(request_data.resident_ids)} residents, task_id={task_id} en cola email_tasks"
+        )
+
         return SuccessResponse(
             success=True,
-            status_code=status.HTTP_200_OK,
-            message=message,
+            status_code=status.HTTP_202_ACCEPTED,
+            message=f"Proceso de envío de credenciales iniciado para {len(request_data.resident_ids)} copropietarios",
             data={
-                "total_processed": results['total'],
-                "successful": results['successful'],
-                "failed": results['failed'],
-                "errors": results['errors'],
-                "residential_unit": unit.str_name
+                "task_id": task_id,
+                "total": len(request_data.resident_ids),
+                "status": "processing"
             }
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        await db.rollback()  #Rollback en caso de error
+        logger.error(f"Error al enviar credenciales masivas: {str(e)}")
         raise ServiceException(
             message=f"Error al enviar credenciales masivamente: {str(e)}",
             details={"original_error": str(e)}
@@ -699,7 +696,7 @@ async def get_active_meeting_details(
             message=f"Error al obtener detalles de la reunión: {str(e)}",
             details={"original_error": str(e)}
         )
-        
+
 @router.post(
     "/{unit_id}/residents/{user_id}/toggle-access",
     response_model=SuccessResponse,
@@ -719,16 +716,16 @@ async def toggle_resident_access(
     """
     try:
         from app.services.user_service import UserService
-        
+
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
-        
+
         if not user or user.int_id_rol != 1:  # 1: Super Admin
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo los super administradores pueden acceder a esta función"
             )
-        
+
         # Habilitar o deshabilitar según el parámetro
         # SuperAdmin puede modificar acceso de todos, incluyendo administradores
         if enabled:
@@ -745,14 +742,14 @@ async def toggle_resident_access(
                 send_email=False,
                 is_super_admin=True
             )
-        
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
             message=f"Acceso {'habilitado' if enabled else 'deshabilitado'} exitosamente",
             data=result
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -781,29 +778,29 @@ async def toggle_residents_access_bulk(
     """
     try:
         from app.services.user_service import UserService
-        
+
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
-        
+
         if not user or user.int_id_rol != 1:  # 1: Super Admin
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo los super administradores pueden acceder a esta función"
             )
-        
+
         if not request_data.user_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Debe proporcionar al menos un ID de usuario"
             )
-        
+
         # Procesar cada residente
         successful = 0
         failed = 0
         already_in_state = 0
         errors = []
         processed_users = []
-        
+
         for user_id in request_data.user_ids:
             try:
                 # SuperAdmin puede modificar acceso de todos, incluyendo administradores
@@ -821,12 +818,12 @@ async def toggle_residents_access_bulk(
                         send_email=False,
                         is_super_admin=True
                     )
-                
+
                 if result['status'] in ['already_enabled', 'already_disabled']:
                     already_in_state += 1
                 else:
                     successful += 1
-                
+
                 processed_users.append({
                     "user_id": result["user_id"],
                     "username": result["username"],
@@ -834,16 +831,16 @@ async def toggle_residents_access_bulk(
                     "email": result["email"],
                     "status": result["status"]
                 })
-                
+
             except Exception as e:
                 failed += 1
                 errors.append({
                     "user_id": user_id,
                     "error": str(e)
                 })
-        
+
         action_text = "habilitados" if request_data.enabled else "deshabilitados"
-        
+
         if successful == len(request_data.user_ids):
             message = f"✅ {successful} residentes {action_text} exitosamente"
         elif successful > 0:
@@ -856,12 +853,12 @@ async def toggle_residents_access_bulk(
             message = f"ℹ️ Todos los residentes ya estaban {action_text}"
         else:
             message = f"❌ No se pudo modificar el acceso de ningún residente"
-        
+
         logger.info(
             f"✅ Super Admin {current_user} modificó acceso masivo en unit_id={unit_id}: "
             f"{successful} exitosos, {failed} fallidos, {already_in_state} sin cambios"
         )
-        
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
@@ -876,7 +873,7 @@ async def toggle_residents_access_bulk(
                 "action": "enabled" if request_data.enabled else "disabled"
             }
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

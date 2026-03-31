@@ -25,6 +25,8 @@ import { MeetingService } from "../services/api/MeetingService";
 import GuestModal from '../components/saDashboard/components/modals/GuestModal';
 import { useGuestOperations } from '../components/saDashboard/hooks/useGuestOperations';
 import { GuestService } from '../services/api/GuestService';
+import { showMeetingInvitationProgressModal } from '../components/common/BulkDeleteConfirmModal';
+import { useProgressNotification } from '../contexts/ProgressNotificationContext';
 
 export default function AppAdmin() {
   const [section, setSection] = useState("users");
@@ -57,6 +59,7 @@ export default function AppAdmin() {
     }
   }, [contextUser]);
   const queryClient = useQueryClient();
+  const { startProgress, updateProgress, finishProgress } = useProgressNotification();
   const [showGuestModal, setShowGuestModal] = useState(false);
 
   // Verificar si es admin o superadmin
@@ -284,18 +287,33 @@ export default function AppAdmin() {
     mutationFn: async (data) => {
       return await MeetingService.createMeeting(data);
     },
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
-      Swal.fire({
-        icon: 'success',
-        title: '¡Reunión Creada!',
-        text: response.message || 'La reunión de Zoom ha sido creada exitosamente',
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 3000,
-        backdrop: false,
-      });
+      
+      const taskId = response.data?.invitation_task_id;
+      const meetingTitle = response.data?.str_title || 'Reunión';
+      
+      if (taskId) {
+        showMeetingInvitationProgressModal({
+          meetingTitle: meetingTitle,
+          total: response.data?.int_total_invitated || 0,
+          pollProgressFn: () => ResidentService.getEmailTaskStatus(taskId),
+          startProgress,
+          updateProgress,
+          finishProgress
+        });
+      } else {
+        Swal.fire({
+          icon: 'success',
+          title: '¡Reunión Creada!',
+          text: response.message || 'La reunión de Zoom ha sido creada exitosamente',
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3000,
+          backdrop: false,
+        });
+      }
     },
     onError: (error) => {
       Swal.fire({
