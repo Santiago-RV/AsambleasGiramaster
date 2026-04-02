@@ -36,10 +36,11 @@ spec:
           livenessProbe:
             exec:
               command:
-                - sh
-                - -c
-                - celery -A app.celery_app inspect ping || exit 1
-            initialDelaySeconds: 30
+                - pgrep
+                - -f
+                - "celery.*worker"
+            initialDelaySeconds: 60
             periodSeconds: 30
             failureThreshold: 3
+            timeoutSeconds: 5
       restartPolicy: Always

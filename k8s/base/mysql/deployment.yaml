@@ -14,9 +14,24 @@ spec:
       labels:
         app: mysql
     spec:
+      initContainers:
+        - name: init-mysql
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - rm -rf /var/lib/mysql/* && mkdir -p /var/lib/mysql
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
       containers:
         - name: mysql
-          image: mysql:8.0
+          image: mariadb:10.11
+          args:
+            - --skip-innodb-read-only-compressed
+            - --innodb-flush-method=nosync
+            - --innodb-buffer-pool-size=64M
+            - --bind-address=0.0.0.0
           ports:
             - containerPort: 3306
               name: mysql
@@ -27,34 +42,25 @@ spec:
                 name: mysql-secret
           resources:
             requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
               memory: "512Mi"
               cpu: "250m"
-            limits:
-              memory: "1Gi"
-              cpu: "500m"
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql
           livenessProbe:
-            exec:
-              command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 3306
             initialDelaySeconds: 30
             periodSeconds: 10
-          readinessProbe:
-            exec:
-              command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
-            initialDelaySeconds: 20
-            periodSeconds: 5
       volumes:
         - name: mysql-data
-          persistentVolumeClaim:
-            claimName: mysql-pvc
+          emptyDir: {}
       restartPolicy: Always
