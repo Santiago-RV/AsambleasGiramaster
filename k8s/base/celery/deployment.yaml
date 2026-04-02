@@ -16,9 +16,11 @@ spec:
     spec:
       containers:
         - name: celery
-          image: arwendev97/giramaster-celery:1.0.0
+          image: arwendev97/giramaster-backend:1.0.0
           imagePullPolicy: Always
-          command: ["celery", "-A", "app.celery_app", "worker", "-Q", "email_tasks", "-l", "info", "--concurrency=4"]
+          env:
+            - name: SERVICE
+              value: "celery"
           envFrom:
             - configMapRef:
                 name: backend-config
