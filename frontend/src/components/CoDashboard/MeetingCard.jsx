@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Calendar, Clock, Users, Video, MapPin, Loader2, Play, CalendarX } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 import ZoomMeetingContainer from './ZoomEmbed';
 import { MeetingService } from '../../services/api/MeetingService';
 
@@ -63,7 +64,7 @@ export default function MeetingCard({ meeting }) {
 
 		// Verificar que tenemos datos de Zoom
 		if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
-			alert('Esta reunion no tiene datos de Zoom validos');
+			toast.error('Esta reunión no tiene datos de Zoom válidos');
 			return;
 		}
 

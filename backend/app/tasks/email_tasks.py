@@ -8,6 +8,7 @@ from app.celery_app import celery_app
 from app.utils.email_sender import EmailSender
 from app.core.logging_config import get_logger
 from app.core.config import settings
+from app.core.security import security_manager
 from pathlib import Path
 
 logger = get_logger(__name__)
@@ -440,6 +441,7 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
             
             template = Template(template_content)
             meeting_year = str(datetime.now().year)
+            email_sender = EmailSender(db)
             
             for idx, (user, data_user, user_residential_unit) in enumerate(users_data):
                 try:
@@ -492,7 +494,6 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                         auto_login_token=auto_login_token
                     )
                     
-                    email_sender = EmailSender(db)
                     success = await email_sender.send_email_async(
                         to_emails=[data_user.str_email],
                         subject=f"Invitación: {meeting.str_title}",
@@ -571,3 +572,307 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
             }
     
     return run_async(_send_invitations())
+
+
+@celery_app.task(bind=True, name='app.tasks.email_tasks.send_qr_email')
+def send_qr_email(self, user_id: int, recipient_email: str = None, frontend_url: str = None):
+    """
+    Tarea Celery para enviar QR por correo electrónico.
+    Genera QR, contraseña temporal y envía email.
+    """
+    logger.info(f"📧 Starting QR email send for user_id={user_id}")
+    
+    async def _send_qr():
+        import redis.asyncio as aioredis
+        from sqlalchemy import select
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from app.models.residential_unit_model import ResidentialUnitModel
+        from app.services.qr_service import qr_service
+        from app.services.email_service import EmailService
+        from app.core.config import settings
+        from app.core.security import security_manager
+        from pathlib import Path
+        
+        engine = create_async_engine(settings.ASYNC_DATABASE_URL, echo=False, pool_pre_ping=True)
+        async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        
+        try:
+            async with async_session_maker() as db:
+                query = (
+                    select(UserModel, DataUserModel, UserResidentialUnitModel, ResidentialUnitModel)
+                    .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                    .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                    .join(ResidentialUnitModel, UserResidentialUnitModel.int_residential_unit_id == ResidentialUnitModel.id)
+                    .where(UserModel.id == user_id)
+                )
+                result = await db.execute(query)
+                user_data = result.first()
+                
+                if not user_data:
+                    logger.error(f"Usuario {user_id} no encontrado")
+                    return {'success': False, 'error': 'Usuario no encontrado'}
+                
+                user, data_user, user_residential_unit, residential_unit = user_data
+                
+                temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits + "!@#$%") for _ in range(12))
+                hashed_password = security_manager.create_password_hash(temp_password)
+                user.str_password_hash = hashed_password
+                user.updated_at = datetime.now()
+                await db.commit()
+                
+                user_info = {
+                    'name': f"{data_user.str_firstname} {data_user.str_lastname}".strip(),
+                    'apartment': user_residential_unit.str_apartment_number,
+                    'residential_unit': residential_unit.str_name,
+                    'email': data_user.str_email,
+                    'role': 'Admin' if user.int_id_rol in [1, 2] else 'Resident'
+                }
+                
+                qr_data = qr_service.generate_user_qr_data(
+                    user_id=user.id,
+                    username=user.str_username,
+                    user_info=user_info,
+                    expiration_hours=24
+                )
+                
+                to_email = recipient_email or data_user.str_email
+                
+                email_service = EmailService(db)
+                success = await email_service.send_qr_access_email(
+                    to_email=to_email,
+                    resident_name=user_info['name'],
+                    apartment_number=user_info['apartment'],
+                    username=user.str_username,
+                    auto_login_url=qr_data['auto_login_url'],
+                    auto_login_token=qr_data['auto_login_token'],
+                    qr_base64=qr_data['qr_base64']
+                )
+                
+                logger.info(f"✅ QR email sent to {to_email}: {success}")
+                return {'success': success, 'to': to_email}
+                
+        except Exception as e:
+            logger.error(f"❌ Error sending QR email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+        finally:
+            await engine.dispose()
+    
+    return run_async(_send_qr())
+
+
+@celery_app.task(bind=True, name='app.tasks.email_tasks.send_welcome_email')
+def send_welcome_email(
+    self,
+    user_id: int,
+    user_email: str,
+    user_name: str,
+    username: str,
+    password: str,
+    residential_unit_name: str,
+    apartment_number: str,
+    voting_weight: float,
+    phone: str = None,
+    auto_login_token: str = None,
+    frontend_url: str = None
+):
+    """
+    Tarea Celery para enviar email de bienvenida al crear un residente.
+    """
+    logger.info(f"📧 Starting welcome email for {user_email}")
+    
+    async def _send_welcome():
+        from sqlalchemy.ext.asyncio import create_async_engine
+        from sqlalchemy.orm import sessionmaker
+        from app.core.config import settings
+        from jinja2 import Template
+        from pathlib import Path
+        
+        engine = create_async_engine(settings.ASYNC_DATABASE_URL, echo=False, pool_pre_ping=True)
+        async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        
+        try:
+            async with async_session_maker() as db:
+                template_path = Path(__file__).parent.parent / "templates" / "email_coproprietario_credentials.html"
+                
+                if not template_path.exists():
+                    logger.error(f"Template de email no encontrado: {template_path}")
+                    return {'success': False, 'error': 'Template no encontrado'}
+                
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    html_template = f.read()
+                
+                name_parts = user_name.split(' ', 1)
+                firstname = name_parts[0] if name_parts else user_name
+                lastname = name_parts[1] if len(name_parts) > 1 else ''
+                
+                auto_login_url = None
+                if auto_login_token:
+                    url_to_use = frontend_url or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                    auto_login_url = f"{url_to_use}/auto-login/{auto_login_token}"
+                
+                template = Template(html_template)
+                voting_weight_percent = voting_weight * 100
+                
+                html_content = template.render(
+                    firstname=firstname,
+                    lastname=lastname,
+                    username=username,
+                    password=password,
+                    residential_unit_name=residential_unit_name,
+                    apartment_number=apartment_number,
+                    voting_weight=f"{voting_weight_percent:.2f}",
+                    user_email=user_email,
+                    phone=phone,
+                    current_year=str(datetime.now().year),
+                    auto_login_url=auto_login_url
+                )
+                
+                email_sender = EmailSender(db)
+                success = await email_sender.send_email_async(
+                    to_emails=[user_email],
+                    subject=f"Bienvenido a GIRAMASTER - {residential_unit_name}",
+                    html_content=html_content
+                )
+                
+                logger.info(f"✅ Welcome email sent to {user_email}: {success}")
+                return {'success': success, 'to': user_email}
+                
+        except Exception as e:
+            logger.error(f"❌ Error sending welcome email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+        finally:
+            await engine.dispose()
+    
+    return run_async(_send_welcome())
+
+
+@celery_app.task(bind=True, name='app.tasks.email_tasks.send_single_credential_email')
+def send_single_credential_email(
+    self,
+    user_id: int,
+    unit_id: int,
+    frontend_url: str = None,
+    template_name: str = 'email_coproprietario_credentials'
+):
+    """
+    Tarea Celery para reenviar credenciales a un solo copropietario.
+    """
+    logger.info(f"📧 Starting single credential email for user_id={user_id}")
+    
+    async def _send_credential():
+        from sqlalchemy import select, and_
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+        from app.models.user_model import UserModel
+        from app.models.data_user_model import DataUserModel
+        from app.models.user_residential_unit_model import UserResidentialUnitModel
+        from app.models.residential_unit_model import ResidentialUnitModel
+        from app.services.simple_auto_login_service import simple_auto_login_service
+        from app.core.config import settings
+        from jinja2 import Template
+        from pathlib import Path
+        
+        engine = create_async_engine(settings.ASYNC_DATABASE_URL, echo=False, pool_pre_ping=True)
+        async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        
+        try:
+            async with async_session_maker() as db:
+                query = (
+                    select(UserModel, DataUserModel, UserResidentialUnitModel, ResidentialUnitModel)
+                    .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                    .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                    .join(ResidentialUnitModel, UserResidentialUnitModel.int_residential_unit_id == ResidentialUnitModel.id)
+                    .where(
+                        and_(
+                            UserModel.id == user_id,
+                            UserResidentialUnitModel.int_residential_unit_id == unit_id
+                        )
+                    )
+                )
+                result = await db.execute(query)
+                user_data = result.first()
+                
+                if not user_data:
+                    logger.error(f"Usuario {user_id} no encontrado en unit_id={unit_id}")
+                    return {'success': False, 'error': 'Usuario no encontrado'}
+                
+                user, data_user, user_unit, residential_unit = user_data
+                
+                temp_password = generate_temp_password(
+                    data_user.str_firstname,
+                    data_user.str_lastname,
+                    user_unit.str_apartment_number
+                )
+                
+                hashed_password = security_manager.create_password_hash(temp_password)
+                user.str_password_hash = hashed_password
+                user.updated_at = datetime.now()
+                await db.commit()
+                
+                auto_login_token = simple_auto_login_service.generate_auto_login_token(
+                    username=user.str_username,
+                    expiration_hours=24
+                )
+                
+                token_payload = simple_auto_login_service.decode_auto_login_token(auto_login_token)
+                token_id = token_payload.get('token_id') if token_payload else None
+                
+                if token_id:
+                    try:
+                        await simple_auto_login_service.upsert_user_token(db, token_id, user.id, None)
+                        await db.flush()
+                    except Exception as token_err:
+                        logger.warning(f"Token ya existe o error guardando token: {token_err}")
+                        await db.rollback()
+                
+                valid_templates = {
+                    'email_coproprietario_credentials': 'email_coproprietario_credentials.html',
+                    'email_guest_credentials': 'email_guest_credentials.html'
+                }
+                template_filename = valid_templates.get(template_name, 'email_coproprietario_credentials.html')
+                template_path = Path(__file__).parent.parent / "templates" / template_filename
+                
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    template_content = f.read()
+                
+                template = Template(template_content)
+                url_to_use = frontend_url or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                auto_login_url = f"{url_to_use}/auto-login/{auto_login_token}"
+                
+                voting_weight_percent = float(user_unit.dec_default_voting_weight or 0) * 100
+                
+                html_content = template.render(
+                    firstname=data_user.str_firstname,
+                    lastname=data_user.str_lastname,
+                    username=user.str_username,
+                    password=temp_password,
+                    residential_unit_name=residential_unit.str_name,
+                    apartment_number=user_unit.str_apartment_number,
+                    voting_weight=f"{voting_weight_percent:.2f}",
+                    user_email=data_user.str_email,
+                    phone=data_user.str_phone,
+                    current_year=str(datetime.now().year),
+                    auto_login_url=auto_login_url
+                )
+                
+                email_sender = EmailSender(db)
+                success = await email_sender.send_email_async(
+                    to_emails=[data_user.str_email],
+                    subject=f"Credenciales de Acceso - {residential_unit.str_name}",
+                    html_content=html_content
+                )
+                
+                logger.info(f"✅ Credential email sent to {data_user.str_email}: {success}")
+                return {'success': success, 'to': data_user.str_email}
+                
+        except Exception as e:
+            logger.error(f"❌ Error sending credential email: {str(e)}")
+            return {'success': False, 'error': str(e)}
+        finally:
+            await engine.dispose()
+    
+    return run_async(_send_credential())

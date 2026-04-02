@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Video, FileText, HandCoins, LogOut, Calendar, Loader2, AlertTriangle, X } from 'lucide-react';
 import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import DashboardLayout from "../components/layout/DashboardLayout";
 import UsersPage from "../components/AdDashboard/UsersPage";
 import AssembliesPage from "../components/AdDashboard/AssembliesPage";
@@ -728,7 +729,7 @@ export default function AppAdmin() {
             <div className="mt-4 flex gap-2">
               <button
                 className="px-4 py-2 bg-green-600 text-white rounded"
-                onClick={() => { alert("Asamblea guardada"); setShowAssemblyForm(false); }}
+                onClick={() => { toast.success('Asamblea guardada'); setShowAssemblyForm(false); }}
               >
                 Guardar Asamblea
               </button>
@@ -745,7 +746,7 @@ export default function AppAdmin() {
           fromLabel={powerModalData.fromLabel}
           onClose={closePowerModal}
           onConfirm={(to, type) => {
-            alert(`Poder cedido a ${to} (${type}) — simulación`);
+            toast.success(`Poder cedido a ${to} (${type})`);
             if (powerModalData.onConfirm) powerModalData.onConfirm(to, type);
             closePowerModal();
           }}

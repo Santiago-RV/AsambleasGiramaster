@@ -21,6 +21,7 @@ from app.schemas.active_meeting_schema import (
 )
 from app.celery_app import celery_app
 from app.core.config import settings
+from app.api.v1.endpoints.decorators import require_email_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ router = APIRouter()
     summary="Carga masiva de copropietarios desde Excel",
     description="Permite al Super Admin cargar copropietarios masivamente desde un archivo Excel"
 )
+@require_email_enabled
 async def upload_residents_excel(
     unit_id: int,
     file: UploadFile = File(..., description="Archivo Excel con los copropietarios"),
@@ -356,6 +358,7 @@ async def change_unit_administrator(
     summary="Enviar credenciales a múltiples copropietarios",
     description="Envía credenciales por correo a múltiples copropietarios seleccionados usando Celery"
 )
+@require_email_enabled
 async def send_credentials_bulk(
     unit_id: int,
     request_data: BulkSendCredentialsRequest,

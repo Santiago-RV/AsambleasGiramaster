@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from 'react-hot-toast';
 import AssembliesTable from "./AssembliesTable";
 
 export default function AssembliesPage({ onCreateAssembly }) {
@@ -9,13 +10,13 @@ export default function AssembliesPage({ onCreateAssembly }) {
   ]);
 
   const handleEdit = (a) => {
-    alert("Editar asamblea: " + a.title);
+    toast(`Editar asamblea: ${a.title}`);
     onCreateAssembly?.();
   };
 
   const handleStart = (a) => {
     if (confirm(`Iniciar ${a.title}?`)) {
-      alert("Asamblea iniciada");
+      toast.success('Asamble iniciada');
     }
   };
 

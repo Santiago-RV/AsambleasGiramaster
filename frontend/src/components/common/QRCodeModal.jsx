@@ -58,7 +58,27 @@ const QRCodeModal = ({
 
 		setIsSending(true);
 		try {
-			// Aquí llamarías a tu API para enviar el correo con el QR
+			const token = localStorage.getItem('access_token');
+			if (!token) {
+				throw new Error('No hay token de autenticación');
+			}
+
+			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
+			const response = await fetch(`${apiUrl}/residents/send-enhanced-qr-email`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${token}`
+				},
+				body: JSON.stringify({
+					userId: resident.id
+				})
+			});
+
+			if (!response.ok) {
+				throw new Error('Error al enviar QR');
+			}
+
 			Swal.fire({
 				icon: 'success',
 				title: '¡Enviado!',
@@ -66,6 +86,7 @@ const QRCodeModal = ({
 				confirmButtonColor: '#27ae60'
 			});
 		} catch (error) {
+			console.error('Error sending QR email:', error);
 			Swal.fire({
 				icon: 'error',
 				title: 'Error',

@@ -512,13 +512,9 @@ class ResidentialUnitService:
                 'failed': 0,
                 'users_created': 0,
                 'user_ids': [],
-                # 'emails_sent': 0,
-                # 'emails_failed': 0,
                 'errors': []
             }
             
-            # Crear instancia del servicio de notificaciones
-            # notification_service = EmailNotificationService(self.db)
             batch_size = 100
             processed_in_batch = 0
             # Procesar cada fila
@@ -669,59 +665,7 @@ class ResidentialUnitService:
                         logger.info(
                             f"🔗 Usuario asignado a unidad: {email} - "
                             f"Apt: {apartment_number} - Peso: {voting_weight}"
-                        )
-
-                    # ============================================
-                    # PASO 4: Enviar correo de bienvenida (solo si es usuario nuevo)
-                    # ============================================
-                    # if user_was_created:
-                    #     try:
-                    #         # Crear notificación en estado "pending"
-                    #         notification = await notification_service.create_notification(
-                    #             user_id=user.id,
-                    #             template="welcome_coproprietario_bulk",
-                    #             status="pending",
-                    #             meeting_id=None
-                    #         )
-                            
-                    #         # Enviar correo de bienvenida
-                    #         email_sent = self._send_welcome_email(
-                    #             user_email=email,
-                    #             user_name=f"{firstname} {lastname}",
-                    #             username=username,
-                    #             password=password_to_send,  # Contraseña sin hashear
-                    #             residential_unit_name=residential_unit_name,
-                    #             apartment_number=apartment_number,
-                    #             voting_weight=voting_weight,
-                    #             phone=phone
-                    #         )
-                            
-                    #         # Actualizar estado de la notificación
-                    #         status = "sent" if email_sent else "failed"
-                    #         await notification_service.update_status(
-                    #             notification_id=notification.id,
-                    #             status=status,
-                    #             commit=False  # No hacer commit individual
-                    #         )
-                            
-                    #         if email_sent:
-                    #             results['emails_sent'] += 1
-                    #             logger.info(
-                    #                 f"Correo enviado a {email} - "
-                    #                 f"Notificación ID: {notification.id}"
-                    #             )
-                    #         else:
-                    #             results['emails_failed'] += 1
-                    #             logger.warning(
-                    #                 f"No se pudo enviar correo a {email} - "
-                    #                 f"Notificación ID: {notification.id} marcada como 'failed'"
-                    #             )
-                                
-                    #     except Exception as email_error:
-                    #         results['emails_failed'] += 1
-                    #         logger.error(
-                    #             f"Error al enviar correo/notificación a {email}: {str(email_error)}"
-                    #         )
+                    )
 
                     results['successful'] += 1
                     processed_in_batch += 1
@@ -911,41 +855,44 @@ class ResidentialUnitService:
             )
             frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
             
-            # 11. Enviar correo de bienvenida (opcional)
+            # 11. Enviar correo de bienvenida (opcional) - vía Celery
+            from app.celery_app import celery_app
+            
             try:
-                email_sent = await self._send_welcome_email(
-                    user_email=email,
-                    user_name=f"{firstname} {lastname}",
-                    username=username,
-                    password=password,  # Contraseña sin hashear
-                    residential_unit_name=residential_unit.str_name,
-                    apartment_number=apartment_number,
-                    voting_weight=voting_weight,
-                    phone=phone,
-                    auto_login_token=auto_login_token,
-                    frontend_url=frontend_url
+                celery_app.send_task(
+                    'app.tasks.email_tasks.send_welcome_email',
+                    args=[
+                        user.id,
+                        email,
+                        f"{firstname} {lastname}",
+                        username,
+                        password,
+                        residential_unit.str_name,
+                        apartment_number,
+                        float(voting_weight)
+                    ],
+                    kwargs={
+                        'phone': phone,
+                        'auto_login_token': auto_login_token,
+                        'frontend_url': frontend_url
+                    }
                 )
+                logger.info(f"📧 Correo de bienvenida enviado a cola Celery para {email}")
                 
-                if email_sent:
-                    logger.info(f"Correo de bienvenida enviado a {email}")
+                try:
+                    notification_service = EmailNotificationService(self.db)
+                    await notification_service.create_notification(
+                        user_id=user.id,
+                        template="welcome",
+                        status="pending"
+                    )
+                    await self.db.commit()
+                    logger.info(f"Notificación registrada en BD para usuario {username}")
+                except Exception as e:
+                    logger.warning(f"No se pudo crear notificación: {str(e)}")
                     
-                    # Registrar notificación en BD
-                    try:
-                        notification_service = EmailNotificationService(self.db)
-                        await notification_service.create_notification(
-                            user_id=user.id,
-                            template="welcome",
-                            status="sent"
-                        )
-                        await self.db.commit()
-                        logger.info(f"Notificación registrada en BD para usuario {username}")
-                    except Exception as e:
-                        logger.warning(f"No se pudo crear notificación: {str(e)}")
-                else:
-                    logger.warning(f"No se pudo enviar correo de bienvenida a {email}")
             except Exception as e:
-                # No fallar si el correo falla, solo registrar
-                logger.error(f"Error al enviar correo de bienvenida: {str(e)}")
+                logger.error(f"Error al encolar correo de bienvenida: {str(e)}")
             
             # 12. Retornar los datos del residente creado
             logger.info(f"Copropietario creado exitosamente: {username}")

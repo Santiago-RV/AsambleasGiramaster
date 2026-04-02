@@ -2,7 +2,6 @@ import { UserCircle } from "lucide-react";
 import ProfileCard from "./ProfileCard";
 import ProfileStats from "./ProfileStats";
 import HistoryTable from "./HistoryTable";
-import NotificationSettings from "./NotificationSettings";
 
 export default function ProfilePage() {
   const user = {
@@ -55,9 +54,6 @@ export default function ProfilePage() {
         </div>
         <HistoryTable data={history} />
       </div>
-
-      {/* Configuración de notificaciones */}
-      <NotificationSettings />
     </div>
   );
 }

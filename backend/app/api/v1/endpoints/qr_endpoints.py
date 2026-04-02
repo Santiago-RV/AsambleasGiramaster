@@ -34,6 +34,8 @@ from app.services.qr_service import qr_service
 from app.services.email_service import EmailService
 from app.core.config import settings
 from app.core.security import security_manager
+from app.celery_app import celery_app
+from app.api.v1.endpoints.decorators import require_email_enabled
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -366,6 +368,7 @@ async def generate_enhanced_qr(
     description="Genera QR con contraseña temporal y lo envía por email",
     response_model=SuccessResponse[Dict]
 )
+@require_email_enabled
 async def send_enhanced_qr_email(
     request: SendQREmailRequest,
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -386,62 +389,24 @@ async def send_enhanced_qr_email(
     try:
         _check_admin_permissions(current_user)
         
-        # Obtener datos completos del usuario
-        target_user, target_data_user, user_residential_unit, residential_unit = \
-            await _get_user_complete_data(db, request.userId)
-        
-        # Generar contraseña temporal
-        temp_password = _generate_temporary_password()
-        logger.info(f"🔐 Contraseña temporal generada para {target_data_user.str_email}")
-        
-        # Actualizar hash en BD
-        await _update_user_password(db, target_user, temp_password)
-        logger.info(f"✅ Hash actualizado en BD para user_id={request.userId}")
-        
-        # Preparar información del usuario
-        user_info = {
-            'name': f"{target_data_user.str_firstname} {target_data_user.str_lastname}".strip(),
-            'apartment': user_residential_unit.str_apartment_number,
-            'residential_unit': residential_unit.str_name,
-            'email': target_data_user.str_email,
-            'role': 'Admin' if target_user.int_id_rol in [1, 2] else 'Resident'
-        }
-        
-        # Generar QR (sin contraseña)
-        qr_data = qr_service.generate_user_qr_data(
-            user_id=target_user.id,
-            username=target_user.str_username,
-            user_info=user_info,
-            expiration_hours=24
+        # Enviar a Celery de forma asíncrona
+        celery_app.send_task(
+            'app.tasks.email_tasks.send_qr_email',
+            args=[request.userId],
+            kwargs={
+                'recipient_email': request.recipient_email,
+                'frontend_url': str(settings.FRONTEND_URL) if settings.FRONTEND_URL else None
+            },
+            queue='email_tasks'
         )
         
-        # Enviar correo con QR (pasar el QR base64 ya generado)
-        email_svc = EmailService(db)
-        email_sent = await email_svc.send_qr_access_email(
-            to_email=request.recipient_email or target_data_user.str_email,
-            resident_name=user_info['name'],
-            apartment_number=user_info['apartment'],
-            username=target_user.str_username,
-            auto_login_url=qr_data['auto_login_url'],
-            auto_login_token=qr_data['auto_login_token'],
-            qr_base64=qr_data['qr_base64']  # ✅ Pasar QR ya generado
-        )
-        
-        if not email_sent:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No se pudo enviar el correo electrónico"
-            )
-        
-        email_address = request.recipient_email or target_data_user.str_email
-        logger.info(f"📧 QR enviado a {email_address}")
+        email_address = request.recipient_email or None
+        logger.info(f"📧 QR email enviado a cola Celery para user_id={request.userId}")
         
         return SuccessResponse[Dict](
             data={
                 'sent_to': email_address,
-                'qr_filename': qr_data['qr_filename'],
-                'auto_login_url': qr_data['auto_login_url'],
-                'expires_in_hours': 48
+                'message': 'QR enviado a cola de procesamiento'
             },
             message="QR enviado exitosamente por correo"
         )

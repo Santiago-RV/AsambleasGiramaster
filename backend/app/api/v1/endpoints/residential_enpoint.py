@@ -14,8 +14,10 @@ from app.schemas.resident_update_schema import ResidentUpdate
 from app.core.exceptions import ResourceNotFoundException
 from app.auth.auth import get_current_user
 from app.services.user_service import UserService
+from app.celery_app import celery_app
+from app.api.v1.endpoints.decorators import require_email_enabled
 
-
+import logging
 class ResendCredentialsRequest(BaseModel):
     frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
 
@@ -273,12 +275,13 @@ async def delete_resident(
         )
         
 @router.post(
-    "/units/{unit_id}/residents",
+    "/units/{unit_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear copropietario",
     description="Crea un nuevo copropietario para una unidad residencial"
 )
+@require_email_enabled
 async def create_resident(
     unit_id: int,
     resident_data: ResidentUpdate,  # Puedes crear un schema específico ResidentCreate si lo prefieres
@@ -334,6 +337,7 @@ async def create_resident(
     summary="Reenviar credenciales por correo",
     description="Envía las credenciales de acceso al copropietario por correo electrónico"
 )
+@require_email_enabled
 async def resend_credentials(
     unit_id: int,
     user_id: int,
@@ -341,7 +345,7 @@ async def resend_credentials(
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Reenvía las credenciales de acceso por correo"""
+    """Reenvía las credenciales de acceso por correo via Celery"""
     try:
         user_service = UserService(db)
         current_user_data = await user_service.get_user_by_username(current_user)
@@ -352,19 +356,18 @@ async def resend_credentials(
                 detail="No tienes permisos para enviar credenciales"
             )
         
-        residential_unit_service = ResidentialUnitService(db)
-        
-        result = await residential_unit_service.resend_resident_credentials(
-            user_id=user_id,
-            unit_id=unit_id,
-            frontend_url=request.frontend_url
+        celery_app.send_task(
+            'app.tasks.email_tasks.send_single_credential_email',
+            args=[user_id, unit_id],
+            kwargs={'frontend_url': request.frontend_url},
+            queue='email_tasks'
         )
         
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
             message="Credenciales enviadas exitosamente",
-            data=result
+            data={'sent_to_queue': True, 'user_id': user_id}
         )
         
     except (ResourceNotFoundException, HTTPException, ServiceException):

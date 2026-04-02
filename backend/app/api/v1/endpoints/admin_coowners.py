@@ -16,6 +16,7 @@ from app.schemas.responses_schema import SuccessResponse
 from app.schemas.residential_unit_schema import BulkDeleteRequest, BulkToggleAccessRequest
 from app.core.exceptions import ServiceException, ResourceNotFoundException
 from app.celery_app import celery_app
+from app.api.v1.endpoints.decorators import require_email_enabled
 import logging
 import uuid
 
@@ -414,6 +415,7 @@ async def enable_all_coowners(
     summary="Reenviar credenciales a un copropietario",
     description="Genera una nueva contraseña temporal y la envía por correo"
 )
+@require_email_enabled
 async def resend_coowner_credentials(
     coowner_id: int,
     request: ResendCredentialsRequest,
@@ -421,7 +423,7 @@ async def resend_coowner_credentials(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Genera una nueva contraseña temporal para el copropietario y la envía por correo.
+    Genera una nueva contraseña temporal para el copropietario y la envía por correo via Celery.
     """
     try:
         user_service = UserService(db)
@@ -442,17 +444,18 @@ async def resend_coowner_credentials(
                 detail="No se encontró una unidad residencial asignada"
             )
 
-        result = await residential_service.resend_resident_credentials(
-            user_id=coowner_id,
-            unit_id=admin_unit['id'],
-            frontend_url=request.frontend_url
+        celery_app.send_task(
+            'app.tasks.email_tasks.send_single_credential_email',
+            args=[coowner_id, admin_unit['id']],
+            kwargs={'frontend_url': request.frontend_url},
+            queue='email_tasks'
         )
 
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
             message="Credenciales reenviadas exitosamente",
-            data=result
+            data={'sent_to_queue': True, 'user_id': coowner_id}
         )
 
     except HTTPException:
@@ -471,6 +474,7 @@ async def resend_coowner_credentials(
     summary="Enviar credenciales en masa a múltiples copropietarios",
     description="Genera nuevas contraseñas temporales y las envía por correo a múltiples copropietarios seleccionados"
 )
+@require_email_enabled
 async def send_bulk_credentials(
     request_data: BulkSendCredentialsRequest,
     current_user: str = Depends(get_current_user),

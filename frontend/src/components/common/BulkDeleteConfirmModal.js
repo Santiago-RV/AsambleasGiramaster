@@ -446,12 +446,17 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
         
         if (progressData.status === 'completed' || progressData.status === 'failed') {
           clearInterval(pollingInterval);
+          const successful = response.data?.successful || 0;
+          const failed = response.data?.failed || 0;
+          const finishMessage = failed > 0
+            ? `Enviadas: ${successful} exitosas, ${failed} fallidas`
+            : progressData.status === 'completed'
+              ? `Credenciales enviadas a ${progressData.current} copropietario(s)`
+              : 'Error al enviar credenciales';
           finishProgress({
             id: notificationId,
             status: progressData.status === 'completed' ? 'completed' : 'failed',
-            message: progressData.status === 'completed' 
-              ? `Credenciales enviadas a ${progressData.current} copropietario(s)` 
-              : 'Error al enviar credenciales'
+            message: finishMessage
           });
         }
       } catch (error) {
@@ -584,12 +589,17 @@ export const showMeetingInvitationProgressModal = async ({
         
         if (progressData.status === 'completed' || progressData.status === 'failed') {
           clearInterval(pollingInterval);
+          const successful = response.data?.successful || 0;
+          const failed = response.data?.failed || 0;
+          const finishMessage = failed > 0
+            ? `Enviadas: ${successful} exitosas, ${failed} fallidas`
+            : progressData.status === 'completed'
+              ? `Invitaciones enviadas a ${progressData.current} residentes`
+              : 'Error al enviar invitaciones';
           finishProgress({
             id: notificationId,
             status: progressData.status,
-            message: progressData.status === 'completed' 
-              ? `Invitaciones enviadas a ${progressData.current} residentes` 
-              : 'Error al enviar invitaciones'
+            message: finishMessage
           });
         }
       } catch (error) {

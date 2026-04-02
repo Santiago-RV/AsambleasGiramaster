@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import {
 	X,
 	Calendar,
@@ -72,7 +73,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 			generarPdfLlamado(numero, meeting, residential_unit, snapshot);
 		} catch (err) {
 			console.error('Error al generar PDF:', err);
-			alert('No se pudo generar el PDF del llamado.');
+			toast.error('No se pudo generar el PDF del llamado.');
 		} finally {
 			setDownloadingPdf(null);
 		}

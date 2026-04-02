@@ -12,12 +12,14 @@ import AppAdmin from './pages/AdDashboard.jsx'
 import AppCopropietario from './pages/CoDashboard.jsx'
 import PresencialVotingPage from './pages/PresencialVotingPage';
 import NotFound from './pages/NotFound';
+import { Toaster } from 'react-hot-toast';
 import './App.css';
 
 function App() {
 	return (
 		
 		<ProgressNotificationProvider>
+			<Toaster position="top-end" />
 			<ProgressNotificationToast />
 			<AppProvider>
 				<div className="w-full min-h-screen overflow-x-hidden">
