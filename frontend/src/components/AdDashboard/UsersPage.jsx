@@ -41,8 +41,10 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalAdminOpen] = useState(false);
 
-  // Extraer los residentes del response
-  const residents = residentsData?.success && residentsData?.data ? residentsData.data : [];
+  // Extraer los residentes del response, excluyendo admin y soporte de la vista de administrador
+  const residents = residentsData?.success && residentsData?.data
+    ? residentsData.data.filter(r => r.apartment_number !== 'ADMIN' && r.apartment_number !== 'SOPORTE')
+    : [];
 
   // Obtener las reuniones de la unidad residencial
   const {
