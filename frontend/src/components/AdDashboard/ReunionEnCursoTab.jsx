@@ -53,7 +53,7 @@ const ReunionEnCursoTab = () => {
       Swal.fire({
         icon: "success",
         title: `${nombreLlamado} llamado registrado`,
-        text: "El snapshot de asistencia fue guardado exitosamente.",
+        text: "La toma de asistencia de asistencia fue guardado exitosamente.",
         timer: 2000,
         showConfirmButton: false,
       });
