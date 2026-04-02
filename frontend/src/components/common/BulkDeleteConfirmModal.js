@@ -530,6 +530,98 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
 };
 
 /**
+ * Muestra un modal de confirmación + loading para habilitar/deshabilitar acceso masivo.
+ *
+ * @param {Object} options
+ * @param {number} options.count - Cantidad de usuarios a modificar
+ * @param {boolean} options.enabled - true = habilitar, false = deshabilitar
+ * @param {Function} options.togglePromise - Función que ejecuta la operación y retorna la respuesta
+ * @param {Function} options.onSuccess - Callback en éxito
+ * @param {Function} options.onError - Callback en error (opcional)
+ */
+export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePromise, onSuccess, onError }) => {
+  const action = enabled ? 'habilitar' : 'deshabilitar';
+  const actionTitle = enabled ? 'Habilitar' : 'Deshabilitar';
+  const actionColor = enabled ? '#27ae60' : '#e74c3c';
+  const bgColor = enabled ? '#f0fdf4' : '#fef2f2';
+  const borderColor = enabled ? '#bbf7d0' : '#fecaca';
+  const textColor = enabled ? '#166534' : '#991b1b';
+
+  const confirmResult = await Swal.fire({
+    title: `¿${actionTitle} acceso?`,
+    html: `
+      <div class="text-left">
+        <div style="background:${bgColor};border:1px solid ${borderColor};border-radius:8px;padding:16px;">
+          <p style="color:${textColor};font-weight:600;margin:0 0 8px 0;">
+            Se va a ${action} el acceso de <strong>${count}</strong> copropietario(s).
+          </p>
+          <p style="color:${textColor};font-size:13px;margin:0;">
+            ${enabled
+              ? 'Los usuarios seleccionados podrán ingresar al sistema.'
+              : 'Los usuarios seleccionados NO podrán ingresar al sistema.'}
+          </p>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonColor: actionColor,
+    cancelButtonColor: '#6b7280',
+    confirmButtonText: `Sí, ${action}`,
+    cancelButtonText: 'Cancelar',
+  });
+
+  if (!confirmResult.isConfirmed) return;
+
+  Swal.fire({
+    title: `${actionTitle}ndo acceso...`,
+    html: `Procesando <strong>${count}</strong> usuario(s), por favor espera.`,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    didOpen: () => Swal.showLoading(),
+  });
+
+  try {
+    const response = await togglePromise();
+    Swal.close();
+
+    const { successful = 0, failed = 0, already_in_state = 0 } = response.data || {};
+
+    Swal.fire({
+      icon: successful > 0 ? 'success' : 'warning',
+      title: `Acceso ${enabled ? 'habilitado' : 'deshabilitado'}`,
+      html: `
+        <div style="text-align:left;">
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:8px;">
+            <p style="color:#166534;font-weight:600;text-align:center;margin:0;">
+              ${successful} usuario(s) ${enabled ? 'habilitados' : 'deshabilitados'} exitosamente
+            </p>
+            ${already_in_state > 0 ? `<p style="color:#6b7280;font-size:13px;text-align:center;margin:6px 0 0 0;">${already_in_state} ya estaban en ese estado</p>` : ''}
+            ${failed > 0 ? `<p style="color:#dc2626;font-size:13px;text-align:center;margin:6px 0 0 0;">${failed} no pudieron modificarse</p>` : ''}
+          </div>
+          <p style="color:#6b7280;font-size:12px;text-align:center;margin:0;">El listado se ha actualizado automáticamente</p>
+        </div>
+      `,
+      timer: 3000,
+      timerProgressBar: true,
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+    });
+
+    if (onSuccess) onSuccess(response);
+  } catch (error) {
+    Swal.close();
+    Swal.fire({
+      icon: 'error',
+      title: 'Error al modificar acceso',
+      text: error.response?.data?.message || error.message,
+      confirmButtonColor: '#3498db',
+    });
+    if (onError) onError(error);
+  }
+};
+
+/**
  * Muestra un modal de progreso para el envío de invitaciones de reunión.
  * 
  * @param {Object} options - Opciones del modal
