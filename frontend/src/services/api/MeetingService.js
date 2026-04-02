@@ -125,6 +125,18 @@ export class MeetingService {
   }
 
   /**
+   * Obtener invitaciones de una reunión con quorum base
+   * Usado por el modal de delegación de poderes
+   * @param {number} meetingId - ID de la reunión
+   */
+  static async getMeetingInvitations(meetingId) {
+    const response = await axiosInstance.get(
+      `/meeting-invitations/meeting/${meetingId}`
+    );
+    return response.data;
+  }
+
+  /**
    * Registrar asistencia presencial mediante escaneo QR
    * El administrador escanea el QR del copropietario para registrar asistencia
    * @param {string} qrToken - Token JWT extraído del código QR

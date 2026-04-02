@@ -32,7 +32,7 @@ const ReunionEnCursoTab = () => {
 
     const confirmText = yaRegistrado
       ? `El ${nombreLlamado} llamado ya fue registrado. ¿Deseas sobreescribirlo?`
-      : `¿Registrar el ${nombreLlamado} Llamado ahora? Se tomará una foto del estado actual de asistencia.`;
+      : `¿Registrar el ${nombreLlamado} Llamado ahora? Se registrará la asistencia con el listado actual.`;
 
     const result = await Swal.fire({
       title: `${nombreLlamado} Llamado`,
@@ -53,7 +53,7 @@ const ReunionEnCursoTab = () => {
       Swal.fire({
         icon: "success",
         title: `${nombreLlamado} llamado registrado`,
-        text: "El snapshot de asistencia fue guardado exitosamente.",
+        text: "La toma de asistencia de asistencia fue guardado exitosamente.",
         timer: 2000,
         showConfirmButton: false,
       });

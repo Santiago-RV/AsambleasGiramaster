@@ -54,6 +54,7 @@ const ResidentsList = ({
 	const [selectedResidentMenu, setSelectedResidentMenu] = useState(null);
 	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 	const [searchTerm, setSearchTerm] = useState('');
+	const [activeFilter, setActiveFilter] = useState('all');
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedResidentForQR, setSelectedResidentForQR] = useState(null);
 	const [autoLoginUrl, setAutoLoginUrl] = useState('');
@@ -101,18 +102,31 @@ const ResidentsList = ({
 		return residentRole === 3 || residentRole === 4;
 	};
 
-	// Filtrar residentes por búsqueda
+	// Filtrar residentes por búsqueda y filtro activo
 	const filteredResidents = residents?.filter((resident) => {
-		if (!searchTerm) return true;
-		const search = searchTerm.toLowerCase();
-		return (
-			resident.firstname?.toLowerCase().includes(search) ||
-			resident.lastname?.toLowerCase().includes(search) ||
-			resident.username?.toLowerCase().includes(search) ||
-			resident.email?.toLowerCase().includes(search) ||
-			resident.apartment_number?.toLowerCase().includes(search) ||
-			resident.phone?.toLowerCase().includes(search)
-		);
+		// Filtro de búsqueda
+		if (searchTerm) {
+			const search = searchTerm.toLowerCase();
+			const matchesSearch = (
+				resident.firstname?.toLowerCase().includes(search) ||
+				resident.lastname?.toLowerCase().includes(search) ||
+				resident.username?.toLowerCase().includes(search) ||
+				resident.email?.toLowerCase().includes(search) ||
+				resident.apartment_number?.toLowerCase().includes(search) ||
+				resident.phone?.toLowerCase().includes(search)
+			);
+			if (!matchesSearch) return false;
+		}
+		// Filtro por credenciales / invitaciones
+		if (activeFilter === 'no_credentials') {
+			return !resident.last_credential_notification;
+		}
+		if (activeFilter === 'no_invitation') {
+			const inv = resident.last_meeting_invitation;
+			const isActive = inv?.meeting_status === 'Programada' || inv?.meeting_status === 'En Curso';
+			return !inv || !isActive;
+		}
+		return true;
 	}) || [];
 
 	// Actualizar posición del menú cuando cambia el scroll o el tamaño de la ventana
@@ -180,7 +194,7 @@ const ResidentsList = ({
 	useEffect(() => {
 		setSelectedResidents([]);
 		setSelectAll(false);
-	}, [searchTerm]);
+	}, [searchTerm, activeFilter]);
 
 	const handleSelectAll = () => {
 		if (selectAll) {
@@ -1234,20 +1248,53 @@ const ResidentsList = ({
 					)}
 				</div>
 
-				{/* Barra de búsqueda (opcional) */}
+				{/* Barra de búsqueda y filtros (opcional) */}
 				{showSearch && (
-					<div className="relative">
-						<Search
-							className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-							size={20}
-						/>
-						<input
-							type="text"
-							placeholder="Buscar por nombre, usuario, email, teléfono o apartamento..."
-							value={searchTerm}
-							onChange={(e) => setSearchTerm(e.target.value)}
-							className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent"
-						/>
+					<div className="space-y-2">
+						<div className="relative">
+							<Search
+								className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+								size={20}
+							/>
+							<input
+								type="text"
+								placeholder="Buscar por nombre, usuario, email, teléfono o apartamento..."
+								value={searchTerm}
+								onChange={(e) => setSearchTerm(e.target.value)}
+								className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent"
+							/>
+						</div>
+						<div className="flex flex-wrap gap-2">
+							{[
+								{ key: 'all', label: 'Todos' },
+								{ key: 'no_credentials', label: 'Sin credenciales' },
+								{ key: 'no_invitation', label: 'Sin invitación activa' },
+							].map(({ key, label }) => (
+								<button
+									key={key}
+									onClick={() => setActiveFilter(key)}
+									className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+										activeFilter === key
+											? 'bg-[#3498db] text-white border-[#3498db]'
+											: 'bg-white text-gray-600 border-gray-300 hover:border-[#3498db] hover:text-[#3498db]'
+									}`}
+								>
+									{label}
+									{key !== 'all' && (
+										<span className="ml-1 font-normal">
+											({residents?.filter((r) => {
+												if (key === 'no_credentials') return !r.last_credential_notification;
+												if (key === 'no_invitation') {
+													const inv = r.last_meeting_invitation;
+													return !inv || !(inv.meeting_status === 'Programada' || inv.meeting_status === 'En Curso');
+												}
+												return true;
+											}).length ?? 0})
+										</span>
+									)}
+								</button>
+							))}
+						</div>
 					</div>
 				)}
 			</div>
