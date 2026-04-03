@@ -82,7 +82,10 @@ export class MeetingService {
   static async sendInvitations(meetingId, userIds = null) {
     const response = await axiosInstance.post(
       `/meetings/${meetingId}/send-invitations`,
-      { user_ids: userIds }
+      { 
+        user_ids: userIds,
+        frontend_url: window.location.origin
+      }
     );
     return response.data;
   }
@@ -103,7 +106,10 @@ export class MeetingService {
   static async sendInvitationsWithProgress(meetingId, userIds = null) {
     const response = await axiosInstance.post(
       `/meetings/${meetingId}/send-invitations`,
-      { user_ids: userIds }
+      { 
+        user_ids: userIds,
+        frontend_url: window.location.origin
+      }
     );
     return response.data;
   }

@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown, Calendar, Building2, Bell } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import Swal from 'sweetalert2';
 import { ReportsService } from '../../../services/api/ReportsService';
 import { getLlamadoReportSA } from '../../../services/api/ActiveMeetingService';
-import { Chart } from 'chart.js/auto';
 
 // ─── Helpers PDF ────────────────────────────────────────────────────────────
 
@@ -69,7 +66,9 @@ const addFooter = (doc) => {
 
 // ─── PDF Graphics ────────────────────────────────────────────────────────────
 
-const generatePieChartImage = (attendedCount, absentCount) => {
+const generatePieChartImage = async (attendedCount, absentCount) => {
+    const { Chart } = await import('chart.js/auto');
+    
     return new Promise((resolve, reject) => {
         const canvas = document.createElement('canvas');
         canvas.width = 500;
@@ -117,6 +116,8 @@ const generatePieChartImage = (attendedCount, absentCount) => {
 };
 
 const generatePollChartImage = async (poll) => {
+    const { Chart } = await import('chart.js/auto');
+    
     const canvas = document.createElement('canvas');
     canvas.width = 500;
     canvas.height = 500;
@@ -169,6 +170,11 @@ const generatePollChartImage = async (poll) => {
 // ─── Generadores PDF ─────────────────────────────────────────────────────────
 
 const generateAttendancePDF = async (data) => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable')
+    ]);
+    
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, summary, attended, absent } = data;
 
@@ -188,7 +194,7 @@ const generateAttendancePDF = async (data) => {
     doc.text(`>> ASISTENTES (${attended.length})`, 14, y);
     y += 4;
 
-    autoTable(doc, {
+    AutoTable(doc, {
         startY: y,
         head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
         body: attended.map(p => [
@@ -229,7 +235,7 @@ const generateAttendancePDF = async (data) => {
         doc.text(`XX AUSENTES (${absent.length})`, 14, y);
         y += 4;
 
-        autoTable(doc, {
+        AutoTable(doc, {
             startY: y,
             head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
             body: absent.map(p => [
@@ -273,6 +279,12 @@ const generateAttendancePDF = async (data) => {
 };
 
 const generatePollsPDF = async (data) => {
+    const [{ default: jsPDF }, { default: autoTable }, { Chart }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+        import('chart.js/auto')
+    ]);
+    
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, polls } = data;
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -299,7 +311,7 @@ const generatePollsPDF = async (data) => {
         y += 14;
 
         // Info general encuesta
-        autoTable(doc, {
+        AutoTable(doc, {
             startY: y,
             head: [['Tipo', 'Estado', 'Total Votantes', 'Peso Total Votado']],
             body: [[poll.type, poll.status, poll.total_voters, poll.total_weight_voted.toFixed(4)]],
@@ -321,7 +333,7 @@ const generatePollsPDF = async (data) => {
             doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Peso: ${opt.votes_weight.toFixed(4)}`, 16, y);
             y += 4;
 
-            autoTable(doc, {
+            AutoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apto', 'Tipo', 'Fecha y Hora del Voto', 'Q. Real', 'Q. Cedido']],
                 body: opt.voters.map(v => [
@@ -368,7 +380,7 @@ const generatePollsPDF = async (data) => {
             doc.text(`Abstenciones: ${poll.abstentions.length}`, 16, y);
             y += 4;
 
-            autoTable(doc, {
+            AutoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apartamento', 'Peso']],
                 body: poll.abstentions.map(v => [v.full_name, v.apartment, v.voting_weight.toFixed(4)]),
@@ -389,7 +401,7 @@ const generatePollsPDF = async (data) => {
             doc.text(`No votaron: ${poll.non_voters.length}`, 16, y);
             y += 4;
 
-            autoTable(doc, {
+            AutoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apartamento', 'Q. Real']],
                 body: poll.non_voters.map(v => [v.full_name, v.apartment, parseFloat(v.quorum_base || 0).toFixed(4)]),
@@ -428,7 +440,12 @@ const generatePollsPDF = async (data) => {
     doc.save(`Votacion_${(polls[0]?.title?.replace(/\s/g, '_') || meeting.title.replace(/\s/g, '_'))}.pdf`);
 };
 
-const generateDelegationsPDF = (data) => {
+const generateDelegationsPDF = async (data) => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable')
+    ]);
+    
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const { meeting, total_delegations, delegations } = data;
 
@@ -452,7 +469,7 @@ const generateDelegationsPDF = (data) => {
         doc.setTextColor(150);
         doc.text('No se registraron delegaciones de poderes en esta reunión.', 14, y);
     } else {
-        autoTable(doc, {
+        AutoTable(doc, {
             startY: y,
             head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Fecha y Hora']],
             body: delegations.map((d, idx) => [
@@ -488,7 +505,12 @@ const generateDelegationsPDF = (data) => {
 
 const NOMBRES_LLAMADO = ['Primer', 'Segundo', 'Tercer'];
 
-const generateLlamadoPDF = (data) => {
+const generateLlamadoPDF = async (data) => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable')
+    ]);
+    
     const { meeting, residential_unit, llamado, snapshot } = data;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const nombreLlamado = NOMBRES_LLAMADO[llamado - 1];
@@ -530,7 +552,7 @@ const generateLlamadoPDF = (data) => {
     doc.text(`>> PRESENTES (${snapshot.present?.length || 0})`, 14, y);
     y += 4;
 
-    autoTable(doc, {
+    AutoTable(doc, {
         startY: y,
         head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Tipo']],
         body: (snapshot.present || []).map((u, i) => [
@@ -557,7 +579,7 @@ const generateLlamadoPDF = (data) => {
     doc.text(`XX AUSENTES (${snapshot.absent?.length || 0})`, 14, y);
     y += 4;
 
-    autoTable(doc, {
+    AutoTable(doc, {
         startY: y,
         head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Observación']],
         body: (snapshot.absent || []).map((u, i) => [

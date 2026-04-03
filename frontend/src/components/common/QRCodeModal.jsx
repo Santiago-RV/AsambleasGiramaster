@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
 import { X, Mail, MessageCircle, Printer, Download, Share2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -23,6 +22,7 @@ const QRCodeModal = ({
 	const generateQRCode = async () => {
 		setIsGenerating(true);
 		try {
+			const QRCode = (await import('qrcode')).default;
 			const qrDataUrl = await QRCode.toDataURL(autoLoginUrl, {
 				width: 300,
 				margin: 2,
@@ -71,7 +71,8 @@ const QRCodeModal = ({
 					'Authorization': `Bearer ${token}`
 				},
 				body: JSON.stringify({
-					userId: resident.id
+					userId: resident.id,
+					frontend_url: window.location.origin
 				})
 			});
 

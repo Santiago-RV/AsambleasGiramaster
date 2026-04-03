@@ -530,7 +530,7 @@ async def send_meeting_invitations(
             )
         
         task_id = str(uuid.uuid4())
-        frontend_url = request.frontend_url or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+        frontend_url = request.frontend_url
         
         logger.info(f"📧 Creando tarea Celery para invitaciones de reunión {meeting_id}, task_id={task_id}")
         

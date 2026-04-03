@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
 import { X, Camera, CameraOff, CheckCircle, XCircle, AlertCircle, UserCheck, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { MeetingService } from '../../services/api/MeetingService';
@@ -163,6 +162,7 @@ const QRScannerModal = ({ isOpen, onClose }) => {
 			const container = document.getElementById(scannerContainerId);
 			if (!container) return;
 
+			const { Html5Qrcode } = await import('html5-qrcode');
 			const html5QrCode = new Html5Qrcode(scannerContainerId);
 			html5QrCodeRef.current = html5QrCode;
 

@@ -48,6 +48,7 @@ router = APIRouter()
 class SimpleQRRequest(BaseModel):
     """Request para generar QR simple (usado por modal del frontend)"""
     userId: int
+    frontend_url: Optional[str] = None
 
 
 class SimpleQRResponse(BaseModel):
@@ -63,6 +64,7 @@ class EnhancedQRRequest(BaseModel):
     include_personal_info: bool = True
     qr_size: int = 400
     expiration_hours: int = 48
+    frontend_url: Optional[str] = None
 
 
 class EnhancedQRResponse(BaseModel):
@@ -79,6 +81,7 @@ class SendQREmailRequest(BaseModel):
     """Request para enviar QR por email"""
     userId: int
     recipient_email: Optional[EmailStr] = None
+    frontend_url: Optional[str] = None
 
 
 class BulkQRRequest(BaseModel):
@@ -86,6 +89,7 @@ class BulkQRRequest(BaseModel):
     user_ids: List[int]
     qr_size: int = 400
     expiration_hours: int = 48
+    frontend_url: Optional[str] = None
 
 
 class BulkQRResponse(BaseModel):
@@ -249,7 +253,9 @@ async def generate_qr_simple(
             )
         
         # Construir URL del frontend
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://10.1.1.171:5173')
+        frontend_url = request.frontend_url
+        if not frontend_url:
+            raise ValueError("frontend_url es requerido")
         auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
         
         logger.info(
@@ -325,7 +331,8 @@ async def generate_enhanced_qr(
             user_id=target_user.id,
             username=target_user.str_username,
             user_info=user_info,
-            expiration_hours=request.expiration_hours if request.expiration_hours else 24
+            expiration_hours=request.expiration_hours if request.expiration_hours else 24,
+            frontend_url=request.frontend_url
         )
         
         # Guardar el token para el usuario (invalidar anteriores)
@@ -395,7 +402,7 @@ async def send_enhanced_qr_email(
             args=[request.userId],
             kwargs={
                 'recipient_email': request.recipient_email,
-                'frontend_url': str(settings.FRONTEND_URL) if settings.FRONTEND_URL else None
+                'frontend_url': request.frontend_url
             },
             queue='email_tasks'
         )
@@ -485,7 +492,8 @@ async def generate_bulk_qr(
         # Generar QRs en lote
         qr_results = qr_service.generate_bulk_qr_codes(
             users_data=bulk_data,
-            expiration_hours=request.expiration_hours
+            expiration_hours=request.expiration_hours,
+            frontend_url=request.frontend_url
         )
         
         # Calcular estadísticas
@@ -578,10 +586,7 @@ async def generate_qr_bulk_simple(
         logger.info(f"📋 Tokens válidos existentes encontrados: {len(existing_tokens)}")
         
         # Determinar frontend_url
-        if request.frontend_url:
-            frontend_url = request.frontend_url
-        else:
-            frontend_url = os.getenv("FRONTEND_URL", "https://asambleas.giramaster.co")
+        frontend_url = request.frontend_url
         
         # Procesar cada usuario
         for target_user, target_data_user, user_residential_unit in users_data:

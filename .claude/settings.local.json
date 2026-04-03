@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(xargs grep:*)",
-      "Bash(find /g/PROJECTS/Asambleas/backend/app/api/v1/endpoints -name \"*.py\" -exec grep -l \"invitation\" {} \\\\;)"
-    ]
-  }
-}

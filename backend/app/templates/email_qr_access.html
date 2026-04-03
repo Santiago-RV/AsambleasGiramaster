@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu Código QR - GIRAMASTER</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a1a2e;
+      background-color: #eef2ff;
+      padding: 20px 0;
+    }
+
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(99, 58, 162, 0.15);
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #6B4C9A 0%, #4F35A3 60%, #3B28CC 100%);
+      padding: 36px 40px 28px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: "";
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 180px;
+      height: 180px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 50%;
+    }
+
+    .header::after {
+      content: "";
+      position: absolute;
+      bottom: -60px;
+      left: -30px;
+      width: 220px;
+      height: 220px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 50%;
+    }
+
+    .logo {
+      width: 120px;
+      height: auto;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .header-subtitle {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* ── Content ─────────────────────────────────────────────────────────── */
+    .content {
+      padding: 32px 40px;
+    }
+
+    .greeting {
+      font-size: 16px;
+      color: #1e1b4b;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .greeting strong {
+      color: #4f46e5;
+    }
+
+    /* ── QR Section ─────────────────────────────────────────────────────── */
+    .qr-section {
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+      border: 2px solid #bae6fd;
+      border-radius: 16px;
+      padding: 28px;
+      text-align: center;
+      margin: 24px 0;
+    }
+
+    .qr-title {
+      color: #0369a1;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .qr-container {
+      display: inline-block;
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      margin-bottom: 16px;
+    }
+
+    .qr-image {
+      max-width: 200px;
+      height: auto;
+      display: block;
+    }
+
+    .qr-info {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      text-align: left;
+    }
+
+    .qr-info-title {
+      color: #92400e;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .qr-info-list {
+      margin: 0;
+      padding-left: 20px;
+      color: #78350f;
+      font-size: 13px;
+    }
+
+    .qr-info-list li {
+      margin-bottom: 4px;
+    }
+
+    /* ── Info Section ─────────────────────────────────────────────────────── */
+    .info-section {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 24px 0;
+    }
+
+    .info-section-title {
+      color: #1e293b;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .info-value {
+      color: #1e293b;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ── Button ─────────────────────────────────────────────────────────── */
+    .button-container {
+      text-align: center;
+      margin: 28px 0;
+    }
+
+    .button {
+      display: inline-block;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      padding: 14px 32px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .button:hover {
+      background: linear-gradient(135deg, #059669, #047857);
+    }
+
+    /* ── URL Section ─────────────────────────────────────────────────────── */
+    .url-section {
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .url-label {
+      color: #64748b;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .url-value {
+      color: #4f46e5;
+      font-size: 11px;
+      word-break: break-all;
+      font-family: monospace;
+    }
+
+    /* ── Warning ─────────────────────────────────────────────────────────── */
+    .warning {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 20px 0;
+      font-size: 12px;
+      color: #78350f;
+    }
+
+    .warning-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    /* ── Soporte Técnico ──────────────────────────────────────────────── */
+    .support-section {
+      background: linear-gradient(135deg, #fff7ed, #ffedd5);
+      border: 1px solid #fed7aa;
+      border-left: 4px solid #f97316;
+      border-radius: 12px;
+      padding: 22px;
+      margin-top: 24px;
+    }
+
+    .support-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .support-icon {
+      font-size: 20px;
+    }
+
+    .support-title {
+      color: #c2410c;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .support-subtitle {
+      color: #9a3412;
+      font-size: 12px;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .support-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #fed7aa;
+    }
+
+    .support-row:last-child {
+      border-bottom: none;
+    }
+
+    .support-emoji {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .support-text {
+      color: #7c2d12;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .support-text a {
+      color: #ea580c;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .support-icon-svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    /* Botón WhatsApp */
+    .whatsapp-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #25D366, #128C7E);
+      color: white !important;
+      padding: 12px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 12px;
+      width: 100%;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .whatsapp-button:hover {
+      background: linear-gradient(135deg, #128C7E, #075E54);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    .footer {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      padding: 28px 40px;
+      text-align: center;
+    }
+
+    .footer-title {
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .footer-subtitle {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .footer-note {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .content {
+        padding: 24px 20px;
+      }
+
+      .qr-section {
+        padding: 20px 16px;
+      }
+
+      .info-row {
+        flex-direction: column;
+        gap: 4px;
+      }
+    }
+    .support-row.whatsapp-row {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      border-bottom: none;
+      padding-top: 12px;
+    }
+
+    .support-row.whatsapp-row .support-text {
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="email-container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-title">🏢 Tu Código de Acceso QR</div>
+      <div class="header-subtitle">Asambleas Giramaster</div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p class="greeting">
+        Hola <strong>{{resident_name}}</strong>, hemos generado un código QR para que accedas directamente al sistema de tu unidad residencial.
+      </p>
+
+      <!-- QR Section -->
+      <div class="qr-section">
+        <div class="qr-title">📱 Escanea este código QR</div>
+        <div class="qr-container">
+          <img src="{{qr_image_url}}" alt="Código QR de Acceso" class="qr-image" />
+        </div>
+        
+        <div class="qr-info">
+          <div class="qr-info-title">📋 ¿Cómo usar tu código QR?</div>
+          <ol class="qr-info-list">
+            <li>Abre la cámara de tu smartphone</li>
+            <li>Enfoca el código QR que aparece en este correo</li>
+            <li>Toca la notificación que aparece en tu pantalla</li>
+            <li>¡Listo! Serás redirigido directamente al sistema</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Info Section -->
+      <div class="info-section">
+        <div class="info-section-title">📋 Información de tu Cuenta</div>
+        
+        <div class="info-row">
+          <span class="info-label">Usuario</span>
+          <span class="info-value">{{username}}</span>
+        </div>
+        
+        <div class="info-row">
+          <span class="info-label">Apartamento</span>
+          <span class="info-value">{{apartment_number}}</span>
+        </div>
+      </div>
+
+      <!-- Button -->
+      <div class="button-container">
+        <a href="{{auto_login_url}}" class="button">🚀 Acceder Directamente</a>
+      </div>
+
+      <!-- URL -->
+      <div class="url-section">
+        <div class="url-label">O copia y pega este enlace:</div>
+        <div class="url-value">{{auto_login_url}}</div>
+      </div>
+
+      <!-- Warning -->
+      <div class="warning">
+        <div class="warning-title">⚠️ Importante:</div>
+        Este código QR es personal y intransferible. Tiene una validez de 48 horas. No lo compartas con personas no autorizadas.
+      </div>
+
+      <!-- Soporte Técnico -->
+      {% if support_name or support_email or support_phone %}
+      <div class="support-section">
+        <div class="support-header">
+          <span class="support-icon">🛟</span>
+          <span class="support-title">¿Tiene alguna duda con este correo?</span>
+        </div>
+        <p class="support-subtitle">
+          Si tiene inquietudes sobre su código QR o necesita asistencia,
+          puede contactar a nuestro equipo de soporte técnico:
+        </p>
+
+        {% if support_name %}
+        <div class="support-row">
+          <span class="support-emoji">👤</span>
+          <span class="support-text">{{support_name}}</span>
+        </div>
+        {% endif %}
+
+        {% if support_email %}
+        <div class="support-row">
+          <span class="support-emoji">📧</span>
+          <span class="support-text">
+            <a href="mailto:{{support_email}}">{{support_email}}</a>
+          </span>
+        </div>
+        {% endif %}
+
+        {% if support_phone %}
+        <div class="support-row">
+          <span class="support-emoji">📞</span>
+          <span class="support-text">
+            <a href="tel:{{support_phone}}">{{support_phone}}</a>
+          </span>
+        </div>
+        {% endif %}
+
+        {% if support_whatsapp %}
+        <div class="support-row whatsapp-row">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="support-emoji">💬</span>
+            <span class="support-text">¿Necesitas ayuda más rápida?</span>
+          </div>
+          <a href="{{support_whatsapp}}" class="whatsapp-button" target="_blank">
+            Escribir en WhatsApp
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-title">GIRAMASTER</div>
+      <div class="footer-subtitle">Sistema de Gestión de Asambleas Residenciales</div>
+      <div class="footer-note">
+        Este es un correo automático generado por el Sistema GIRAMASTER<br>
+        © {{current_year}} GIRAMASTER - Todos los derechos reservados
+      </div>
+    </div>
+
+  </div>
+</body>
+
+</html>

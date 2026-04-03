@@ -197,7 +197,8 @@ class QRCodeService:
         user_id: int,
         username: str,
         user_info: Dict,
-        expiration_hours: int = 24
+        expiration_hours: int = 24,
+        frontend_url: str = None
     ) -> Dict[str, str]:
         """
         Genera todos los datos necesarios para el QR de un usuario
@@ -206,8 +207,8 @@ class QRCodeService:
             user_id: ID del usuario
             username: Nombre de usuario
             user_info: Información adicional del usuario
-            user_info: Información adicional del usuario
             expiration_hours: Horas de expiración
+            frontend_url: URL base del frontend (requerido)
             
         Returns:
             Dict con token, URL y QR en base64
@@ -219,8 +220,9 @@ class QRCodeService:
                 expiration_hours=expiration_hours
             )
             
-            # Construir URL (mismo fallback que email_service para consistencia)
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+            # Construir URL
+            if not frontend_url:
+                raise ValueError("frontend_url es requerido para generar URL de auto-login")
             auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
             
             # Generar QR con información del usuario
@@ -258,7 +260,8 @@ class QRCodeService:
     def generate_bulk_qr_codes(
         self,
         users_data: list,
-        expiration_hours: int = 24
+        expiration_hours: int = 24,
+        frontend_url: str = None
     ) -> list:
         """
         Genera códigos QR para múltiples usuarios
@@ -266,10 +269,14 @@ class QRCodeService:
         Args:
             users_data: Lista de diccionarios con información de usuarios
             expiration_hours: Horas de expiración
+            frontend_url: URL base del frontend (requerido)
              
         Returns:
             List de diccionarios con QR data para cada usuario
         """
+        if not frontend_url:
+            raise ValueError("frontend_url es requerido para generar URLs de auto-login")
+        
         qr_results = []
         
         for user_data in users_data:
@@ -294,7 +301,8 @@ class QRCodeService:
                     user_id=user_id,
                     username=username,
                     user_info=qr_user_info,
-                    expiration_hours=expiration_hours
+                    expiration_hours=expiration_hours,
+                    frontend_url=frontend_url
                 )
                 
                 qr_results.append({

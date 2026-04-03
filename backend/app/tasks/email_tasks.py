@@ -167,6 +167,11 @@ def send_bulk_emails(self, resident_ids: List[int], unit_id: int, task_id: str, 
             auto_login_service = SimpleAutoLoginService()
             notification_service = EmailNotificationService(db)
             
+            # Obtener información de soporte técnico UNA SOLA VEZ antes del loop
+            from app.services.support_service import SupportService
+            support_service = SupportService(db)
+            support_data = await support_service.get_support_info(unit_id)
+            
             emails_data = []
             
             for idx, user_id in enumerate(resident_ids):
@@ -246,9 +251,10 @@ def send_bulk_emails(self, resident_ids: List[int], unit_id: int, task_id: str, 
                         user_email=data_user.str_email,
                         phone=data_user.str_phone,
                         auto_login_url=auto_login_url,
-                        support_name=None,
-                        support_email=None,
-                        support_phone=None,
+                        support_name=support_data.get("str_support_name") if support_data else None,
+                        support_email=support_data.get("str_support_email") if support_data else None,
+                        support_phone=support_data.get("str_support_phone") if support_data else None,
+                        support_whatsapp=support_data.get("str_support_whatsapp") if support_data else None,
                     )
                     
                     subject = f"Bienvenido a GIRAMASTER - {residential_unit.str_name}"
@@ -443,6 +449,11 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
             meeting_year = str(datetime.now().year)
             email_sender = EmailSender(db)
             
+            # Obtener información de soporte técnico UNA SOLA VEZ antes del loop
+            from app.services.support_service import SupportService
+            support_service = SupportService(db)
+            support_data = await support_service.get_support_info(meeting.int_id_residential_unit)
+            
             for idx, (user, data_user, user_residential_unit) in enumerate(users_data):
                 try:
                     current = idx + 1
@@ -491,7 +502,11 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                         str_modality=meeting.str_modality or "presencial",
                         current_year=meeting_year,
                         auto_login_url=auto_login_url,
-                        auto_login_token=auto_login_token
+                        auto_login_token=auto_login_token,
+                        support_name=support_data.get("str_support_name") if support_data else None,
+                        support_email=support_data.get("str_support_email") if support_data else None,
+                        support_phone=support_data.get("str_support_phone") if support_data else None,
+                        support_whatsapp=support_data.get("str_support_whatsapp") if support_data else None,
                     )
                     
                     success = await email_sender.send_email_async(
@@ -636,19 +651,22 @@ def send_qr_email(self, user_id: int, recipient_email: str = None, frontend_url:
                     user_id=user.id,
                     username=user.str_username,
                     user_info=user_info,
-                    expiration_hours=24
+                    expiration_hours=24,
+                    frontend_url=frontend_url
                 )
                 
                 to_email = recipient_email or data_user.str_email
                 
                 email_service = EmailService(db)
                 success = await email_service.send_qr_access_email(
+                    db=db,
                     to_email=to_email,
                     resident_name=user_info['name'],
                     apartment_number=user_info['apartment'],
                     username=user.str_username,
                     auto_login_url=qr_data['auto_login_url'],
                     auto_login_token=qr_data['auto_login_token'],
+                    residential_unit_id=residential_unit.id,
                     qr_base64=qr_data['qr_base64']
                 )
                 
@@ -843,6 +861,11 @@ def send_single_credential_email(
                 url_to_use = frontend_url or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                 auto_login_url = f"{url_to_use}/auto-login/{auto_login_token}"
                 
+                # Obtener información de soporte técnico
+                from app.services.support_service import SupportService
+                support_service = SupportService(db)
+                support_data = await support_service.get_support_info(unit_id)
+                
                 voting_weight_percent = float(user_unit.dec_default_voting_weight or 0) * 100
                 
                 html_content = template.render(
@@ -856,7 +879,11 @@ def send_single_credential_email(
                     user_email=data_user.str_email,
                     phone=data_user.str_phone,
                     current_year=str(datetime.now().year),
-                    auto_login_url=auto_login_url
+                    auto_login_url=auto_login_url,
+                    support_name=support_data.get("str_support_name") if support_data else None,
+                    support_email=support_data.get("str_support_email") if support_data else None,
+                    support_phone=support_data.get("str_support_phone") if support_data else None,
+                    support_whatsapp=support_data.get("str_support_whatsapp") if support_data else None,
                 )
                 
                 email_sender = EmailSender(db)

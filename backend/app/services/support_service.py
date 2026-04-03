@@ -32,6 +32,61 @@ from app.core.exceptions import ServiceException, ResourceNotFoundException
 logger = logging.getLogger(__name__)
 
 SUPPORT_IDENTIFIER = "SOPORTE"
+DEFAULT_WHATSAPP_MESSAGE = "Hola, necesito ayuda con mis credenciales de acceso"
+
+
+def _format_phone_for_whatsapp(phone: str) -> str:
+    """
+    Formatea un número de teléfono para WhatsApp.
+    - Elimina caracteres no numéricos
+    - Agrega indicativo de país +57 si no lo tiene
+    - Ejemplos:
+        - "3106301469" -> "573106301469"
+        - "+573106301469" -> "573106301469"
+        - "573106301469" -> "573106301469"
+    """
+    if not phone:
+        return None
+    
+    # Eliminar caracteres no numéricos excepto +
+    clean_phone = ''.join(c for c in phone if c.isdigit() or c == '+')
+    
+    # Ya tiene indicativo (+57 o 57)
+    if clean_phone.startswith('+57'):
+        return clean_phone.replace('+', '')
+    elif clean_phone.startswith('57') and len(clean_phone) > 2:
+        return clean_phone
+    elif clean_phone.startswith('57'):
+        return clean_phone
+    # Solo número local, agregar +57
+    else:
+        return '57' + clean_phone
+
+
+def _generate_whatsapp_link(phone: str, message: str = DEFAULT_WHATSAPP_MESSAGE) -> Optional[str]:
+    """
+    Genera un link de WhatsApp con mensaje precargado.
+    
+    Args:
+        phone: Número de teléfono del soporte
+        message: Mensaje a precargar
+    
+    Returns:
+        Link de WhatsApp listo para usar
+    """
+    if not phone:
+        return None
+    
+    formatted_phone = _format_phone_for_whatsapp(phone)
+    if not formatted_phone:
+        return None
+    
+    # Codificar el mensaje para URL
+    from urllib.parse import quote
+    encoded_message = quote(message)
+    
+    # Link de WhatsApp (formato wa.me)
+    return f"https://wa.me/{formatted_phone}?text={encoded_message}"
 
 
 class SupportService:
@@ -64,37 +119,40 @@ class SupportService:
         Retorna None si no existe ningún contacto configurado.
         """
         try:
-            unit_record = await self._get_support_unit_record(unit_id)
-
-            if not unit_record:
-                return None
-
-            # Cargar datos personales del usuario de soporte
-            data_user_result = await self.db.execute(
-                select(DataUserModel).where(
-                    DataUserModel.id == unit_record.user.int_data_user_id
+            # Query directa sin eager loading - más robusta
+            result = await self.db.execute(
+                select(
+                    UserResidentialUnitModel.int_user_id,
+                    DataUserModel.str_firstname,
+                    DataUserModel.str_lastname,
+                    DataUserModel.str_email,
+                    DataUserModel.str_phone
+                )
+                .join(UserModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                .join(DataUserModel, DataUserModel.id == UserModel.int_data_user_id)
+                .where(
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                    UserResidentialUnitModel.str_apartment_number == SUPPORT_IDENTIFIER
                 )
             )
-            data_user = data_user_result.scalar_one_or_none()
-
-            if not data_user:
+            row = result.first()
+            
+            if not row:
+                logger.warning(f"No se encontró contacto de soporte para unidad {unit_id}")
                 return None
 
             return {
-                "user_id": unit_record.int_user_id,
+                "user_id": row.int_user_id,
                 "unit_id": unit_id,
-                "str_support_name": f"{data_user.str_firstname} {data_user.str_lastname}".strip(),
-                "str_support_email": data_user.str_email,
-                "str_support_phone": data_user.str_phone,
-                "updated_at": unit_record.updated_at.isoformat() if unit_record.updated_at else None
+                "str_support_name": f"{row.str_firstname} {row.str_lastname}".strip(),
+                "str_support_email": row.str_email,
+                "str_support_phone": row.str_phone,
+                "str_support_whatsapp": _generate_whatsapp_link(row.str_phone) if row.str_phone else None,
             }
 
         except Exception as e:
             logger.error(f"Error al obtener soporte técnico para unidad {unit_id}: {str(e)}")
-            raise ServiceException(
-                message=f"Error al obtener soporte técnico: {str(e)}",
-                details={"original_error": str(e)}
-            )
+            return None
 
     # ─────────────────────────────────────────────────────────────────────────
     # UPSERT: crear o actualizar el contacto de soporte

@@ -1,7 +1,6 @@
 // ZoomEmbed.jsx - VERSIÓN CON BURBUJA INFORMATIVA
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { ZoomMtg } from '@zoom/meetingsdk';
 import { X, Loader2, CheckCircle, UserCircle, Building2, Hash, AlertTriangle, Eye, BarChart3 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
@@ -109,21 +108,36 @@ const ZoomEmbed = ({
 			return;
 		}
 
-		ZoomMtg.preLoadWasm();
-		ZoomMtg.prepareWebSDK();
+		let mounted = true;
 
-		const zmmtgRoot = document.getElementById('zmmtg-root');
-		if (zmmtgRoot) {
-			zmmtgRoot.style.display = 'block';
-		}
+		const initZoomSDK = async () => {
+			try {
+				const { ZoomMtg } = await import('@zoom/meetingsdk');
+				if (!mounted) return;
 
-		const timer = setTimeout(() => {
-			initializeZoom();
-		}, 100);
+				ZoomMtg.preLoadWasm();
+				ZoomMtg.prepareWebSDK();
+
+				const zmmtgRoot = document.getElementById('zmmtg-root');
+				if (zmmtgRoot) {
+					zmmtgRoot.style.display = 'block';
+				}
+
+				setTimeout(() => {
+					if (mounted) initializeZoom(ZoomMtg);
+				}, 100);
+			} catch (err) {
+				if (!mounted) return;
+				console.error('Error cargando Zoom SDK:', err);
+				setError('No se pudo cargar el componente de Zoom');
+				setIsLoading(false);
+			}
+		};
+
+		initZoomSDK();
 
 		return () => {
-			clearTimeout(timer);
-			console.log('🧹 Limpiando componente de Zoom...');
+			mounted = false;
 			const zmmtgRoot = document.getElementById('zmmtg-root');
 			if (zmmtgRoot) {
 				zmmtgRoot.style.display = 'none';
@@ -296,7 +310,7 @@ const ZoomEmbed = ({
 		}
 	};
 
-	const initializeZoom = async () => {
+	const initializeZoom = async (ZoomMtg) => {
 		try {
 			setIsLoading(true);
 			setLoadingMessage('Preparando reunión...');

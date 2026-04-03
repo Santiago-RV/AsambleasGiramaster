@@ -977,9 +977,6 @@ class ResidentialUnitService:
             # Construir URL de auto-login si hay token
             auto_login_url = None
             if auto_login_token:
-                if not frontend_url:
-                    from app.core.config import settings
-                    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                 auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
             
             # Usar Jinja2 para renderizar el template correctamente
@@ -1489,9 +1486,6 @@ class ResidentialUnitService:
                 else:
                     auto_login_url = None
                     if auto_login_token:
-                        if not frontend_url:
-                            from app.core.config import settings
-                            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                         auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                     
                     try:
@@ -1812,12 +1806,14 @@ class ResidentialUnitService:
 
             try:
                 await email_svc.send_administrator_credentials_email(
+                    db=self.db,
                     to_email=admin_data.str_email,
                     firstname=admin_data.str_firstname,
                     lastname=admin_data.str_lastname,
                     username=username,
                     password=default_password,
                     residential_unit_name=unit_name,
+                    residential_unit_id=unit_id,
                     auto_login_token=auto_login_token
                 )
 
@@ -2207,12 +2203,14 @@ class ResidentialUnitService:
                 email_svc = EmailService(self.db)
                 
                 email_sent = await email_svc.send_guest_credentials_email(
+                    db=self.db,
                     to_email=guest_data['email'],
                     firstname=guest_data['firstname'],
                     lastname=guest_data['lastname'],
                     username=username,  # Username en minúsculas
                     password=password,
                     residential_unit_name=unit.str_name,
+                    residential_unit_id=unit_id,
                     auto_login_token=auto_login_token
                 )
                 

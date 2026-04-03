@@ -34,7 +34,6 @@ router = APIRouter()
     summary="Carga masiva de copropietarios desde Excel",
     description="Permite al Super Admin cargar copropietarios masivamente desde un archivo Excel"
 )
-@require_email_enabled
 async def upload_residents_excel(
     unit_id: int,
     file: UploadFile = File(..., description="Archivo Excel con los copropietarios"),

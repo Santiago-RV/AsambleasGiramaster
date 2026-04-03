@@ -1,5 +1,4 @@
 import axiosInstance from "./axiosconfig";
-import ExcelJS from 'exceljs';
 
 /**
  * Servicio para manejar las operaciones de unidades residenciales
@@ -448,6 +447,7 @@ export class ResidentialUnitService {
    */
   static async downloadResidentsExcelTemplate() {
     try {
+      const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Copropietarios');
 

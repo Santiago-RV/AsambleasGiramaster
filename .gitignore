@@ -29,6 +29,7 @@ htmlcov/
 *.njsproj
 *.sln
 *.sw?
+.claude
 
 # backend
 .env
@@ -43,3 +44,6 @@ qr_codes/
 
 tls-secret.yaml
 secret.yaml
+
+package-lock.json
+pnpm-lock.yaml

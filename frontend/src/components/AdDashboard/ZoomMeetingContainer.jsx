@@ -1,7 +1,6 @@
 // ZoomMeetingContainer.jsx
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { ZoomMtg } from '@zoom/meetingsdk';
 import { X, Loader2, CheckCircle, AlertTriangle, Lightbulb, BarChart3, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
@@ -91,37 +90,45 @@ const ZoomMeetingContainer = ({
 			return;
 		}
 
-		// Precargar recursos de Zoom SOLO cuando se va a usar
-		ZoomMtg.preLoadWasm();
-		ZoomMtg.prepareWebSDK();
+		let mounted = true;
 
-		// Mostrar el contenedor root de Zoom
-		const zmmtgRoot = document.getElementById('zmmtg-root');
-		if (zmmtgRoot) {
-			zmmtgRoot.style.display = 'block';
-		}
+		const initZoomSDK = async () => {
+			try {
+				const { ZoomMtg } = await import('@zoom/meetingsdk');
+				if (!mounted) return;
 
-		const timer = setTimeout(() => {
-			initializeZoom();
-		}, 100);
+				ZoomMtg.preLoadWasm();
+				ZoomMtg.prepareWebSDK();
+
+				const zmmtgRoot = document.getElementById('zmmtg-root');
+				if (zmmtgRoot) {
+					zmmtgRoot.style.display = 'block';
+				}
+
+				setTimeout(() => {
+					if (mounted) initializeZoom(ZoomMtg);
+				}, 100);
+			} catch (err) {
+				if (!mounted) return;
+				console.error('Error cargando Zoom SDK:', err);
+				setError('No se pudo cargar el componente de Zoom');
+				setIsLoading(false);
+			}
+		};
+
+		initZoomSDK();
 
 		return () => {
-			clearTimeout(timer);
-
-			// Si el componente se desmonta y aún hay una reunión activa, registrar fin
-			console.log('🧹 Limpiando componente de Zoom...');
-
-			// Limpiar Zoom al desmontar
+			mounted = false;
 			const zmmtgRoot = document.getElementById('zmmtg-root');
 			if (zmmtgRoot) {
 				zmmtgRoot.style.display = 'none';
-				// Limpiar el contenido de Zoom
 				zmmtgRoot.innerHTML = '';
 			}
 		};
 	}, [meetingData]);
 
-	const initializeZoom = async () => {
+	const initializeZoom = async (ZoomMtg) => {
 		try {
 			setIsLoading(true);
 			setLoadingMessage('Preparando reunión...');

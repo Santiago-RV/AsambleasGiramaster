@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: arwendev97/giramaster-backend:1.0.0
-          imagePullPolicy: Always #IfNotPresent
+          image: giramaster-backend:latest
+          imagePullPolicy: Never
           env:
             - name: SERVICE
               value: "backend"

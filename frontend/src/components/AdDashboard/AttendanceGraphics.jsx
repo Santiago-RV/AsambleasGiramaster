@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import Chart from "chart.js/auto";
 
 const AttendanceChart = ({ summary }) => {
   const canvasRef = useRef(null);
@@ -8,31 +7,41 @@ const AttendanceChart = ({ summary }) => {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    if (chartRef.current) {
-      chartRef.current.destroy();
-    }
+    let mounted = true;
 
-    chartRef.current = new Chart(canvasRef.current, {
-      type: "pie",
-      data: {
-        labels: ["Asistieron", "No asistieron"],
-        datasets: [
-          {
-            data: [summary.total_attended, summary.total_absent],
-            backgroundColor: ["#10b981", "#ef4444"],
-          },
-        ],
-      },
-      options: {
-        plugins: {
-          legend: {
-            position: "top",
+    const initChart = async () => {
+      const { default: Chart } = await import("chart.js/auto");
+      if (!mounted || !canvasRef.current) return;
+
+      if (chartRef.current) {
+        chartRef.current.destroy();
+      }
+
+      chartRef.current = new Chart(canvasRef.current, {
+        type: "pie",
+        data: {
+          labels: ["Asistieron", "No asistieron"],
+          datasets: [
+            {
+              data: [summary.total_attended, summary.total_absent],
+              backgroundColor: ["#10b981", "#ef4444"],
+            },
+          ],
+        },
+        options: {
+          plugins: {
+            legend: {
+              position: "top",
+            },
           },
         },
-      },
-    });
+      });
+    };
+
+    initChart();
 
     return () => {
+      mounted = false;
       chartRef.current?.destroy();
     };
   }, [summary]);

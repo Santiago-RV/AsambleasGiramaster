@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: celery
-          image: arwendev97/giramaster-backend:1.0.0
-          imagePullPolicy: Always
+          image: giramaster-backend:latest
+          imagePullPolicy: Never
           env:
             - name: SERVICE
               value: "celery"

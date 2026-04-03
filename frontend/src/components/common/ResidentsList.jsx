@@ -5,8 +5,6 @@ import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
 import Modal from './Modal';
 import ResidentDetailsModal from './ResidentDetailsModal';
-import { jsPDF } from 'jspdf';
-import QRCodeLib from 'qrcode';
 import { useQuery } from '@tanstack/react-query';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
@@ -20,7 +18,6 @@ const SVG_ICONS = {
 	xCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
 	alertTriangle: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
 };
-import ExcelJS from 'exceljs';
 
 /**
  * Componente reutilizable para mostrar lista de residentes
@@ -394,7 +391,8 @@ const ResidentsList = ({
 					},
 					body: JSON.stringify({
 						user_ids: selectedResidents,
-						expiration_hours: 48
+						expiration_hours: 48,
+						frontend_url: window.location.origin
 					})
 				});
 
@@ -419,9 +417,12 @@ const ResidentsList = ({
 					throw new Error(errorData.detail || errorData.message || `HTTP error! status: ${response.status}`);
 				}
 
-				const data = await response.json();
+			const data = await response.json();
 
-				// Procesar tokens recibidos
+			// Import dinámico de QRCode
+			const { default: QRCodeLib } = await import('qrcode');
+
+			// Procesar tokens recibidos
 				for (let i = 0; i < data.data.qr_tokens.length; i++) {
 					const tokenData = data.data.qr_tokens[i];
 
@@ -473,6 +474,12 @@ const ResidentsList = ({
 					title: 'Creando documento PDF...',
 					html: 'Preparando documento con códigos QR...'
 				});
+
+				// Import dinámico de jsPDF
+				const [{ jsPDF }, { default: QRCodeLib }] = await Promise.all([
+					import('jspdf'),
+					import('qrcode')
+				]);
 
 				// Crear PDF con jsPDF
 				const pdf = new jsPDF({
@@ -708,6 +715,9 @@ const ResidentsList = ({
 			const tokens = data.data?.qr_tokens || [];
 
 			if (!tokens.length) throw new Error('No se obtuvo ningún token. Verifica que los residentes seleccionados estén activos en el sistema.');
+
+			// Import dinámico de ExcelJS
+			const ExcelJS = await import('exceljs');
 
 			// Crear workbook con ExcelJS
 			const workbook = new ExcelJS.Workbook();
@@ -976,7 +986,8 @@ const ResidentsList = ({
 					'Authorization': `Bearer ${token}`
 				},
 				body: JSON.stringify({
-					userId: resident.id
+					userId: resident.id,
+					frontend_url: window.location.origin
 				})
 			});
 

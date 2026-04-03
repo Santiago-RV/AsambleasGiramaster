@@ -23,8 +23,6 @@ import {
 	WifiOff,
 	BarChart3,
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import {
 	formatMeetingStartTime,
 	calculateMeetingDuration,
@@ -70,7 +68,12 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 			if (!response.success) return;
 
 			const { meeting, residential_unit, snapshot } = response.data;
-			generarPdfLlamado(numero, meeting, residential_unit, snapshot);
+			// Import dinámico de jsPDF y jspdf-autotable
+			const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+				import('jspdf'),
+				import('jspdf-autotable')
+			]);
+			generarPdfLlamado(numero, meeting, residential_unit, snapshot, jsPDF, autoTable);
 		} catch (err) {
 			console.error('Error al generar PDF:', err);
 			toast.error('No se pudo generar el PDF del llamado.');
@@ -79,8 +82,8 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 		}
 	};
 
-	const generarPdfLlamado = (numero, meeting, residentialUnit, snapshot) => {
-		const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+	const generarPdfLlamado = (numero, meeting, residentialUnit, snapshot, JsPDF, AutoTable) => {
+		const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 		const nombreLlamado = NOMBRES_LLAMADO[numero - 1];
 		const timestamp = snapshot.timestamp
 			? new Date(snapshot.timestamp).toLocaleString('es-CO', {
@@ -136,7 +139,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 		doc.setTextColor(22, 101, 52); // green-800
 		doc.text(`Presentes (${snapshot.present?.length || 0})`, 14, 86);
 
-		autoTable(doc, {
+		AutoTable(doc, {
 			startY: 89,
 			head: [['#', 'Nombre', 'Apartamento', 'Quórum Base', 'Tipo']],
 			body: presentRows.length > 0 ? presentRows : [['', 'Sin presentes', '', '', '']],
@@ -161,7 +164,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 		doc.setTextColor(153, 27, 27); // red-800
 		doc.text(`Ausentes (${snapshot.absent?.length || 0})`, 14, ausentesStartY);
 
-		autoTable(doc, {
+		AutoTable(doc, {
 			startY: ausentesStartY + 3,
 			head: [['#', 'Nombre', 'Apartamento', 'Quórum Base', 'Observación']],
 			body: absentRows.length > 0 ? absentRows : [['', 'Sin ausentes', '', '', '']],
