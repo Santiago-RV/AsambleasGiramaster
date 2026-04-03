@@ -324,10 +324,9 @@
 
     /* Botón WhatsApp */
     .whatsapp-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
+      display: block;
+      width: 100%;
+      text-align: center;
       background: linear-gradient(135deg, #25D366, #128C7E);
       color: white !important;
       padding: 12px 20px;
@@ -394,6 +393,7 @@
       align-items: stretch;
       border-bottom: none;
       padding-top: 12px;
+      width: 100%;
     }
 
     .support-row.whatsapp-row .support-text {
@@ -468,7 +468,7 @@
       </div>
 
       <!-- Soporte Técnico -->
-      {% if support_name or support_email or support_phone %}
+      {% if support_name or support_email or support_phone or support_whatsapp %}
       <div class="support-section">
         <div class="support-header">
           <span class="support-icon">🛟</span>
@@ -505,11 +505,11 @@
         {% endif %}
 
         {% if support_whatsapp %}
+        <div class="support-row">
+          <span class="support-emoji">💬</span>
+          <span class="support-text">¿Necesitas ayuda más rápida?</span>
+        </div>
         <div class="support-row whatsapp-row">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span class="support-emoji">💬</span>
-            <span class="support-text">¿Necesitas ayuda más rápida?</span>
-          </div>
           <a href="{{support_whatsapp}}" class="whatsapp-button" target="_blank">
             Escribir en WhatsApp
           </a>
