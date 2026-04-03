@@ -4,7 +4,7 @@ import { Upload, Plus, UserPlus, Lightbulb, Mail, AlertTriangle, Headphones, Inf
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
 import MeetingsList from "../common/MeetingsList";
-import { showBulkDeleteWithLoading } from "../common/BulkDeleteConfirmModal";
+import { showBulkDeleteWithLoading, showBulkToggleAccessWithLoading } from "../common/BulkDeleteConfirmModal";
 import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
@@ -403,41 +403,6 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
     },
   });
 
-  // Mutación para toggle access masivo
-  const toggleAccessBulkMutation = useMutation({
-    mutationFn: async ({ userIds, enabled }) => {
-      return await CoownerService.toggleCoownersAccessBulk(userIds, enabled);
-    },
-    onSuccess: (response) => {
-      const { successful, failed, already_in_state, total_processed } = response.data;
-      queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
-
-      Swal.fire({
-        icon: successful === total_processed ? 'success' : 'warning',
-        title: 'Acceso Modificado',
-        html: `
-        <div class="text-left">
-          <div class="bg-blue-50 p-3 rounded-lg">
-            <p class="text-sm text-blue-700"><strong>Exitosos:</strong> ${successful}</p>
-            ${already_in_state > 0 ? `<p class="text-sm text-gray-700"><strong>Sin cambios:</strong> ${already_in_state}</p>` : ''}
-            ${failed > 0 ? `<p class="text-sm text-red-700"><strong>Fallidos:</strong> ${failed}</p>` : ''}
-          </div>
-        </div>
-      `,
-        confirmButtonColor: '#27ae60',
-        width: '500px',
-      });
-    },
-    onError: (error) => {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.response?.data?.message || 'Error al modificar acceso',
-        confirmButtonColor: '#e74c3c',
-      });
-    },
-  });
-
   // Función para reenviar credenciales individuales
   const handleResendCredentials = async (resident) => {
     const result = await Swal.fire({
@@ -557,20 +522,14 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       return;
     }
 
-    const action = enabled ? 'habilitar' : 'deshabilitar';
-    const result = await Swal.fire({
-      title: `¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso?`,
-      text: `Se ${action}á el acceso de ${selectedResidents.length} usuario(s)`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: enabled ? '#27ae60' : '#e74c3c',
-      confirmButtonText: `Sí, ${action}`,
-      cancelButtonText: 'Cancelar',
+    await showBulkToggleAccessWithLoading({
+      count: selectedResidents.length,
+      enabled,
+      togglePromise: () => CoownerService.toggleCoownersAccessBulk(selectedResidents, enabled),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
+      },
     });
-
-    if (result.isConfirmed) {
-      toggleAccessBulkMutation.mutate({ userIds: selectedResidents, enabled });
-    }
   };
 
   // Mostrar error
