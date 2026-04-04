@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Info, Loader2, CheckCircle, Clock, AlertCircle, Users, History, Award, Timer } from "lucide-react";
+import { FileText, Info, Loader2, CheckCircle, Clock, AlertCircle, Users, History, Award, Timer, ShieldOff } from "lucide-react";
 import Swal from 'sweetalert2';
 import { PollService } from '../../services/api/PollService';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
+import { DelegationService } from '../../services/api/DelegationService';
+import DelegatedPowersHeader from './DelegatedPowersHeader';
 
-export default function VotingPage() {
+export default function VotingPage({ onNavigate }) {
   const queryClient = useQueryClient();
   const [selectedOptions, setSelectedOptions] = useState({});
   const [textResponses, setTextResponses] = useState({});
@@ -47,6 +49,7 @@ export default function VotingPage() {
   });
 
   const residentialUnitId = userData?.residential_unit?.id;
+  const [delegationCountdown, setDelegationCountdown] = useState(10);
 
   const { data: meetingsData, isLoading: isLoadingMeetings } = useQuery({
     queryKey: ['residential-meetings', residentialUnitId],
@@ -78,6 +81,43 @@ export default function VotingPage() {
     enabled: !!meetingsData?.data && meetingsData.data.length > 0,
     refetchInterval: 5000,
   });
+
+  // Reunión activa para verificar delegación (cubre todos los estados posibles del backend)
+  const activeMeeting = meetingsData?.data?.find(m => {
+    const status = m.str_status?.toLowerCase();
+    return ['en curso', 'in progress', 'active', 'available', 'disponible'].includes(status);
+  }) ?? meetingsData?.data?.find(m => {
+    // Fallback: cualquier reunión que no esté finalizada ni programada
+    const status = m.str_status?.toLowerCase();
+    return !['completed', 'finalizada', 'cerrada', 'scheduled', 'programada'].includes(status);
+  });
+
+  const { data: delegationData } = useQuery({
+    queryKey: ['delegation-status', activeMeeting?.id],
+    queryFn: () => DelegationService.getUserDelegationStatus(activeMeeting.id),
+    enabled: !!activeMeeting?.id,
+    refetchInterval: 30000,
+  });
+
+  const hasDelegated = delegationData?.data?.has_delegated ?? false;
+  const delegatedTo = delegationData?.data?.delegated_to;
+
+  // Countdown de 10s cuando el usuario cedió su poder
+  useEffect(() => {
+    if (!hasDelegated) return;
+    setDelegationCountdown(10);
+    const interval = setInterval(() => {
+      setDelegationCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          onNavigate?.('meetings');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [hasDelegated]);
 
   const activePolls = allPollsData?.polls?.filter((poll) => {
     const isActive = poll.str_status === 'active' || poll.str_status === 'Activa';
@@ -165,8 +205,55 @@ export default function VotingPage() {
     );
   }
 
+  // Bloqueo por delegación de poder
+  if (hasDelegated) {
+    const delegatedName = delegatedTo
+      ? `${delegatedTo.str_firstname} ${delegatedTo.str_lastname}`.trim()
+      : 'otro copropietario';
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white rounded-2xl shadow-xl border-2 border-amber-300 p-10 max-w-lg w-full text-center">
+          <div className="flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full mx-auto mb-5">
+            <ShieldOff className="text-amber-500" size={40} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">Has cedido tu poder de voto</h2>
+          <p className="text-gray-600 mb-2">
+            Delegaste tu poder de votación a <span className="font-semibold text-gray-800">{delegatedName}</span>,
+            por lo que no puedes participar en las encuestas de esta reunión.
+          </p>
+          <p className="text-gray-600 mb-4">
+            Tu <strong>asistencia y votación</strong> en esta reunión dependen de la presencia de{' '}
+            <span className="font-semibold text-gray-800">{delegatedName}</span>.
+          </p>
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6">
+            Si tienes dudas o crees que esto es un error, por favor contáctate con el administrador de tu unidad residencial.
+          </p>
+          {/* Barra de progreso del countdown */}
+          <div className="mb-3">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-amber-400 h-2 rounded-full transition-all duration-1000"
+                style={{ width: `${(delegationCountdown / 10) * 100}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-gray-500">
+            Serás redirigido en <span className="font-bold text-amber-600">{delegationCountdown}</span> segundo{delegationCountdown !== 1 ? 's' : ''}...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const receivedDelegations = delegationData?.data?.received_delegations ?? [];
+
   return (
     <div className="space-y-6">
+      {/* Poderes recibidos: visible para quien recibió delegaciones */}
+      {activeMeeting?.id && receivedDelegations.length > 0 && (
+        <DelegatedPowersHeader meetingId={activeMeeting.id} />
+      )}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
         <div className="flex-1">

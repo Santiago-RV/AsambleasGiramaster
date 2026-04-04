@@ -1,6 +1,6 @@
 // CoDashboard.jsx - VERSIÓN CON HEADER DE PODERES DELEGADOS
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Video, FileText, User, LogOut, Building2, Hash, UserCircle, HandCoins, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import DelegatedPowersHeader from '../components/CoDashboard/DelegatedPowersHead
 import { UserService } from '../services/api/UserService';
 import { PollService } from '../services/api/PollService';
 import { MeetingService } from '../services/api/MeetingService';
+import { DelegationService } from '../services/api/DelegationService';
 
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');
@@ -121,6 +122,41 @@ export default function AppCopropietario() {
   // ✅ Extraer reunión activa
   const liveMeetings = liveMeetingsData?.data || [];
   const activeMeeting = liveMeetings.length > 0 ? liveMeetings[0] : null;
+
+  // Verificar si el usuario cedió su poder en la reunión activa
+  const hasShownDelegationAlertRef = useRef(false);
+
+  const { data: dashboardDelegationData } = useQuery({
+    queryKey: ['dashboard-delegation-status', activeMeeting?.id],
+    queryFn: () => DelegationService.getUserDelegationStatus(activeMeeting.id),
+    enabled: !!activeMeeting?.id && !isGuest,
+    refetchOnWindowFocus: false,
+  });
+
+  const dashboardHasDelegated = dashboardDelegationData?.data?.has_delegated ?? false;
+  const dashboardDelegatedTo = dashboardDelegationData?.data?.delegated_to;
+
+  useEffect(() => {
+    if (!dashboardHasDelegated || hasShownDelegationAlertRef.current) return;
+    hasShownDelegationAlertRef.current = true;
+
+    const delegatedName = dashboardDelegatedTo
+      ? `${dashboardDelegatedTo.str_firstname} ${dashboardDelegatedTo.str_lastname}`.trim()
+      : 'otro copropietario';
+
+    Swal.fire({
+      icon: 'warning',
+      title: 'Has cedido tu poder de voto',
+      html: `
+        <p>Delegaste tu poder de votación a <strong>${delegatedName}</strong>.</p>
+        <p style="margin-top:10px;">Tu <strong>asistencia y votación</strong> en esta reunión dependen de la presencia de <strong>${delegatedName}</strong>.</p>
+        <p style="margin-top:10px;font-size:0.85em;color:#6b7280;">Si tienes dudas o crees que esto es un error, por favor contáctate con el administrador de tu unidad residencial.</p>
+      `,
+      confirmButtonText: 'Entendido',
+      confirmButtonColor: '#d97706',
+      allowOutsideClick: false,
+    });
+  }, [dashboardHasDelegated, dashboardDelegatedTo]);
 
   // 🔍 DEBUGGING - Ver reuniones en vivo
   console.log('🔍 [CoDashboard] Estado de reuniones:', {
@@ -376,7 +412,7 @@ export default function AppCopropietario() {
         {section === 'meetings' && (
           <MeetingsPage residentialUnitId={residentialUnitId} />
         )}
-        {section === 'voting' && !isGuest && <VotingPage />}
+        {section === 'voting' && !isGuest && <VotingPage onNavigate={setSection} />}
         {section === 'powers' && !isGuest && <PowersViewPage />}
         {section === 'profile' && !isGuest && <ProfilePage />}
       </div>

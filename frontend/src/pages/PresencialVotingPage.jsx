@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, Clock, AlertCircle, Timer, MapPin, LogOut } from "lucide-react";
+import { Loader2, CheckCircle, Clock, AlertCircle, Timer, MapPin, LogOut, ShieldOff, UserPlus, Hash } from "lucide-react";
 import Swal from 'sweetalert2';
 import { PollService } from '../services/api/PollService';
 import { MeetingService } from '../services/api/MeetingService';
+import { DelegationService } from '../services/api/DelegationService';
 
 export default function PresencialVotingPage() {
   const { meetingId } = useParams();
@@ -17,6 +18,8 @@ export default function PresencialVotingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isVoting, setIsVoting] = useState(false);
   const [noPoll, setNoPoll] = useState(false);
+  const [delegationStatus, setDelegationStatus] = useState(null);
+  const [delegationCountdown, setDelegationCountdown] = useState(10);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -67,6 +70,14 @@ export default function PresencialVotingPage() {
           setPoll(null);
           setNoPoll(true);
         }
+
+        // Verificar si el usuario cedió su poder en esta reunión
+        try {
+          const delegationResponse = await DelegationService.getUserDelegationStatus(meetingId);
+          setDelegationStatus(delegationResponse?.data ?? delegationResponse ?? null);
+        } catch {
+          // Si falla la consulta de delegación, no bloquear
+        }
       } catch (error) {
         console.error('Error cargando datos:', error);
         setNoPoll(true);
@@ -77,6 +88,27 @@ export default function PresencialVotingPage() {
 
     fetchData();
   }, [meetingId]);
+
+  // Countdown para redirigir si cedió el poder
+  const hasDelegated = delegationStatus?.has_delegated ?? false;
+  const delegatedTo = delegationStatus?.delegated_to;
+  const receivedDelegations = delegationStatus?.received_delegations ?? [];
+
+  useEffect(() => {
+    if (!hasDelegated) return;
+    setDelegationCountdown(10);
+    const interval = setInterval(() => {
+      setDelegationCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleLogout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [hasDelegated]);
 
   useEffect(() => {
     if (noPoll && !isLoading) {
@@ -157,6 +189,45 @@ export default function PresencialVotingPage() {
     );
   }
 
+  // Bloqueo: el usuario cedió su poder en esta reunión
+  if (hasDelegated) {
+    const delegatedName = delegatedTo
+      ? `${delegatedTo.str_firstname} ${delegatedTo.str_lastname}`.trim()
+      : 'otro copropietario';
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 px-4">
+        <div className="bg-white rounded-2xl shadow-2xl border-2 border-amber-300 p-8 max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <ShieldOff className="text-amber-500" size={40} />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-3">Has cedido tu poder de voto</h1>
+          <p className="text-gray-600 mb-2">
+            Delegaste tu poder de votación a{' '}
+            <span className="font-semibold text-gray-800">{delegatedName}</span>.
+          </p>
+          <p className="text-gray-600 mb-4">
+            Tu <strong>asistencia y votación</strong> en esta reunión dependen de la presencia de{' '}
+            <span className="font-semibold text-gray-800">{delegatedName}</span>.
+          </p>
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6">
+            Si tienes dudas o crees que esto es un error, por favor contáctate con el administrador de tu unidad residencial.
+          </p>
+          <div className="mb-3">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-amber-400 h-2 rounded-full transition-all duration-1000"
+                style={{ width: `${(delegationCountdown / 10) * 100}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-gray-500">
+            Saliendo en <span className="font-bold text-amber-600">{delegationCountdown}</span> segundo{delegationCountdown !== 1 ? 's' : ''}...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (noPoll) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-100">
@@ -215,6 +286,40 @@ export default function PresencialVotingPage() {
             <div>
               <h2 className="font-semibold text-gray-800">{meeting.str_title}</h2>
               <p className="text-sm text-gray-500">Votación presencial</p>
+            </div>
+          </div>
+        )}
+
+        {/* Banner: poderes recibidos */}
+        {receivedDelegations.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md border-2 border-green-300 p-4 mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                <UserPlus className="text-white" size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-green-900">Poderes de Votación Recibidos</h3>
+                <p className="text-xs text-green-700">Tu voto contará con el peso acumulado de todos los poderes</p>
+              </div>
+            </div>
+            <div className="space-y-2 mb-3">
+              {receivedDelegations.map((d, i) => (
+                <div key={i} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+                  <span className="text-sm font-medium text-gray-800">
+                    {d.delegator.str_firstname} {d.delegator.str_lastname}
+                  </span>
+                  <div className="flex items-center gap-1 text-green-700">
+                    <Hash size={13} />
+                    <span className="text-sm font-bold">+{parseFloat(d.delegated_weight).toFixed(4)}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between bg-green-100 rounded-lg px-3 py-2 border-2 border-green-300">
+              <span className="text-sm font-semibold text-green-800">Tu coeficiente propio:</span>
+              <span className="text-sm font-bold text-green-700">{parseFloat(delegationStatus?.original_weight ?? 0).toFixed(4)}%</span>
+              <span className="text-sm font-semibold text-green-800">Peso total de votación:</span>
+              <span className="text-lg font-bold text-green-700">{parseFloat(delegationStatus?.total_weight ?? 0).toFixed(4)}%</span>
             </div>
           </div>
         )}
