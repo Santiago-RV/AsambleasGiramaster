@@ -469,8 +469,10 @@ const generateDelegationsPDF = async (data) => {
         doc.setTextColor(150);
         doc.text('No se registraron delegaciones de poderes en esta reunión.', 14, y);
     } else {
+        // A4 landscape: 297mm - 28mm márgenes = 269mm útiles
         autoTable(doc, {
             startY: y,
+            tableWidth: 269,
             head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Fecha y Hora']],
             body: delegations.map((d, idx) => [
                 idx + 1,
@@ -479,19 +481,17 @@ const generateDelegationsPDF = async (data) => {
                 typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
                 d.delegate.full_name,
                 fmtDate(d.delegated_at),
-                //d.notes || '—',
             ]),
             styles: { fontSize: 8, cellPadding: 3 },
             headStyles: { fillColor: [124, 58, 237], fontSize: 8, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [245, 243, 255] },
             columnStyles: {
-                0: { cellWidth: 8, halign: 'center' },
-                1: { cellWidth: 50 },
-                2: { cellWidth: 15, halign: 'center' },
-                3: { cellWidth: 22, halign: 'right' },
-                4: { cellWidth: 50 },
-                5: { cellWidth: 35 },
-                6: { cellWidth: 'auto' },
+                0: { cellWidth: 8,  halign: 'center' },
+                1: { cellWidth: 84 },
+                2: { cellWidth: 18, halign: 'center' },
+                3: { cellWidth: 24, halign: 'right' },
+                4: { cellWidth: 84 },
+                5: { cellWidth: 51 },
             },
             margin: { left: 14, right: 14 },
         });
