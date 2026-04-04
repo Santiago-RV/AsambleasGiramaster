@@ -194,7 +194,7 @@ const generateAttendancePDF = async (data) => {
     doc.text(`>> ASISTENTES (${attended.length})`, 14, y);
     y += 4;
 
-    AutoTable(doc, {
+    autoTable(doc, {
         startY: y,
         head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
         body: attended.map(p => [
@@ -235,7 +235,7 @@ const generateAttendancePDF = async (data) => {
         doc.text(`XX AUSENTES (${absent.length})`, 14, y);
         y += 4;
 
-        AutoTable(doc, {
+        autoTable(doc, {
             startY: y,
             head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
             body: absent.map(p => [
@@ -311,7 +311,7 @@ const generatePollsPDF = async (data) => {
         y += 14;
 
         // Info general encuesta
-        AutoTable(doc, {
+        autoTable(doc, {
             startY: y,
             head: [['Tipo', 'Estado', 'Total Votantes', 'Peso Total Votado']],
             body: [[poll.type, poll.status, poll.total_voters, poll.total_weight_voted.toFixed(4)]],
@@ -333,7 +333,7 @@ const generatePollsPDF = async (data) => {
             doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Peso: ${opt.votes_weight.toFixed(4)}`, 16, y);
             y += 4;
 
-            AutoTable(doc, {
+            autoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apto', 'Tipo', 'Fecha y Hora del Voto', 'Q. Real', 'Q. Cedido']],
                 body: opt.voters.map(v => [
@@ -380,7 +380,7 @@ const generatePollsPDF = async (data) => {
             doc.text(`Abstenciones: ${poll.abstentions.length}`, 16, y);
             y += 4;
 
-            AutoTable(doc, {
+            autoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apartamento', 'Peso']],
                 body: poll.abstentions.map(v => [v.full_name, v.apartment, v.voting_weight.toFixed(4)]),
@@ -401,7 +401,7 @@ const generatePollsPDF = async (data) => {
             doc.text(`No votaron: ${poll.non_voters.length}`, 16, y);
             y += 4;
 
-            AutoTable(doc, {
+            autoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apartamento', 'Q. Real']],
                 body: poll.non_voters.map(v => [v.full_name, v.apartment, parseFloat(v.quorum_base || 0).toFixed(4)]),
@@ -469,7 +469,7 @@ const generateDelegationsPDF = async (data) => {
         doc.setTextColor(150);
         doc.text('No se registraron delegaciones de poderes en esta reunión.', 14, y);
     } else {
-        AutoTable(doc, {
+        autoTable(doc, {
             startY: y,
             head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Fecha y Hora']],
             body: delegations.map((d, idx) => [
@@ -552,7 +552,7 @@ const generateLlamadoPDF = async (data) => {
     doc.text(`>> PRESENTES (${snapshot.present?.length || 0})`, 14, y);
     y += 4;
 
-    AutoTable(doc, {
+    autoTable(doc, {
         startY: y,
         head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Tipo']],
         body: (snapshot.present || []).map((u, i) => [
@@ -579,7 +579,7 @@ const generateLlamadoPDF = async (data) => {
     doc.text(`XX AUSENTES (${snapshot.absent?.length || 0})`, 14, y);
     y += 4;
 
-    AutoTable(doc, {
+    autoTable(doc, {
         startY: y,
         head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Observación']],
         body: (snapshot.absent || []).map((u, i) => [
@@ -638,7 +638,7 @@ const REPORT_TYPES = [
     {
         id: 'llamados',
         label: 'Informe de Llamados',
-        description: 'Snapshot de asistencia y % de quórum para cada uno de los 3 llamados de lista.',
+        description: 'Tomas de de asistencia y % de quórum para cada uno de los 3 llamados de lista.',
         icon: Bell,
         color: 'from-indigo-500 to-indigo-600',
         border: 'border-indigo-200',
