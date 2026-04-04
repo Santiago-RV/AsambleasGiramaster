@@ -93,8 +93,8 @@ class Settings(BaseSettings):
   SMTP_FROM_NAME: str = "GIRAMASTER - Sistema de Asambleas"
   EMAIL_ENABLED: bool = True  # Activar/desactivar envío de emails
   
-  # Generar Qrs
-  FRONTEND_URL: str = "http://localhost:5173"
+  # Generar Qrs - Ahora se recibe del frontend via request
+  FRONTEND_URL: str = ""
 
   class Config:
     env_file = ".env"

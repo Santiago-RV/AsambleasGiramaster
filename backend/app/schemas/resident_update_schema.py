@@ -12,6 +12,7 @@ class ResidentUpdate(BaseModel):
     password: Optional[str] = None
     is_active: Optional[bool] = None
     voting_weight: Optional[Decimal] = None
+    frontend_url: Optional[str] = None
     
     class Config:
         from_attributes = True

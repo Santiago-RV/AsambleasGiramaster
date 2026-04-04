@@ -109,7 +109,8 @@ class MeetingService:
         allow_delegates: bool,
         user_id: int,
         zoom_account_id: Optional[int] = None,
-        modality: str = "virtual"
+        modality: str = "virtual",
+        frontend_url: str = None
     ) -> MeetingModel:
         """
         Crea una nueva reunión y genera la reunión en Zoom usando la API real.
@@ -314,10 +315,8 @@ class MeetingService:
             task_id = None
             try:
                 import uuid
-                from app.core.config import settings
                 
                 task_id = str(uuid.uuid4())
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
                 
                 logger.info(f"📧 Creando tarea Celery para invitaciones de reunión ID {meeting_with_relations.id}")
                 

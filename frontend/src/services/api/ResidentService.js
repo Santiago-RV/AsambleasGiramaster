@@ -25,7 +25,7 @@ export class ResidentService {
         try {
             const response = await axiosInstance.post(
                 `/residential/units/${unitId}/residents`,
-                residentData
+                { ...residentData, frontend_url: window.location.origin }
             );
             return response.data;
         } catch (error) {

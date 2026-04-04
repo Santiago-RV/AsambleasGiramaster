@@ -14,6 +14,7 @@ class MeetingCreateRequest(BaseModel):
     bln_allow_delegates: bool = Field(default=True, description="Permite delegados")
     str_modality: str = Field(default="virtual", description="Modalidad de la reunion: 'virtual' o 'presencial'")
     int_zoom_account_id: Optional[int] = Field(None, ge=1, le=3, description="ID de la cuenta Zoom a usar (1-3). Si no se especifica, usa la primera disponible. Solo aplica para reuniones virtuales")
+    frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
 
 
 class ResidentialUnitBasic(BaseModel):

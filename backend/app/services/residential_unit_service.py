@@ -6,7 +6,7 @@ import pandas as pd
 import secrets
 import string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, and_
+from sqlalchemy import select, delete, and_, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 import logging
@@ -106,12 +106,9 @@ class ResidentialUnitService:
     async def delete_residential_unit(self, unit_id: int) -> None:
         """
         Elimina una unidad residencial y todos sus datos asociados.
-        Gracias a las relaciones en cascada, se eliminan automáticamente:
-        - Reuniones
-        - Encuestas
-        - Invitaciones
-        - Asistencias
-        - Tokens de auto-login
+        - Reuniones (y sus encuestas, invitaciones, asistencias, sesiones zoom, delegaciones)
+        - Usuarios residentes (y sus datos personales) que solo belong a esta unidad
+        - Usuarios que tienen otras unidades asignadas se conservan
         """
         try:
             # Obtener la unidad residencial
@@ -121,7 +118,48 @@ class ResidentialUnitService:
             
             unit_name = unit.str_name
             
-            # Eliminar la unidad (las relaciones en cascada eliminan los datos relacionados)
+            # 1. Obtener usuarios asociados ONLY a esta unidad
+            from sqlalchemy import select
+            from app.models.user_model import UserModel
+            from app.models.data_user_model import DataUserModel
+            from app.models.user_residential_unit_model import UserResidentialUnitModel
+            
+            # Buscar usuarios que solo tienen esta unidad asignada
+            # Subquery: usuarios con más de una unidad
+            subquery = (
+                select(UserResidentialUnitModel.int_user_id)
+                .group_by(UserResidentialUnitModel.int_user_id)
+                .having(func.count(UserResidentialUnitModel.int_residential_unit_id) > 1)
+            )
+            
+            # Usuarios que solo tienen esta unidad
+            users_only_this_unit = await self.db.execute(
+                select(UserModel)
+                .join(UserResidentialUnitModel, UserModel.id == UserResidentialUnitModel.int_user_id)
+                .where(UserResidentialUnitModel.int_residential_unit_id == unit_id)
+                .where(UserModel.id.not_in(subquery))
+            )
+            users_to_delete = users_only_this_unit.scalars().all()
+            
+            # Recopilar IDs para eliminar
+            user_ids_to_delete = [u.id for u in users_to_delete]
+            data_user_ids_to_delete = [u.int_data_user_id for u in users_to_delete]
+            
+            # 2. Eliminar usuarios que solo tienen esta unidad
+            if user_ids_to_delete:
+                await self.db.execute(
+                    delete(UserModel).where(UserModel.id.in_(user_ids_to_delete))
+                )
+                logger.info(f"🗑️ {len(user_ids_to_delete)} usuarios eliminados (solo belong a esta unidad)")
+            
+            # 3. Eliminar datos personales de esos usuarios
+            if data_user_ids_to_delete:
+                await self.db.execute(
+                    delete(DataUserModel).where(DataUserModel.id.in_(data_user_ids_to_delete))
+                )
+                logger.info(f"🗑️ {len(data_user_ids_to_delete)} registros de datos personales eliminados")
+            
+            # 4. Eliminar la unidad (cascade elimina el resto)
             await self.db.delete(unit)
             await self.db.commit()
             
@@ -708,7 +746,7 @@ class ResidentialUnitService:
                 details={"original_error": str(e)}
             )        
     
-    async def create_resident(self, unit_id: int, resident_data: dict):
+    async def create_resident(self, unit_id: int, resident_data: dict, frontend_url: str = None):
         """
         Crea un nuevo copropietario para una unidad residencial
         Inserta en 3 tablas: tbl_data_users, tbl_users, tbl_user_residential_units
@@ -853,7 +891,9 @@ class ResidentialUnitService:
                 username=username,
                 expiration_hours=24
             )
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+            if not frontend_url:
+                raise ValueError("frontend_url es requerido para generar URL de auto-login")
+            auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
             
             # 11. Enviar correo de bienvenida (opcional) - vía Celery
             from app.celery_app import celery_app

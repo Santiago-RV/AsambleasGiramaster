@@ -148,7 +148,8 @@ async def create_meeting(
             allow_delegates=meeting_data.bln_allow_delegates,
             user_id=1,  # TODO: Obtener el ID del usuario actual
             zoom_account_id=meeting_data.int_zoom_account_id,
-            modality=meeting_data.str_modality
+            modality=meeting_data.str_modality,
+            frontend_url=meeting_data.frontend_url
         )
 
         meeting_data_response = MeetingResponse.from_orm(new_meeting).dict()

@@ -275,7 +275,7 @@ async def delete_resident(
         )
         
 @router.post(
-    "/units/{unit_id}",
+    "/units/{unit_id}/residents",
     response_model=SuccessResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear copropietario",
@@ -284,7 +284,7 @@ async def delete_resident(
 @require_email_enabled
 async def create_resident(
     unit_id: int,
-    resident_data: ResidentUpdate,  # Puedes crear un schema específico ResidentCreate si lo prefieres
+    resident_data: ResidentUpdate,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -312,7 +312,8 @@ async def create_resident(
         # Crear el copropietario
         new_resident = await residential_unit_service.create_resident(
             unit_id=unit_id,
-            resident_data=resident_data.model_dump(exclude_unset=True, exclude_none=False)
+            resident_data=resident_data.model_dump(exclude_unset=True, exclude_none=False),
+            frontend_url=resident_data.frontend_url
         )
         
         return SuccessResponse(

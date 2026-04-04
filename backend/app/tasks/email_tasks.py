@@ -237,8 +237,9 @@ def send_bulk_emails(self, resident_ids: List[int], unit_id: int, task_id: str, 
                         meeting_id=None
                     )
                     
-                    url_to_use = frontend_url if frontend_url else getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-                    auto_login_url = f"{url_to_use}/auto-login/{auto_login_token}"
+                    if not frontend_url:
+                        raise ValueError("frontend_url es requerido para generar URL de auto-login")
+                    auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                     
                     html_content = template.render(
                         firstname=data_user.str_firstname,
@@ -483,8 +484,9 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                     
                     auto_login_url = None
                     if auto_login_token:
-                        url_to_use = frontend_url if frontend_url else getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-                        auto_login_url = f"{url_to_use}/auto-login/{auto_login_token}"
+                        if not frontend_url:
+                            raise ValueError("frontend_url es requerido para generar URL de auto-login")
+                        auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                     
                     html_content = template.render(
                         user_name=f"{data_user.str_firstname} {data_user.str_lastname}",
@@ -729,8 +731,9 @@ def send_welcome_email(
                 
                 auto_login_url = None
                 if auto_login_token:
-                    url_to_use = frontend_url or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-                    auto_login_url = f"{url_to_use}/auto-login/{auto_login_token}"
+                    if not frontend_url:
+                        raise ValueError("frontend_url es requerido para generar URL de auto-login")
+                    auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                 
                 template = Template(html_template)
                 voting_weight_percent = voting_weight * 100
@@ -858,8 +861,9 @@ def send_single_credential_email(
                     template_content = f.read()
                 
                 template = Template(template_content)
-                url_to_use = frontend_url or getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-                auto_login_url = f"{url_to_use}/auto-login/{auto_login_token}"
+                if not frontend_url:
+                    raise ValueError("frontend_url es requerido para generar URL de auto-login")
+                auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                 
                 # Obtener información de soporte técnico
                 from app.services.support_service import SupportService
