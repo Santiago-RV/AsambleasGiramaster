@@ -286,6 +286,50 @@ export default function AppAdmin() {
   // Mutación para crear reunión
   const createMeetingMutation = useMutation({
     mutationFn: async (data) => {
+      // Mostrar loader mientras se verifica el servicio de correo
+      Swal.fire({
+        title: 'Verificando servicio de correo...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // Timeout de 3 segundos
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+
+      try {
+        const statusCheck = await Promise.race([
+          ResidentService.checkCeleryStatus(),
+          timeoutPromise
+        ]);
+
+        Swal.close();
+
+        if (!statusCheck.data?.celery_available) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Servicio no disponible',
+            html: `
+              <div class="text-left">
+                <p class="mb-2">${statusCheck.data?.message || 'El servicio de correos no está disponible en este momento.'}</p>
+                <p class="text-sm text-gray-600 mb-2">Por favor, contacte a soporte técnico.</p>
+                <p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+              </div>
+            `,
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#e74c3c'
+          });
+          throw new Error('Celery no disponible');
+        }
+      } catch {
+        // Si falla por timeout o error, continuar con el envío
+        Swal.close();
+      }
+
       return await MeetingService.createMeeting(data);
     },
     onSuccess: async (response) => {
@@ -301,7 +345,16 @@ export default function AppAdmin() {
           pollProgressFn: () => ResidentService.getEmailTaskStatus(taskId),
           startProgress,
           updateProgress,
-          finishProgress
+          finishProgress,
+          timeoutMs: 120000,
+          onTimeout: () => {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Tiempo de espera agotado',
+              text: 'El servicio de correos tardó más de lo esperado. Por favor, contacte a soporte técnico.',
+              confirmButtonText: 'Aceptar'
+            });
+          }
         });
       } else {
         Swal.fire({

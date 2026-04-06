@@ -93,6 +93,49 @@ async def get_my_coowners(
         )
 
 
+# Celery status - debe estar ANTES de /{coowner_id} para evitar que se interprete como parámetro
+@router.get("/celery-status", response_model=SuccessResponse)
+async def check_celery_status(
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Verifica si el servicio de Celery está activo y disponible.
+    Por defecto asume disponible para no bloquear envios.
+    """
+    try:
+        from app.celery_app import celery_app
+        
+        inspect = celery_app.control.inspect(timeout=2.0)
+        
+        # Intentar ping
+        try:
+            ping_result = inspect.ping()
+            celery_available = ping_result is not None and len(ping_result) > 0
+        except:
+            # Si falla el ping, asumir disponible
+            celery_available = True
+        
+        return SuccessResponse(
+            success=True,
+            status_code=200,
+            data={
+                "celery_available": celery_available,
+                "message": "El servicio de correos está disponible" if celery_available else "El servicio de correos no está disponible"
+            }
+        )
+    except Exception as e:
+        # Si cualquier cosa falla, asumir disponible para no bloquear envios
+        logger.warning(f"Celery check failed: {str(e)}, asumiendo disponible")
+        return SuccessResponse(
+            success=True,
+            status_code=200,
+            data={
+                "celery_available": True,
+                "message": "Servicio disponible"
+            }
+        )
+
+
 @router.get(
     "/{coowner_id}",
     response_model=SuccessResponse,

@@ -176,6 +176,12 @@ export const useResidentOperations = (unitId) => {
 	const sendBulkCredentialsMutation = useMutation({
 		mutationFn: async (residentIds) => {
 			const ids = Array.isArray(residentIds) ? residentIds : [residentIds];
+			
+			const statusCheck = await ResidentService.checkCeleryStatus();
+			if (!statusCheck.data?.celery_available) {
+				throw new Error(statusCheck.data?.message || 'El servicio de correos no está disponible en este momento. Por favor, contacte a soporte técnico.');
+			}
+			
 			const response = await ResidentService.sendBulkCredentials(unitId, ids);
 			const taskId = response.data?.task_id;
 			const total = response.data?.total || ids.length;
@@ -186,7 +192,16 @@ export const useResidentOperations = (unitId) => {
 					pollProgressFn: () => ResidentService.getEmailTaskStatus(taskId),
 					startProgress,
 					updateProgress,
-					finishProgress
+					finishProgress,
+					timeoutMs: 120000,
+					onTimeout: () => {
+						Swal.fire({
+							icon: 'warning',
+							title: 'Tiempo de espera agotado',
+							text: 'El servicio de correos tardó más de lo esperado. Por favor, contacte a soporte técnico.',
+							confirmButtonText: 'Aceptar'
+						});
+					}
 				});
 
 				const finalStatus = await ResidentService.getEmailTaskStatus(taskId);
@@ -217,6 +232,50 @@ export const useResidentOperations = (unitId) => {
 
 	// Handler para reenviar credenciales individuales
 	const handleResendCredentials = async (resident) => {
+		// Mostrar loader mientras se verifica el servicio de correo
+		Swal.fire({
+			title: 'Verificando servicio de correo...',
+			allowOutsideClick: false,
+			showConfirmButton: false,
+			didOpen: () => {
+				Swal.showLoading();
+			}
+		});
+
+		// Timeout de 3 segundos
+		const timeoutPromise = new Promise((_, reject) =>
+			setTimeout(() => reject(new Error('Timeout de verificación')), 3000)
+		);
+
+		try {
+			const statusCheck = await Promise.race([
+				ResidentService.checkCeleryStatus(),
+				timeoutPromise
+			]);
+
+			if (!statusCheck.data?.celery_available) {
+				Swal.close();
+				Swal.fire({
+					icon: 'error',
+					title: 'Servicio no disponible',
+					html: `
+						<div class="text-left">
+							<p class="mb-2">${statusCheck.data?.message || 'El servicio de correos no está disponible en este momento.'}</p>
+							<p class="text-sm text-gray-600 mb-2">Por favor, contacte a soporte técnico.</p>
+							<p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+						</div>
+					`,
+					confirmButtonText: 'Aceptar',
+					confirmButtonColor: '#e74c3c',
+				});
+				return;
+			}
+		} catch (error) {
+			// Si falla por timeout o error, continuar con el envío
+			Swal.close();
+		}
+
+		// Continuar con el flujo normal de confirmación
 		const result = await Swal.fire({
 			title: '¿Reenviar credenciales?',
 			html: `

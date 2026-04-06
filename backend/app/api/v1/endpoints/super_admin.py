@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 import uuid
 import logging
 
 from app.auth.auth import get_current_user
-from app.schemas.responses_schema import SuccessResponse, ErrorResponse
+from app.schemas.responses_schema import SuccessResponse
 from app.services.user_service import UserService
 from app.services.residential_unit_service import ResidentialUnitService
 from app.services.dashboard_service import DashboardService
@@ -14,13 +13,7 @@ from app.core.database import get_db
 from app.core.exceptions import ServiceException
 from app.schemas.residential_unit_schema import AdministratorData, BulkToggleAccessRequest
 from app.schemas.email_notification_schema import BulkSendCredentialsRequest
-from app.schemas.dashboard_schema import DashboardDataResponse
-from app.schemas.active_meeting_schema import (
-    ActiveMeetingsListResponse,
-    ActiveMeetingDetailsSchema
-)
 from app.celery_app import celery_app
-from app.core.config import settings
 from app.api.v1.endpoints.decorators import require_email_enabled
 
 logger = logging.getLogger(__name__)
@@ -854,7 +847,7 @@ async def toggle_residents_access_bulk(
         elif already_in_state == len(request_data.user_ids):
             message = f"ℹ️ Todos los residentes ya estaban {action_text}"
         else:
-            message = f"❌ No se pudo modificar el acceso de ningún residente"
+            message = "❌ No se pudo modificar el acceso de ningún residente"
 
         logger.info(
             f"✅ Super Admin {current_user} modificó acceso masivo en unit_id={unit_id}: "

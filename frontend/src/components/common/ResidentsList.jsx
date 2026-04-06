@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { UsersIcon, MoreVertical, Mail, Send, Shield, Loader2, ShieldOff, UserCheck, UserX, Search, Info , QrCode, Calendar, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
 import Modal from './Modal';
 import ResidentDetailsModal from './ResidentDetailsModal';
-import { useQuery } from '@tanstack/react-query';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
+import { ResidentService } from '../../services/api/ResidentService';
 import logoGiramaster from '../../assets/logo-giramaster.jpeg';
 import HelpModalCopro from "./HelpModalCopro";
 import { showMeetingInvitationProgressModal } from '../common/BulkDeleteConfirmModal';
@@ -875,6 +876,50 @@ const ResidentsList = ({
 			return;
 		}
 
+		// Mostrar loader mientras se verifica el servicio de correo
+		Swal.fire({
+			title: 'Verificando servicio de correo...',
+			allowOutsideClick: false,
+			showConfirmButton: false,
+			didOpen: () => {
+				Swal.showLoading();
+			}
+		});
+
+		// Timeout de 3 segundos
+		const timeoutPromise = new Promise((_, reject) =>
+			setTimeout(() => reject(new Error('Timeout de verificación')), 3000)
+		);
+
+		try {
+			const statusCheck = await Promise.race([
+				ResidentService.checkCeleryStatus(),
+				timeoutPromise
+			]);
+
+			Swal.close();
+
+			if (!statusCheck.data?.celery_available) {
+				Swal.fire({
+					icon: 'error',
+					title: 'Servicio no disponible',
+					html: `
+						<div class="text-left">
+							<p class="mb-2">${statusCheck.data?.message || 'El servicio de correos no está disponible en este momento.'}</p>
+							<p class="text-sm text-gray-600 mb-2">Por favor, contacte a soporte técnico.</p>
+							<p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+						</div>
+					`,
+					confirmButtonText: 'Aceptar',
+					confirmButtonColor: '#e74c3c',
+				});
+				return;
+			}
+		} catch (error) {
+			// Si falla por timeout o error, continuar con el envío
+			Swal.close();
+		}
+
 		// Verificar si la reunión está en curso
 		const isEnCurso = selectedMeetingInfo?.str_status === 'En Curso';
 
@@ -932,7 +977,16 @@ const ResidentsList = ({
 						pollProgressFn: () => MeetingService.getInvitationTaskStatus(taskId),
 						startProgress,
 						updateProgress,
-						finishProgress: wrappedFinishProgress
+						finishProgress: wrappedFinishProgress,
+						timeoutMs: 120000,
+						onTimeout: () => {
+							Swal.fire({
+								icon: 'warning',
+								title: 'Tiempo de espera agotado',
+								text: 'El servicio de correos tardó más de lo esperado. Por favor, contacte a soporte técnico.',
+								confirmButtonText: 'Aceptar'
+							});
+						}
 					});
 					
 					setShowInviteModal(false);
