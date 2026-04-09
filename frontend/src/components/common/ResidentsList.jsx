@@ -13,6 +13,7 @@ import logoGiramaster from '../../assets/logo-giramaster.jpeg';
 import HelpModalCopro from "./HelpModalCopro";
 import { showMeetingInvitationProgressModal } from '../common/BulkDeleteConfirmModal';
 import { useProgressNotification } from '../../contexts/ProgressNotificationContext';
+import { formatDateLong, formatDateTime } from '../../utils/dateUtils';
 
 const SVG_ICONS = {
 	checkCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
@@ -270,13 +271,7 @@ const ResidentsList = ({
 		pdf.setFont('helvetica', 'normal');
 		pdf.setTextColor(127, 140, 141); // Gris claro
 
-		const currentDate = new Date().toLocaleDateString('es-ES', {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		});
+		const currentDate = formatDateTime(new Date());
 		pdf.text(`Generado el ${currentDate}`, pageWidth / 2, margin + 16, { align: 'center' });
 
 
@@ -1456,11 +1451,7 @@ const ResidentsList = ({
 												{resident.last_credential_notification ? (
 													<span className="text-green-700">
 														<CheckCircle size={12} className="inline mr-1" />
-														Credenciales enviadas: {new Date(resident.last_credential_notification.sent_at).toLocaleString('es-ES', {
-															day: '2-digit',
-															month: '2-digit',
-															year: 'numeric',
-														})}
+														Credenciales enviadas: {formatDateTime(resident.last_credential_notification.sent_at)}
 													</span>
 												) : (
 													<span className="text-amber-700">
@@ -1475,11 +1466,7 @@ const ResidentsList = ({
 													<span className="text-blue-700">
 														<Mail size={12} className="inline mr-1" />
 														Invitación: {resident.last_meeting_invitation.meeting_title?.substring(0, 20)}
-														{resident.last_meeting_invitation.meeting_title?.length > 20 ? '...' : ''} - {new Date(resident.last_meeting_invitation.sent_at).toLocaleString('es-ES', {
-															day: '2-digit',
-															month: '2-digit',
-															year: 'numeric'
-														})}
+														{resident.last_meeting_invitation.meeting_title?.length > 20 ? '...' : ''} - {formatDateLong(resident.last_meeting_invitation.sent_at)}
 													</span>
 												) : (
 													<span className="text-gray-500">
@@ -1657,7 +1644,7 @@ const ResidentsList = ({
 											) : (
 												<span className="text-blue-600 font-semibold">[PROGRAMADA]</span>
 											)}{' - '}
-											{new Date(meeting.dat_schedule_date).toLocaleString()}
+											{formatDateTime(meeting.dat_schedule_date)}
 										</option>
 									))}
 								</select>

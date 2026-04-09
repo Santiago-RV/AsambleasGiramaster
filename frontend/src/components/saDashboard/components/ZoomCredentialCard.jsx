@@ -1,5 +1,6 @@
 import React from 'react';
 import { Video, CheckCircle, AlertCircle, Settings, Edit, Trash2 } from 'lucide-react';
+import { formatDateLong } from '../../../utils/dateUtils';
 
 const ZoomCredentialCard = ({ isConfigured, lastUpdated, onConfigure, onDelete, isLoading, accountId, accountName }) => {
     return (
@@ -67,7 +68,7 @@ const ZoomCredentialCard = ({ isConfigured, lastUpdated, onConfigure, onDelete, 
                 {/* Informacion adicional */}
                 {lastUpdated && (
                     <p className="text-xs text-gray-500">
-                        Ultima actualizacion: {new Date(lastUpdated).toLocaleDateString('es-ES')}
+                        Ultima actualizacion: {formatDateLong(lastUpdated)}
                     </p>
                 )}
 

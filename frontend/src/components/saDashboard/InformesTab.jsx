@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText, Download, Calendar, TrendingUp, Users, Building2 } from 'lucide-react';
+import { formatDateLong } from '../../utils/dateUtils';
 
 const InformesTab = () => {
 	const reports = [
@@ -103,7 +104,7 @@ const InformesTab = () => {
 						>
 							<div>
 								<p className="font-semibold text-gray-800">
-									Reporte de Asambleas - {new Date().toLocaleDateString('es-ES')}
+									Reporte de Asambleas - {formatDateLong(new Date())}
 								</p>
 								<p className="text-sm text-gray-500">
 									Generado hace {item} hora{item > 1 ? 's' : ''}

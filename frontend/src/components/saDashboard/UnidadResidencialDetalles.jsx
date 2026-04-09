@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import { MeetingService } from '../../services/api/MeetingService';
+import { formatDateLong } from '../../utils/dateUtils';
 
 // Hooks personalizados
 import { useResidentialUnitData } from './hooks/useResidentialUnitData';
@@ -276,7 +277,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
         <div class="bg-blue-50 p-3 rounded-lg">
           <p class="font-semibold text-blue-800">${meeting.titulo}</p>
           <p class="text-sm text-blue-700 mt-1">
-            <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+            <strong>Fecha:</strong> ${formatDateLong(meeting.fecha)}
           </p>
         </div>
         <p class="text-xs text-gray-600 mt-3">

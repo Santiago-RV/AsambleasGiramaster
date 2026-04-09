@@ -32,6 +32,7 @@ import {
 	getAllLlamadosSA,
 	getLlamadoReportSA,
 } from '../../../services/api/ActiveMeetingService';
+import { formatDateLong, formatDateTime } from '../../../utils/dateUtils';
 
 const NOMBRES_LLAMADO = ['Primer', 'Segundo', 'Tercer'];
 
@@ -86,10 +87,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 		const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 		const nombreLlamado = NOMBRES_LLAMADO[numero - 1];
 		const timestamp = snapshot.timestamp
-			? new Date(snapshot.timestamp).toLocaleString('es-CO', {
-					day: '2-digit', month: 'long', year: 'numeric',
-					hour: '2-digit', minute: '2-digit', hour12: true,
-				})
+			? formatDateTime(snapshot.timestamp)
 			: '—';
 
 		// Encabezado
@@ -107,7 +105,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 		doc.setTextColor(50, 50, 50);
 		doc.setFontSize(9);
 		doc.text(`Reunión: ${meeting.title}`, 14, 38);
-		doc.text(`Fecha programada: ${meeting.scheduled_date ? new Date(meeting.scheduled_date).toLocaleDateString('es-CO') : '—'}`, 14, 44);
+		doc.text(`Fecha programada: ${meeting.scheduled_date ? formatDateLong(meeting.scheduled_date) : '—'}`, 14, 44);
 		doc.text(`Llamado registrado: ${timestamp}`, 14, 50);
 
 		// Resumen de quórum
@@ -181,7 +179,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 			doc.setFontSize(7);
 			doc.setTextColor(150, 150, 150);
 			doc.text(
-				`Generado el ${new Date().toLocaleString('es-CO')}  ·  Página ${i} de ${pageCount}`,
+				`Generado el ${formatDateTime(new Date())}  ·  Página ${i} de ${pageCount}`,
 				14,
 				doc.internal.pageSize.height - 8
 			);

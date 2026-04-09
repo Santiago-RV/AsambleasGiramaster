@@ -3,6 +3,7 @@ import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle,
 import QRScannerModal from './QRScannerModal';
 import { showDeleteMeetingConfirmModal } from './BulkDeleteConfirmModal';
 import Swal from 'sweetalert2';
+import { formatDateLong, formatTime } from '../../utils/dateUtils';
 
 /**
  * Componente unificado para mostrar lista de reuniones
@@ -370,11 +371,7 @@ const MeetingsList = ({
 													<div>
 														<p className="text-xs text-gray-500 font-medium">Fecha</p>
 														<p className="font-semibold text-gray-700">
-															{new Date(meeting.fecha).toLocaleDateString('es-ES', {
-																day: '2-digit',
-																month: 'short',
-																year: 'numeric'
-															})}
+															{formatDateLong(meeting.fecha)}
 														</p>
 													</div>
 												</div>
@@ -747,11 +744,7 @@ const MeetingsList = ({
 									<div className="space-y-2 mb-3">
 										<div className="flex items-center gap-2 text-sm text-gray-600">
 											<Calendar size={14} />
-											{new Date(reunion.fecha).toLocaleDateString('es-ES', {
-												day: '2-digit',
-												month: 'short',
-												year: 'numeric',
-											})}
+											{formatDateLong(reunion.fecha)}
 										</div>
 										<div className="flex items-center gap-2 text-sm text-gray-600">
 											<Clock size={14} />

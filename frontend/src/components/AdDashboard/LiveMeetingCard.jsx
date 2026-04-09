@@ -1,6 +1,7 @@
 import { Calendar, Clock, Users, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatDateLong, formatDateTime } from '../../utils/dateUtils';
 
 export default function LiveMeetingCard({ meeting, onClick }) {
   const getStatusBadge = () => {
@@ -51,7 +52,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
 
   const formatDate = (dateString) => {
     try {
-      return format(new Date(dateString), "d 'de' MMMM, yyyy", { locale: es });
+      return format(new Date(dateString), "d MMM yyyy", { locale: es });
     } catch {
       return dateString;
     }
@@ -59,7 +60,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
 
   const formatTime = (dateString) => {
     try {
-      return format(new Date(dateString), 'HH:mm', { locale: es });
+      return format(new Date(dateString), 'h:mm a', { locale: es });
     } catch {
       return dateString;
     }
@@ -106,7 +107,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
           <div className="flex items-center text-sm text-gray-600">
             <Users size={16} className="mr-2 text-green-500" />
             <span>
-              {meeting.int_total_confirmed || 0} confirmados de {meeting.int_total_invitated || 0}
+              {meeting.connected_users_count || 0} conectados de {meeting.int_total_invitated || 0} invitados
             </span>
           </div>
         </div>

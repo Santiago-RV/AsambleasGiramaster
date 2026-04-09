@@ -395,6 +395,11 @@ export class PollService {
     }
     return response.data;
   }
+
+  static async getPollVotes(pollId) {
+    const response = await axiosInstance.get(`/polls/${pollId}/votes`);
+    return response.data;
+  }
 }
 
 export default PollService;

@@ -1,4 +1,5 @@
 import axiosInstance from './axiosconfig';
+import { formatDateLong, formatDateTime } from '../../utils/dateUtils';
 
 /**
  * Servicio para gestionar las estadísticas del dashboard de SuperAdmin
@@ -49,11 +50,7 @@ export const formatRelativeTime = (dateString) => {
 	if (diffInHours < 24) return `Hace ${diffInHours} hora${diffInHours > 1 ? 's' : ''}`;
 	if (diffInDays < 7) return `Hace ${diffInDays} día${diffInDays > 1 ? 's' : ''}`;
 
-	return date.toLocaleDateString('es-ES', {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric'
-	});
+	return formatDateLong(date);
 };
 
 /**
@@ -63,15 +60,7 @@ export const formatRelativeTime = (dateString) => {
  */
 export const formatDate = (dateString) => {
 	if (!dateString) return 'Fecha no disponible';
-
-	const date = new Date(dateString);
-	return date.toLocaleDateString('es-ES', {
-		year: 'numeric',
-		month: 'long',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit'
-	});
+	return formatDateTime(dateString);
 };
 
 /**

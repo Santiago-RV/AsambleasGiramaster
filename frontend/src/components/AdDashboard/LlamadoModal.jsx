@@ -1,4 +1,5 @@
 import { X, Wifi, WifiOff, BarChart3, Clock, Users } from "lucide-react";
+import { formatDateTime } from '../../utils/dateUtils';
 
 /**
  * Modal que muestra los detalles de un llamado de asistencia.
@@ -11,16 +12,7 @@ const LlamadoModal = ({ isOpen, onClose, llamadoNumero, snapshot }) => {
   const absentCount = snapshot.absent?.length || 0;
   const totalCount = presentCount + absentCount;
 
-  const timestamp = snapshot.timestamp
-    ? new Date(snapshot.timestamp).toLocaleString("es-CO", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      })
-    : "—";
+  const timestamp = snapshot.timestamp ? formatDateTime(snapshot.timestamp) : "—";
 
   const nombreLlamado = ["Primer", "Segundo", "Tercer"][llamadoNumero - 1] || `${llamadoNumero}°`;
 

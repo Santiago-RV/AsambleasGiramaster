@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, MessageCircle, Printer, Download, Share2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { ResidentService } from '../../services/api/ResidentService';
+import { formatDateLong } from '../../utils/dateUtils';
 
 const QRCodeModal = ({ 
 	resident, 
@@ -250,7 +251,7 @@ const QRCodeModal = ({
 					
 					<div class="footer">
 						<p>Este código QR proporciona acceso directo y seguro al sistema.</p>
-						<p>Generado el: ${new Date().toLocaleDateString('es-ES')}</p>
+						<p>Generado el: ${formatDateLong(new Date())}</p>
 					</div>
 				</body>
 			</html>

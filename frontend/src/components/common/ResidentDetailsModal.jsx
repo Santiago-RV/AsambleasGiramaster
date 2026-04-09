@@ -1,20 +1,11 @@
 import React from 'react';
 import { User, Home, Mail, Phone, Percent, CheckCircle, XCircle, Send, Calendar, X } from 'lucide-react';
+import { formatDateTime } from '../../utils/dateUtils';
 
 const ResidentDetailsModal = ({ resident, isOpen, onClose }) => {
 	if (!isOpen || !resident) return null;
 
-	const formatDate = (dateString) => {
-		if (!dateString) return 'No disponible';
-		const date = new Date(dateString);
-		return date.toLocaleDateString('es-ES', {
-			day: '2-digit',
-			month: '2-digit',
-			year: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		});
-	};
+	const formatDate = (dateString) => dateString ? formatDateTime(dateString) : 'No disponible';
 
 	const formatVotingWeight = (weight) => {
 		if (weight === undefined || weight === null) return 'No disponible';

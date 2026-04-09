@@ -164,7 +164,7 @@ const ReunionEnCursoTab = () => {
             <div className="flex gap-4 mt-4 text-sm">
               <span className="flex items-center gap-1 text-lg">
                 <Users size={25} />
-                Invitados: {meeting.total_invited}
+                Copropietarios conectados: {meeting.connected_count} de {meeting.total_invited}
               </span>
               <span className="flex items-center gap-1 text-lg">
                 <BarChart3 size={25} />

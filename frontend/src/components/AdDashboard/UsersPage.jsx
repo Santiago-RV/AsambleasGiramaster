@@ -12,6 +12,7 @@ import CoownerService from "../../services/api/coownerService";
 import SupportModal from '../saDashboard/components/modals/SupportModal';
 import HelpModalAdmin from "./HelpModalAdmin";
 import { useProgressNotification } from '../../contexts/ProgressNotificationContext';
+import { formatDateLong, formatTime } from '../../utils/dateUtils';
 
 const SVG_ICONS = {
   lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
@@ -65,7 +66,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       estado: meeting.str_status || 'Programada',
       fecha: meeting.dat_schedule_date,
       hora: meeting.dat_schedule_date
-        ? new Date(meeting.dat_schedule_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        ? formatTime(meeting.dat_schedule_date)
         : 'No definida',
       asistentes: meeting.int_total_invitated || 0,
       fechaCompleta: new Date(meeting.dat_schedule_date),
@@ -281,7 +282,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
           <div class="${isPresencial ? 'bg-emerald-50' : 'bg-blue-50'} p-3 rounded-lg">
             <p class="font-semibold ${isPresencial ? 'text-emerald-800' : 'text-blue-800'}">${meeting.titulo}</p>
             <p class="text-sm ${isPresencial ? 'text-emerald-700' : 'text-blue-700'} mt-1">
-              <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+              <strong>Fecha:</strong> ${formatDateLong(meeting.fecha)}
             </p>
             <p class="text-sm ${isPresencial ? 'text-emerald-700' : 'text-blue-700'} mt-1">
               <strong>Modalidad:</strong> ${isPresencial ? 'Presencial' : 'Virtual'}
@@ -316,7 +317,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
         <div class="bg-blue-50 p-3 rounded-lg">
           <p class="font-semibold text-blue-800">${meeting.titulo}</p>
           <p class="text-sm text-blue-700 mt-1">
-            <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+            <strong>Fecha:</strong> ${formatDateLong(meeting.fecha)}
           </p>
         </div>
         <p class="text-xs text-gray-600 mt-3">

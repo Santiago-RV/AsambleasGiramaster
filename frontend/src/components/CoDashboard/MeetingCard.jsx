@@ -39,13 +39,13 @@ export default function MeetingCard({ meeting }) {
 	// Formatear fecha y hora
 	const formattedDate = format(
 		new Date(meeting.dat_schedule_date),
-		"d 'de' MMMM, yyyy",
+		"d MMM yyyy",
 		{ locale: es }
 	);
 
 	const formattedTime = format(
 		new Date(meeting.dat_schedule_date),
-		'HH:mm',
+		'h:mm a',
 		{ locale: es }
 	);
 

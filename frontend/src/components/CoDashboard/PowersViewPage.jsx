@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { HandCoins, Loader2, AlertCircle, UserMinus, UserPlus, Info, CheckCircle } from 'lucide-react';
 import { DelegationService } from '../../services/api/DelegationService';
 import { MeetingService } from '../../services/api/MeetingService';
+import { formatDateLong } from '../../utils/dateUtils';
 
 export default function PowersViewPage() {
   const [selectedMeeting, setSelectedMeeting] = useState(null);
@@ -120,11 +121,7 @@ export default function PowersViewPage() {
                         </h4>
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                           <span>
-                            {new Date(meeting.dat_schedule_date).toLocaleDateString('es-ES', {
-                              day: '2-digit',
-                              month: 'long',
-                              year: 'numeric'
-                            })}
+                            {formatDateLong(meeting.dat_schedule_date)}
                           </span>
                           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${
                             meeting.str_status === 'En vivo'

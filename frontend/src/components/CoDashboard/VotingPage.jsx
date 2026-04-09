@@ -7,6 +7,7 @@ import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import { DelegationService } from '../../services/api/DelegationService';
 import DelegatedPowersHeader from './DelegatedPowersHeader';
+import { formatDateTime } from '../../utils/dateUtils';
 
 export default function VotingPage({ onNavigate }) {
   const queryClient = useQueryClient();
@@ -190,12 +191,6 @@ export default function VotingPage({ onNavigate }) {
     } catch { /* Error manejado en onError */ }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'No disponible';
-    const date = new Date(dateString);
-    return date.toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  };
-
   if (isLoadingMeetings || isLoadingPolls) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -317,7 +312,7 @@ export default function VotingPage({ onNavigate }) {
                     <div className="flex flex-col items-end gap-2"><span className="px-3 py-1 bg-green-500 rounded-full text-xs font-semibold">ACTIVA</span>{hasVoted && <span className="px-3 py-1 bg-green-400 rounded-full text-xs font-semibold flex items-center gap-1"><CheckCircle size={14} />Votado</span>}</div>
                   </div>
                   <div className="flex items-center gap-4 mt-4 text-sm text-blue-100">
-                    <div className="flex items-center gap-1"><Clock size={16} />Iniciada: {formatDate(poll.dat_started_at)}</div>
+                    <div className="flex items-center gap-1"><Clock size={16} />Iniciada: {formatDateTime(poll.dat_started_at)}</div>
                     {poll.dat_ended_at && (
                       <div className="flex items-center gap-1">
                         <Timer size={16} />
@@ -377,7 +372,7 @@ export default function VotingPage({ onNavigate }) {
             {closedPolls.map((poll) => (
               <div key={poll.id} className="bg-gray-50 rounded-lg border border-gray-300 p-4">
                 <div className="flex items-start justify-between">
-                  <div><h4 className="font-semibold text-gray-800">{poll.str_title}</h4><p className="text-sm text-gray-600 mt-1">Finalizada: {formatDate(poll.dat_ended_at)}</p></div>
+                  <div><h4 className="font-semibold text-gray-800">{poll.str_title}</h4><p className="text-sm text-gray-600 mt-1">Finalizada: {formatDateTime(poll.dat_ended_at)}</p></div>
                   <span className="px-3 py-1 bg-gray-300 text-gray-700 rounded-full text-xs font-semibold">CERRADA</span>
                 </div>
               </div>

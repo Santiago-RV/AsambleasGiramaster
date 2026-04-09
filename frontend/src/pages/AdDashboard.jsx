@@ -8,6 +8,7 @@ import UsersPage from "../components/AdDashboard/UsersPage";
 import AssembliesPage from "../components/AdDashboard/AssembliesPage";
 import LivePage from "../components/AdDashboard/LivePage";
 import ReportsPage from "../components/AdDashboard/ReportsPage";
+import { formatDateLong } from "../utils/dateUtils";
 import PowersManagementPage from "../components/AdDashboard/PowersManagementPage";
 import ReunionEnCursoTab from "../components/AdDashboard/ReunionEnCursoTab";
 import PowerModal from "../components/AdDashboard/PowerModal";
@@ -570,7 +571,7 @@ export default function AppAdmin() {
           <div class="bg-blue-50 p-3 rounded-lg">
             <p class="font-semibold text-blue-800">${meeting.titulo}</p>
             <p class="text-sm text-blue-700 mt-1">
-              <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+              <strong>Fecha:</strong> ${formatDateLong(meeting.fecha)}
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">

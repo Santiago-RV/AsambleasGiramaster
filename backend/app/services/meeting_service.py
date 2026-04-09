@@ -1142,10 +1142,24 @@ class MeetingService:
                 "int_total_invitated": meeting.int_total_invitated or 0,
                 "quorum_total": 0.0,
                 "quorum_actual": 0.0,
+                "connected_users_count": 0,
             }
 
             # Solo calcular quórum para reuniones En Curso
             if meeting.str_status == "En Curso":
+                # Contar usuarios conectados
+                connected_count_query = await self.db.execute(
+                    select(func.count(MeetingInvitationModel.id)).where(
+                        and_(
+                            MeetingInvitationModel.int_meeting_id == meeting.id,
+                            MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                            MeetingInvitationModel.bln_actually_attended == True,
+                            MeetingInvitationModel.dat_left_at == None
+                        )
+                    )
+                )
+                meeting_dict["connected_users_count"] = connected_count_query.scalar() or 0
+
                 # Quórum total (todos los invitados menos ADMIN)
                 q_total = await self.db.execute(
                     select(func.coalesce(func.sum(MeetingInvitationModel.dec_voting_weight), 0)).where(

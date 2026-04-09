@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mail, CheckCircle, AlertCircle, Settings, Edit } from 'lucide-react';
+import { formatDateLong } from '../../../utils/dateUtils';
 
 const SMTPCredentialCard = ({ isConfigured, lastUpdated, onConfigure, isLoading }) => {
     return (
@@ -53,7 +54,7 @@ const SMTPCredentialCard = ({ isConfigured, lastUpdated, onConfigure, isLoading 
                 {/* Información adicional */}
                 {lastUpdated && (
                     <p className="text-xs text-gray-500">
-                        Última actualización: {new Date(lastUpdated).toLocaleDateString('es-ES')}
+                        Última actualización: {formatDateLong(lastUpdated)}
                     </p>
                 )}
 
