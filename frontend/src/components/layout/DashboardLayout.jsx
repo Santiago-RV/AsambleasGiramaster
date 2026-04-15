@@ -74,7 +74,7 @@ const DashboardLayout = ({
           min-w-0
           ml-0 md:ml-[280px]
           flex flex-col
-          overflow-hidden
+          overflow-auto
           ${className}
   `}
       >
@@ -89,7 +89,7 @@ const DashboardLayout = ({
             flex items-center
             px-4 md:px-6
             gap-3
-            overflow-hidden
+            overflow-auto
             flex-nowrap
           "
         >

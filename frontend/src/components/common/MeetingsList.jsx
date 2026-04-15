@@ -3,7 +3,7 @@ import { Calendar, Clock, Users, Plus, Video, CheckCircle, XCircle, AlertCircle,
 import QRScannerModal from './QRScannerModal';
 import { showDeleteMeetingConfirmModal } from './BulkDeleteConfirmModal';
 import Swal from 'sweetalert2';
-import { formatDateLong, formatTime } from '../../utils/dateUtils';
+import { formatDateLong } from '../../utils/dateUtils';
 
 /**
  * Componente unificado para mostrar lista de reuniones
@@ -30,7 +30,6 @@ const MeetingsList = ({
 
 	// Filtrar y ordenar reuniones
 	const { upcomingMeetings, pastMeetings } = useMemo(() => {
-		const now = new Date();
 		const upcoming = [];
 		const past = [];
 
@@ -56,20 +55,20 @@ const MeetingsList = ({
 			const now = new Date();
 			const aIsActive = a.estado?.toLowerCase() === 'en curso' || a.estado?.toLowerCase() === 'activa';
 			const bIsActive = b.estado?.toLowerCase() === 'en curso' || b.estado?.toLowerCase() === 'activa';
-			
+
 			// Primero: En Curso/Activa siempre primero
 			if (aIsActive && !bIsActive) return -1;
 			if (!aIsActive && bIsActive) return 1;
-			
+
 			// Segundo: Para programadas, las que ya pasaron su hora van al final
 			const aFecha = new Date(a.fechaCompleta);
 			const bFecha = new Date(b.fechaCompleta);
 			const aPasada = aFecha < now;
 			const bPasada = bFecha < now;
-			
+
 			if (!aPasada && bPasada) return -1;
 			if (aPasada && !bPasada) return 1;
-			
+
 			// Tercero: orden normal por fecha
 			return aFecha - bFecha;
 		});
@@ -197,32 +196,32 @@ const MeetingsList = ({
 								<Calendar className="text-white" size={24} />
 							</div>
 							<div>
-								<h2 className="text-xl font-bold text-white">Reuniones Virtuales</h2>
+								<h2 className="text-xl font-bold text-white">Reuniones</h2>
 								<p className="text-green-100 text-sm">
 									{upcomingMeetings.length} próxima{upcomingMeetings.length !== 1 ? 's' : ''} · {pastMeetings.length} pasada{pastMeetings.length !== 1 ? 's' : ''}
 								</p>
 							</div>
-					</div>
-					<div className="flex items-center gap-3">
-						{hasActivePresencialMeeting && (
+						</div>
+						<div className="flex items-center gap-3">
+							{hasActivePresencialMeeting && (
+								<button
+									onClick={() => setIsQRScannerOpen(true)}
+									className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 animate-pulse"
+								>
+									<ScanLine size={14} />
+									<span>Escanear QR</span>
+								</button>
+							)}
 							<button
-								onClick={() => setIsQRScannerOpen(true)}
-								className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 animate-pulse"
+								onClick={onCreateMeeting}
+								className="flex items-center gap-2 px-5 py-2.5 bg-white text-green-600 rounded-xl hover:bg-green-50 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
 							>
-								<ScanLine size={20} />
-								<span>Escanear QR</span>
+								<Plus size={14} />
+								<span>Nueva Reunión</span>
 							</button>
-						)}
-						<button
-							onClick={onCreateMeeting}
-							className="flex items-center gap-2 px-5 py-2.5 bg-white text-green-600 rounded-xl hover:bg-green-50 transition-all font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-						>
-							<Plus size={20} />
-							<span>Nueva Reunión</span>
-						</button>
+						</div>
 					</div>
 				</div>
-			</div>
 
 				{/* Tabs */}
 				<div className="border-b border-gray-200 bg-gray-50">
@@ -267,7 +266,7 @@ const MeetingsList = ({
 				</div>
 
 				{/* Content */}
-				<div className="p-6 max-h-[520px] overflow-y-auto">
+				<div className="p-4 md:p-6 max-h-[520px] overflow-y-auto">
 					{displayMeetings && displayMeetings.length > 0 ? (
 						<div className="grid gap-4">
 							{displayMeetings.map((meeting) => {
@@ -280,34 +279,63 @@ const MeetingsList = ({
 								return (
 									<div
 										key={meeting.id}
-										className={`relative border-2 ${statusInfo.borderClass} ${statusInfo.bgClass} rounded-xl p-5 hover:shadow-md transition-all group`}
+										className={`border-2 ${statusInfo.borderClass} ${statusInfo.bgClass} rounded-xl p-3 md:p-5 hover:shadow-md transition-all group overflow-hidden`}
 									>
-										{/* Status badge and time until */}
-										<div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-											<div className="flex gap-2">
-												{/* Botón editar */}
+										{/* Header: Título, Badges y Botones acción - TODO EN UNA FILA */}
+										<div className="flex flex-wrap items-center gap-2">
+											{/* Título */}
+											<h3 className="text-sm md:text-lg font-bold text-gray-800 group-hover:text-green-600 transition-colors truncate min-w-0 flex-shrink">
+												{meeting.titulo}
+											</h3>
+
+											{/* Badge modalidad */}
+											{meeting.str_modality === 'presencial' ? (
+												<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 shrink-0">
+													<MapPin size={10} />
+													<span className="hidden md:inline">Presencial</span>
+												</span>
+											) : (
+												<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 shrink-0">
+													<Video size={10} />
+													<span className="hidden md:inline">Virtual</span>
+												</span>
+											)}
+
+											{/* Badge estado */}
+											<span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${statusInfo.badgeClass}`}>
+												<StatusIcon size={10} />
+												<span className="hidden md:inline">{statusInfo.text}</span>
+											</span>
+
+											{/* Time until */}
+											{activeTab === 'upcoming' && isProgrammed && (
+												<span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
+													{timeUntil}
+												</span>
+											)}
+
+											{/* Botones de acción (editar/eliminar) - al final con ml-auto */}
+											<div className="flex gap-1 ml-auto shrink-0">
 												{onEditMeeting && (
 													<button
 														onClick={() => onEditMeeting(meeting)}
-														className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+														className="p-1.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
 														title="Editar reunión"
 													>
-														<Edit size={16} className="text-gray-600" />
+														<Edit size={14} className="text-gray-600" />
 													</button>
 												)}
-												
-												{/* Botón eliminar */}
 												{onDeleteMeeting && (
 													meeting.estado?.toLowerCase() === 'en curso' || meeting.estado?.toLowerCase() === 'activa' ? (
 														<button
 															disabled
-															className="p-2 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed opacity-50"
+															className="p-1.5 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed opacity-50"
 															title="No se puede eliminar una reunión en curso"
 														>
-															<Trash2 size={16} className="text-gray-400" />
+															<Trash2 size={14} className="text-gray-400" />
 														</button>
 													) : (
-												<button
+														<button
 															onClick={async () => {
 																await showDeleteMeetingConfirmModal({
 																	meetingTitle: meeting.titulo,
@@ -325,183 +353,144 @@ const MeetingsList = ({
 																	}
 																});
 															}}
-															className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all shadow-sm"
+															className="p-1.5 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all shadow-sm"
 															title="Eliminar reunión"
 														>
-															<Trash2 size={16} className="text-red-600" />
+															<Trash2 size={14} className="text-red-600" />
 														</button>
 													)
 												)}
 											</div>
-											<span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.badgeClass}`}>
-												<StatusIcon size={14} />
-												{statusInfo.text}
-											</span>
-											{activeTab === 'upcoming' && isProgrammed && (
-												<span className="text-xs font-medium text-gray-600 bg-white px-2 py-1 rounded-full">
-													{timeUntil}
-												</span>
-											)}
 										</div>
 
-										{/* Meeting info */}
-										<div className="pr-32">
-											<div className="flex items-center gap-2 mb-3">
-												<h3 className="text-lg font-bold text-gray-800 group-hover:text-green-600 transition-colors">
-													{meeting.titulo}
-												</h3>
-												{meeting.str_modality === 'presencial' ? (
-													<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-														<MapPin size={12} />
-														Presencial
-													</span>
-												) : (
-													<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-														<Video size={12} />
-														Virtual
-													</span>
-												)}
-											</div>
-
-											<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-												<div className="flex items-center gap-2 text-sm text-gray-600">
-													<div className="p-1.5 bg-white rounded-lg">
-														<Calendar size={16} className="text-green-600" />
-													</div>
-													<div>
-														<p className="text-xs text-gray-500 font-medium">Fecha</p>
-														<p className="font-semibold text-gray-700">
-															{formatDateLong(meeting.fecha)}
-														</p>
+										{/* Info: Fecha, Hora, Asistentes */}
+										<div className="mt-3 pt-3 border-t border-gray-200">
+											<div className="grid grid-cols-3 gap-2">
+												<div className="flex items-center gap-1.5 text-xs text-gray-600">
+													<div className="flex flex-col">
+														<span className="text-[10px] text-gray-400 uppercase tracking-wide hidden md:block">Fecha</span>
+														<div className="flex items-center gap-1">
+															<Calendar size={12} className="text-green-600 shrink-0" />
+															<span className="truncate">{formatDateLong(meeting.fecha)}</span>
+														</div>
 													</div>
 												</div>
-
-												<div className="flex items-center gap-2 text-sm text-gray-600">
-													<div className="p-1.5 bg-white rounded-lg">
-														<Clock size={16} className="text-indigo-600" />
-													</div>
-													<div>
-														<p className="text-xs text-gray-500 font-medium">Hora</p>
-														<p className="font-semibold text-gray-700">{meeting.hora}</p>
+												<div className="flex items-center gap-1.5 text-xs text-gray-600">
+													<div className="flex flex-col">
+														<span className="text-[10px] text-gray-400 uppercase tracking-wide hidden md:block">Hora</span>
+														<div className="flex items-center gap-1">
+															<Clock size={12} className="text-indigo-600 shrink-0" />
+															<span className="truncate">{meeting.hora}</span>
+														</div>
 													</div>
 												</div>
-
-												<div className="flex items-center gap-2 text-sm text-gray-600">
-													<div className="p-1.5 bg-white rounded-lg">
-														<Users size={16} className="text-blue-600" />
-													</div>
-													<div>
-														<p className="text-xs text-gray-500 font-medium">Asistentes</p>
-														<p className="font-semibold text-gray-700">{meeting.asistentes || 0}</p>
+												<div className="flex items-center gap-1.5 text-xs text-gray-600">
+													<div className="flex flex-col">
+														<span className="text-[10px] text-gray-400 uppercase tracking-wide hidden md:block">Invitados</span>
+														<div className="flex items-center gap-1">
+															<Users size={12} className="text-blue-600 shrink-0" />
+															<span>{meeting.asistentes || 0}</span>
+														</div>
 													</div>
 												</div>
 											</div>
 										</div>
 
 										{/* Actions for upcoming */}
-									{activeTab === 'upcoming' && (
-										<div className="mt-4 pt-4 border-t border-gray-200">
-											{meeting.str_modality === 'presencial' ? (
-												/* Reunion presencial */
-												<div>
-													{isActive ? (
-														<div className="flex gap-3">
-															<button
-																onClick={() => setIsQRScannerOpen(true)}
-																className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all font-semibold shadow-md hover:shadow-lg"
-															>
-																<ScanLine size={20} />
-																<span>Escanear QR de Asistencia</span>
-															</button>
-															{onEndMeeting && (
+										{activeTab === 'upcoming' && (
+											<div className="mt-3 pt-3 border-t border-gray-200">
+												<div className="flex flex-wrap gap-2">
+													{meeting.str_modality === 'presencial' ? (
+														isActive ? (
+															<>
 																<button
-																	onClick={() => onEndMeeting(meeting)}
-																	className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-md hover:shadow-lg"
-																	title="Finalizar reunion"
+																	onClick={() => setIsQRScannerOpen(true)}
+																	className="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all font-semibold"
 																>
-																	<StopCircle size={20} />
-																	<span>Finalizar</span>
-																</button>
-															)}
-														</div>
-													) : isProgrammed ? (
-														<div className="flex gap-3">
-															<button
-																onClick={() => onStartMeeting && onStartMeeting(meeting)}
-																className="flex-[2] flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-															>
-																<PlayCircle size={24} />
-																<span>Iniciar Reunion</span>
-															</button>
-															{onEndMeeting && (
-																<button
-																	onClick={() => onEndMeeting(meeting)}
-																	className="flex-1 flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-md hover:shadow-lg"
-																	title="Finalizar reunion sin iniciar"
-																>
-																	<StopCircle size={20} />
-																	<span>Finalizar</span>
-																</button>
-															)}
-														</div>
-													) : (
-														<div className="text-center py-2">
-															<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
-																<MapPin size={16} className="text-emerald-500" />
-																Reunion presencial
-															</p>
-														</div>
-													)}
-												</div>
-											) : (
-													<>
-														{/* Botones para reuniones EN CURSO (virtual) */}
-														{isActive && (
-															<div className="flex gap-3">
-																<button
-																	onClick={() => handleJoinMeeting && handleJoinMeeting(meeting)}
-																	className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all font-semibold shadow-md hover:shadow-lg"
-																>
-																	<Video size={20} />
-																	<span>Unirse a la Reunion</span>
+																	<ScanLine size={14} />
+																	<span>Escanear QR</span>
 																</button>
 																{onEndMeeting && (
 																	<button
 																		onClick={() => onEndMeeting(meeting)}
-																		className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-md hover:shadow-lg"
+																		className="flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all font-semibold"
 																		title="Finalizar reunion"
 																	>
-																		<StopCircle size={20} />
+																		<StopCircle size={14} />
 																		<span>Finalizar</span>
 																	</button>
 																)}
-															</div>
-														)}
-
-														{/* Botones para reuniones PROGRAMADAS (virtual) */}
-														{isProgrammed && (
-															<div className="flex gap-3">
+															</>
+														) : isProgrammed ? (
+															<>
 																<button
 																	onClick={() => onStartMeeting && onStartMeeting(meeting)}
-																	className="flex-[2] flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+																	className="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all font-bold"
 																>
-																	<PlayCircle size={24} />
-																	<span>Iniciar Reunion</span>
+																	<PlayCircle size={14} />
+																	<span>Iniciar</span>
 																</button>
 																{onEndMeeting && (
 																	<button
 																		onClick={() => onEndMeeting(meeting)}
-																		className="flex-1 flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-md hover:shadow-lg"
-																		title="Finalizar reunion sin iniciar"
+																		className="flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all font-semibold"
+																		title="Finalizar"
 																	>
-																		<StopCircle size={20} />
-																		<span>Finalizar</span>
+																		<StopCircle size={14} />
+																		<span>Fin</span>
 																	</button>
 																)}
+															</>
+														) : (
+															<div className="flex items-center gap-2 text-xs text-gray-500 py-2">
+																<MapPin size={12} className="text-emerald-500" />
+																<span>Reunion presencial</span>
 															</div>
-														)}
-													</>
-												)}
+														)
+													) : (
+														isActive ? (
+															<>
+																<button
+																	onClick={() => handleJoinMeeting && handleJoinMeeting(meeting)}
+																	className="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all font-semibold"
+																>
+																	<Video size={14} />
+																	<span>Unirse</span>
+																</button>
+																{onEndMeeting && (
+																	<button
+																		onClick={() => onEndMeeting(meeting)}
+																		className="flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all font-semibold"
+																		title="Finalizar reunion"
+																	>
+																		<StopCircle size={14} />
+																		<span>Fin</span>
+																	</button>
+																)}
+															</>
+														) : isProgrammed && (
+															<>
+																<button
+																	onClick={() => onStartMeeting && onStartMeeting(meeting)}
+																	className="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all font-bold"
+																>
+																	<PlayCircle size={14} />
+																	<span>Iniciar</span>
+																</button>
+																{onEndMeeting && (
+																	<button
+																		onClick={() => onEndMeeting(meeting)}
+																		className="flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all font-semibold"
+																		title="Finalizar"
+																	>
+																		<StopCircle size={14} />
+																		<span>Fin</span>
+																	</button>
+																)}
+															</>
+														)
+													)}
+												</div>
 											</div>
 										)}
 
@@ -559,11 +548,11 @@ const MeetingsList = ({
 						</div>
 					)}
 				</div>
-			{/* QR Scanner Modal - variante admin */}
-			<QRScannerModal
-				isOpen={isQRScannerOpen}
-				onClose={() => setIsQRScannerOpen(false)}
-			/>
+				{/* QR Scanner Modal - variante admin */}
+				<QRScannerModal
+					isOpen={isQRScannerOpen}
+					onClose={() => setIsQRScannerOpen(false)}
+				/>
 			</div>
 		);
 	}
@@ -575,27 +564,29 @@ const MeetingsList = ({
 			style={{ maxHeight: '700px' }}
 		>
 			{/* Header */}
-			<div className="p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-				<h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-					<Calendar size={24} />
-					Reuniones ({meetings?.length || 0})
+			<div className="p-4 md:p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 flex-shrink-0">
+				<h2 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2">
+					<Calendar size={20} className="md:size-6" />
+					<span className="truncate">Reuniones ({meetings?.length || 0})</span>
 				</h2>
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-2 flex-wrap">
 					{hasActivePresencialMeeting && (
 						<button
 							onClick={() => setIsQRScannerOpen(true)}
-							className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 hover:shadow-lg transition-all font-semibold text-sm animate-pulse"
+							className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 hover:shadow-lg transition-all font-semibold text-xs md:text-sm animate-pulse"
 						>
-							<ScanLine size={18} />
-							Escanear QR
+							<ScanLine size={14} className="md:size-[18px]" />
+							<span className="hidden sm:inline">Escanear QR</span>
+							<span className="sm:hidden">QR</span>
 						</button>
 					)}
 					<button
 						onClick={onCreateMeeting}
-						className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm"
+						className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold text-xs md:text-sm"
 					>
-						<Plus size={18} />
-						Nueva Reunión
+						<Plus size={14} className="md:size-[18px]" />
+						<span className="hidden sm:inline">Nueva Reunión</span>
+						<span className="sm:hidden">Nueva</span>
 					</button>
 				</div>
 			</div>
@@ -669,31 +660,35 @@ const MeetingsList = ({
 							return (
 								<div
 									key={reunion.id}
-									className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+									className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all overflow-hidden"
 								>
-									<div className="flex items-start justify-between mb-3">
-										<div className="flex-1">
-											<div className="flex items-center gap-2 mb-1">
-												<h3 className="font-bold text-gray-800">
-													{reunion.titulo}
-												</h3>
-												{reunion.str_modality === 'presencial' ? (
-													<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-														<MapPin size={10} />
-														Presencial
-													</span>
-												) : (
-													<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-														<Video size={10} />
-														Virtual
-													</span>
-												)}
-												<span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${statusInfo.badgeClassCompact}`}>
-													{reunion.estado}
-												</span>
-											</div>
-										</div>
-										<div className="flex gap-1">
+									{/* Fila 1: Solo Título */}
+									<h3 className="font-bold text-gray-800 truncate text-sm min-w-0 mb-2">
+										{reunion.titulo}
+									</h3>
+
+									{/* Fila 2: Badges y Botones de acción */}
+									<div className="flex flex-wrap items-center gap-2 mb-2">
+										{/* Badge modalidad */}
+										{reunion.str_modality === 'presencial' ? (
+											<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 shrink-0">
+												<MapPin size={10} />
+												<span className="hidden md:inline">Presencial</span>
+											</span>
+										) : (
+											<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 shrink-0">
+												<Video size={10} />
+												<span className="hidden md:inline">Virtual</span>
+											</span>
+										)}
+
+										{/* Badge estado */}
+										<span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${statusInfo.badgeClassCompact}`}>
+											{reunion.estado}
+										</span>
+
+										{/* Botones de acción */}
+										<div className="flex gap-1 ml-auto shrink-0">
 											{onEditMeeting && (
 												<button
 													onClick={() => onEditMeeting(reunion)}
@@ -741,144 +736,146 @@ const MeetingsList = ({
 										</div>
 									</div>
 
-									<div className="space-y-2 mb-3">
-										<div className="flex items-center gap-2 text-sm text-gray-600">
-											<Calendar size={14} />
-											{formatDateLong(reunion.fecha)}
+									{/* Info: Fecha, Hora, Asistentes */}
+									<div className="grid grid-cols-3 gap-2 text-xs text-gray-600 mb-3">
+										<div className="flex flex-col">
+											<span className="text-[10px] text-gray-400 uppercase tracking-wide hidden md:block">Fecha</span>
+											<div className="flex items-center gap-1">
+												<Calendar size={12} className="text-green-600 shrink-0" />
+												<span className="truncate">{formatDateLong(reunion.fecha)}</span>
+											</div>
 										</div>
-										<div className="flex items-center gap-2 text-sm text-gray-600">
-											<Clock size={14} />
-											{reunion.hora}
+										<div className="flex flex-col">
+											<span className="text-[10px] text-gray-400 uppercase tracking-wide hidden md:block">Hora</span>
+											<div className="flex items-center gap-1">
+												<Clock size={12} className="text-indigo-600 shrink-0" />
+												<span className="truncate">{reunion.hora}</span>
+											</div>
 										</div>
-										<div className="flex items-center gap-2 text-sm text-gray-600">
-											<Users size={14} />
-											{reunion.asistentes} asistentes
+										<div className="flex flex-col">
+											<span className="text-[10px] text-gray-400 uppercase tracking-wide hidden md:block">Invitados</span>
+											<div className="flex items-center gap-1">
+												<Users size={12} className="text-blue-600 shrink-0" />
+												<span>{reunion.asistentes}</span>
+											</div>
 										</div>
 									</div>
 
 									{/* Botones solo para proximas */}
 									{activeTab === 'upcoming' && (
-										<>
+										<div className="flex flex-wrap gap-2">
 											{reunion.str_modality === 'presencial' ? (
-												<div className="mt-2 border-t border-gray-100 pt-2">
-													{isActive ? (
-														<div className="flex gap-2">
-															<button
-																onClick={() => setIsQRScannerOpen(true)}
-																className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-semibold text-sm"
-															>
-																<ScanLine size={18} />
-																Escanear QR
-															</button>
-															{onEndMeeting && (
-																<button
-																	onClick={() => onEndMeeting(reunion)}
-																	className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
-																	title="Finalizar reunion"
-																>
-																	<StopCircle size={18} />
-																</button>
-															)}
-														</div>
-													) : isProgrammed ? (
-														<div className="flex gap-2">
-															<button
-																onClick={() => onStartMeeting && onStartMeeting(reunion)}
-																className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-bold text-base shadow-md hover:shadow-lg"
-															>
-																<PlayCircle size={22} />
-																Iniciar Reunion
-															</button>
-															{onEndMeeting && (
-																<button
-																	onClick={() => onEndMeeting(reunion)}
-																	className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
-																	title="Finalizar reunion sin iniciar"
-																>
-																	<StopCircle size={18} />
-																</button>
-															)}
-														</div>
-													) : (
-														<div className="text-center py-2">
-															<p className="text-sm text-gray-500 flex items-center justify-center gap-2">
-																<MapPin size={14} className="text-emerald-500" />
-																Reunion presencial
-															</p>
-														</div>
-													)}
-												</div>
-											) : (
-												<>
-													{/* Boton para reuniones en curso o activas */}
-													{isActive && (
-														<div className="flex gap-2">
-															<button
-																onClick={() => handleJoinMeeting && handleJoinMeeting(reunion)}
-																className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm"
-															>
-																<PlayCircle size={18} />
-																Unirse a la Reunion
-															</button>
-															{onEndMeeting && (
-																<button
-																	onClick={() => onEndMeeting(reunion)}
-																	className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
-																	title="Finalizar reunion"
-																>
-																	<StopCircle size={18} />
-																</button>
-															)}
-														</div>
-													)}
-
-													{/* Boton para reuniones programadas */}
-													{isProgrammed && (
-														<div className="flex gap-2">
-															<button
-																onClick={() => onStartMeeting && onStartMeeting(reunion)}
-																className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-bold text-base shadow-md hover:shadow-lg"
-															>
-																<PlayCircle size={22} />
-																Iniciar Reunion
-															</button>
-															{onEndMeeting && (
-																<button
-																	onClick={() => onEndMeeting(reunion)}
-																	className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm"
-																	title="Finalizar reunion sin iniciar"
-																>
-																	<StopCircle size={18} />
-																</button>
-															)}
-														</div>
-													)}
-												</>
-											)}
-										</>
-									)}
-
-									{/* Info para historial */}
-									{activeTab === 'past' && (
-										<div className="text-center py-2 text-sm text-gray-500 border-t border-gray-100 mt-2">
-											<p className="font-medium flex items-center justify-center gap-2">
-												{reunion.estado?.toLowerCase() === 'cancelada' ? (
+												isActive ? (
 													<>
-														<AlertTriangle size={14} className="text-red-500" />
-														<span>Cancelada</span>
+														<button
+															onClick={() => setIsQRScannerOpen(true)}
+															className="flex-1 min-w-[100px] flex items-center justify-center gap-1 px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-semibold text-xs"
+														>
+															<ScanLine size={12} />
+															<span>QR</span>
+														</button>
+														{onEndMeeting && (
+															<button
+																onClick={() => onEndMeeting(reunion)}
+																className="flex items-center justify-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-xs"
+																title="Finalizar"
+															>
+																<StopCircle size={12} />
+															</button>
+														)}
 													</>
-												) : reunion.estado?.toLowerCase() === 'completada' || reunion.estado?.toLowerCase() === 'finalizada' ? (
+												) : isProgrammed ? (
 													<>
-														<CheckCircle size={14} className="text-green-500" />
-														<span>Finalizada</span>
+														<button
+															onClick={() => onStartMeeting && onStartMeeting(reunion)}
+															className="flex-1 min-w-[100px] flex items-center justify-center gap-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-xs"
+														>
+															<PlayCircle size={12} />
+															<span>Iniciar</span>
+														</button>
+														{onEndMeeting && (
+															<button
+																onClick={() => onEndMeeting(reunion)}
+																className="flex items-center justify-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-xs"
+																title="Finalizar"
+															>
+																<StopCircle size={12} />
+															</button>
+														)}
 													</>
 												) : (
+													<div className="flex items-center gap-1 text-xs text-gray-500 py-1">
+														<MapPin size={10} />
+														<span>Presencial</span>
+													</div>
+												)
+											) : (
+												isActive ? (
 													<>
-														<Calendar size={14} className="text-gray-500" />
-														<span>Pasada</span>
+														<button
+															onClick={() => handleJoinMeeting && handleJoinMeeting(reunion)}
+															className="flex-1 min-w-[100px] flex items-center justify-center gap-1 px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-semibold text-xs"
+														>
+															<Video size={12} />
+															<span>Unirse</span>
+														</button>
+														{onEndMeeting && (
+															<button
+																onClick={() => onEndMeeting(reunion)}
+																className="flex items-center justify-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-xs"
+																title="Finalizar"
+															>
+																<StopCircle size={12} />
+															</button>
+														)}
 													</>
-												)}
-											</p>
+												) : isProgrammed && (
+													<>
+														<button
+															onClick={() => onStartMeeting && onStartMeeting(reunion)}
+															className="flex-1 min-w-[100px] flex items-center justify-center gap-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-xs"
+														>
+															<PlayCircle size={12} />
+															<span>Iniciar</span>
+														</button>
+														{onEndMeeting && (
+															<button
+																onClick={() => onEndMeeting(reunion)}
+																className="flex items-center justify-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-xs"
+																title="Finalizar"
+															>
+																<StopCircle size={12} />
+															</button>
+														)}
+													</>
+												)
+											)}
+										</div>
+									)}
+
+									{/* Past meeting info */}
+									{activeTab === 'past' && (
+										<div className="mt-3 pt-3 border-t border-gray-200">
+											<div className="text-center py-2 text-xs text-gray-500">
+												<p className="font-medium flex items-center justify-center gap-2">
+													{reunion.estado?.toLowerCase() === 'cancelada' ? (
+														<>
+															<AlertTriangle size={12} className="text-red-500" />
+															<span>Cancelada</span>
+														</>
+													) : reunion.estado?.toLowerCase() === 'completada' || reunion.estado?.toLowerCase() === 'finalizada' ? (
+														<>
+															<CheckCircle size={12} className="text-green-500" />
+															<span>Finalizada</span>
+														</>
+													) : (
+														<>
+															<Calendar size={12} className="text-gray-500" />
+															<span>Pasada</span>
+														</>
+													)}
+												</p>
+											</div>
 										</div>
 									)}
 								</div>
@@ -891,7 +888,7 @@ const MeetingsList = ({
 						<p className="text-gray-600 mb-2">
 							{activeTab === 'upcoming' ? 'No hay reuniones programadas' : 'No hay reuniones en el historial'}
 						</p>
-						{activeTab === 'upcoming' && (
+						{activeTab === 'upcoming' && onCreateMeeting && (
 							<button
 								onClick={onCreateMeeting}
 								className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#3498db] text-white rounded-lg hover:bg-[#2980b9] transition-colors font-semibold text-sm"
@@ -903,7 +900,6 @@ const MeetingsList = ({
 					</div>
 				)}
 			</div>
-			{/* QR Scanner Modal - variante compact */}
 			<QRScannerModal
 				isOpen={isQRScannerOpen}
 				onClose={() => setIsQRScannerOpen(false)}

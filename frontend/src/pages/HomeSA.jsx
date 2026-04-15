@@ -226,35 +226,35 @@ const HomeSA = () => {
 	// ==========================================
 
 	const headerContent = (
-		<div className="px-8 py-4 flex justify-between items-center">
-			<div className="flex items-center gap-4">
-				<h1 className="text-2xl font-bold text-gray-800">
+		<div className="px-4 md:px-8 py-4 flex justify-between items-center gap-4">
+			<div className="flex items-center gap-4 min-w-0">
+				<h1 className="text-lg md:text-2xl font-bold text-gray-800 truncate">
 					Sistema de Asambleas
 				</h1>
 			</div>
 
-			<div className="flex items-center gap-4">
+			<div className="flex items-center gap-2 md:gap-4 shrink-0">
 				{/* Configuración */}
 				<button
 					onClick={handleOpenSettings}
-					className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+					className="p-2 md:p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
 					title="Configuración"
 				>
-					<Settings size={20} />
+					<Settings size={18} />
 				</button>
 
 				{/* Separador */}
-				<div className="w-px h-8 bg-gray-300"></div>
+				<div className="hidden sm:block w-px h-8 bg-gray-300"></div>
 
 				{/* Perfil de usuario */}
-				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-full bg-linear-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md">
+				<div className="flex items-center gap-2 md:gap-3">
+					<div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-linear-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white font-bold shadow-md text-sm md:text-base">
 						{user?.name
 							? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 							: user?.role?.charAt(0).toUpperCase() || 'U'
 						}
 					</div>
-					<div className="hidden md:flex flex-col">
+					<div className="hidden lg:flex flex-col">
 						<span className="text-sm font-semibold text-gray-800">
 							{user?.name || user?.role || 'Usuario'}
 						</span>
@@ -268,10 +268,10 @@ const HomeSA = () => {
 				{/* Cerrar sesión */}
 				<button
 					onClick={logout}
-					className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+					className="p-2 md:p-3 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
 					title="Cerrar sesión"
 				>
-					<LogOut size={20} />
+					<LogOut size={18} />
 				</button>
 			</div>
 		</div>

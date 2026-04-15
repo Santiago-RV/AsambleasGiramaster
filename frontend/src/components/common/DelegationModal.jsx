@@ -240,8 +240,8 @@ export const DelegationModal = ({ isOpen, onClose, meetingId, onSuccess }) => {
           )}
         </div>
 
-        {/* Grid de tres columnas */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* Grid de tres columnas - responsive */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
           {/* COLUMNA 1: RECEPTOR (Izquierda) */}
           <div className="border border-gray-200 rounded-lg">

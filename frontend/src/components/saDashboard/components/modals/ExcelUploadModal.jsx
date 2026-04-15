@@ -248,7 +248,7 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 			isOpen={isOpen}
 			onClose={handleClose}
 			title="Cargar Copropietarios desde Excel"
-			size="lg"
+			size="md"
 		>
 			<div className="space-y-6">
 				{/* Información sobre formato */}

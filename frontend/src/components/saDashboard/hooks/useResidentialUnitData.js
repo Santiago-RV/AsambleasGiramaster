@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ResidentialUnitService } from '../../../services/api/ResidentialUnitService';
 import { MeetingService } from '../../../services/api/MeetingService';
+import { formatDateLong, formatTime } from '../../../utils/dateUtils';
 
 export const useResidentialUnitData = (unitId) => {
 	// Obtener datos de la unidad residencial
@@ -65,18 +66,13 @@ export const useResidentialUnitData = (unitId) => {
 						fechaObj = new Date();
 					}
 					
-					const fechaStr = fechaObj.toISOString().split('T')[0];
-					
 					return {
 						...reunion,
 						id: reunion.id,
 						titulo: reunion.str_title,
-						fecha: fechaStr,
+						fecha: formatDateLong(fechaObj),
 						fechaCompleta: fechaObj,
-						hora: fechaObj.toLocaleTimeString('es-ES', {
-							hour: '2-digit',
-							minute: '2-digit',
-						}),
+						hora: formatTime(fechaObj),
 						asistentes: reunion.int_total_invitated || 0,
 						estado: reunion.str_status || 'Programada',
 						tipo: reunion.str_meeting_type,

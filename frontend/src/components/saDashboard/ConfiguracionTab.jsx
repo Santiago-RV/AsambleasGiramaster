@@ -208,26 +208,26 @@ const ConfiguracionTab = ({ onBack }) => {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center gap-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+                <div className="flex items-center gap-2 md:gap-4">
                     {onBack && (
                         <button
                             onClick={onBack}
-                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
                             title="Volver"
                         >
-                            <ArrowLeft size={24} className="text-gray-600" />
+                            <ArrowLeft size={20} className="text-gray-600 md:size-6" />
                         </button>
                     )}
-                    <div className="flex items-center gap-3">
-                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shadow-lg">
-                            <Settings size={28} />
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                        <div className="w-10 h-10 md:w-14 md:h-14 rounded-lg md:rounded-xl bg-gradient-to-br from-[#3498db] to-[#2980b9] flex items-center justify-center text-white shadow-lg shrink-0">
+                            <Settings size={20} className="md:size-7" />
                         </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-800">
+                        <div className="min-w-0">
+                            <h1 className="text-xl md:text-3xl font-bold text-gray-800 truncate">
                                 Configuracion
                             </h1>
-                            <p className="text-gray-600 mt-1">
+                            <p className="text-gray-600 mt-1 text-sm md:text-base hidden sm:block">
                                 Gestiona las integraciones y configuraciones del sistema
                             </p>
                         </div>
@@ -237,11 +237,11 @@ const ConfiguracionTab = ({ onBack }) => {
 
             {/* Seccion de Integraciones */}
             <div>
-                <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                <div className="mb-4 md:mb-6">
+                    <h2 className="text-lg md:text-2xl font-bold text-gray-800 mb-2">
                         Integraciones
                     </h2>
-                    <p className="text-gray-600">
+                    <p className="text-gray-600 text-sm md:text-base">
                         Configura las integraciones de terceros para extender la funcionalidad del sistema
                     </p>
                 </div>

@@ -44,16 +44,16 @@ const ResidentDetailsModal = ({ resident, isOpen, onClose }) => {
 	);
 
 	return (
-		<div className="fixed inset-0 z-[9999] overflow-y-auto" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+		<div className="fixed inset-0 z-[9999] overflow-y-auto flex items-center justify-center p-4">
 			{/* Overlay */}
 			<div
-				style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }}
+				className="fixed inset-0 bg-black/50"
 				onClick={onClose}
 			></div>
 
 			{/* Modal Container */}
 			<div
-				style={{ position: 'relative', backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', width: '100%', maxWidth: '42rem', maxHeight: '90vh', overflow: 'auto', margin: '1rem' }}
+				className="relative bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto"
 				onClick={(e) => e.stopPropagation()}
 			>
 				{/* Header */}

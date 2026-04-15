@@ -247,9 +247,9 @@ export default function AppCopropietario() {
           </h1>
         </div>
 
-        {/* Información del copropietario y unidad CON BOTÓN DE LOGOUT */}
+        {/* Información del copropietario y unidad */}
         {!isGuest && !isLoadingUser && (
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 gap-4">
             {/* Contenedor izquierdo: Info del usuario y unidad */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
               {/* Información del Usuario */}
@@ -298,10 +298,10 @@ export default function AppCopropietario() {
               </div>
             </div>
 
-            {/* BOTÓN DE LOGOUT SOLO ICONO A LA DERECHA */}
+            {/* BOTÓN DE LOGOUT */}
             <button
               onClick={handleLogout}
-              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm self-end md:self-auto"
+              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-md shrink-0"
               title="Cerrar Sesión"
             >
               <LogOut size={20} />
