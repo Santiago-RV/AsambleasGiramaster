@@ -8,6 +8,7 @@ import UsersPage from "../components/AdDashboard/UsersPage";
 import AssembliesPage from "../components/AdDashboard/AssembliesPage";
 import LivePage from "../components/AdDashboard/LivePage";
 import ReportsPage from "../components/AdDashboard/ReportsPage";
+import { formatDateLong } from "../utils/dateUtils";
 import PowersManagementPage from "../components/AdDashboard/PowersManagementPage";
 import ReunionEnCursoTab from "../components/AdDashboard/ReunionEnCursoTab";
 import PowerModal from "../components/AdDashboard/PowerModal";
@@ -286,6 +287,50 @@ export default function AppAdmin() {
   // Mutación para crear reunión
   const createMeetingMutation = useMutation({
     mutationFn: async (data) => {
+      // Mostrar loader mientras se verifica el servicio de correo
+      Swal.fire({
+        title: 'Verificando servicio de correo...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // Timeout de 3 segundos
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+
+      try {
+        const statusCheck = await Promise.race([
+          ResidentService.checkCeleryStatus(),
+          timeoutPromise
+        ]);
+
+        Swal.close();
+
+        if (!statusCheck.data?.celery_available) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Servicio no disponible',
+            html: `
+              <div class="text-left">
+                <p class="mb-2">${statusCheck.data?.message || 'El servicio de correos no está disponible en este momento.'}</p>
+                <p class="text-sm text-gray-600 mb-2">Por favor, contacte a soporte técnico.</p>
+                <p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+              </div>
+            `,
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#e74c3c'
+          });
+          throw new Error('Celery no disponible');
+        }
+      } catch {
+        // Si falla por timeout o error, continuar con el envío
+        Swal.close();
+      }
+
       return await MeetingService.createMeeting(data);
     },
     onSuccess: async (response) => {
@@ -301,7 +346,16 @@ export default function AppAdmin() {
           pollProgressFn: () => ResidentService.getEmailTaskStatus(taskId),
           startProgress,
           updateProgress,
-          finishProgress
+          finishProgress,
+          timeoutMs: 120000,
+          onTimeout: () => {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Tiempo de espera agotado',
+              text: 'El servicio de correos tardó más de lo esperado. Por favor, contacte a soporte técnico.',
+              confirmButtonText: 'Aceptar'
+            });
+          }
         });
       } else {
         Swal.fire({
@@ -517,7 +571,7 @@ export default function AppAdmin() {
           <div class="bg-blue-50 p-3 rounded-lg">
             <p class="font-semibold text-blue-800">${meeting.titulo}</p>
             <p class="text-sm text-blue-700 mt-1">
-              <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+              <strong>Fecha:</strong> ${formatDateLong(meeting.fecha)}
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">
@@ -575,22 +629,22 @@ export default function AppAdmin() {
 
   // Header personalizado con usuario y cerrar sesión
   const headerContent = (
-    <div className="px-8 py-4 flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">
+    <div className="px-4 md:px-8 py-4 flex justify-between items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0">
+        <h1 className="text-lg md:text-2xl font-bold text-gray-800 truncate">
           {sectionTitles[section]}
         </h1>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4 shrink-0">
         {/* Separador */}
-        <div className="w-px h-8 bg-gray-300"></div>
+        <div className="hidden sm:block w-px h-8 bg-gray-300"></div>
 
         {/* Perfil de usuario */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
 
           {/* Avatar (siempre visible) */}
-          <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#059669] to-[#10b981] flex items-center justify-center text-white font-bold shadow-md">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-linear-to-br from-[#059669] to-[#10b981] flex items-center justify-center text-white font-bold shadow-md text-sm md:text-base">
             {user?.name
               ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
               : user?.role?.charAt(0).toUpperCase() || 'A'
@@ -598,7 +652,7 @@ export default function AppAdmin() {
           </div>
 
           {/* Nombre + correo (solo desktop) */}
-          <div className="hidden md:flex flex-col">
+          <div className="hidden lg:flex flex-col">
             <span className="text-sm font-semibold text-gray-800">
               {user?.name || user?.role || 'Administrador'}
             </span>
@@ -612,10 +666,10 @@ export default function AppAdmin() {
         {/* Cerrar sesión */}
         <button
           onClick={logout}
-          className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          className="p-2 md:p-3 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           title="Cerrar sesión"
         >
-          <LogOut size={20} />
+          <LogOut size={18} />
         </button>
       </div>
     </div>

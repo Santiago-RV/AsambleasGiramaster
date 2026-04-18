@@ -1,4 +1,5 @@
 import axiosInstance from './axiosconfig';
+import { formatDateTime } from '../../utils/dateUtils';
 
 /**
  * Servicio para gestionar reuniones activas del SuperAdmin
@@ -75,16 +76,7 @@ export const calculateAttendancePercentage = (
  */
 export const formatMeetingStartTime = (dateISO) => {
 	if (!dateISO) return 'No iniciada';
-
-	const date = new Date(dateISO);
-	return date.toLocaleString('es-ES', {
-		day: '2-digit',
-		month: 'short',
-		year: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit',
-		hour12: true,
-	});
+	return formatDateTime(dateISO);
 };
 
 /**

@@ -1,6 +1,7 @@
 import { Calendar, Clock, Users, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatDateLong, formatDateTime } from '../../utils/dateUtils';
 
 export default function LiveMeetingCard({ meeting, onClick }) {
   const getStatusBadge = () => {
@@ -51,7 +52,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
 
   const formatDate = (dateString) => {
     try {
-      return format(new Date(dateString), "d 'de' MMMM, yyyy", { locale: es });
+      return format(new Date(dateString), "d MMM yyyy", { locale: es });
     } catch {
       return dateString;
     }
@@ -59,7 +60,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
 
   const formatTime = (dateString) => {
     try {
-      return format(new Date(dateString), 'HH:mm', { locale: es });
+      return format(new Date(dateString), 'h:mm a', { locale: es });
     } catch {
       return dateString;
     }
@@ -70,16 +71,16 @@ export default function LiveMeetingCard({ meeting, onClick }) {
       onClick={onClick}
       className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-200 hover:border-green-400 overflow-hidden group"
     >
-      <div className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600 transition-colors">
+      <div className="p-4 md:p-6">
+        <div className="flex items-start justify-between gap-2 mb-4">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600 transition-colors truncate">
               {meeting.str_title}
             </h3>
-            {getStatusBadge()}
+            <div className="flex-shrink-0">{getStatusBadge()}</div>
           </div>
-          <div className="p-3 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-            <Video className="text-green-600" size={24} />
+          <div className="p-2 md:p-3 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors shrink-0">
+            <Video className="text-green-600 md:size-6" size={20} />
           </div>
         </div>
 
@@ -90,30 +91,30 @@ export default function LiveMeetingCard({ meeting, onClick }) {
         )}
 
         <div className="space-y-2">
-          <div className="flex items-center text-sm text-gray-600">
-            <Calendar size={16} className="mr-2 text-green-500" />
+          <div className="flex items-center text-xs md:text-sm text-gray-600">
+            <Calendar size={14} className="mr-2 text-green-500 md:size-4" />
             <span>{formatDate(meeting.dat_schedule_date)}</span>
           </div>
 
-          <div className="flex items-center text-sm text-gray-600">
-            <Clock size={16} className="mr-2 text-green-500" />
+          <div className="flex items-center text-xs md:text-sm text-gray-600 flex-wrap">
+            <Clock size={14} className="mr-2 text-green-500 md:size-4" />
             <span>{formatTime(meeting.dat_schedule_date)}</span>
             {meeting.int_estimated_duration > 0 && (
               <span className="ml-1">({meeting.int_estimated_duration} min)</span>
             )}
           </div>
 
-          <div className="flex items-center text-sm text-gray-600">
-            <Users size={16} className="mr-2 text-green-500" />
-            <span>
-              {meeting.int_total_confirmed || 0} confirmados de {meeting.int_total_invitated || 0}
+          <div className="flex items-center text-xs md:text-sm text-gray-600">
+            <Users size={14} className="mr-2 text-green-500 md:size-4" />
+            <span className="truncate">
+              {meeting.connected_users_count || 0} conectados de {meeting.int_total_invitated || 0} invitados
             </span>
           </div>
         </div>
 
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs md:text-sm text-gray-500">
               Tipo: {meeting.str_meeting_type}
             </span>
             {meeting.bln_quorum_reached && (
@@ -125,7 +126,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
         </div>
 
         <div className="mt-4">
-          <div className="text-center py-2 text-sm text-gray-600">
+          <div className="text-center py-2 text-xs md:text-sm text-gray-600">
             <p>Haz clic para ver las encuestas de esta reunión</p>
           </div>
         </div>

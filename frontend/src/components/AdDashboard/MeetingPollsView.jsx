@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, Loader2, AlertCircle, CheckCircle, Clock, Users, TrendingUp, Play, Square } from 'lucide-react';
 import { PollService } from '../../services/api/PollService';
 import CreatePollView from './CreatePollView';
+import VotersList from './VotersList';
 import Swal from 'sweetalert2';
 
 export default function MeetingPollsView({ meeting, onBack }) {
@@ -355,10 +356,10 @@ export default function MeetingPollsView({ meeting, onBack }) {
             <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Cargando estadísticas...</p>
           </div>
-        ) : stats ? (
+          ) : stats ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl shadow-md p-6 border-2 border-blue-200">
                 <div className="flex items-center gap-3 mb-2">
                   <Users className="text-blue-600" size={24} />
                   <h3 className="font-semibold text-gray-700">Total Votos</h3>
@@ -366,7 +367,17 @@ export default function MeetingPollsView({ meeting, onBack }) {
                 <p className="text-3xl font-bold text-gray-800">{stats.total_votes || 0}</p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
+              {typeof stats.total_abstentions === 'number' && (
+                <div className="bg-white rounded-xl shadow-md p-6 border-2 border-amber-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <AlertCircle className="text-amber-600" size={24} />
+                    <h3 className="font-semibold text-gray-700">Abstenciones</h3>
+                  </div>
+                  <p className="text-3xl font-bold text-amber-600">{stats.total_abstentions}</p>
+                </div>
+              )}
+
+              <div className="bg-white rounded-xl shadow-md p-6 border-2 border-green-200">
                 <div className="flex items-center gap-3 mb-2">
                   <TrendingUp className="text-green-600" size={24} />
                   <h3 className="font-semibold text-gray-700">Participación</h3>
@@ -376,7 +387,7 @@ export default function MeetingPollsView({ meeting, onBack }) {
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="bg-white rounded-xl shadow-md p-6 border-2 border-green-200">
                 <div className="flex items-center gap-3 mb-2">
                   <CheckCircle className={stats.quorum_reached ? "text-green-600" : "text-red-500"} size={24} />
                   <h3 className="font-semibold text-gray-700">Quórum</h3>
@@ -390,43 +401,45 @@ export default function MeetingPollsView({ meeting, onBack }) {
               </div>
             </div>
 
-            {statsOptions && statsOptions.length > 0 && (
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
-                <div className="space-y-4">
-                  {statsOptions.map((option, index) => (
-                    <div key={option.id || index}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span>{option.str_option_text}</span>
-                        <span>{option.int_votes_count} votos ({option.dec_percentage?.toFixed(1)}%)</span>
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-6">Resultados de la Votación</h3>
+              <div className="space-y-5">
+                {statsOptions.map((option, index) => (
+                  <div key={option.id || index} className="relative">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className={`flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm ${
+                          index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-amber-600'
+                        }`}>
+                          {String.fromCharCode(65 + index)}
+                        </span>
+                        <span className="font-medium text-gray-800">{option.str_option_text}</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div
-                          className="bg-green-600 h-3 rounded-full transition-all duration-300"
-                          style={{ width: `${option.dec_percentage || 0}%` }}
-                        ></div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-gray-800">{option.int_votes_count}</span>
+                        <span className="text-sm text-gray-500">votos</span>
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                          {option.dec_percentage?.toFixed(1)}%
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div
+                        className={`h-4 rounded-full transition-all duration-500 ${
+                          index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
+                          index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
+                          'bg-gradient-to-r from-amber-500 to-amber-600'
+                        }`}
+                        style={{ width: `${option.dec_percentage || 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {textResponses.length > 0 && (
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Respuestas de Texto</h3>
-                <div className="space-y-3">
-                  {textResponses.map((response, index) => (
-                    <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-700">{response.str_response_text}</p>
-                      {!selectedPoll.bln_is_anonymous && response.user_name && (
-                        <p className="text-sm text-gray-500 mt-2">- {response.user_name}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Listado de Voters */}
+            <VotersList pollId={selectedPoll.id} />
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">

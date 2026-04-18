@@ -119,4 +119,17 @@ export class ResidentService {
         return response.data;
     }
 
+    static async checkCeleryStatus() {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const response = await axiosInstance.get(
+            `/admin/coowners/celery-status`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
+        return response.data;
+    }
+
 }

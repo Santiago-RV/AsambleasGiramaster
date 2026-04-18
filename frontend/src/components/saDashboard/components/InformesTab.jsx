@@ -4,6 +4,7 @@ import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown, Calenda
 import Swal from 'sweetalert2';
 import { ReportsService } from '../../../services/api/ReportsService';
 import { getLlamadoReportSA } from '../../../services/api/ActiveMeetingService';
+import { formatDateLong, formatDateTime } from '../../../utils/dateUtils';
 
 // ─── Helpers PDF ────────────────────────────────────────────────────────────
 
@@ -34,12 +35,10 @@ const addHeader = (doc, title, meetingTitle, unitName, date) => {
     doc.text(`Reunión: ${meetingTitle}`, 14, 40);
     doc.text(`Unidad Residencial: ${unitName}`, 14, 47);
 
-    const fmtDate = new Date(date).toLocaleDateString('es-ES', {
-        day: '2-digit', month: 'long', year: 'numeric',
-    });
+    const fmtDate = formatDateLong(date);
 
     doc.text(`Fecha: ${fmtDate}`, pw - 14, 40, { align: 'right' });
-    doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, pw - 14, 47, { align: 'right' });
+    doc.text(`Generado: ${formatDateTime(new Date())}`, pw - 14, 47, { align: 'right' });
     doc.setDrawColor(200, 200, 220);
     doc.setLineWidth(0.3);
     doc.line(14, 52, pw - 14, 52);
@@ -201,15 +200,7 @@ const generateAttendancePDF = async (data) => {
             p.full_name,
             p.apartment,
             p.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
-            p.attended_at
-                ? new Date(p.attended_at).toLocaleString('es-ES', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })
-                : '—',
+            p.attended_at ? formatDateTime(p.attended_at) : '—',
             p.quorum_base.toFixed(4),
             Math.max(0, (p.voting_weight || 0) - p.quorum_base).toFixed(4),
         ]),
@@ -340,12 +331,7 @@ const generatePollsPDF = async (data) => {
                     v.full_name,
                     v.apartment || '—',
                     v.is_delegation_vote ? 'Vía delegado' : 'Directo',
-                    v.voted_at
-                        ? new Date(v.voted_at).toLocaleString('es-ES', {
-                            day: '2-digit', month: '2-digit', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
-                        })
-                        : '—',
+                    v.voted_at ? formatDateTime(v.voted_at) : '—',
                     parseFloat(v.quorum_base || 0).toFixed(4),
                     Math.max(0, (v.voting_weight || 0) - (v.quorum_base || 0)).toFixed(4),
                 ]),
@@ -457,12 +443,7 @@ const generateDelegationsPDF = async (data) => {
     doc.text(`Total de delegaciones registradas: ${total_delegations}`, 14, y);
     y += 8;
 
-    const fmtDate = (iso) => iso
-        ? new Date(iso).toLocaleString('es-ES', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        })
-        : '—';
+    const fmtDate = (iso) => iso ? formatDateTime(iso) : '—';
 
     if (delegations.length === 0) {
         doc.setFont('helvetica', 'italic');
@@ -515,12 +496,7 @@ const generateLlamadoPDF = async (data) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const nombreLlamado = NOMBRES_LLAMADO[llamado - 1];
 
-    const timestamp = snapshot.timestamp
-        ? new Date(snapshot.timestamp).toLocaleString('es-ES', {
-              day: '2-digit', month: 'long', year: 'numeric',
-              hour: '2-digit', minute: '2-digit', hour12: true,
-          })
-        : '—';
+    const timestamp = snapshot.timestamp ? formatDateTime(snapshot.timestamp) : '—';
 
     let y = addHeader(doc, `${nombreLlamado.toUpperCase()} LLAMADO DE ASISTENCIA`, meeting.title, residential_unit.name, meeting.scheduled_date);
 
@@ -784,7 +760,7 @@ const InformesTab = () => {
 
                 {selectedMeetingInfo && (
                     <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
-                        <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Calendar size={14} /> {new Date(selectedMeetingInfo.scheduled_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                        <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Calendar size={14} /> {formatDateLong(selectedMeetingInfo.scheduled_date)}</span>
                         <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Building2 size={14} /> {selectedMeetingInfo.residential_unit}</span>
                         <span className={`px-2 py-1 rounded-lg font-medium ${selectedMeetingInfo.status === 'En Curso' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{selectedMeetingInfo.status}</span>
                     </div>

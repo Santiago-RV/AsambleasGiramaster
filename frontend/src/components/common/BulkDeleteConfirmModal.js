@@ -408,14 +408,57 @@ export default showBulkDeleteConfirmModal;
  * @param {Object} options - Opciones del modal
  * @param {number} options.total - Cantidad total de correos a enviar
  * @param {Function} options.pollProgressFn - Función asíncrona para obtener el progreso
+ * @param {number} options.timeoutMs - Timeout en milisegundos (default: 120000 = 2 minutos)
+ * @param {Function} options.onTimeout - Callback cuando expire el timeout
  * @returns {Promise} - Resuelve cuando el proceso termina
  */
-export const showBulkSendProgressModal = async ({ total, pollProgressFn, startProgress, updateProgress, finishProgress }) => {
+export const showBulkSendProgressModal = async ({ total, pollProgressFn, startProgress, updateProgress, finishProgress, timeoutMs = 120000, onTimeout }) => {
   let pollingInterval = null;
   let progressData = { current: 0, total: total, status: 'processing', progress: 0 };
+  let startTime = Date.now();
   
   const useToast = startProgress && typeof startProgress === 'function' && updateProgress && typeof updateProgress === 'function' && finishProgress && typeof finishProgress === 'function';
   let notificationId = null;
+  
+  const checkTimeout = () => {
+    return Date.now() - startTime >= timeoutMs;
+  };
+  
+  const handleError = (message) => {
+    if (pollingInterval) clearInterval(pollingInterval);
+    if (useToast && notificationId) {
+      finishProgress({
+        id: notificationId,
+        status: 'failed',
+        message: message
+      });
+    } else {
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: 'Error en el envío de correos',
+        html: `
+          <div class="text-left">
+            <p class="mb-2">${message}</p>
+            <p class="text-sm text-gray-600 mb-2">El servicio de correos puede estar indisponible. Por favor:</p>
+            <ul class="text-sm text-gray-600 list-disc pl-4 mb-2">
+              <li>Verificar que el servicio de procesamiento de correos esté activo</li>
+              <li>Intentar más tarde</li>
+              <li>Contactar a soporte técnico si el problema persiste</li>
+            </ul>
+            <p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+          </div>
+        `,
+        confirmButtonText: 'Contactar Soporte',
+        confirmButtonColor: '#e74c3c',
+        cancelButtonText: 'Cerrar'
+      }).then((result) => {
+        if (result.isConfirmed && onTimeout) {
+          onTimeout();
+        }
+      });
+    }
+  };
   
   if (useToast) {
     notificationId = startProgress({
@@ -427,11 +470,26 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
     
     pollingInterval = setInterval(async () => {
       try {
+        if (checkTimeout()) {
+          handleError('El servicio de correos está tardando más de lo esperado. La tarea puede haber fallado o el servicio está indisponible.');
+          return;
+        }
+        
         const response = await pollProgressFn();
+        const status = response.data?.status || 'unknown';
+        
+        if (status === 'not_found' || status === 'unknown') {
+          if (checkTimeout()) {
+            handleError('No se recibió confirmación del servicio de correos. La tarea puede no haberse iniciado correctamente.');
+            return;
+          }
+          return;
+        }
+        
         progressData = {
           current: response.data?.current || 0,
           total: response.data?.total || total,
-          status: response.data?.status || 'processing',
+          status: status,
           progress: response.data?.progress || 0
         };
         
@@ -461,11 +519,10 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
         }
       } catch (error) {
         console.error('Error polling progress:', error);
-        finishProgress({ 
-          id: notificationId,
-          status: 'failed', 
-          message: 'Error al obtener progreso' 
-        });
+        if (checkTimeout()) {
+          handleError('Error de conexión con el servicio de correos. Verifique la conexión e intente más tarde.');
+          return;
+        }
       }
     }, 1500);
     
@@ -503,11 +560,45 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
       
       pollingInterval = setInterval(async () => {
         try {
+          if (checkTimeout()) {
+            clearInterval(pollingInterval);
+            Swal.close();
+            Swal.fire({
+              icon: 'error',
+              title: 'Tiempo de espera agotado',
+              html: `
+                <div class="text-left">
+                  <p class="mb-3">El servicio de correos está tardando más de lo esperado.</p>
+                  <p class="text-sm text-gray-600">La tarea puede haber fallado o el servicio está indisponible. Por favor:</p>
+                  <ul class="text-sm text-gray-600 list-disc pl-4 mt-2">
+                    <li>Verificar que el servicio de procesamiento de correos esté activo</li>
+                    <li>Intentar más tarde</li>
+                    <li>Contactar a soporte técnico si el problema persiste</li>
+                  </ul>
+                </div>
+              `,
+              confirmButtonText: 'Contactar Soporte',
+              confirmButtonColor: '#e74c3c',
+              cancelButtonText: 'Cerrar'
+            }).then((result) => {
+              if (result.isConfirmed && onTimeout) {
+                onTimeout();
+              }
+            });
+            return;
+          }
+          
           const response = await pollProgressFn();
+          const status = response.data?.status || 'unknown';
+          
+          if (status === 'not_found' || status === 'unknown') {
+            return;
+          }
+          
           progressData = {
             current: response.data?.current || 0,
             total: response.data?.total || total,
-            status: response.data?.status || 'processing',
+            status: status,
             progress: response.data?.progress || 0
           };
           
@@ -521,6 +612,22 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
           }
         } catch (error) {
           console.error('Error polling progress:', error);
+          if (checkTimeout()) {
+            clearInterval(pollingInterval);
+            Swal.close();
+            Swal.fire({
+              icon: 'error',
+              title: 'Error de conexión',
+              html: `
+                <div class="text-left">
+                  <p class="mb-3">No se pudo conectar con el servicio de correos.</p>
+                  <p class="text-sm text-gray-600">Verifique su conexión a internet e intente más tarde.</p>
+                </div>
+              `,
+              confirmButtonText: 'Cerrar'
+            });
+            return;
+          }
         }
       }, 1500);
     },
@@ -636,6 +743,9 @@ export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePr
  * @param {Function} options.startProgress - Función para iniciar progreso (opcional, usa toast si se provee)
  * @param {Function} options.updateProgress - Función para actualizar progreso (opcional)
  * @param {Function} options.finishProgress - Función para finalizar progreso (opcional)
+ * @param {Function} options.pollProgressFn - Función asíncrona para obtener el progreso
+ * @param {number} options.timeoutMs - Timeout en milisegundos (default: 120000 = 2 minutos)
+ * @param {Function} options.onTimeout - Callback cuando expire el timeout
  * @returns {Promise} - Resuelve cuando el proceso termina
  */
 export const showMeetingInvitationProgressModal = async ({ 
@@ -644,13 +754,56 @@ export const showMeetingInvitationProgressModal = async ({
   pollProgressFn,
   startProgress,
   updateProgress,
-  finishProgress
+  finishProgress,
+  timeoutMs = 120000,
+  onTimeout
 }) => {
   let pollingInterval = null;
   let progressData = { current: 0, total: total, status: 'processing', progress: 0 };
+  let startTime = Date.now();
   
   const useToast = startProgress && typeof startProgress === 'function' && updateProgress && typeof updateProgress === 'function' && finishProgress && typeof finishProgress === 'function';
   let notificationId = null;
+  
+  const checkTimeout = () => {
+    return Date.now() - startTime >= timeoutMs;
+  };
+  
+  const handleError = (message) => {
+    if (pollingInterval) clearInterval(pollingInterval);
+    if (useToast && notificationId) {
+      finishProgress({
+        id: notificationId,
+        status: 'failed',
+        message: message
+      });
+    } else {
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: 'Error en el envío de invitaciones',
+        html: `
+          <div class="text-left">
+            <p class="mb-2">${message}</p>
+            <p class="text-sm text-gray-600 mb-2">El servicio de correos puede estar indisponible. Por favor:</p>
+            <ul class="text-sm text-gray-600 list-disc pl-4 mb-2">
+              <li>Verificar que el servicio de procesamiento de correos esté activo</li>
+              <li>Intentar más tarde</li>
+              <li>Contactar a soporte técnico si el problema persiste</li>
+            </ul>
+            <p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+          </div>
+        `,
+        confirmButtonText: 'Contactar Soporte',
+        confirmButtonColor: '#e74c3c',
+        cancelButtonText: 'Cerrar'
+      }).then((result) => {
+        if (result.isConfirmed && onTimeout) {
+          onTimeout();
+        }
+      });
+    }
+  };
   
   if (useToast) {
     notificationId = startProgress({
@@ -662,11 +815,22 @@ export const showMeetingInvitationProgressModal = async ({
     
     pollingInterval = setInterval(async () => {
       try {
+        if (checkTimeout()) {
+          handleError('El servicio de correos está tardando más de lo esperado. La tarea puede haber fallado o el servicio está indisponible.');
+          return;
+        }
+        
         const response = await pollProgressFn();
+        const status = response.data?.status || 'unknown';
+        
+        if (status === 'not_found' || status === 'unknown') {
+          return;
+        }
+        
         progressData = {
           current: response.data?.current || 0,
           total: response.data?.total || total,
-          status: response.data?.status || 'processing',
+          status: status,
           progress: response.data?.progress || 0
         };
         
@@ -696,11 +860,10 @@ export const showMeetingInvitationProgressModal = async ({
         }
       } catch (error) {
         console.error('Error polling progress:', error);
-        finishProgress({ 
-          id: notificationId,
-          status: 'failed', 
-          message: 'Error al obtener progreso' 
-        });
+        if (checkTimeout()) {
+          handleError('Error de conexión con el servicio de correos. Verifique la conexión e intente más tarde.');
+          return;
+        }
       }
     }, 1500);
     
@@ -736,11 +899,45 @@ export const showMeetingInvitationProgressModal = async ({
       
       pollingInterval = setInterval(async () => {
         try {
+          if (checkTimeout()) {
+            clearInterval(pollingInterval);
+            Swal.close();
+            Swal.fire({
+              icon: 'error',
+              title: 'Tiempo de espera agotado',
+              html: `
+                <div class="text-left">
+                  <p class="mb-3">El servicio de correos está tardando más de lo esperado.</p>
+                  <p class="text-sm text-gray-600">La tarea puede haber fallado o el servicio está indisponible. Por favor:</p>
+                  <ul class="text-sm text-gray-600 list-disc pl-4 mt-2">
+                    <li>Verificar que el servicio de procesamiento de correos esté activo</li>
+                    <li>Intentar más tarde</li>
+                    <li>Contactar a soporte técnico si el problema persiste</li>
+                  </ul>
+                </div>
+              `,
+              confirmButtonText: 'Contactar Soporte',
+              confirmButtonColor: '#e74c3c',
+              cancelButtonText: 'Cerrar'
+            }).then((result) => {
+              if (result.isConfirmed && onTimeout) {
+                onTimeout();
+              }
+            });
+            return;
+          }
+          
           const response = await pollProgressFn();
+          const status = response.data?.status || 'unknown';
+          
+          if (status === 'not_found' || status === 'unknown') {
+            return;
+          }
+          
           progressData = {
             current: response.data?.current || 0,
             total: response.data?.total || total,
-            status: response.data?.status || 'processing',
+            status: status,
             progress: response.data?.progress || 0
           };
           
@@ -754,6 +951,22 @@ export const showMeetingInvitationProgressModal = async ({
           }
         } catch (error) {
           console.error('Error polling progress:', error);
+          if (checkTimeout()) {
+            clearInterval(pollingInterval);
+            Swal.close();
+            Swal.fire({
+              icon: 'error',
+              title: 'Error de conexión',
+              html: `
+                <div class="text-left">
+                  <p class="mb-3">No se pudo conectar con el servicio de correos.</p>
+                  <p class="text-sm text-gray-600">Verifique su conexión a internet e intente más tarde.</p>
+                </div>
+              `,
+              confirmButtonText: 'Cerrar'
+            });
+            return;
+          }
         }
       }, 1500);
     },

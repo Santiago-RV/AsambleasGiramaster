@@ -6,6 +6,7 @@ import DelegationModal from '../common/DelegationModal';
 import { DelegationService } from '../../services/api/DelegationService';
 import { PollService } from '../../services/api/PollService';
 import { UserService } from '../../services/api/UserService';
+import { formatDateLong } from '../../utils/dateUtils';
 
 export default function PowersManagementPage() {
   const [selectedMeeting, setSelectedMeeting] = useState(null);
@@ -187,11 +188,7 @@ export default function PowersManagementPage() {
                           {meeting.str_title}
                         </h4>
                         <p className="text-sm text-gray-500 mt-1">
-                          {new Date(meeting.dat_schedule_date).toLocaleDateString('es-ES', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
+                          {formatDateLong(meeting.dat_schedule_date)}
                         </p>
                         <div className="mt-2 inline-flex items-center px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded">
                           En vivo

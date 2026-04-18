@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Mail, MessageCircle, Printer, Download, Share2 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { ResidentService } from '../../services/api/ResidentService';
+import { formatDateLong } from '../../utils/dateUtils';
 
 const QRCodeModal = ({ 
 	resident, 
@@ -54,6 +56,49 @@ const QRCodeModal = ({
 				confirmButtonColor: '#3498db'
 			});
 			return;
+		}
+
+		// Mostrar loader mientras se verifica el servicio de correo
+		Swal.fire({
+			title: 'Verificando servicio de correo...',
+			allowOutsideClick: false,
+			showConfirmButton: false,
+			didOpen: () => {
+				Swal.showLoading();
+			}
+		});
+
+		// Timeout de 3 segundos
+		const timeoutPromise = new Promise((_, reject) =>
+			setTimeout(() => reject(new Error('Timeout de verificación')), 3000)
+		);
+
+		try {
+			const statusCheck = await Promise.race([
+				ResidentService.checkCeleryStatus(),
+				timeoutPromise
+			]);
+
+			if (!statusCheck.data?.celery_available) {
+				Swal.close();
+				Swal.fire({
+					icon: 'error',
+					title: 'Servicio no disponible',
+					html: `
+						<div class="text-left">
+							<p class="mb-2">${statusCheck.data?.message || 'El servicio de correos no está disponible en este momento.'}</p>
+							<p class="text-sm text-gray-600 mb-2">Por favor, contacte a soporte técnico.</p>
+							<p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+						</div>
+					`,
+					confirmButtonText: 'Aceptar',
+					confirmButtonColor: '#e74c3c',
+				});
+				return;
+			}
+		} catch (error) {
+			// Si falla por timeout o error, continuar con el envío
+			Swal.close();
 		}
 
 		setIsSending(true);
@@ -206,7 +251,7 @@ const QRCodeModal = ({
 					
 					<div class="footer">
 						<p>Este código QR proporciona acceso directo y seguro al sistema.</p>
-						<p>Generado el: ${new Date().toLocaleDateString('es-ES')}</p>
+						<p>Generado el: ${formatDateLong(new Date())}</p>
 					</div>
 				</body>
 			</html>

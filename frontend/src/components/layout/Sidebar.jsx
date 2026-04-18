@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Building2 } from 'lucide-react';
 
 /**
  * Componente Sidebar genérico y reutilizable
@@ -65,20 +65,15 @@ const Sidebar = ({
 
 			{/* Logo y título */}
 			<div className="px-6 py-8 border-b border-white/10">
-				<div className="flex items-center gap-3 mb-2">
+				<div className="flex flex-col items-center text-center">
 					<div
-						className="w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center shadow-lg text-2xl"
-						style={{
-							backgroundImage: `linear-gradient(to bottom right, ${accentColor}, ${accentColor}dd)`
-						}}
+						className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center mb-3 shadow-lg"
 					>
-						🏢
+						<Building2 size={32} />
 					</div>
 					<h2 className="text-xl font-bold">{title}</h2>
+					<p className="text-sm text-gray-400 mt-1">{subtitle}</p>
 				</div>
-				<p className="text-sm text-gray-400 ml-[52px]">
-					{subtitle}
-				</p>
 			</div>
 
 			{/* Menú de navegación */}

@@ -685,6 +685,10 @@ class PollService:
         # Verificar quorum (basado en peso de votación)
         quorum_reached = weight_participation_percentage >= float(poll.dec_minimum_quorum_percentage)
 
+        # Calcular estadísticas de opciones directamente desde poll_responses
+        # (para corregir bug donde int_votes_count no se actualiza con votos por delegación)
+        options_stats = await self._get_options_stats_from_responses(poll_id, poll.options, total_weight_voted)
+
         return {
             "poll": poll,
             "total_responses": total_responses,
@@ -695,8 +699,55 @@ class PollService:
             "weight_participation_percentage": weight_participation_percentage,
             "quorum_reached": quorum_reached,
             "participation_percentage": participation_percentage,
-            "text_responses": await self._get_text_responses(poll, poll_id)
+            "text_responses": await self._get_text_responses(poll, poll_id),
+            "options_stats": options_stats
         }
+
+    async def _get_options_stats_from_responses(self, poll_id: int, options, total_weight: float) -> list:
+        """Calcula estadísticas de opciones directamente desde poll_responses"""
+        try:
+            from app.models.poll_option_model import PollOptionModel
+            
+            options_result = []
+            
+            for option in options:
+                # Contar votos para esta opción directamente desde poll_responses
+                option_votes_result = await self.db.execute(
+                    select(func.count(PollResponseModel.id))
+                    .where(and_(
+                        PollResponseModel.int_poll_id == poll_id,
+                        PollResponseModel.int_option_id == option.id,
+                        PollResponseModel.bln_is_abstention == False
+                    ))
+                )
+                option_votes_count = option_votes_result.scalar() or 0
+                
+                # Calcular peso total para esta opción
+                option_weight_result = await self.db.execute(
+                    select(func.sum(PollResponseModel.dec_voting_weight))
+                    .where(and_(
+                        PollResponseModel.int_poll_id == poll_id,
+                        PollResponseModel.int_option_id == option.id,
+                        PollResponseModel.bln_is_abstention == False
+                    ))
+                )
+                option_weight = float(option_weight_result.scalar() or 0)
+                
+                # Calcular porcentaje
+                option_percentage = (option_weight / total_weight * 100) if total_weight > 0 else 0.0
+                
+                options_result.append({
+                    "id": option.id,
+                    "str_option_text": option.str_option_text,
+                    "int_votes_count": option_votes_count,
+                    "dec_weight_total": option_weight,
+                    "dec_percentage": option_percentage
+                })
+            
+            return options_result
+        except Exception as e:
+            # Si falla, retornar lista vacía para no romper el endpoint
+            return []
 
     async def _get_text_responses(self, poll, poll_id: int) -> list:
         """Obtiene las respuestas de texto de una encuesta"""

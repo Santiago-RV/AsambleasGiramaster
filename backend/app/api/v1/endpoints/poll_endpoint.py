@@ -638,15 +638,15 @@ async def get_poll_statistics(
                     "required_quorum": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
                     "has_quorum_requirement": poll.bln_requires_quorum
                 },
-                "options": [
+                "options": stats.get("options_stats", [
                     {
                         "id": opt.id,
                         "str_option_text": opt.str_option_text,
                         "int_votes_count": opt.int_votes_count,
                         "dec_weight_total": float(opt.dec_weight_total),
                         "dec_percentage": float(opt.dec_percentage)
-                        } for opt in sorted(poll.options, key=lambda x: x.int_option_order)
-                ] if poll.str_poll_type in ['single', 'multiple'] else [],
+                    } for opt in sorted(poll.options, key=lambda x: x.int_option_order)
+                ]) if poll.str_poll_type in ['single', 'multiple'] else [],
                 "text_responses": stats.get("text_responses", [])
             }
         )
@@ -834,6 +834,43 @@ async def get_poll_votes(
                 "votes": votes_list
             })
         
+        # Obtener abstenciones
+        abstentions_query = (
+            select(
+                PollResponseModel,
+                UserModel.id.label("voter_id"),
+                DataUserModel.str_firstname,
+                DataUserModel.str_lastname,
+                UserResidentialUnitModel.str_apartment_number,
+                PollResponseModel.dat_response_at
+            )
+            .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .join(
+                UserResidentialUnitModel,
+                UserResidentialUnitModel.int_user_id == UserModel.id
+            )
+            .where(
+                and_(
+                    PollResponseModel.int_poll_id == poll_id,
+                    PollResponseModel.bln_is_abstention == True
+                )
+            )
+            .order_by(PollResponseModel.dat_response_at.desc())
+        )
+        
+        abstentions_result = await db.execute(abstentions_query)
+        abstentions = abstentions_result.all()
+        
+        abstentions_list = []
+        for abst in abstentions:
+            abstentions_list.append({
+                "user_id": abst.voter_id,
+                "full_name": f"{abst.str_firstname} {abst.str_lastname}".strip(),
+                "apartment_number": abst.str_apartment_number or "N/A",
+                "abstained_at": abst.dat_response_at.isoformat() if abst.dat_response_at else None
+            })
+        
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
@@ -844,6 +881,8 @@ async def get_poll_votes(
                 "description": poll.str_description,
                 "status": poll.str_status,
                 "poll_type": poll.str_poll_type,
+                "total_abstentions": len(abstentions_list),
+                "abstentions": abstentions_list,
                 "options": options_with_votes
             }
         )

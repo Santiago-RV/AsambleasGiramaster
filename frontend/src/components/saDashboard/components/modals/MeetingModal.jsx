@@ -133,7 +133,7 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 					? (isVirtual ? "Editar Reunion Virtual" : "Editar Reunion Presencial")
 					: (isVirtual ? "Crear Reunion Virtual" : "Crear Reunion Presencial")
 			} 
-			size="2xl"
+			size="lg"
 		>
 			<div className="relative">
 				{/* OVERLAY DE CARGANDO */}

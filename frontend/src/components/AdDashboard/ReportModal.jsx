@@ -4,6 +4,7 @@ import { ReportsService } from '../../services/api/ReportsService';
 import { MeetingService } from '../../services/api/MeetingService';
 import AttendanceChart from "./AttendanceGraphics";
 import PollChart  from "./PollGraphics";
+import { formatDateTime } from '../../utils/dateUtils';
 
 const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) => {
   const [loading, setLoading] = useState(true);
@@ -214,10 +215,7 @@ const { summary, attended, absent } = data;
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-500">
                     {person.attended_at
-                      ? new Date(person.attended_at).toLocaleString('es-ES', {
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit'
-                      })
+                      ? formatDateTime(person.attended_at)
                       : '—'}
                   </td>
                   <td className="px-4 py-2 text-right">{person.quorum_base}</td>
@@ -360,12 +358,7 @@ const QuorumReportContent = ({ data }) => {
   );
 };
 
-const fmtDate = (iso) => iso
-  ? new Date(iso).toLocaleString('es-ES', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  })
-  : '—';
+const fmtDate = (iso) => iso ? formatDateTime(iso) : '—';
 
 const optionColors = [
   { bar: 'from-emerald-400 to-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
@@ -636,12 +629,7 @@ const PollsReportContent = ({ data }) => {
 const DelegationsReportContent = ({ data }) => {
   const { summary, delegations } = data;
 
-  const fmtDate = (iso) => iso
-    ? new Date(iso).toLocaleString('es-ES', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    })
-    : '—';
+  const fmtDate = (iso) => iso ? formatDateTime(iso) : '—';
 
   if (!delegations || delegations.length === 0) {
     return (

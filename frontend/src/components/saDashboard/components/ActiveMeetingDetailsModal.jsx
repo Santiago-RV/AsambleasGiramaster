@@ -32,6 +32,7 @@ import {
 	getAllLlamadosSA,
 	getLlamadoReportSA,
 } from '../../../services/api/ActiveMeetingService';
+import { formatDateLong, formatDateTime } from '../../../utils/dateUtils';
 
 const NOMBRES_LLAMADO = ['Primer', 'Segundo', 'Tercer'];
 
@@ -86,10 +87,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 		const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 		const nombreLlamado = NOMBRES_LLAMADO[numero - 1];
 		const timestamp = snapshot.timestamp
-			? new Date(snapshot.timestamp).toLocaleString('es-CO', {
-					day: '2-digit', month: 'long', year: 'numeric',
-					hour: '2-digit', minute: '2-digit', hour12: true,
-				})
+			? formatDateTime(snapshot.timestamp)
 			: '—';
 
 		// Encabezado
@@ -107,7 +105,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 		doc.setTextColor(50, 50, 50);
 		doc.setFontSize(9);
 		doc.text(`Reunión: ${meeting.title}`, 14, 38);
-		doc.text(`Fecha programada: ${meeting.scheduled_date ? new Date(meeting.scheduled_date).toLocaleDateString('es-CO') : '—'}`, 14, 44);
+		doc.text(`Fecha programada: ${meeting.scheduled_date ? formatDateLong(meeting.scheduled_date) : '—'}`, 14, 44);
 		doc.text(`Llamado registrado: ${timestamp}`, 14, 50);
 
 		// Resumen de quórum
@@ -181,7 +179,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 			doc.setFontSize(7);
 			doc.setTextColor(150, 150, 150);
 			doc.text(
-				`Generado el ${new Date().toLocaleString('es-CO')}  ·  Página ${i} de ${pageCount}`,
+				`Generado el ${formatDateTime(new Date())}  ·  Página ${i} de ${pageCount}`,
 				14,
 				doc.internal.pageSize.height - 8
 			);
@@ -351,7 +349,7 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 													{registrado && (
 														<div className="flex items-center gap-2">
 															<span className="text-xs font-medium text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
-																{snapshot.quorum_percentage ?? 0}% quórum
+																{llamadoInfo?.snapshot?.quorum_percentage ?? 0}% quórum
 															</span>
 															<button
 																onClick={() => setLlamadoExpandido(expandido ? null : num)}
@@ -377,77 +375,77 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 												</div>
 
 												{/* Detalle expandible */}
-												{registrado && expandido && snapshot && (
-													<div className="border-t border-indigo-200 p-3 bg-white">
-														{/* Mini stats */}
-														<div className="grid grid-cols-3 gap-2 mb-3">
-															<div className="text-center bg-green-50 rounded-lg py-2">
-																<p className="text-xs text-green-600 font-medium flex items-center justify-center gap-1">
-																	<Wifi size={11} /> Presentes
-																</p>
-																<p className="text-lg font-bold text-green-700">
-																	{snapshot.present?.length || 0}
-																</p>
-															</div>
-															<div className="text-center bg-red-50 rounded-lg py-2">
-																<p className="text-xs text-red-600 font-medium flex items-center justify-center gap-1">
-																	<WifiOff size={11} /> Ausentes
-																</p>
-																<p className="text-lg font-bold text-red-700">
-																	{snapshot.absent?.length || 0}
-																</p>
-															</div>
-															<div className="text-center bg-indigo-50 rounded-lg py-2">
-																<p className="text-xs text-indigo-600 font-medium flex items-center justify-center gap-1">
-																	<BarChart3 size={11} /> Quórum
-																</p>
-																<p className="text-lg font-bold text-indigo-700">
-																	{snapshot.quorum_percentage ?? 0}%
-																</p>
-															</div>
+											{registrado && expandido && llamadoInfo?.snapshot && (
+												<div className="border-t border-indigo-200 p-3 bg-white">
+													{/* Mini stats */}
+													<div className="grid grid-cols-3 gap-2 mb-3">
+														<div className="text-center bg-green-50 rounded-lg py-2">
+															<p className="text-xs text-green-600 font-medium flex items-center justify-center gap-1">
+																<Wifi size={11} /> Presentes
+															</p>
+															<p className="text-lg font-bold text-green-700">
+																{llamadoInfo?.snapshot?.present?.length || 0}
+															</p>
 														</div>
-
-														{/* Listas compactas */}
-														<div className="grid grid-cols-2 gap-3 max-h-52 overflow-y-auto">
-															<div>
-																<p className="text-xs font-semibold text-green-700 mb-1">
-																	Presentes
-																</p>
-																{snapshot.present?.slice(0, 20).map((u) => (
-																	<div key={u.user_id} className="text-xs text-gray-700 py-0.5 border-b border-gray-100 truncate">
-																		{u.full_name}
-																		<span className="text-gray-400 ml-1">
-																			· {u.apartment_number}
-																		</span>
-																	</div>
-																))}
-																{(snapshot.present?.length || 0) > 20 && (
-																	<p className="text-xs text-gray-400 mt-1">
-																		+{snapshot.present.length - 20} más
-																	</p>
-																)}
-															</div>
-															<div>
-																<p className="text-xs font-semibold text-red-700 mb-1">
-																	Ausentes
-																</p>
-																{snapshot.absent?.slice(0, 20).map((u) => (
-																	<div key={u.user_id} className="text-xs text-gray-700 py-0.5 border-b border-gray-100 truncate">
-																		{u.full_name}
-																		<span className="text-gray-400 ml-1">
-																			· {u.apartment_number}
-																		</span>
-																	</div>
-																))}
-																{(snapshot.absent?.length || 0) > 20 && (
-																	<p className="text-xs text-gray-400 mt-1">
-																		+{snapshot.absent.length - 20} más
-																	</p>
-																)}
-															</div>
+														<div className="text-center bg-red-50 rounded-lg py-2">
+															<p className="text-xs text-red-600 font-medium flex items-center justify-center gap-1">
+																<WifiOff size={11} /> Ausentes
+															</p>
+															<p className="text-lg font-bold text-red-700">
+																{llamadoInfo?.snapshot?.absent?.length || 0}
+															</p>
+														</div>
+														<div className="text-center bg-indigo-50 rounded-lg py-2">
+															<p className="text-xs text-indigo-600 font-medium flex items-center justify-center gap-1">
+																<BarChart3 size={11} /> Quórum
+															</p>
+															<p className="text-lg font-bold text-indigo-700">
+																{llamadoInfo?.snapshot?.quorum_percentage ?? 0}%
+															</p>
 														</div>
 													</div>
-												)}
+
+													{/* Listas compactas */}
+													<div className="grid grid-cols-2 gap-3 max-h-52 overflow-y-auto">
+														<div>
+															<p className="text-xs font-semibold text-green-700 mb-1">
+																Presentes
+															</p>
+															{llamadoInfo?.snapshot?.present?.slice(0, 20).map((u) => (
+																<div key={u.user_id} className="text-xs text-gray-700 py-0.5 border-b border-gray-100 truncate">
+																	{u.full_name}
+																	<span className="text-gray-400 ml-1">
+																		· {u.apartment_number}
+																	</span>
+																</div>
+															))}
+															{(llamadoInfo?.snapshot?.present?.length || 0) > 20 && (
+																<p className="text-xs text-gray-400 mt-1">
+																	+{llamadoInfo.snapshot.present.length - 20} más
+																</p>
+															)}
+														</div>
+														<div>
+															<p className="text-xs font-semibold text-red-700 mb-1">
+																Ausentes
+															</p>
+															{llamadoInfo?.snapshot?.absent?.slice(0, 20).map((u) => (
+																<div key={u.user_id} className="text-xs text-gray-700 py-0.5 border-b border-gray-100 truncate">
+																	{u.full_name}
+																	<span className="text-gray-400 ml-1">
+																		· {u.apartment_number}
+																	</span>
+																</div>
+															))}
+															{(llamadoInfo?.snapshot?.absent?.length || 0) > 20 && (
+																<p className="text-xs text-gray-400 mt-1">
+																	+{llamadoInfo.snapshot.absent.length - 20} más
+																</p>
+															)}
+														</div>
+													</div>
+												</div>
+											)}
 											</div>
 										);
 									})}

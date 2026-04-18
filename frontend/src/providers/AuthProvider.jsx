@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
 		try {
 			const raw = localStorage.getItem('user');
 			const token = localStorage.getItem('access_token');
-			if (raw && token) return JSON.parse(raw);
+			if (raw && token && AuthService.isAuthenticated()) return JSON.parse(raw);
 			return null;
 		} catch {
 			return null;
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
 
 	return (
 		<AuthContext.Provider
-			value={{ user, isAuthenticated: !!user, isLoading: false, updateUser }}
+			value={{ user, isAuthenticated: AuthService.isAuthenticated(), isLoading: false, updateUser }}
 		>
 			{children}
 		</AuthContext.Provider>

@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import { PollService } from '../services/api/PollService';
 import { MeetingService } from '../services/api/MeetingService';
 import { DelegationService } from '../services/api/DelegationService';
+import { formatDateTime } from '../utils/dateUtils';
 
 export default function PresencialVotingPage() {
   const { meetingId } = useParams();
@@ -13,18 +14,19 @@ export default function PresencialVotingPage() {
   const [poll, setPoll] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [countdown, setCountdown] = useState(null);
-  const [hasVoted, setHasVoted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isVoting, setIsVoting] = useState(false);
   const [noPoll, setNoPoll] = useState(false);
+  const [countdown, setCountdown] = useState(null);
   const [delegationStatus, setDelegationStatus] = useState(null);
-  const [delegationCountdown, setDelegationCountdown] = useState(10);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
+  const [delegationCountdown, setDelegationCountdown] = useState(0);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
-    navigate('/login');
+    localStorage.removeItem('meeting_id');
+    navigate('/');
   };
 
   useEffect(() => {
@@ -128,12 +130,6 @@ export default function PresencialVotingPage() {
     const time = getTimeRemaining(endDateStr);
     if (!time || time.expired) return null;
     return `${time.minutes}:${time.seconds.toString().padStart(2, '0')}`;
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'No disponible';
-    const date = new Date(dateString);
-    return date.toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   const handleOptionToggle = (optionId) => {
@@ -356,7 +352,7 @@ export default function PresencialVotingPage() {
               <span className="px-3 py-1 bg-green-500 rounded-full text-xs font-semibold">ACTIVA</span>
             </div>
             <div className="flex items-center gap-4 mt-4 text-sm text-blue-100">
-              <div className="flex items-center gap-1"><Clock size={16} />{formatDate(poll.dat_started_at)}</div>
+              <div className="flex items-center gap-1"><Clock size={16} />{formatDateTime(poll.dat_started_at)}</div>
               {poll.dat_ended_at && (
                 <div className="flex items-center gap-1">
                   <Timer size={16} />

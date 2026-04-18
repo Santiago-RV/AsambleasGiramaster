@@ -4,7 +4,7 @@ import { Upload, Plus, UserPlus, Lightbulb, Mail, AlertTriangle, Headphones, Inf
 import Swal from 'sweetalert2';
 import ResidentsList from "../common/ResidentsList";
 import MeetingsList from "../common/MeetingsList";
-import { showBulkDeleteWithLoading, showBulkToggleAccessWithLoading } from "../common/BulkDeleteConfirmModal";
+import { showBulkDeleteWithLoading, showBulkToggleAccessWithLoading, showBulkSendProgressModal } from "../common/BulkDeleteConfirmModal";
 import { ResidentialUnitService } from "../../services/api/ResidentialUnitService";
 import { ResidentService } from "../../services/api/ResidentService";
 import { MeetingService } from "../../services/api/MeetingService";
@@ -12,6 +12,7 @@ import CoownerService from "../../services/api/coownerService";
 import SupportModal from '../saDashboard/components/modals/SupportModal';
 import HelpModalAdmin from "./HelpModalAdmin";
 import { useProgressNotification } from '../../contexts/ProgressNotificationContext';
+import { formatDateLong, formatTime } from '../../utils/dateUtils';
 
 const SVG_ICONS = {
   lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
@@ -65,7 +66,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       estado: meeting.str_status || 'Programada',
       fecha: meeting.dat_schedule_date,
       hora: meeting.dat_schedule_date
-        ? new Date(meeting.dat_schedule_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        ? formatTime(meeting.dat_schedule_date)
         : 'No definida',
       asistentes: meeting.int_total_invitated || 0,
       fechaCompleta: new Date(meeting.dat_schedule_date),
@@ -161,57 +162,34 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
   // Mutación para el envío masivo de credenciales
   const sendBulkCredentialsMutation = useMutation({
     mutationFn: async (residentIds) => {
+      const statusCheck = await ResidentService.checkCeleryStatus();
+      if (!statusCheck.data?.celery_available) {
+        throw new Error(statusCheck.data?.message || 'El servicio de correos no está disponible en este momento. Por favor, contacte a soporte técnico.');
+      }
       return await CoownerService.sendBulkCredentials(residentIds);
     },
     onSuccess: (response) => {
-      const { successful, total_processed, task_id } = response.data;
+      const { total_processed, task_id } = response.data;
 
       if (task_id) {
         const total = response.data.total || total_processed;
         
-        startProgress({
-          title: 'Enviando Credenciales',
-          message: `Enviando enlaces de acceso (0/${total})`,
+        showBulkSendProgressModal({
           total: total,
-          type: 'info'
-        });
-
-        const pollingInterval = setInterval(async () => {
-          try {
-            const statusResponse = await ResidentService.getEmailTaskStatus(task_id);
-            const current = statusResponse.data?.current || 0;
-            const progress = statusResponse.data?.progress || 0;
-            const status = statusResponse.data?.status || 'processing';
-
-            updateProgress({
-              current,
-              total,
-              message: `Enviando enlaces de acceso (${current}/${total})`,
-              status,
-              progress
-            });
-
-            if (status === 'completed' || status === 'failed') {
-              clearInterval(pollingInterval);
-              
-              const successCount = statusResponse.data?.successful || successful;
-              
-              finishProgress({
-                status: status === 'completed' ? 'completed' : 'failed',
-                message: status === 'completed'
-                  ? `Credenciales enviadas a ${successCount} copropietario(s)`
-                  : 'Error al enviar credenciales'
-              });
-            }
-          } catch (error) {
-            console.error('Error polling credentials progress:', error);
-            clearInterval(pollingInterval);
-            finishProgress({
-              status: 'failed',
-              message: 'Error al obtener progreso'
+          pollProgressFn: () => ResidentService.getEmailTaskStatus(task_id),
+          startProgress,
+          updateProgress,
+          finishProgress,
+          timeoutMs: 120000,
+          onTimeout: () => {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Tiempo de espera agotado',
+              text: 'El servicio de correos tardó más de lo esperado. Por favor, contacte a soporte técnico.',
+              confirmButtonText: 'Aceptar'
             });
           }
-        }, 1500);
+        });
       } else {
         queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
       }
@@ -304,7 +282,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
           <div class="${isPresencial ? 'bg-emerald-50' : 'bg-blue-50'} p-3 rounded-lg">
             <p class="font-semibold ${isPresencial ? 'text-emerald-800' : 'text-blue-800'}">${meeting.titulo}</p>
             <p class="text-sm ${isPresencial ? 'text-emerald-700' : 'text-blue-700'} mt-1">
-              <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+              <strong>Fecha:</strong> ${formatDateLong(meeting.fecha)}
             </p>
             <p class="text-sm ${isPresencial ? 'text-emerald-700' : 'text-blue-700'} mt-1">
               <strong>Modalidad:</strong> ${isPresencial ? 'Presencial' : 'Virtual'}
@@ -339,7 +317,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
         <div class="bg-blue-50 p-3 rounded-lg">
           <p class="font-semibold text-blue-800">${meeting.titulo}</p>
           <p class="text-sm text-blue-700 mt-1">
-            <strong>Fecha:</strong> ${new Date(meeting.fecha).toLocaleDateString('es-ES')}
+            <strong>Fecha:</strong> ${formatDateLong(meeting.fecha)}
           </p>
         </div>
         <p class="text-xs text-gray-600 mt-3">
@@ -405,6 +383,50 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
 
   // Función para reenviar credenciales individuales
   const handleResendCredentials = async (resident) => {
+	// Mostrar loader mientras se verifica el servicio de correo
+	Swal.fire({
+		title: 'Verificando servicio de correo...',
+		allowOutsideClick: false,
+		showConfirmButton: false,
+		didOpen: () => {
+			Swal.showLoading();
+		}
+	});
+
+	// Timeout de 3 segundos
+	const timeoutPromise = new Promise((_, reject) =>
+		setTimeout(() => reject(new Error('Timeout de verificación')), 3000)
+	);
+
+	try {
+		const statusCheck = await Promise.race([
+			ResidentService.checkCeleryStatus(),
+			timeoutPromise
+		]);
+
+		if (!statusCheck.data?.celery_available) {
+			Swal.close();
+			Swal.fire({
+          icon: 'error',
+          title: 'Servicio no disponible',
+          html: `
+            <div class="text-left">
+              <p class="mb-2">${statusCheck.data?.message || 'El servicio de correos no está disponible en este momento.'}</p>
+              <p class="text-sm text-gray-600 mb-2">Por favor, contacte a soporte técnico.</p>
+              <p class="text-xs text-gray-500">Los mensajes permanecerán en espera y se enviarán una vez corregido el problema.</p>
+            </div>
+          `,
+          confirmButtonText: 'Aceptar',
+          confirmButtonColor: '#e74c3c',
+        });
+        return;
+      }
+    } catch {
+      // Si falla por timeout o error, continuar con el envío
+      Swal.close();
+    }
+
+    // Continuar con el flujo normal de confirmación
     const result = await Swal.fire({
       title: '¿Reenviar credenciales?',
       html: `

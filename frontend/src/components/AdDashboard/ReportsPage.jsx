@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import ReportModal from './ReportModal';
+import { formatDateLong } from '../../utils/dateUtils';
 
 export default function ReportsPage() {
   const [showReportModal, setShowReportModal] = useState(false);
@@ -130,7 +131,7 @@ export default function ReportsPage() {
     const meetingOptions = completedMeetings.map(m => ({
       id: m.id,
       title: m.str_title || m.titulo,
-      date: m.dat_schedule_date ? new Date(m.dat_schedule_date).toLocaleDateString('es-ES') : 'Sin fecha',
+      date: m.dat_schedule_date ? formatDateLong(m.dat_schedule_date) : 'Sin fecha',
       status: m.str_status
     }));
 
