@@ -268,6 +268,9 @@ export default function PowersManagementPage() {
                                 <p className="font-medium text-gray-800">
                                   {delegation.delegator.str_firstname} {delegation.delegator.str_lastname}
                                 </p>
+                                {delegation.delegator.str_apartment_number && (
+                                  <p className="text-xs text-gray-400">Apto {delegation.delegator.str_apartment_number}</p>
+                                )}
                                 <p className="text-xs text-gray-500">Cedente</p>
                               </div>
                             </div>
@@ -289,6 +292,9 @@ export default function PowersManagementPage() {
                                 <p className="font-medium text-gray-800">
                                   {delegation.delegate.str_firstname} {delegation.delegate.str_lastname}
                                 </p>
+                                {delegation.delegate.str_apartment_number && (
+                                  <p className="text-xs text-gray-400">Apto {delegation.delegate.str_apartment_number}</p>
+                                )}
                                 <p className="text-xs text-gray-500">Receptor</p>
                               </div>
                             </div>

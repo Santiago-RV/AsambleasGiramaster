@@ -443,6 +443,21 @@ class VotingDelegationService:
             delegator_info = await self._get_user_info(delegation.int_user_id)
             delegate_info = await self._get_user_info(delegation.int_delegated_id)
 
+            # Apartamento del cedente ya viene en la invitación
+            delegator_info["str_apartment_number"] = delegation.str_apartment_number
+
+            # Buscar apartamento del receptor en la misma reunión
+            delegate_apt_result = await self.db.execute(
+                select(MeetingInvitationModel.str_apartment_number)
+                .where(
+                    and_(
+                        MeetingInvitationModel.int_meeting_id == meeting_id,
+                        MeetingInvitationModel.int_user_id == delegation.int_delegated_id
+                    )
+                )
+            )
+            delegate_info["str_apartment_number"] = delegate_apt_result.scalar_one_or_none()
+
             # Usar dec_quorum_base directamente
             delegated_weight = float(delegation.dec_quorum_base)
 
