@@ -1,9 +1,10 @@
 // ZoomEmbed.jsx - VERSIÓN CON BURBUJA INFORMATIVA
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Loader2, CheckCircle, UserCircle, Building2, Hash, AlertTriangle, Eye, BarChart3 } from 'lucide-react';
+import { X, Loader2, CheckCircle, UserCircle, Building2, Hash, AlertTriangle, Eye, BarChart3, LogOut, RefreshCw } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
+import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
 import { UserService } from '../../services/api/UserService';
@@ -19,7 +20,9 @@ const ZoomEmbed = ({
 	onClose,
 	startFullscreen = false
 }) => {
+	const navigate = useNavigate();
 	const [isLoading, setIsLoading] = useState(true);
+	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [loadingMessage, setLoadingMessage] = useState('Iniciando reunión...');
 	const [error, setError] = useState(null);
 	const [isFullscreen, setIsFullscreen] = useState(startFullscreen);
@@ -200,6 +203,40 @@ const ZoomEmbed = ({
 		console.log('📊 Cerrando modal de encuesta');
 		setShowPollModal(false);
 		setSelectedOptions([]);
+	};
+
+	const handleManualRefresh = async () => {
+		setIsRefreshing(true);
+		try {
+			await refetchPolls();
+		} finally {
+			setTimeout(() => setIsRefreshing(false), 600);
+		}
+	};
+
+	const handleLogout = () => {
+		Swal.fire({
+			title: '¿Cerrar Sesión?',
+			text: 'Saldrás de la reunión y del aplicativo.',
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonColor: '#dc2626',
+			cancelButtonColor: '#6b7280',
+			confirmButtonText: 'Sí, salir',
+			cancelButtonText: 'Cancelar',
+			reverseButtons: true,
+			customClass: {
+				popup: 'swal-wide',
+				title: 'swal-title',
+				confirmButton: 'swal-confirm-btn'
+			}
+		}).then((result) => {
+			if (result.isConfirmed) {
+				localStorage.removeItem('access_token');
+				localStorage.removeItem('user');
+				navigate('/login');
+			}
+		});
 	};
 
 	const handleOptionToggle = (optionId) => {
@@ -449,6 +486,11 @@ const ZoomEmbed = ({
 							opacity: 0;
 						}
 					}
+
+					@keyframes spin {
+						from { transform: rotate(0deg); }
+						to { transform: rotate(360deg); }
+					}
 				`}
 			</style>
 			{/* 🆕 BURBUJA INFORMATIVA SUPERIOR */}
@@ -508,6 +550,89 @@ const ZoomEmbed = ({
 							</>
 						)}
 					</div>
+				</div>,
+				document.body
+			)}
+
+			{/* BURBUJAS INFERIORES: Refrescar y Cerrar Sesión */}
+			{!isLoading && !error && ReactDOM.createPortal(
+				<div
+					style={{
+						position: 'fixed',
+						bottom: '28px',
+						right: '28px',
+						zIndex: 9999,
+						display: 'flex',
+						flexDirection: 'column',
+						gap: '12px',
+						alignItems: 'center',
+						pointerEvents: 'auto'
+					}}
+				>
+					{/* Botón Refrescar encuestas */}
+					<button
+						onClick={handleManualRefresh}
+						title="Refrescar encuestas"
+						style={{
+							width: '52px',
+							height: '52px',
+							borderRadius: '9999px',
+							background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+							border: '3px solid white',
+							boxShadow: '0 4px 14px rgba(37, 99, 235, 0.45)',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							cursor: 'pointer',
+							transition: 'transform 0.2s, box-shadow 0.2s',
+							color: 'white'
+						}}
+						onMouseEnter={(e) => {
+							e.currentTarget.style.transform = 'scale(1.12)';
+							e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.6)';
+						}}
+						onMouseLeave={(e) => {
+							e.currentTarget.style.transform = 'scale(1)';
+							e.currentTarget.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.45)';
+						}}
+					>
+						<RefreshCw
+							size={22}
+							style={{
+								animation: isRefreshing ? 'spin 0.6s linear' : 'none'
+							}}
+						/>
+					</button>
+
+					{/* Botón Cerrar sesión */}
+					<button
+						onClick={handleLogout}
+						title="Cerrar sesión"
+						style={{
+							width: '52px',
+							height: '52px',
+							borderRadius: '9999px',
+							background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+							border: '3px solid white',
+							boxShadow: '0 4px 14px rgba(220, 38, 38, 0.45)',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							cursor: 'pointer',
+							transition: 'transform 0.2s, box-shadow 0.2s',
+							color: 'white'
+						}}
+						onMouseEnter={(e) => {
+							e.currentTarget.style.transform = 'scale(1.12)';
+							e.currentTarget.style.boxShadow = '0 6px 20px rgba(220, 38, 38, 0.6)';
+						}}
+						onMouseLeave={(e) => {
+							e.currentTarget.style.transform = 'scale(1)';
+							e.currentTarget.style.boxShadow = '0 4px 14px rgba(220, 38, 38, 0.45)';
+						}}
+					>
+						<LogOut size={22} />
+					</button>
 				</div>,
 				document.body
 			)}

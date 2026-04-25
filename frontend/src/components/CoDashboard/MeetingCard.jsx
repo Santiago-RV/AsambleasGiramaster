@@ -213,7 +213,7 @@ export default function MeetingCard({ meeting }) {
 						) : status.canJoin ? (
 							<>
 								<Video size={18} />
-								Unirse a la Reunion
+								{status.text === 'En Curso' ? 'Acceder Ahora' : 'Unirse a la Reunión'}
 							</>
 						) : (
 							<>
