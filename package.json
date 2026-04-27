@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "celer": "^0.2.0",
+    "celery": "^0.0.0",
+    "chartjs-plugin-datalabels": "^2.2.0",
+    "react-hot-toast": "^2.6.0"
+  }
+}
