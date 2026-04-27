@@ -709,6 +709,9 @@ const DelegationsReportContent = ({ data }) => {
                   <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Recibe el poder</span>
                 </div>
                 <p className="font-bold text-gray-800 text-sm">{delegation.delegate.full_name}</p>
+                {delegation.delegate.apartment && (
+                  <p className="text-xs text-gray-500 mt-0.5">Apto: {delegation.delegate.apartment}</p>
+                )}
                 <p className="text-xs text-gray-400 mt-0.5">{delegation.delegate.email}</p>
               </div>
             </div>

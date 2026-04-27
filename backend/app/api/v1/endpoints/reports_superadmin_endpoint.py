@@ -14,6 +14,7 @@ from app.models.poll_option_model import PollOptionModel
 from app.models.poll_response_model import PollResponseModel
 from app.models.residential_unit_model import ResidentialUnitModel
 from app.models.delegation_history_model import DelegationHistoryModel
+from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.services.user_service import UserService
 from app.schemas.responses_schema import SuccessResponse
 import logging
@@ -404,6 +405,26 @@ async def get_delegations_report(
         )
         delegate_data = delegate_result.scalar_one_or_none()
 
+        delegate_inv_result = await db.execute(
+            select(MeetingInvitationModel.str_apartment_number)
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == inv.int_meeting_id,
+                    MeetingInvitationModel.int_user_id == inv.int_delegated_id
+                )
+            )
+        )
+        delegate_apartment = delegate_inv_result.scalar_one_or_none()
+
+        # Fallback: buscar en tbl_user_residential_units si no hay invitación
+        if not delegate_apartment:
+            delegate_unit_result = await db.execute(
+                select(UserResidentialUnitModel.str_apartment_number)
+                .where(UserResidentialUnitModel.int_user_id == inv.int_delegated_id)
+                .limit(1)
+            )
+            delegate_apartment = delegate_unit_result.scalar_one_or_none()
+
         delegated_at = None
         if delegation_history and delegation_history.dat_delegated_at:
             delegated_at = delegation_history.dat_delegated_at.isoformat()
@@ -420,6 +441,7 @@ async def get_delegations_report(
             "delegate": {
                 "full_name": f"{delegate_data.str_firstname} {delegate_data.str_lastname}" if delegate_data else "—",
                 "email": delegate_data.str_email if delegate_data else "—",
+                "apartment": delegate_apartment,
             },
             "delegated_weight": float(inv.dec_quorum_base),
             "delegated_at": delegated_at,

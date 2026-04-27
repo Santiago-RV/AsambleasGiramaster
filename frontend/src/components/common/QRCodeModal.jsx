@@ -155,7 +155,8 @@ const QRCodeModal = ({
 			return;
 		}
 
-		const phone = resident.phone.replace(/\D/g, "");
+		const digits = resident.phone.replace(/\D/g, "");
+		const phone = digits.startsWith("57") && digits.length >= 11 ? digits : `57${digits}`;
 		const message = `Hola ${resident.firstname} ${resident.lastname}, te comparto tu código de acceso directo al sistema: ${autoLoginUrl}`;
 		window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 	};
