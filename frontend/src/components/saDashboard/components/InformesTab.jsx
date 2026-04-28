@@ -463,13 +463,14 @@ const generateDelegationsPDF = async (data) => {
         autoTable(doc, {
             startY: y,
             tableWidth: 269,
-            head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Fecha y Hora']],
+            head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Apto', 'Fecha y Hora']],
             body: delegations.map((d, idx) => [
                 idx + 1,
                 d.delegator.full_name,
                 d.delegator.apartment,
                 typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
                 d.delegate.full_name,
+                d.delegate.apartment || '—',
                 fmtDate(d.delegated_at),
             ]),
             styles: { fontSize: 8, cellPadding: 3 },
@@ -477,11 +478,12 @@ const generateDelegationsPDF = async (data) => {
             alternateRowStyles: { fillColor: [245, 243, 255] },
             columnStyles: {
                 0: { cellWidth: 8,  halign: 'center' },
-                1: { cellWidth: 84 },
+                1: { cellWidth: 74 },
                 2: { cellWidth: 18, halign: 'center' },
-                3: { cellWidth: 24, halign: 'right' },
-                4: { cellWidth: 84 },
-                5: { cellWidth: 51 },
+                3: { cellWidth: 22, halign: 'right' },
+                4: { cellWidth: 74 },
+                5: { cellWidth: 22, halign: 'center' },
+                6: { cellWidth: 51 },
             },
             margin: { left: 14, right: 14 },
         });
