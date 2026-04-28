@@ -4,11 +4,11 @@ import Swal from 'sweetalert2';
 import { ResidentService } from '../../services/api/ResidentService';
 import { formatDateLong } from '../../utils/dateUtils';
 
-const QRCodeModal = ({ 
-	resident, 
-	isOpen, 
-	onClose, 
-	autoLoginUrl 
+const QRCodeModal = ({
+	resident,
+	isOpen,
+	onClose,
+	autoLoginUrl
 }) => {
 	const [qrCodeUrl, setQrCodeUrl] = useState('');
 	const [isGenerating, setIsGenerating] = useState(false);
@@ -155,8 +155,10 @@ const QRCodeModal = ({
 			return;
 		}
 
-		const digits = resident.phone.replace(/\D/g, "");
-		const phone = digits.startsWith("57") && digits.length >= 11 ? digits : `57${digits}`;
+		const rawPhone = resident.phone.replace(/\D/g, "");
+		const phone = rawPhone.startsWith("57") && rawPhone.length > 2
+			? rawPhone
+			: "57" + rawPhone;
 		const message = `Hola ${resident.firstname} ${resident.lastname}, te comparto tu código de acceso directo al sistema: ${autoLoginUrl}`;
 		window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 	};
@@ -168,9 +170,9 @@ const QRCodeModal = ({
 				<head>
 					<title>Código de Acceso - ${resident.firstname} ${resident.lastname}</title>
 					<style>
-						body { 
-							font-family: Arial, sans-serif; 
-							text-align: center; 
+						body {
+							font-family: Arial, sans-serif;
+							text-align: center;
 							padding: 20px;
 							margin: 0;
 						}
@@ -220,11 +222,11 @@ const QRCodeModal = ({
 						<h2>Código de Acceso al Sistema</h2>
 						<p>Asambleas Giramaster</p>
 					</div>
-					
+
 					<div class="qr-container">
 						<img src="${qrCodeUrl}" alt="Código QR de Acceso" />
 					</div>
-					
+
 					<div class="resident-info">
 						<div class="info-row">
 							<span class="label">Nombre:</span>
@@ -249,7 +251,7 @@ const QRCodeModal = ({
 							${autoLoginUrl}
 						</div>
 					</div>
-					
+
 					<div class="footer">
 						<p>Este código QR proporciona acceso directo y seguro al sistema.</p>
 						<p>Generado el: ${formatDateLong(new Date())}</p>
@@ -330,8 +332,8 @@ const QRCodeModal = ({
 						) : (
 							qrCodeUrl && (
 								<div className="p-4 bg-white rounded-lg shadow-md">
-									<img 
-										src={qrCodeUrl} 
+									<img
+										src={qrCodeUrl}
 										alt="Código QR de Acceso"
 										className="w-[300px] h-[300px]"
 									/>

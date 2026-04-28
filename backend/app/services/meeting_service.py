@@ -372,7 +372,12 @@ class MeetingService:
         """Actualiza una reunión existente"""
         try:
             meeting = await self.get_meeting_by_id(meeting_id)
-            
+
+            date_changed = (
+                schedule_date is not None and
+                meeting.dat_schedule_date != schedule_date
+            )
+
             if title is not None:
                 meeting.str_title = title
             if description is not None:
@@ -385,16 +390,23 @@ class MeetingService:
                 meeting.int_estimated_duration = estimated_duration
             if allow_delegates is not None:
                 meeting.bln_allow_delegates = allow_delegates
-            if status is not None:
+
+            # Si cambió la fecha, siempre volver a "Programada" independientemente del estado actual
+            if date_changed:
+                meeting.str_status = "Programada"
+                logger.info(
+                    f"Reunión {meeting_id}: fecha modificada, estado restablecido a 'Programada'"
+                )
+            elif status is not None:
                 meeting.str_status = status
-            
+
             meeting.updated_at = datetime.now()
             if user_id:
                 meeting.updated_by = user_id
-            
+
             await self.db.commit()
             await self.db.refresh(meeting)
-            
+
             return meeting
             
         except ResourceNotFoundException:
@@ -724,8 +736,7 @@ class MeetingService:
         """
         try:
             from app.services.simple_auto_login_service import simple_auto_login_service
-            from app.core.security import security_manager
-            
+
             # 1. Decodificar el JWT del QR
             credentials = simple_auto_login_service.decode_auto_login_token(qr_token)
             
@@ -740,13 +751,13 @@ class MeetingService:
                 }
             
             username = credentials["username"]
-            password = credentials["password"]
-            
+            token_id = credentials.get("token_id")
+
             # 2. Buscar al usuario por username
             user_query = select(UserModel).where(UserModel.str_username == username.lower().strip())
             user_result = await self.db.execute(user_query)
             target_user = user_result.scalar_one_or_none()
-            
+
             if not target_user:
                 logger.warning(f"QR Attendance: Usuario no encontrado: {username}")
                 return {
@@ -756,17 +767,21 @@ class MeetingService:
                     "user_info": None,
                     "meeting_info": None
                 }
-            
-            # 3. Verificar la contrasena (el QR puede haber sido regenerado)
-            if not security_manager.verify_password(password, target_user.str_password_hash):
-                logger.warning(f"QR Attendance: Credenciales invalidas para usuario {username}")
-                return {
-                    "success": False,
-                    "already_registered": False,
-                    "message": "El codigo QR tiene credenciales obsoletas. El copropietario debe solicitar un nuevo QR.",
-                    "user_info": None,
-                    "meeting_info": None
-                }
+
+            # 3. Verificar que el token_id fue emitido para este usuario y no ha expirado
+            if token_id:
+                is_valid = await simple_auto_login_service.is_token_valid_for_user(
+                    self.db, token_id, target_user.id
+                )
+                if not is_valid:
+                    logger.warning(f"QR Attendance: Token invalido o expirado para usuario {username}")
+                    return {
+                        "success": False,
+                        "already_registered": False,
+                        "message": "El codigo QR ha expirado o ya no es valido. El copropietario debe solicitar un nuevo QR.",
+                        "user_info": None,
+                        "meeting_info": None
+                    }
             
             # 4. Obtener datos personales del usuario
             data_user_query = select(DataUserModel).where(DataUserModel.id == target_user.int_data_user_id)

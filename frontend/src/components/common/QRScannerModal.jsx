@@ -14,10 +14,12 @@ import { MeetingService } from '../../services/api/MeetingService';
  */
 const QRScannerModal = ({ isOpen, onClose }) => {
 	const [isScanning, setIsScanning] = useState(false);
+	const [isStarting, setIsStarting] = useState(false);
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [scanResult, setScanResult] = useState(null); // { type: 'success'|'error'|'warning', data }
 	const [registeredUsers, setRegisteredUsers] = useState([]); // historial de registros en esta sesion
 	const html5QrCodeRef = useRef(null);
+	const isStartingRef = useRef(false); // guard contra llamadas concurrentes a startScanning
 	const scannerContainerId = 'qr-scanner-reader';
 	const lastScannedRef = useRef(''); // evitar escaneos duplicados rapidos
 	const lastScannedTimeRef = useRef(0);
@@ -149,10 +151,15 @@ const QRScannerModal = ({ isOpen, onClose }) => {
 	 * Inicia el escaneo de QR usando la camara
 	 */
 	const startScanning = useCallback(async () => {
+		// Evitar llamadas concurrentes que causarian vista duplicada
+		if (isStartingRef.current) return;
+		isStartingRef.current = true;
+		setIsStarting(true);
+
 		try {
 			if (html5QrCodeRef.current) {
 				try { await html5QrCodeRef.current.stop(); } catch { /* ignorar */ }
-				html5QrCodeRef.current.clear();
+				try { html5QrCodeRef.current.clear(); } catch { /* ignorar */ }
 				html5QrCodeRef.current = null;
 			}
 
@@ -184,6 +191,7 @@ const QRScannerModal = ({ isOpen, onClose }) => {
 			setIsScanning(true);
 		} catch (error) {
 			console.error('Error al iniciar scanner:', error);
+			html5QrCodeRef.current = null;
 
 			let errorMsg = 'No se pudo acceder a la camara.';
 			if (error.toString().includes('NotAllowedError')) {
@@ -200,6 +208,9 @@ const QRScannerModal = ({ isOpen, onClose }) => {
 				text: errorMsg,
 				confirmButtonColor: '#e74c3c'
 			});
+		} finally {
+			isStartingRef.current = false;
+			setIsStarting(false);
 		}
 	}, [handleQRScan]);
 
@@ -207,13 +218,13 @@ const QRScannerModal = ({ isOpen, onClose }) => {
 	 * Detiene el escaneo
 	 */
 	const stopScanning = useCallback(async () => {
+		isStartingRef.current = false;
+		setIsStarting(false);
 		try {
 			if (html5QrCodeRef.current) {
-				const state = html5QrCodeRef.current.getState();
-				if (state === 2) { // SCANNING state
-					await html5QrCodeRef.current.stop();
-				}
-				html5QrCodeRef.current.clear();
+				// Intentar stop() siempre, independientemente del estado (incluso si aun esta iniciando)
+				try { await html5QrCodeRef.current.stop(); } catch { /* ignorar */ }
+				try { html5QrCodeRef.current.clear(); } catch { /* ignorar */ }
 				html5QrCodeRef.current = null;
 			}
 		} catch (error) {
@@ -310,10 +321,15 @@ const QRScannerModal = ({ isOpen, onClose }) => {
 						) : (
 							<button
 								onClick={startScanning}
-								className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors text-sm font-medium"
+								disabled={isStarting}
+								className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
 							>
-								<Camera size={16} />
-								Iniciar camara
+								{isStarting ? (
+									<Loader2 size={16} className="animate-spin" />
+								) : (
+									<Camera size={16} />
+								)}
+								{isStarting ? 'Iniciando...' : 'Iniciar camara'}
 							</button>
 						)}
 					</div>
