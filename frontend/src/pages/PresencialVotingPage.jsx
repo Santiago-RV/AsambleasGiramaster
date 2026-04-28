@@ -287,38 +287,60 @@ export default function PresencialVotingPage() {
         )}
 
         {/* Banner: poderes recibidos */}
-        {receivedDelegations.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md border-2 border-green-300 p-4 mb-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                <UserPlus className="text-white" size={20} />
+        {receivedDelegations.length > 0 && (() => {
+          const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const currentUserName = storedUser.name || storedUser.username || storedUser.email || 'Usted';
+          return (
+            <div className="bg-white rounded-xl shadow-md border-2 border-green-300 p-4 mb-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <UserPlus className="text-white" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-green-900">Poderes de Votación Recibidos</h3>
+                  <p className="text-xs text-green-700">Tu voto contará con el peso acumulado de todos los poderes cedidos</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-green-900">Poderes de Votación Recibidos</h3>
-                <p className="text-xs text-green-700">Tu voto contará con el peso acumulado de todos los poderes</p>
-              </div>
-            </div>
-            <div className="space-y-2 mb-3">
-              {receivedDelegations.map((d, i) => (
-                <div key={i} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 border border-green-200">
-                  <span className="text-sm font-medium text-gray-800">
-                    {d.delegator.str_firstname} {d.delegator.str_lastname}
-                  </span>
-                  <div className="flex items-center gap-1 text-green-700">
+
+              {/* Usuario actual */}
+              <div className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 border border-blue-200 mb-3">
+                <div>
+                  <p className="text-xs text-blue-600 font-semibold uppercase">Tu nombre</p>
+                  <span className="text-sm font-bold text-blue-900">{currentUserName}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-blue-600 font-semibold uppercase">Tu coeficiente propio</p>
+                  <div className="flex items-center gap-1 justify-end text-blue-700">
                     <Hash size={13} />
-                    <span className="text-sm font-bold">+{parseFloat(d.delegated_weight).toFixed(4)}%</span>
+                    <span className="text-sm font-bold">{parseFloat(delegationStatus?.original_weight ?? 0).toFixed(4)}%</span>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Personas que cedieron poder */}
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Poderes recibidos de:</p>
+              <div className="space-y-2 mb-3">
+                {receivedDelegations.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+                    <span className="text-sm font-medium text-gray-800">
+                      {d.delegator.str_firstname} {d.delegator.str_lastname}
+                    </span>
+                    <div className="flex items-center gap-1 text-green-700">
+                      <Hash size={13} />
+                      <span className="text-sm font-bold">+{parseFloat(d.delegated_weight).toFixed(4)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total */}
+              <div className="flex items-center justify-between bg-green-100 rounded-lg px-3 py-2 border-2 border-green-300">
+                <span className="text-sm font-semibold text-green-800">Peso total de votación:</span>
+                <span className="text-xl font-bold text-green-700">{parseFloat(delegationStatus?.total_weight ?? 0).toFixed(4)}%</span>
+              </div>
             </div>
-            <div className="flex items-center justify-between bg-green-100 rounded-lg px-3 py-2 border-2 border-green-300">
-              <span className="text-sm font-semibold text-green-800">Tu coeficiente propio:</span>
-              <span className="text-sm font-bold text-green-700">{parseFloat(delegationStatus?.original_weight ?? 0).toFixed(4)}%</span>
-              <span className="text-sm font-semibold text-green-800">Peso total de votación:</span>
-              <span className="text-lg font-bold text-green-700">{parseFloat(delegationStatus?.total_weight ?? 0).toFixed(4)}%</span>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">

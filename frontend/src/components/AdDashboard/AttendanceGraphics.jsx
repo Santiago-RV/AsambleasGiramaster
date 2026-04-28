@@ -17,24 +17,51 @@ const AttendanceChart = ({ summary }) => {
         chartRef.current.destroy();
       }
 
+      const counts = [summary.total_attended, summary.total_absent];
+
+      const centerLabels = {
+        id: "centerLabels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            if (!meta.visible) return;
+            meta.data.forEach((element, index) => {
+              const value = counts[index];
+              if (!value) return;
+              const midAngle = (element.startAngle + element.endAngle) / 2;
+              const radius = element.outerRadius * 0.6;
+              const x = element.x + Math.cos(midAngle) * radius;
+              const y = element.y + Math.sin(midAngle) * radius;
+              ctx.save();
+              ctx.fillStyle = "#ffffff";
+              ctx.font = `bold ${Math.max(11, Math.round(element.outerRadius * 0.18))}px sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText(String(value), x, y);
+              ctx.restore();
+            });
+          });
+        },
+      };
+
       chartRef.current = new Chart(canvasRef.current, {
         type: "pie",
         data: {
           labels: ["Asistieron", "No asistieron"],
           datasets: [
             {
-              data: [summary.total_attended, summary.total_absent],
+              data: counts,
               backgroundColor: ["#10b981", "#ef4444"],
             },
           ],
         },
         options: {
           plugins: {
-            legend: {
-              position: "top",
-            },
+            legend: { position: "top" },
           },
         },
+        plugins: [centerLabels],
       });
     };
 

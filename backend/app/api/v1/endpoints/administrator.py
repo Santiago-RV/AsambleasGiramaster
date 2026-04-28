@@ -1418,7 +1418,24 @@ async def get_delegations_report(
                 .where(UserModel.id == inv.int_delegated_id)
             )
             delegate_data = delegate_result.scalar_one_or_none()
-            
+
+            delegate_apt_result = await db.execute(
+                select(MeetingInvitationModel.str_apartment_number)
+                .where(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.int_user_id == inv.int_delegated_id
+                )
+            )
+            delegate_apartment = delegate_apt_result.scalar_one_or_none()
+
+            if not delegate_apartment:
+                fallback_result = await db.execute(
+                    select(UserResidentialUnitModel.str_apartment_number)
+                    .where(UserResidentialUnitModel.int_user_id == inv.int_delegated_id)
+                    .limit(1)
+                )
+                delegate_apartment = fallback_result.scalar_one_or_none()
+
             delegations.append({
                 "id": inv.id,
                 "delegator": {
@@ -1432,6 +1449,7 @@ async def get_delegations_report(
                     "id": inv.int_delegated_id,
                     "full_name": f"{delegate_data.str_firstname} {delegate_data.str_lastname}" if delegate_data else "—",
                     "email": delegate_data.str_email if delegate_data else "—",
+                    "apartment": delegate_apartment,
                 },
                 "delegated_weight": float(inv.dec_quorum_base) if inv.dec_quorum_base else 0.0,
             })

@@ -27,6 +27,18 @@ from app.models.email_notification_model import EmailNotificationModel
 from app.models.meeting_invitation_model import MeetingInvitationModel
 from app.models.meeting_model import MeetingModel
 from app.services.email_service import EmailService
+
+
+def _normalize_phone_co(phone) -> Optional[str]:
+    """Normaliza un número de teléfono colombiano agregando el prefijo +57."""
+    if not phone:
+        return None
+    digits = ''.join(c for c in str(phone) if c.isdigit())
+    if not digits:
+        return None
+    if digits.startswith('57') and len(digits) >= 11:
+        return f'+{digits}'
+    return f'+57{digits}'
 from app.services.support_service import SupportService
 from app.core.logging_config import get_logger
 
@@ -565,7 +577,7 @@ class ResidentialUnitService:
                     firstname = str(row_dict['firstname']).strip()
                     lastname = str(row_dict['lastname']).strip()
                     apartment_number = str(row_dict['apartment_number']).strip()
-                    phone = str(row_dict.get('phone', '')).strip() if pd.notna(row_dict.get('phone')) else None
+                    phone = _normalize_phone_co(str(row_dict.get('phone', '')).strip() if pd.notna(row_dict.get('phone')) else None)
                     password_from_excel = str(row_dict.get('password', '')).strip()
                     if password_from_excel and len(password_from_excel) >= 8:
                         password = password_from_excel
@@ -764,7 +776,7 @@ class ResidentialUnitService:
             firstname = resident_data.get('firstname', '').strip()
             lastname = resident_data.get('lastname', '').strip()
             email = resident_data.get('email', '').strip().lower()
-            phone = resident_data.get('phone', '').strip() if resident_data.get('phone') else None
+            phone = _normalize_phone_co(resident_data.get('phone', '').strip() if resident_data.get('phone') else None)
             apartment_number = resident_data.get('apartment_number', '').strip()
             password = self._generate_secure_password(firstname, lastname, apartment_number)
             is_active = resident_data.get('is_active', False)  # Por defecto deshabilitado
@@ -1173,7 +1185,7 @@ class ResidentialUnitService:
                 data_user.str_email = update_data['email']
             
             if 'phone' in update_data:
-                data_user.str_phone = update_data['phone']
+                data_user.str_phone = _normalize_phone_co(update_data['phone'])
             
             data_user.updated_at = datetime.now()
             

@@ -65,9 +65,35 @@ const addFooter = (doc) => {
 
 // ─── PDF Graphics ────────────────────────────────────────────────────────────
 
+const centerLabelsPlugin = (labelValues) => ({
+    id: 'centerLabels',
+    afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            if (!meta.visible) return;
+            meta.data.forEach((element, index) => {
+                const value = labelValues ? labelValues[index] : dataset.data[index];
+                if (!value) return;
+                const midAngle = (element.startAngle + element.endAngle) / 2;
+                const radius = element.outerRadius * 0.6;
+                const x = element.x + Math.cos(midAngle) * radius;
+                const y = element.y + Math.sin(midAngle) * radius;
+                ctx.save();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${Math.round(element.outerRadius * 0.2)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(value), x, y);
+                ctx.restore();
+            });
+        });
+    }
+});
+
 const generatePieChartImage = async (attendedCount, absentCount) => {
     const { Chart } = await import('chart.js/auto');
-    
+
     return new Promise((resolve, reject) => {
         const canvas = document.createElement('canvas');
         canvas.width = 500;
@@ -79,7 +105,6 @@ const generatePieChartImage = async (attendedCount, absentCount) => {
             type: 'pie',
             data: {
                 labels: ['Asistentes', 'Ausentes'],
-                position: 'right',
                 datasets: [{
                     data: [attendedCount, absentCount],
                     backgroundColor: ['#16a34a', '#dc2626']
@@ -87,8 +112,9 @@ const generatePieChartImage = async (attendedCount, absentCount) => {
             },
             options: {
                 responsive: false,
-                animation: false 
-            }
+                animation: false
+            },
+            plugins: [centerLabelsPlugin()]
         });
 
         try {
@@ -116,7 +142,7 @@ const generatePieChartImage = async (attendedCount, absentCount) => {
 
 const generatePollChartImage = async (poll) => {
     const { Chart } = await import('chart.js/auto');
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = 500;
     canvas.height = 500;
@@ -124,7 +150,8 @@ const generatePollChartImage = async (poll) => {
     const ctx = canvas.getContext('2d');
 
     const labels = poll.options.map(opt => opt.text);
-    const dataValues = poll.options.map(opt => opt.votes_weight); // 🔥 usa peso
+    const dataValues = poll.options.map(opt => opt.votes_weight);
+    const countValues = poll.options.map(opt => opt.votes_count);
 
     const colors = [
         '#4f46e5', '#16a34a', '#dc2626', '#f59e0b',
@@ -145,24 +172,18 @@ const generatePollChartImage = async (poll) => {
             responsive: false,
             plugins: {
                 legend: {
-                        position: 'top',
-                        labels: {
-                            font: {
-                                size: 14
-                            },
-                        }   
+                    position: 'top',
+                    labels: { font: { size: 14 } }
                 }
             }
-        }
+        },
+        plugins: [centerLabelsPlugin(countValues)]
     });
 
     chart.update();
-
     await new Promise(r => setTimeout(r, 100));
-
     const image = canvas.toDataURL('image/png');
     chart.destroy();
-
     return image;
 };
 
@@ -173,11 +194,27 @@ const generateAttendancePDF = async (data) => {
         import('jspdf'),
         import('jspdf-autotable')
     ]);
-    
+
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, summary, attended, absent } = data;
 
+    // Generar gráfica primero (async) antes de construir el PDF
+    const chartImage = await generatePieChartImage(attended.length, absent.length);
+
     let y = addHeader(doc, 'INFORME DE ASISTENCIA', meeting.title, meeting.residential_unit, meeting.scheduled_date);
+
+    // GRÁFICO AL INICIO
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 58, 138);
+    doc.text('GRÁFICO DE ASISTENCIA', 14, y);
+    y += 6;
+
+    const pageWidthChart = doc.internal.pageSize.getWidth();
+    const imgSizeChart = 65;
+    const xChart = (pageWidthChart - imgSizeChart) / 2;
+    doc.addImage(chartImage, 'PNG', xChart, y, imgSizeChart, imgSizeChart);
+    y += imgSizeChart + 10;
 
     // RESUMEN
     doc.setFontSize(10);
@@ -243,28 +280,7 @@ const generateAttendancePDF = async (data) => {
         });
     }
     y = doc.lastAutoTable.finalY + 10;
-    // GRAFICO
-    const chartImage = await generatePieChartImage(attended.length, absent.length);
 
-    if (y > 160) {
-        doc.addPage();
-        y = 20;
-    }
-
-    // Título
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(30, 58, 138);
-    doc.text('GRAFICO DE ASISTENCIA', 14, y);
-    y += 6;
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const imgSize = 65;
-    const x = (pageWidth - imgSize) / 2;
-
-    doc.addImage(chartImage, 'PNG', x, y, imgSize, imgSize);
-    y += imgSize + 10;
- 
     addFooter(doc);
     doc.save(`Asistencia_${meeting.title.replace(/\s/g, '_')}.pdf`);
 };
@@ -292,6 +308,9 @@ const generatePollsPDF = async (data) => {
     for (let idx = 0; idx < polls.length; idx++) {
         const poll = polls[idx];
 
+        // Generar gráfica al inicio de cada encuesta
+        const chartImage = await generatePollChartImage(poll);
+
         // Título encuesta
         doc.setFillColor(238, 242, 255);
         doc.roundedRect(14, y - 1, doc.internal.pageSize.getWidth() - 28, 10, 2, 2, 'F');
@@ -300,6 +319,17 @@ const generatePollsPDF = async (data) => {
         doc.setTextColor(30, 58, 138);
         doc.text(`${idx + 1}. ${poll.title}`, 17, y + 6);
         y += 14;
+
+        // GRÁFICO ANTES DE LAS TABLAS
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(30, 58, 138);
+        doc.text('Resultados de votación', 14, y);
+        y += 6;
+        doc.addImage(chartImage, 'PNG', x, y, imgWidth, imgWidth);
+        y += imgWidth + 8;
+
+        if (y > 240) { doc.addPage(); y = 20; }
 
         // Info general encuesta
         autoTable(doc, {
@@ -399,27 +429,6 @@ const generatePollsPDF = async (data) => {
             y = doc.lastAutoTable.finalY + 4;
         }
 
-        //GRAFICO
-        const chartImage = await generatePollChartImage(poll);
-
-        if (y > 160) {
-            doc.addPage();
-            y = 20;
-        }
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(30, 58, 138);
-        doc.text('Resultados de votación', 14, y);
-        y += 6;
-
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const imgSize = 65;
-        const x = (pageWidth - imgSize) / 2;
-
-        doc.addImage(chartImage, 'PNG', x, y, imgSize, imgSize);
-        y += imgSize + 10;
-        
     };
 
     addFooter(doc);
@@ -450,8 +459,10 @@ const generateDelegationsPDF = async (data) => {
         doc.setTextColor(150);
         doc.text('No se registraron delegaciones de poderes en esta reunión.', 14, y);
     } else {
+        // A4 landscape: 297mm - 28mm márgenes = 269mm útiles
         autoTable(doc, {
             startY: y,
+            tableWidth: 269,
             head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Fecha y Hora']],
             body: delegations.map((d, idx) => [
                 idx + 1,
@@ -460,19 +471,17 @@ const generateDelegationsPDF = async (data) => {
                 typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
                 d.delegate.full_name,
                 fmtDate(d.delegated_at),
-                //d.notes || '—',
             ]),
             styles: { fontSize: 8, cellPadding: 3 },
             headStyles: { fillColor: [124, 58, 237], fontSize: 8, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [245, 243, 255] },
             columnStyles: {
-                0: { cellWidth: 8, halign: 'center' },
-                1: { cellWidth: 50 },
-                2: { cellWidth: 15, halign: 'center' },
-                3: { cellWidth: 22, halign: 'right' },
-                4: { cellWidth: 50 },
-                5: { cellWidth: 35 },
-                6: { cellWidth: 'auto' },
+                0: { cellWidth: 8,  halign: 'center' },
+                1: { cellWidth: 84 },
+                2: { cellWidth: 18, halign: 'center' },
+                3: { cellWidth: 24, halign: 'right' },
+                4: { cellWidth: 84 },
+                5: { cellWidth: 51 },
             },
             margin: { left: 14, right: 14 },
         });

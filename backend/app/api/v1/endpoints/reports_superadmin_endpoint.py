@@ -13,6 +13,8 @@ from app.models.poll_model import PollModel
 from app.models.poll_option_model import PollOptionModel
 from app.models.poll_response_model import PollResponseModel
 from app.models.residential_unit_model import ResidentialUnitModel
+from app.models.delegation_history_model import DelegationHistoryModel
+from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.services.user_service import UserService
 from app.schemas.responses_schema import SuccessResponse
 import logging
@@ -373,9 +375,17 @@ async def get_delegations_report(
     meeting, residential_unit = row
 
     result = await db.execute(
-        select(MeetingInvitationModel, DataUserModel)
+        select(MeetingInvitationModel, DataUserModel, DelegationHistoryModel)
         .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
         .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+        .outerjoin(
+            DelegationHistoryModel,
+            and_(
+                DelegationHistoryModel.int_delegator_user_id == MeetingInvitationModel.int_user_id,
+                DelegationHistoryModel.int_meeting_id == meeting_id,
+                DelegationHistoryModel.str_status == "active"
+            )
+        )
         .where(
             and_(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
@@ -387,13 +397,39 @@ async def get_delegations_report(
     delegator_rows = result.all()
 
     delegations = []
-    for inv, delegator_data in delegator_rows:
+    for inv, delegator_data, delegation_history in delegator_rows:
         delegate_result = await db.execute(
             select(DataUserModel)
             .join(UserModel, UserModel.int_data_user_id == DataUserModel.id)
             .where(UserModel.id == inv.int_delegated_id)
         )
         delegate_data = delegate_result.scalar_one_or_none()
+
+        delegate_inv_result = await db.execute(
+            select(MeetingInvitationModel.str_apartment_number)
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == inv.int_meeting_id,
+                    MeetingInvitationModel.int_user_id == inv.int_delegated_id
+                )
+            )
+        )
+        delegate_apartment = delegate_inv_result.scalar_one_or_none()
+
+        # Fallback: buscar en tbl_user_residential_units si no hay invitación
+        if not delegate_apartment:
+            delegate_unit_result = await db.execute(
+                select(UserResidentialUnitModel.str_apartment_number)
+                .where(UserResidentialUnitModel.int_user_id == inv.int_delegated_id)
+                .limit(1)
+            )
+            delegate_apartment = delegate_unit_result.scalar_one_or_none()
+
+        delegated_at = None
+        if delegation_history and delegation_history.dat_delegated_at:
+            delegated_at = delegation_history.dat_delegated_at.isoformat()
+        elif inv.updated_at:
+            delegated_at = inv.updated_at.isoformat()
 
         delegations.append({
             "delegator": {
@@ -405,8 +441,10 @@ async def get_delegations_report(
             "delegate": {
                 "full_name": f"{delegate_data.str_firstname} {delegate_data.str_lastname}" if delegate_data else "—",
                 "email": delegate_data.str_email if delegate_data else "—",
+                "apartment": delegate_apartment,
             },
             "delegated_weight": float(inv.dec_quorum_base),
+            "delegated_at": delegated_at,
         })
 
     return SuccessResponse(
