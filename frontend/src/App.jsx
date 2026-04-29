@@ -12,7 +12,7 @@ import AppAdmin from './pages/AdDashboard.jsx'
 import AppCopropietario from './pages/CoDashboard.jsx'
 import PresencialVotingPage from './pages/PresencialVotingPage';
 import NotFound from './pages/NotFound';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import './App.css';
 
 function App() {

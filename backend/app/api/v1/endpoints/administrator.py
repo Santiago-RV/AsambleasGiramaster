@@ -1308,8 +1308,19 @@ async def get_polls_report(
                 }
                 for inv_nv, user_nv, du in non_voters_result.all()
             ]
+            total_invited_result = await db.execute(
+                select(MeetingInvitationModel).where(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )   
+
+            total_invited = len(total_invited_result.scalars().all())
 
             polls_data.append({
+                "participation_percentage":
+                    round((len(voted_user_ids) / total_invited) * 100, 2)
+                    if total_invited > 0 else 0,
                 "id": poll.id,
                 "title": poll.str_title,
                 "description": poll.str_description,

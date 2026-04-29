@@ -168,17 +168,16 @@ const { summary, attended, absent } = data;
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Distribución de Asistencia
         </h3>
-
         <AttendanceChart summary={summary} />
       </div>
       {/* Quorum Info */}
-      <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+      {/* <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
         <div className="flex items-center gap-2 mb-2">
           <TrendingUp className="text-amber-600" size={20} />
           <span className="font-semibold text-amber-800">Quórum Alcanzado</span>
         </div>
         <p className="text-2xl font-bold text-amber-700">{summary.quorum_achieved}</p>
-      </div>
+      </div> */}
 
       {/* Attended List */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -404,8 +403,8 @@ const PollDetailView = ({ poll }) => (
           <p className="text-xs text-indigo-200">Peso Total</p>
         </div>
         <div className="bg-white/15 rounded-lg p-2.5 text-center">
-          <p className="text-xl font-bold text-white">{poll.options.length}</p>
-          <p className="text-xs text-indigo-200">Opciones</p>
+          <p className="text-xl font-bold text-white">{poll.participation_percentage}%</p>
+          <p className="text-xs text-indigo-200">% Participación</p>
         </div>
       </div>
     </div>
