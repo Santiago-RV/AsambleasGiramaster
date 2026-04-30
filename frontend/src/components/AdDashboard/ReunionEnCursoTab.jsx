@@ -158,8 +158,26 @@ const ReunionEnCursoTab = () => {
 
   const registeredUsers = meeting?.connected_users ?? [];
   const absentUsers = meeting?.absent_users ?? [];
-  const absentPageCount = Math.ceil(absentUsers.length / ABSENT_PAGE_SIZE);
-  const absentPageItems = absentUsers.slice(absentPage * ABSENT_PAGE_SIZE, (absentPage + 1) * ABSENT_PAGE_SIZE);
+
+  // Agrupar ausentes: el delegado (receptor de poderes) es el encabezado;
+  // sus delegantes aparecen como sub-items dentro de la misma card.
+  const absentGroups = (() => {
+    const absentIds = new Set(absentUsers.map(u => u.user_id));
+    // Delegantes: tienen delegated_to_user_id apuntando a otro ausente
+    const delegatorIds = new Set(
+      absentUsers
+        .filter(u => u.delegated_to_user_id && absentIds.has(u.delegated_to_user_id))
+        .map(u => u.user_id)
+    );
+    const heads = absentUsers.filter(u => !delegatorIds.has(u.user_id));
+    return heads.map(head => ({
+      head,
+      delegators: absentUsers.filter(u => u.delegated_to_user_id === head.user_id),
+    }));
+  })();
+
+  const absentPageCount = Math.ceil(absentGroups.length / ABSENT_PAGE_SIZE);
+  const absentPageItems = absentGroups.slice(absentPage * ABSENT_PAGE_SIZE, (absentPage + 1) * ABSENT_PAGE_SIZE);
 
   if (!meeting) {
     return (
@@ -401,31 +419,54 @@ const ReunionEnCursoTab = () => {
           <UserMinus size={18} className="text-orange-500" />
           Ausentes ({absentUsers.length})
         </h3>
-        {absentUsers.length > 0 ? (
+        {absentGroups.length > 0 ? (
           <>
             <div className="grid grid-cols-3 gap-2">
-              {absentPageItems.map((user) => (
+              {absentPageItems.map(({ head, delegators }) => (
                 <div
-                  key={user.user_id}
-                  className="flex items-center justify-between p-2 bg-orange-50 rounded-lg"
+                  key={head.user_id}
+                  className="bg-orange-50 border border-orange-200 rounded-lg overflow-hidden"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 bg-orange-200 rounded-full flex items-center justify-center text-orange-700 font-semibold text-xs shrink-0">
-                      {user.full_name?.charAt(0)}
+                  {/* Encabezado: el delegado (quien recibió los poderes) */}
+                  <div className="flex items-center justify-between p-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 bg-orange-300 rounded-full flex items-center justify-center text-orange-800 font-bold text-xs shrink-0">
+                        {head.full_name?.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-xs truncate text-orange-900">{head.full_name}</div>
+                        <div className="text-xs text-gray-500">Apto {head.apartment_number}</div>
+                        <div className="text-xs text-orange-600 font-medium">Q: {head.voting_weight ?? '—'}</div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="font-medium text-xs truncate">{user.full_name}</div>
-                      <div className="text-xs text-gray-500">Apto {user.apartment_number}</div>
-                      <div className="text-xs text-orange-600 font-medium">Q: {user.voting_weight ?? user.quorum_base ?? '—'}</div>
-                    </div>
+                    <button
+                      onClick={() => handleUnmarkAbsent(head.user_id)}
+                      className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded shrink-0"
+                      title="Quitar de ausentes (incluye delegantes)"
+                    >
+                      <X size={13} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleUnmarkAbsent(user.user_id)}
-                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded shrink-0"
-                    title="Quitar de ausentes"
-                  >
-                    <X size={13} />
-                  </button>
+
+                  {/* Sub-lista: delegantes que cedieron su poder a este usuario */}
+                  {delegators.length > 0 && (
+                    <div className="border-t border-orange-200 bg-orange-100/50 px-2 py-1.5 space-y-1">
+                      <p className="text-[10px] font-semibold text-orange-500 uppercase tracking-wide mb-1">
+                        Cedió poder a este usuario
+                      </p>
+                      {delegators.map(d => (
+                        <div key={d.user_id} className="flex items-center gap-1.5">
+                          <div className="w-4 h-4 bg-orange-200 rounded-full flex items-center justify-center text-orange-700 font-semibold text-[9px] shrink-0">
+                            {d.full_name?.charAt(0)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[11px] font-medium truncate text-gray-700">{d.full_name}</div>
+                            <div className="text-[10px] text-gray-400">Apto {d.apartment_number} · Q: {d.voting_weight ?? '—'}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

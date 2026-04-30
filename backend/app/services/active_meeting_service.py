@@ -580,6 +580,7 @@ class ActiveMeetingService:
                 "email": u["email"],
                 "apartment_number": u["apartment_number"],
                 "voting_weight": u["voting_weight"],
+                "delegated_to_user_id": u.get("delegated_to_user_id"),
             }
             for u in absent_users
         ]
@@ -732,7 +733,7 @@ class ActiveMeetingService:
         ]
 
     async def _get_absent_users(self, meeting_id: int) -> List[dict]:
-        """Obtiene usuarios conectados marcados como ausentes por el admin."""
+        """Obtiene usuarios marcados como ausentes por el admin, incluyendo a quién delegaron."""
         query = (
             select(
                 UserModel.id,
@@ -741,6 +742,7 @@ class ActiveMeetingService:
                 DataUserModel.str_email,
                 MeetingInvitationModel.str_apartment_number,
                 MeetingInvitationModel.dec_quorum_base,
+                MeetingInvitationModel.int_delegated_id,
             )
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
             .join(
@@ -766,12 +768,13 @@ class ActiveMeetingService:
                 "email": u.str_email,
                 "apartment_number": u.str_apartment_number,
                 "voting_weight": float(u.dec_quorum_base or 0),
+                "delegated_to_user_id": u.int_delegated_id,
             }
             for u in result.all()
         ]
 
     async def mark_user_absent(self, meeting_id: int, user_id: int) -> dict:
-        """Marca a un usuario como ausente en la reunión."""
+        """Marca a un usuario como ausente y también a sus delegantes (quienes le cedieron el poder)."""
         inv_q = select(MeetingInvitationModel).where(
             and_(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
@@ -781,16 +784,29 @@ class ActiveMeetingService:
         inv = (await self.db.execute(inv_q)).scalar_one_or_none()
         if not inv:
             return {"success": False, "message": "Invitación no encontrada"}
+
+        # Marcar al usuario principal
         await self.db.execute(
             sa_update(MeetingInvitationModel)
             .where(MeetingInvitationModel.id == inv.id)
+            .values(bln_marked_absent=True)
+        )
+        # Marcar en cascada a quienes le cedieron el poder
+        await self.db.execute(
+            sa_update(MeetingInvitationModel)
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.int_delegated_id == user_id,
+                )
+            )
             .values(bln_marked_absent=True)
         )
         await self.db.commit()
         return {"success": True}
 
     async def unmark_user_absent(self, meeting_id: int, user_id: int) -> dict:
-        """Quita la marca de ausente de un usuario."""
+        """Quita la marca de ausente del usuario y de sus delegantes."""
         inv_q = select(MeetingInvitationModel).where(
             and_(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
@@ -800,9 +816,22 @@ class ActiveMeetingService:
         inv = (await self.db.execute(inv_q)).scalar_one_or_none()
         if not inv:
             return {"success": False, "message": "Invitación no encontrada"}
+
+        # Desmarcar al usuario principal
         await self.db.execute(
             sa_update(MeetingInvitationModel)
             .where(MeetingInvitationModel.id == inv.id)
+            .values(bln_marked_absent=False)
+        )
+        # Desmarcar en cascada a sus delegantes
+        await self.db.execute(
+            sa_update(MeetingInvitationModel)
+            .where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.int_delegated_id == user_id,
+                )
+            )
             .values(bln_marked_absent=False)
         )
         await self.db.commit()
