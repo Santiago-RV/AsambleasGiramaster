@@ -12,13 +12,15 @@ const addHeader = (doc, title, meetingTitle, unitName, date) => {
     const pw = doc.internal.pageSize.getWidth();
     const logo = '/src/assets/logo-giramaster.jpeg'; 
 
-    doc.setFillColor(30, 58, 138);
+    doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pw, 32, 'F');
+    doc.setDrawColor(30, 58, 138);
+    doc.setLineWidth(0.8);
+    doc.line(0, 32, pw, 32);
 
+    doc.addImage(logo, 'jpeg', 10, 6, 50, 20);
 
-    doc.addImage(logo, 'jpeg', 10, 6, 50, 20); 
-
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(30, 58, 138);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
 
@@ -200,7 +202,16 @@ const generatePollChartImage = async (poll) => {
 
 // ─── Generadores PDF ─────────────────────────────────────────────────────────
 
-const generateAttendancePDF = async (data) => {
+const buildDelegateMap = (delegations) => {
+    const map = {};
+    (delegations || []).forEach(d => {
+        const key = `${d.delegator.full_name}|${d.delegator.apartment}`;
+        map[key] = d.delegate.full_name;
+    });
+    return map;
+};
+
+const generateAttendancePDF = async (data, delegateMap = {}) => {
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
         import('jspdf'),
         import('jspdf-autotable')
@@ -208,6 +219,7 @@ const generateAttendancePDF = async (data) => {
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, summary, attended, absent } = data;
+    const pw = doc.internal.pageSize.getWidth();
 
     // Generar gráfica primero (async) antes de construir el PDF
     const chartImage = await generatePieChartImage(attended.length, absent.length);
@@ -232,6 +244,8 @@ const generateAttendancePDF = async (data) => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 58, 138);
     doc.text('RESUMEN GENERAL', 14, y + 4);
+    const quorumPct = ((summary?.quorum_achieved || 0) * 100).toFixed(2);
+    doc.text(`QUÓRUM: ${quorumPct}%`, pw - 14, y + 4, { align: 'right' });
     y += 8;
 
     // ASISTENTES
@@ -243,11 +257,11 @@ const generateAttendancePDF = async (data) => {
 
     autoTable(doc, {
         startY: y,
-        head: [['Nombre Completo', 'Apartamento', 'Tipo', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
+        head: [['Nombre Completo', 'Apartamento', 'Apoderado', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
         body: attended.map(p => [
             p.full_name,
             p.apartment,
-            p.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
+            delegateMap[`${p.full_name}|${p.apartment}`] || '—',
             p.attended_at ? formatDateTime(p.attended_at) : '—',
             p.quorum_base.toFixed(4),
             Math.max(0, (p.voting_weight || 0) - p.quorum_base).toFixed(4),
@@ -276,11 +290,11 @@ const generateAttendancePDF = async (data) => {
 
         autoTable(doc, {
             startY: y,
-            head: [['Nombre Completo', 'Apartamento', 'Fecha y Hora Ingreso', 'Quorum Real', 'Quorum Cedido']],
+            head: [['Nombre Completo', 'Apartamento', 'Apoderado', 'Quorum Real', 'Quorum Cedido']],
             body: absent.map(p => [
                 p.full_name,
                 p.apartment,
-                '—',
+                delegateMap[`${p.full_name}|${p.apartment}`] || '—',
                 p.quorum_base.toFixed(4),
                 '0.0000',
             ]),
@@ -451,52 +465,96 @@ const generateDelegationsPDF = async (data) => {
         import('jspdf'),
         import('jspdf-autotable')
     ]);
-    
+
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const { meeting, total_delegations, delegations } = data;
+    const pw = doc.internal.pageSize.getWidth();
+    const usableWidth = pw - 28; // 297 - 28 margins = 269mm
 
     let y = addHeader(doc, 'INFORME DE CESIÓN DE PODERES', meeting.title, meeting.residential_unit, meeting.scheduled_date);
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60);
-    doc.text(`Total de delegaciones registradas: ${total_delegations}`, 14, y);
-    y += 8;
-
     const fmtDate = (iso) => iso ? formatDateTime(iso) : '—';
+
+    // Totales en la línea de resumen
+    const totalWeight = delegations.reduce((sum, d) => sum + (typeof d.delegated_weight === 'number' ? d.delegated_weight : 0), 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60);
+    doc.text(`Total de delegaciones registradas:`, 14, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${total_delegations}`, 80, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Coeficiente total delegado`, 110, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(totalWeight.toFixed(4), 175, y);
+    y += 10;
 
     if (delegations.length === 0) {
         doc.setFont('helvetica', 'italic');
         doc.setTextColor(150);
         doc.text('No se registraron delegaciones de poderes en esta reunión.', 14, y);
     } else {
-        // A4 landscape: 297mm - 28mm márgenes = 269mm útiles
-        autoTable(doc, {
-            startY: y,
-            tableWidth: 269,
-            head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Delegado A', 'Apto', 'Fecha y Hora']],
-            body: delegations.map((d, idx) => [
-                idx + 1,
-                d.delegator.full_name,
-                d.delegator.apartment,
-                typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
-                d.delegate.full_name,
-                d.delegate.apartment || '—',
-                fmtDate(d.delegated_at),
-            ]),
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [124, 58, 237], fontSize: 8, fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [245, 243, 255] },
-            columnStyles: {
-                0: { cellWidth: 8,  halign: 'center' },
-                1: { cellWidth: 74 },
-                2: { cellWidth: 18, halign: 'center' },
-                3: { cellWidth: 22, halign: 'right' },
-                4: { cellWidth: 74 },
-                5: { cellWidth: 22, halign: 'center' },
-                6: { cellWidth: 51 },
-            },
-            margin: { left: 14, right: 14 },
+        // Agrupar por delegado (quien recibe los poderes)
+        const grouped = {};
+        const groupOrder = [];
+        delegations.forEach(d => {
+            const key = d.delegate.full_name + '|' + (d.delegate.apartment || '');
+            if (!grouped[key]) {
+                grouped[key] = { delegate: d.delegate, delegators: [], totalWeight: 0 };
+                groupOrder.push(key);
+            }
+            grouped[key].delegators.push(d);
+            grouped[key].total_weight = (grouped[key].total_weight || 0) + (typeof d.delegated_weight === 'number' ? d.delegated_weight : 0);
+        });
+
+        groupOrder.forEach((key) => {
+            const group = grouped[key];
+            if (y > 175) { doc.addPage(); y = 20; }
+
+            // Fila encabezado del delegado (fondo violeta)
+            const headerH = 10;
+            doc.setFillColor(124, 58, 237);
+            doc.rect(14, y, usableWidth, headerH, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+
+            const delegateApt = group.delegate.apartment || '—';
+            const delegateTotal = group.total_weight.toFixed(4);
+
+            doc.text(group.delegate.full_name, 17, y + 6.5);
+            doc.text(`apto ${delegateApt}`, 130, y + 6.5);
+            doc.text('Coeficiente total delegado:', 185, y + 6.5);
+            doc.text(delegateTotal, 255, y + 6.5);
+            y += headerH;
+
+            // Tabla de delegantes
+            autoTable(doc, {
+                startY: y,
+                tableWidth: usableWidth,
+                head: [['#', 'Delegante', 'Apto', 'Coeficiente', 'Estado', 'Fecha y Hora']],
+                body: group.delegators.map((d, idx) => [
+                    idx + 1,
+                    d.delegator.full_name,
+                    d.delegator.apartment || '—',
+                    typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
+                    'Registrado',
+                    fmtDate(d.delegated_at),
+                ]),
+                styles: { fontSize: 8, cellPadding: 3 },
+                headStyles: { fillColor: [167, 139, 250], fontSize: 8, fontStyle: 'bold', textColor: [255, 255, 255] },
+                alternateRowStyles: { fillColor: [245, 243, 255] },
+                columnStyles: {
+                    0: { cellWidth: 8,  halign: 'center' },
+                    1: { cellWidth: 90 },
+                    2: { cellWidth: 16, halign: 'center' },
+                    3: { cellWidth: 25, halign: 'right' },
+                    4: { cellWidth: 28 },
+                    5: { cellWidth: 52 },
+                },
+                margin: { left: 14, right: 14 },
+            });
+            y = doc.lastAutoTable.finalY + 8;
         });
     }
 
@@ -508,14 +566,15 @@ const generateDelegationsPDF = async (data) => {
 
 const NOMBRES_LLAMADO = ['Primer', 'Segundo', 'Tercer'];
 
-const generateLlamadoPDF = async (data) => {
+const generateLlamadoPDF = async (data, delegateMap = {}) => {
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
         import('jspdf'),
         import('jspdf-autotable')
     ]);
-    
+
     const { meeting, residential_unit, llamado, snapshot } = data;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
     const nombreLlamado = NOMBRES_LLAMADO[llamado - 1];
 
     const timestamp = snapshot.timestamp ? formatDateTime(snapshot.timestamp) : '—';
@@ -548,17 +607,19 @@ const generateLlamadoPDF = async (data) => {
     doc.setFontSize(10);
     doc.setTextColor(22, 101, 52);
     doc.text(`>> PRESENTES (${snapshot.present?.length || 0})`, 14, y);
+    doc.setTextColor(30, 58, 138);
+    doc.text(`QUÓRUM: ${snapshot.quorum_percentage || 0}%`, pw - 14, y, { align: 'right' });
     y += 4;
 
     autoTable(doc, {
         startY: y,
-        head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Tipo']],
+        head: [['#', 'Nombre Completo', 'Apartamento', 'Quórum Base', 'Apoderado']],
         body: (snapshot.present || []).map((u, i) => [
             i + 1,
             u.full_name,
             u.apartment_number,
             Number(u.quorum_base || 0).toFixed(4),
-            u.attendance_type === 'Delegado' ? 'Por delegación' : 'Titular',
+            delegateMap[`${u.full_name}|${u.apartment_number}`] || '—',
         ]),
         styles: { fontSize: 8.5 },
         headStyles: { fillColor: [22, 163, 74] },
@@ -685,9 +746,13 @@ const InformesTab = () => {
 
             setLoadingReport('llamados');
             try {
-                const response = await getLlamadoReportSA(Number(selectedMeeting), Number(numeroStr));
+                const [response, delResponse] = await Promise.all([
+                    getLlamadoReportSA(Number(selectedMeeting), Number(numeroStr)),
+                    ReportsService.getDelegations(selectedMeeting).catch(() => null),
+                ]);
                 if (!response.success) throw new Error(response.message);
-                generateLlamadoPDF(response.data);
+                const delegateMap = buildDelegateMap(delResponse?.data?.delegations || []);
+                generateLlamadoPDF(response.data, delegateMap);
             } catch (err) {
                 const msg = err.response?.data?.detail || err.message || 'Ocurrió un error inesperado.';
                 Swal.fire({ icon: 'error', title: 'Error al generar informe', text: msg, confirmButtonColor: '#dc2626' });
@@ -734,6 +799,13 @@ const InformesTab = () => {
                 if (!isConfirmed) return;
                 const selectedPoll = polls[Number(selectedIdx)];
                 report.generator({ ...data, polls: [selectedPoll] });
+            } else if (report.id === 'attendance') {
+                let delegateMap = {};
+                try {
+                    const delRes = await ReportsService.getDelegations(selectedMeeting);
+                    delegateMap = buildDelegateMap(delRes.data?.delegations || []);
+                } catch (_) {}
+                report.generator(data, delegateMap);
             } else {
                 report.generator(data);
             }
