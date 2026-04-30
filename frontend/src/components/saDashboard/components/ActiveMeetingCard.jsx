@@ -11,7 +11,6 @@ import {
 	calculateMeetingDuration,
 	calculateAttendancePercentage,
 	formatMeetingStartTime,
-	getQuorumBadgeColor,
 } from '../../../services/api/ActiveMeetingService';
 
 const ActiveMeetingCard = ({ meeting, onClick }) => {
@@ -49,10 +48,8 @@ const ActiveMeetingCard = ({ meeting, onClick }) => {
 					<span className="px-1.5 md:px-2 py-0.5 md:py-1 bg-white/20 rounded-full text-xs font-semibold backdrop-blur-sm">
 						{meeting.meeting_type}
 					</span>
-					<span
-						className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded-full text-xs font-semibold ${getQuorumBadgeColor(meeting.quorum_reached)}`}
-					>
-						{meeting.quorum_reached ? 'Con Quórum' : 'Sin Quórum'}
+					<span className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-sm">
+						Quórum: {meeting.quorum_percentage ?? 0}%
 					</span>
 				</div>
 			</div>

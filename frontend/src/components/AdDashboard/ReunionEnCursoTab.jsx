@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axiosInstance from "../../services/api/axiosconfig";
-import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Loader2, Bell, CheckCircle2 } from "lucide-react";
+import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Loader2, Bell, CheckCircle2, UserMinus, X, ChevronLeft, ChevronRight } from "lucide-react";
 import Swal from "sweetalert2";
 import PollDetailsModal from "./PollDetailsModal";
 import LlamadoModal from "./LlamadoModal";
@@ -14,6 +14,8 @@ const ReunionEnCursoTab = () => {
   const [selectedLlamado, setSelectedLlamado] = useState(null);
   const [selectedLlamadoSnapshot, setSelectedLlamadoSnapshot] = useState(null);
   const [loadingLlamado, setLoadingLlamado] = useState(null);
+  const [absentPage, setAbsentPage] = useState(0);
+  const ABSENT_PAGE_SIZE = 6;
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["meetingInProgress", refreshKey],
@@ -109,6 +111,27 @@ const ReunionEnCursoTab = () => {
     }
   };
 
+  const handleMarkAbsent = async (userId, userName) => {
+    if (!data?.data?.meeting_id) return;
+    try {
+      await axiosInstance.post(`/administrator/meeting/${data.data.meeting_id}/mark-absent/${userId}`);
+      setAbsentPage(0);
+      setRefreshKey((k) => k + 1);
+    } catch {
+      Swal.fire("Error", `No se pudo marcar como ausente a ${userName}.`, "error");
+    }
+  };
+
+  const handleUnmarkAbsent = async (userId) => {
+    if (!data?.data?.meeting_id) return;
+    try {
+      await axiosInstance.post(`/administrator/meeting/${data.data.meeting_id}/unmark-absent/${userId}`);
+      setRefreshKey((k) => k + 1);
+    } catch {
+      Swal.fire("Error", "No se pudo quitar la marca de ausente.", "error");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -133,6 +156,11 @@ const ReunionEnCursoTab = () => {
 
   const meeting = data?.data;
 
+  const registeredUsers = meeting?.connected_users ?? [];
+  const absentUsers = meeting?.absent_users ?? [];
+  const absentPageCount = Math.ceil(absentUsers.length / ABSENT_PAGE_SIZE);
+  const absentPageItems = absentUsers.slice(absentPage * ABSENT_PAGE_SIZE, (absentPage + 1) * ABSENT_PAGE_SIZE);
+
   if (!meeting) {
     return (
       <div className="p-6 text-center">
@@ -148,60 +176,61 @@ const ReunionEnCursoTab = () => {
     );
   }
 
-  const connectedPercentage = meeting.total_invited > 0 
-    ? Math.round((meeting.connected_count / meeting.total_invited) * 100) 
-    : 0;
-  const disconnectedPercentage = 100 - connectedPercentage;
+  const total = meeting.total_invited > 0 ? meeting.total_invited : 1;
+  const registeredPercentage = Math.round((registeredUsers.length / total) * 100);
+  const absentPercentage = Math.round((absentUsers.length / total) * 100);
+  const disconnectedPercentage = 100 - registeredPercentage - absentPercentage;
+  const connectedPercentage = registeredPercentage;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex flex-col h-[calc(100vh-88px)] md:h-[calc(100vh-104px)] overflow-hidden gap-3">
       {/* Header */}
-      <div className="bg-blue-600 rounded-lg p-6 text-white">
+      <div className="bg-blue-600 rounded-lg px-5 py-3 text-white shrink-0">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-2xl font-bold">{meeting.title}</h2>
-            <p className="text-blue-100 mt-1">{meeting.description}</p>
-            <div className="flex gap-4 mt-4 text-sm">
-              <span className="flex items-center gap-1 text-lg">
-                <Users size={25} />
+            <h2 className="text-xl font-bold">{meeting.title}</h2>
+            <p className="text-blue-100 text-sm">{meeting.description}</p>
+            <div className="flex gap-4 mt-2 text-sm flex-wrap">
+              <span className="flex items-center gap-1">
+                <Users size={18} />
                 Copropietarios conectados: {meeting.connected_count} de {meeting.total_invited}
               </span>
-              <span className="flex items-center gap-1 text-lg">
-                <BarChart3 size={25} />
+              <span className="flex items-center gap-1">
+                <BarChart3 size={18} />
                 Quórum: {meeting.connected_quorum} / {meeting.total_quorum} ({meeting.quorum_percentage}%)
               </span>
-              <span className={`px-2 py-0.5 rounded text-xs ${meeting.quorum_reached ? 'bg-green-500' : 'bg-red-500'}`}>
+              <span className={`px-2 py-0.5 rounded text-xs self-center ${meeting.quorum_reached ? 'bg-green-500' : 'bg-red-500'}`}>
                 {meeting.quorum_reached ? "Quórum alcanzado" : "Sin quórum"}
               </span>
             </div>
           </div>
           <button
             onClick={() => refetch()}
-            className="p-2 bg-blue-500 rounded hover:bg-blue-400"
+            className="p-2 bg-blue-500 rounded hover:bg-blue-400 shrink-0"
             title="Actualizar"
           >
-            <RefreshCw size={20} />
+            <RefreshCw size={18} />
           </button>
         </div>
       </div>
 
-      {/* Main Content - 3 columns same height */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Connected Users */}
-        <div className="bg-white rounded-lg shadow p-4 flex flex-col h-96">
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 shrink-0">
-            <Wifi size={20} className="text-green-500" />
-            Conectados ({meeting.connected_count})
+      {/* Listas + gráfico — ocupa el espacio disponible */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-0">
+        {/* Registrados */}
+        <div className="bg-white rounded-lg shadow p-4 flex flex-col min-h-0">
+          <h3 className="text-base font-semibold mb-2 flex items-center gap-2 shrink-0">
+            <Wifi size={18} className="text-green-500" />
+            Registrados ({registeredUsers.length})
           </h3>
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {meeting.connected_users?.length > 0 ? (
-              meeting.connected_users.map((user) => (
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+            {registeredUsers.length > 0 ? (
+              registeredUsers.map((user) => (
                 <div
                   key={user.user_id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-semibold">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-semibold text-sm">
                       {user.full_name?.charAt(0)}
                     </div>
                     <div>
@@ -211,91 +240,127 @@ const ReunionEnCursoTab = () => {
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCloseSession(user.user_id, user.full_name)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    title="Cerrar sesión"
-                  >
-                    <LogOut size={16} />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleMarkAbsent(user.user_id, user.full_name)}
+                      className="p-1.5 text-orange-500 hover:bg-orange-50 rounded"
+                      title="Marcar ausente"
+                    >
+                      <UserMinus size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleCloseSession(user.user_id, user.full_name)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                      title="Cerrar sesión"
+                    >
+                      <LogOut size={15} />
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
-              <div className="text-gray-500 text-center py-8">No hay usuarios conectados</div>
+              <div className="text-gray-500 text-center py-6 text-sm">No hay usuarios registrados</div>
             )}
           </div>
         </div>
 
-        {/* Pie Chart */}
-        <div className="bg-white rounded-lg shadow p-4 flex flex-col items-center justify-center h-96">
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 shrink-0">
-            <PieChart size={20} />
-            Estado
+        {/* Gráfico central */}
+        <div className="bg-white rounded-lg shadow p-4 flex flex-col min-h-0 overflow-y-auto">
+          <h3 className="text-base font-semibold mb-3 flex items-center gap-2 shrink-0">
+            <PieChart size={18} />
+            Asistencia
           </h3>
-          <div className="relative w-40 h-40">
-            <svg viewBox="0 0 100 100" className="transform -rotate-90">
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke="#e5e7eb"
-                strokeWidth="20"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth="20"
-                strokeDasharray={`${connectedPercentage * 2.51} 251`}
-                strokeLinecap="round"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke="#ef4444"
-                strokeWidth="20"
-                strokeDasharray={`${disconnectedPercentage * 2.51} 251`}
-                strokeDashoffset={`-${connectedPercentage * 2.51}`}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{connectedPercentage}%</div>
+
+          {/* Donut */}
+          <div className="flex flex-col items-center shrink-0">
+            <div className="relative w-32 h-32">
+              <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="18" />
+                <circle
+                  cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="18"
+                  strokeDasharray={`${registeredPercentage * 2.51} 251`}
+                  strokeLinecap="butt"
+                />
+                <circle
+                  cx="50" cy="50" r="40" fill="none" stroke="#f97316" strokeWidth="18"
+                  strokeDasharray={`${absentPercentage * 2.51} 251`}
+                  strokeDashoffset={`-${registeredPercentage * 2.51}`}
+                  strokeLinecap="butt"
+                />
+                <circle
+                  cx="50" cy="50" r="40" fill="none" stroke="#ef4444" strokeWidth="18"
+                  strokeDasharray={`${disconnectedPercentage * 2.51} 251`}
+                  strokeDashoffset={`-${(registeredPercentage + absentPercentage) * 2.51}`}
+                  strokeLinecap="butt"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-xl font-bold leading-none">{registeredPercentage}%</span>
+                <span className="text-[10px] text-gray-400 mt-0.5">en sala</span>
+              </div>
+            </div>
+
+            {/* Leyenda */}
+            <div className="mt-3 w-full space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-green-500 shrink-0"></div>
+                  <span className="text-gray-600">Registrados</span>
+                </div>
+                <span className="font-semibold">{registeredUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-orange-400 shrink-0"></div>
+                  <span className="text-gray-600">Ausentes</span>
+                </div>
+                <span className="font-semibold">{absentUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-red-500 shrink-0"></div>
+                  <span className="text-gray-600">No registrados</span>
+                </div>
+                <span className="font-semibold">{meeting.disconnected_count} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
               </div>
             </div>
           </div>
-          <div className="flex justify-center gap-4 mt-4 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="text-sm">Conectados ({meeting.connected_count})</span>
+
+          {/* Indicador quórum */}
+          <div className="mt-4 pt-3 border-t border-gray-100 shrink-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium text-gray-600">Quórum alcanzado</span>
+              <span className={`text-xs font-bold ${meeting.quorum_reached ? 'text-green-600' : 'text-red-500'}`}>
+                {meeting.quorum_percentage}%
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span className="text-sm">Desconectados ({meeting.disconnected_count})</span>
+            <div className="w-full bg-gray-100 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${meeting.quorum_reached ? 'bg-green-500' : 'bg-red-400'}`}
+                style={{ width: `${Math.min(meeting.quorum_percentage, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+              <span>{meeting.connected_quorum} coeficiente conectado</span>
+              <span>total {meeting.total_quorum}</span>
             </div>
           </div>
         </div>
 
-        {/* Disconnected Users */}
-        <div className="bg-white rounded-lg shadow p-4 flex flex-col h-96">
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 shrink-0">
-            <WifiOff size={20} className="text-red-500" />
-            Desconectados ({meeting.disconnected_count})
+        {/* No Registrados */}
+        <div className="bg-white rounded-lg shadow p-4 flex flex-col min-h-0">
+          <h3 className="text-base font-semibold mb-2 flex items-center gap-2 shrink-0">
+            <WifiOff size={18} className="text-red-500" />
+            No Registrados ({meeting.disconnected_count})
           </h3>
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
             {meeting.disconnected_users?.length > 0 ? (
               meeting.disconnected_users.map((user) => (
                 <div
                   key={user.user_id}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg"
                 >
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-semibold">
+                  <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-semibold text-sm">
                     {user.full_name?.charAt(0)}
                   </div>
                   <div>
@@ -307,16 +372,74 @@ const ReunionEnCursoTab = () => {
                 </div>
               ))
             ) : (
-              <div className="text-gray-500 text-center py-8">No hay usuarios desconectados</div>
+              <div className="text-gray-500 text-center py-6 text-sm">No hay usuarios desconectados</div>
             )}
           </div>
         </div>
       </div>
 
+      {/* Ausentes */}
+      <div className="bg-white rounded-lg shadow p-4 shrink-0">
+        <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
+          <UserMinus size={18} className="text-orange-500" />
+          Ausentes ({absentUsers.length})
+        </h3>
+        {absentUsers.length > 0 ? (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              {absentPageItems.map((user) => (
+                <div
+                  key={user.user_id}
+                  className="flex items-center justify-between p-2 bg-orange-50 rounded-lg"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 bg-orange-200 rounded-full flex items-center justify-center text-orange-700 font-semibold text-xs shrink-0">
+                      {user.full_name?.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-xs truncate">{user.full_name}</div>
+                      <div className="text-xs text-gray-500">Apto {user.apartment_number}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleUnmarkAbsent(user.user_id)}
+                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded shrink-0"
+                    title="Quitar de ausentes"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {absentPageCount > 1 && (
+              <div className="flex items-center justify-end gap-2 mt-2">
+                <button
+                  onClick={() => setAbsentPage(p => p - 1)}
+                  disabled={absentPage === 0}
+                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs text-gray-500">{absentPage + 1} / {absentPageCount}</span>
+                <button
+                  onClick={() => setAbsentPage(p => p + 1)}
+                  disabled={absentPage === absentPageCount - 1}
+                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-gray-400">Sin ausentes marcados</p>
+        )}
+      </div>
+
       {/* Llamados de Asistencia */}
-      <div className="bg-white rounded-lg shadow p-5">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Bell size={20} className="text-indigo-600" />
+      <div className="bg-white rounded-lg shadow p-4 shrink-0">
+        <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+          <Bell size={18} className="text-indigo-600" />
           Llamados de Asistencia
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -328,24 +451,20 @@ const ReunionEnCursoTab = () => {
             return (
               <div
                 key={num}
-                className={`rounded-xl border-2 p-4 ${
-                  registrado
-                    ? "border-indigo-300 bg-indigo-50"
-                    : "border-gray-200 bg-gray-50"
+                className={`rounded-xl border-2 p-3 ${
+                  registrado ? "border-indigo-300 bg-indigo-50" : "border-gray-200 bg-gray-50"
                 }`}
               >
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-1.5">
                   {registrado ? (
-                    <CheckCircle2 size={18} className="text-indigo-600 shrink-0" />
+                    <CheckCircle2 size={16} className="text-indigo-600 shrink-0" />
                   ) : (
-                    <Bell size={18} className="text-gray-400 shrink-0" />
+                    <Bell size={16} className="text-gray-400 shrink-0" />
                   )}
-                  <span className="font-semibold text-sm">
-                    {nombreLlamado} Llamado
-                  </span>
+                  <span className="font-semibold text-sm">{nombreLlamado} Llamado</span>
                 </div>
                 {!registrado && (
-                  <p className="text-xs text-gray-400 mb-3">Sin registrar</p>
+                  <p className="text-xs text-gray-400 mb-2">Sin registrar</p>
                 )}
                 <div className="flex gap-2">
                   <button

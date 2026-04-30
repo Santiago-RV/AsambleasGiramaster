@@ -242,10 +242,13 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 						<div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
 							<div className="flex items-center gap-2 text-green-100 text-xs mb-1">
 								<CheckCircle size={14} />
-								<span>Quórum</span>
+								<span>Quórum actual</span>
 							</div>
 							<p className="text-xl font-bold">
-								{meetingDetails.quorum_reached ? 'Sí' : 'No'}
+								{meetingDetails.quorum_percentage ?? 0}%
+							</p>
+							<p className="text-xs text-green-200 mt-0.5">
+								{(meetingDetails.connected_quorum ?? 0).toFixed(4)} / {(meetingDetails.total_quorum ?? 0).toFixed(4)}
 							</p>
 						</div>
 						<div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
@@ -348,9 +351,14 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 													</div>
 													{registrado && (
 														<div className="flex items-center gap-2">
-															<span className="text-xs font-medium text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
-																{llamadoInfo?.snapshot?.quorum_percentage ?? 0}% quórum
-															</span>
+															<div className="flex flex-col items-end">
+																<span className="text-sm font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
+																	{llamadoInfo?.snapshot?.quorum_percentage ?? 0}% quórum
+																</span>
+																<span className="text-xs text-gray-400 mt-0.5 pr-1">
+																	{(llamadoInfo?.snapshot?.connected_quorum ?? 0).toFixed(4)} / {(llamadoInfo?.snapshot?.total_quorum ?? 0).toFixed(4)}
+																</span>
+															</div>
 															<button
 																onClick={() => setLlamadoExpandido(expandido ? null : num)}
 																className="text-xs text-indigo-600 hover:underline"

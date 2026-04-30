@@ -559,6 +559,7 @@ async def get_active_meetings(
                         "connected_users_count": meeting.connected_users_count,
                         "total_invited": meeting.total_invited,
                         "quorum_reached": meeting.quorum_reached,
+                        "quorum_percentage": meeting.quorum_percentage,
                         "active_polls_count": meeting.active_polls_count
                     }
                     for meeting in active_meetings.active_meetings
@@ -623,6 +624,53 @@ async def get_active_meeting_details(
                 detail=f"La reunión con ID {meeting_id} no existe"
             )
 
+        # Calcular quórum actual
+        from sqlalchemy import select, func, and_, or_
+        from sqlalchemy.orm import aliased
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+
+        q_total = await db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
+        )
+        total_quorum = float(q_total.scalar() or 0)
+
+        q_direct = await db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    MeetingInvitationModel.bln_actually_attended == True,
+                    MeetingInvitationModel.dat_left_at == None,
+                )
+            )
+        )
+        DelegadoQ = aliased(MeetingInvitationModel)
+        q_deleg = await db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0))
+            .join(DelegadoQ, and_(
+                DelegadoQ.int_user_id == MeetingInvitationModel.int_delegated_id,
+                DelegadoQ.int_meeting_id == meeting_id,
+                DelegadoQ.bln_actually_attended == True,
+                DelegadoQ.dat_left_at == None,
+            ))
+            .where(and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                MeetingInvitationModel.int_delegated_id != None,
+                or_(
+                    MeetingInvitationModel.bln_actually_attended == False,
+                    MeetingInvitationModel.dat_left_at != None
+                )
+            ))
+        )
+        connected_quorum = float(q_direct.scalar() or 0) + float(q_deleg.scalar() or 0)
+        quorum_percentage = round((connected_quorum / total_quorum * 100) if total_quorum > 0 else 0, 2)
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
@@ -644,6 +692,9 @@ async def get_active_meeting_details(
                 "total_invited": meeting_details.total_invited,
                 "total_confirmed": meeting_details.total_confirmed,
                 "quorum_reached": meeting_details.quorum_reached,
+                "connected_quorum": connected_quorum,
+                "total_quorum": total_quorum,
+                "quorum_percentage": quorum_percentage,
                 "zoom_join_url": meeting_details.zoom_join_url,
                 "zoom_meeting_id": meeting_details.zoom_meeting_id,
                 "administrator": {

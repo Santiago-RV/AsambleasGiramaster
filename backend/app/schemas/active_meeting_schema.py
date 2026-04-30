@@ -58,6 +58,7 @@ class ActiveMeetingCardSchema(BaseModel):
     connected_users_count: int
     total_invited: int
     quorum_reached: bool
+    quorum_percentage: float = 0.0
     active_polls_count: int
 
     class Config:

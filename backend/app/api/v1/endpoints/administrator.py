@@ -855,6 +855,68 @@ async def close_user_session(
         )
 
 
+@router.post(
+    "/meeting/{meeting_id}/mark-absent/{user_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Marcar usuario como ausente",
+    description="Marca a un usuario conectado como ausente en la reunión en curso"
+)
+async def mark_user_absent(
+    meeting_id: int,
+    user_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        if not user or user.int_id_rol not in (1, 2):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+        from app.services.active_meeting_service import ActiveMeetingService
+        result = await ActiveMeetingService(db).mark_user_absent(meeting_id, user_id)
+        if not result["success"]:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["message"])
+        return SuccessResponse(success=True, status_code=status.HTTP_200_OK, message="Usuario marcado como ausente", data=result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al marcar ausente: {str(e)}")
+        raise ServiceException(message=f"Error al marcar ausente: {str(e)}", details={"original_error": str(e)})
+
+
+@router.post(
+    "/meeting/{meeting_id}/unmark-absent/{user_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Quitar marca de ausente",
+    description="Quita la marca de ausente de un usuario en la reunión en curso"
+)
+async def unmark_user_absent(
+    meeting_id: int,
+    user_id: int,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        if not user or user.int_id_rol not in (1, 2):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+        from app.services.active_meeting_service import ActiveMeetingService
+        result = await ActiveMeetingService(db).unmark_user_absent(meeting_id, user_id)
+        if not result["success"]:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["message"])
+        return SuccessResponse(success=True, status_code=status.HTTP_200_OK, message="Marca de ausente eliminada", data=result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error al desmarcar ausente: {str(e)}")
+        raise ServiceException(message=f"Error al desmarcar ausente: {str(e)}", details={"original_error": str(e)})
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ENDPOINTS DE REPORTES PARA ADMIN
 # ═══════════════════════════════════════════════════════════════════════════════

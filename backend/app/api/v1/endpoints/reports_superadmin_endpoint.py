@@ -543,6 +543,18 @@ async def get_all_llamados_report(
     svc = ActiveMeetingService(db)
     llamados_result = await svc.get_all_llamados(meeting_id)
 
+    # Enriquecer cada llamado registrado con su snapshot de quórum
+    llamados_enriched = {}
+    for num_str, info in llamados_result["llamados"].items():
+        if info.get("registered"):
+            snapshot_result = await svc.get_llamado_data(meeting_id, int(num_str))
+            llamados_enriched[num_str] = {
+                "registered": True,
+                "snapshot": snapshot_result.get("snapshot") if snapshot_result.get("success") else None,
+            }
+        else:
+            llamados_enriched[num_str] = {"registered": False, "snapshot": None}
+
     return SuccessResponse(
         success=True,
         status_code=200,
@@ -557,6 +569,6 @@ async def get_all_llamados_report(
                 "name": residential_unit.str_name,
                 "nit": residential_unit.str_nit,
             },
-            "llamados": llamados_result["llamados"],
+            "llamados": llamados_enriched,
         }
     )

@@ -67,6 +67,8 @@ class MeetingInvitationModel(Base):
     
     # === ASISTENCIA ===
     bln_actually_attended = Column(Boolean, default=False)
+    bln_marked_absent = Column(Boolean, default=False, nullable=False,
+                               comment="Marcado como ausente por el admin durante la reunión")
     dat_joined_at = Column(DateTime, nullable=True)
     dat_left_at = Column(DateTime, nullable=True)
     json_llamados = Column(

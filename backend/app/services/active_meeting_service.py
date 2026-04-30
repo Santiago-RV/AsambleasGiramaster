@@ -61,11 +61,10 @@ class ActiveMeetingService:
 
         active_meetings = []
         for meeting in meetings:
-            # Contar usuarios conectados
             connected_count = await self._count_connected_users(meeting.id)
-
-            # Contar encuestas activas
+            total_invited = await self._count_total_invited(meeting.id)
             active_polls_count = await self._count_active_polls(meeting.id)
+            quorum_pct = await self._compute_quorum_percentage(meeting.id)
 
             active_meetings.append(ActiveMeetingCardSchema(
                 meeting_id=meeting.id,
@@ -75,8 +74,9 @@ class ActiveMeetingService:
                 status=meeting.str_status,
                 started_at=meeting.dat_actual_start_time,
                 connected_users_count=connected_count,
-                total_invited=meeting.int_total_invitated or 0,
+                total_invited=total_invited,
                 quorum_reached=meeting.bln_quorum_reached or False,
+                quorum_percentage=quorum_pct,
                 active_polls_count=active_polls_count
             ))
 
@@ -151,7 +151,7 @@ class ActiveMeetingService:
         )
 
     async def _count_connected_users(self, meeting_id: int) -> int:
-        """Cuenta usuarios conectados directamente + delegantes con presencia efectiva."""
+        """Cuenta usuarios conectados directamente + delegantes con presencia efectiva (excluye ausentes marcados)."""
 
         # Directamente conectados
         query_direct = select(func.count(MeetingInvitationModel.id)).where(
@@ -159,7 +159,8 @@ class ActiveMeetingService:
                 MeetingInvitationModel.int_meeting_id == meeting_id,
                 MeetingInvitationModel.bln_actually_attended == True,
                 MeetingInvitationModel.dat_left_at == None,
-                MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                MeetingInvitationModel.bln_marked_absent == False
             )
         )
         result_direct = await self.db.execute(query_direct)
@@ -175,7 +176,8 @@ class ActiveMeetingService:
                     DelegadoInv.int_user_id == MeetingInvitationModel.int_delegated_id,
                     DelegadoInv.int_meeting_id == meeting_id,
                     DelegadoInv.bln_actually_attended == True,
-                    DelegadoInv.dat_left_at == None
+                    DelegadoInv.dat_left_at == None,
+                    DelegadoInv.bln_marked_absent == False
                 )
             )
             .where(
@@ -183,6 +185,7 @@ class ActiveMeetingService:
                     MeetingInvitationModel.int_meeting_id == meeting_id,
                     MeetingInvitationModel.int_delegated_id != None,
                     MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    MeetingInvitationModel.bln_marked_absent == False,
                     or_(
                         MeetingInvitationModel.bln_actually_attended == False,
                         MeetingInvitationModel.dat_left_at != None
@@ -194,6 +197,62 @@ class ActiveMeetingService:
         delegantes_count = result_delegantes.scalar() or 0
 
         return direct_count + delegantes_count
+
+    async def _count_total_invited(self, meeting_id: int) -> int:
+        """Cuenta el total real de invitados (excluye ADMIN) desde tbl_meeting_invitations."""
+        q = select(func.count(MeetingInvitationModel.id)).where(
+            and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN'
+            )
+        )
+        return (await self.db.execute(q)).scalar() or 0
+
+    async def _compute_quorum_percentage(self, meeting_id: int) -> float:
+        """Calcula el porcentaje de quórum actual (conectados no ausentes / total)."""
+        q_total = await self.db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
+        )
+        total = float(q_total.scalar() or 0)
+        if total == 0:
+            return 0.0
+
+        q_direct = await self.db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    MeetingInvitationModel.bln_actually_attended == True,
+                    MeetingInvitationModel.dat_left_at == None,
+                )
+            )
+        )
+        DelegadoQ = aliased(MeetingInvitationModel)
+        q_deleg = await self.db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0))
+            .join(DelegadoQ, and_(
+                DelegadoQ.int_user_id == MeetingInvitationModel.int_delegated_id,
+                DelegadoQ.int_meeting_id == meeting_id,
+                DelegadoQ.bln_actually_attended == True,
+                DelegadoQ.dat_left_at == None,
+            ))
+            .where(and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                MeetingInvitationModel.int_delegated_id != None,
+                or_(
+                    MeetingInvitationModel.bln_actually_attended == False,
+                    MeetingInvitationModel.dat_left_at != None
+                )
+            ))
+        )
+        connected = float(q_direct.scalar() or 0) + float(q_deleg.scalar() or 0)
+        return round(connected / total * 100, 2)
 
     async def _count_active_polls(self, meeting_id: int) -> int:
         """Cuenta encuestas activas de la reunión"""
@@ -277,7 +336,8 @@ class ActiveMeetingService:
                     MeetingInvitationModel.int_meeting_id == meeting_id,
                     MeetingInvitationModel.bln_actually_attended == True,
                     MeetingInvitationModel.dat_left_at == None,
-                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    MeetingInvitationModel.bln_marked_absent == False
                 )
             )
             .order_by(DataUserModel.str_firstname.asc())
@@ -326,13 +386,15 @@ class ActiveMeetingService:
                     DelegadoInv.int_user_id == MeetingInvitationModel.int_delegated_id,
                     DelegadoInv.int_meeting_id == meeting_id,
                     DelegadoInv.bln_actually_attended == True,
-                    DelegadoInv.dat_left_at == None
+                    DelegadoInv.dat_left_at == None,
+                    DelegadoInv.bln_marked_absent == False
                 )
             )
             .where(
                 and_(
                     MeetingInvitationModel.int_delegated_id != None,
                     MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    MeetingInvitationModel.bln_marked_absent == False,
                     # El delegante mismo NO está conectado directamente
                     or_(
                         MeetingInvitationModel.bln_actually_attended == False,
@@ -481,6 +543,7 @@ class ActiveMeetingService:
         
         connected_users = await self._get_connected_users(meeting.id)
         disconnected_users = await self._get_disconnected_users(meeting.id)
+        absent_users = await self._get_absent_users(meeting.id)
         polls = await self._get_meeting_polls(meeting.id)
         
         # Convertir objetos schema a diccionarios
@@ -509,6 +572,17 @@ class ActiveMeetingService:
             }
             for u in disconnected_users
         ]
+
+        absent_users_data = [
+            {
+                "user_id": u["user_id"],
+                "full_name": u["full_name"],
+                "email": u["email"],
+                "apartment_number": u["apartment_number"],
+                "voting_weight": u["voting_weight"],
+            }
+            for u in absent_users
+        ]
         
         # total_quorum: suma de dec_quorum_base de TODOS los invitados (excluye ADMIN)
         # Se usa dec_quorum_base y no dec_voting_weight para evitar doble conteo cuando
@@ -523,19 +597,19 @@ class ActiveMeetingService:
         )
         total_quorum = float(q_total_res.scalar() or 0)
 
-        # connected_quorum parte 1: directamente asistentes
+        # connected_quorum parte 1: directamente asistentes (incluye ausentes marcados — su quórum sigue contando)
         q_direct_res = await self.db.execute(
             select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
                 and_(
                     MeetingInvitationModel.int_meeting_id == meeting.id,
                     MeetingInvitationModel.str_apartment_number != 'ADMIN',
                     MeetingInvitationModel.bln_actually_attended == True,
-                    MeetingInvitationModel.dat_left_at == None
+                    MeetingInvitationModel.dat_left_at == None,
                 )
             )
         )
 
-        # connected_quorum parte 2: delegantes cuyo delegado está activo
+        # connected_quorum parte 2: delegantes cuyo delegado está activo (incluye ausentes marcados)
         DelegadoQ = aliased(MeetingInvitationModel)
         q_deleg_res = await self.db.execute(
             select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0))
@@ -543,7 +617,7 @@ class ActiveMeetingService:
                 DelegadoQ.int_user_id == MeetingInvitationModel.int_delegated_id,
                 DelegadoQ.int_meeting_id == meeting.id,
                 DelegadoQ.bln_actually_attended == True,
-                DelegadoQ.dat_left_at == None
+                DelegadoQ.dat_left_at == None,
             ))
             .where(and_(
                 MeetingInvitationModel.int_meeting_id == meeting.id,
@@ -556,10 +630,11 @@ class ActiveMeetingService:
             ))
         )
         connected_quorum = float(q_direct_res.scalar() or 0) + float(q_deleg_res.scalar() or 0)
-        
+
         connected_count = len(connected_users_data)
         disconnected_count = len(disconnected_users_data)
-        total_invited = connected_count + disconnected_count
+        absent_count = len(absent_users_data)
+        total_invited = connected_count + disconnected_count + absent_count
         
         llamados_result = await self.get_all_llamados(meeting.id)
         llamados_status = llamados_result["llamados"]
@@ -580,6 +655,8 @@ class ActiveMeetingService:
             "quorum_reached": meeting.bln_quorum_reached or False,
             "connected_users": connected_users_data,
             "disconnected_users": disconnected_users_data,
+            "absent_users": absent_users_data,
+            "absent_count": absent_count,
             "polls": polls,
             "llamados_status": llamados_status,
         }
@@ -653,6 +730,83 @@ class ActiveMeetingService:
             }
             for user in users
         ]
+
+    async def _get_absent_users(self, meeting_id: int) -> List[dict]:
+        """Obtiene usuarios conectados marcados como ausentes por el admin."""
+        query = (
+            select(
+                UserModel.id,
+                DataUserModel.str_firstname,
+                DataUserModel.str_lastname,
+                DataUserModel.str_email,
+                MeetingInvitationModel.str_apartment_number,
+                MeetingInvitationModel.dec_quorum_base,
+            )
+            .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+            .join(
+                MeetingInvitationModel,
+                and_(
+                    MeetingInvitationModel.int_user_id == UserModel.id,
+                    MeetingInvitationModel.int_meeting_id == meeting_id
+                )
+            )
+            .where(
+                and_(
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    MeetingInvitationModel.bln_marked_absent == True
+                )
+            )
+            .order_by(DataUserModel.str_lastname, DataUserModel.str_firstname)
+        )
+        result = await self.db.execute(query)
+        return [
+            {
+                "user_id": u.id,
+                "full_name": f"{u.str_firstname} {u.str_lastname}".strip(),
+                "email": u.str_email,
+                "apartment_number": u.str_apartment_number,
+                "voting_weight": float(u.dec_quorum_base or 0),
+            }
+            for u in result.all()
+        ]
+
+    async def mark_user_absent(self, meeting_id: int, user_id: int) -> dict:
+        """Marca a un usuario como ausente en la reunión."""
+        inv_q = select(MeetingInvitationModel).where(
+            and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_user_id == user_id,
+            )
+        )
+        inv = (await self.db.execute(inv_q)).scalar_one_or_none()
+        if not inv:
+            return {"success": False, "message": "Invitación no encontrada"}
+        await self.db.execute(
+            sa_update(MeetingInvitationModel)
+            .where(MeetingInvitationModel.id == inv.id)
+            .values(bln_marked_absent=True)
+        )
+        await self.db.commit()
+        return {"success": True}
+
+    async def unmark_user_absent(self, meeting_id: int, user_id: int) -> dict:
+        """Quita la marca de ausente de un usuario."""
+        inv_q = select(MeetingInvitationModel).where(
+            and_(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_user_id == user_id,
+            )
+        )
+        inv = (await self.db.execute(inv_q)).scalar_one_or_none()
+        if not inv:
+            return {"success": False, "message": "Invitación no encontrada"}
+        await self.db.execute(
+            sa_update(MeetingInvitationModel)
+            .where(MeetingInvitationModel.id == inv.id)
+            .values(bln_marked_absent=False)
+        )
+        await self.db.commit()
+        return {"success": True}
 
     async def take_llamado_snapshot(self, meeting_id: int, numero: int) -> dict:
         """
