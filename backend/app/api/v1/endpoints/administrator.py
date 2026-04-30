@@ -1051,11 +1051,14 @@ async def get_quorum_report(
         
         inv_result = await db.execute(
             select(MeetingInvitationModel).where(
-                MeetingInvitationModel.int_meeting_id == meeting_id
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
             )
         )
         invitations = inv_result.scalars().all()
-        
+
         total_invited = len(invitations)
         total_quorum_base = sum(float(inv.dec_quorum_base or 0) for inv in invitations)
         

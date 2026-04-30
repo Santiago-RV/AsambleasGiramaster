@@ -272,15 +272,24 @@ class MeetingService:
             invitations_created = 0
             for user, user_residential_unit in copropietarios_data:
                 try:
-                    # Calcular quorum base
-                    quorum_base = user_residential_unit.dec_default_voting_weight or Decimal('1.0')
+                    # Admin sin apartamento: quorum 0, marcado como 'ADMIN' para ser excluido de cálculos
+                    is_admin_no_apt = (
+                        user_residential_unit.bool_is_admin
+                        and not user_residential_unit.str_apartment_number
+                    )
+                    quorum_base = Decimal('0') if is_admin_no_apt else (
+                        user_residential_unit.dec_default_voting_weight or Decimal('1.0')
+                    )
+                    apt_number = 'ADMIN' if is_admin_no_apt else (
+                        user_residential_unit.str_apartment_number or "N/A"
+                    )
 
                     invitation = MeetingInvitationModel(
                         int_meeting_id=new_meeting.id,
                         int_user_id=user.id,
-                        dec_voting_weight=quorum_base,           
-                        dec_quorum_base=quorum_base,             
-                        str_apartment_number=user_residential_unit.str_apartment_number or "N/A",
+                        dec_voting_weight=quorum_base,
+                        dec_quorum_base=quorum_base,
+                        str_apartment_number=apt_number,
                         str_invitation_status="pending",
                         str_response_status="no_response",
                         dat_sent_at=datetime.now(),
@@ -1175,9 +1184,9 @@ class MeetingService:
                 )
                 meeting_dict["connected_users_count"] = connected_count_query.scalar() or 0
 
-                # Quórum total (todos los invitados menos ADMIN)
+                # Quórum total (todos los invitados menos ADMIN) — usar dec_quorum_base para evitar doble conteo por delegaciones
                 q_total = await self.db.execute(
-                    select(func.coalesce(func.sum(MeetingInvitationModel.dec_voting_weight), 0)).where(
+                    select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
                         and_(
                             MeetingInvitationModel.int_meeting_id == meeting.id,
                             MeetingInvitationModel.str_apartment_number != 'ADMIN'

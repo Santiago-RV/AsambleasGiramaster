@@ -392,12 +392,16 @@ class MeetingInvitationService:
                         logger.warning(f"⚠️ Usuario {user_id} ya tiene invitación a la reunión {meeting_id}")
                         continue
                     
+                    is_admin_no_apt = user_unit.bool_is_admin and not user_unit.str_apartment_number
+                    quorum_val = Decimal("0") if is_admin_no_apt else (user_unit.dec_default_voting_weight or Decimal("0"))
+                    apt_number = "ADMIN" if is_admin_no_apt else (user_unit.str_apartment_number or "N/A")
+
                     invitation = MeetingInvitationModel(
                         int_meeting_id=meeting_id,
                         int_user_id=user_id,
-                        dec_voting_weight=user_unit.dec_default_voting_weight or Decimal("0"),
-                        dec_quorum_base=user_unit.dec_default_voting_weight or Decimal("0"),
-                        str_apartment_number=user_unit.str_apartment_number or "N/A",
+                        dec_voting_weight=quorum_val,
+                        dec_quorum_base=quorum_val,
+                        str_apartment_number=apt_number,
                         str_invitation_status="pending",
                         str_response_status="no_response",
                         dat_sent_at=datetime.now(),

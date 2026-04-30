@@ -510,14 +510,52 @@ class ActiveMeetingService:
             for u in disconnected_users
         ]
         
-        total_quorum = sum(
-            u["voting_weight"] for u in disconnected_users_data
-        ) + sum(
-            # Para conectados directos: usar voting_weight normal
-            # Para delegantes (attendance_type="Delegado"): voting_weight ya viene como dec_quorum_base
-            u["voting_weight"] for u in connected_users_data
+        # total_quorum: suma de dec_quorum_base de TODOS los invitados (excluye ADMIN)
+        # Se usa dec_quorum_base y no dec_voting_weight para evitar doble conteo cuando
+        # un usuario recibió delegaciones (su dec_voting_weight incluye pesos ajenos).
+        q_total_res = await self.db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting.id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
         )
-        connected_quorum = sum(u["voting_weight"] for u in connected_users_data)
+        total_quorum = float(q_total_res.scalar() or 0)
+
+        # connected_quorum parte 1: directamente asistentes
+        q_direct_res = await self.db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
+                and_(
+                    MeetingInvitationModel.int_meeting_id == meeting.id,
+                    MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                    MeetingInvitationModel.bln_actually_attended == True,
+                    MeetingInvitationModel.dat_left_at == None
+                )
+            )
+        )
+
+        # connected_quorum parte 2: delegantes cuyo delegado está activo
+        DelegadoQ = aliased(MeetingInvitationModel)
+        q_deleg_res = await self.db.execute(
+            select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0))
+            .join(DelegadoQ, and_(
+                DelegadoQ.int_user_id == MeetingInvitationModel.int_delegated_id,
+                DelegadoQ.int_meeting_id == meeting.id,
+                DelegadoQ.bln_actually_attended == True,
+                DelegadoQ.dat_left_at == None
+            ))
+            .where(and_(
+                MeetingInvitationModel.int_meeting_id == meeting.id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                MeetingInvitationModel.int_delegated_id != None,
+                or_(
+                    MeetingInvitationModel.bln_actually_attended == False,
+                    MeetingInvitationModel.dat_left_at != None
+                )
+            ))
+        )
+        connected_quorum = float(q_direct_res.scalar() or 0) + float(q_deleg_res.scalar() or 0)
         
         connected_count = len(connected_users_data)
         disconnected_count = len(disconnected_users_data)
