@@ -11,43 +11,71 @@ const PollChart = ({ poll }) => {
 
     const initChart = async () => {
       const { default: Chart } = await import("chart.js/auto");
+
       if (!mounted || !canvasRef.current) return;
 
       if (chartRef.current) {
         chartRef.current.destroy();
       }
 
-      const labels = poll.options.map(opt => opt.text);
-      const dataValues = poll.options.map(opt => opt.votes_weight);
-      const countValues = poll.options.map(opt => opt.votes_count);
+      let filteredOptions = poll.options.filter(
+        (opt) => opt.votes_weight > 0
+      );
+
+
+      if (filteredOptions.length === 0) {
+        filteredOptions = [
+          {
+            text: "Sin votos",
+            votes_weight: 1,
+          },
+        ];
+      }
+
+      const labels = filteredOptions.map((opt) => opt.text);
+      const dataValues = filteredOptions.map((opt) => opt.votes_weight);
+
+      const total = dataValues.reduce((a, b) => a + b, 0);
 
       const colors = [
-        "#6366f1", "#10b981", "#f59e0b", "#ef4444",
-        "#8b5cf6", "#14b8a6", "#f97316", "#ec4899"
+        "#6366f1",
+        "#10b981",
+        "#f59e0b",
+        "#ef4444",
+        "#8b5cf6",
+        "#14b8a6",
+        "#f97316",
+        "#ec4899",
       ];
 
-      const centerLabels = {
-        id: "centerLabels",
-        afterDatasetsDraw(chart) {
+      const percentageLabels = {
+        id: "percentageLabels",
+        afterDraw(chart) {
           const { ctx } = chart;
-          chart.data.datasets.forEach((dataset, i) => {
-            const meta = chart.getDatasetMeta(i);
-            if (!meta.visible) return;
-            meta.data.forEach((element, index) => {
-              const value = countValues[index];
-              if (!value) return;
-              const midAngle = (element.startAngle + element.endAngle) / 2;
-              const radius = element.outerRadius * 0.6;
-              const x = element.x + Math.cos(midAngle) * radius;
-              const y = element.y + Math.sin(midAngle) * radius;
-              ctx.save();
-              ctx.fillStyle = "#ffffff";
-              ctx.font = `bold ${Math.max(11, Math.round(element.outerRadius * 0.18))}px sans-serif`;
-              ctx.textAlign = "center";
-              ctx.textBaseline = "middle";
-              ctx.fillText(String(value), x, y);
-              ctx.restore();
-            });
+
+          chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
+            const value = dataValues[index];
+
+            if (!value) return;
+
+            const percentage = ((value / total) * 100).toFixed(1) + "%";
+
+            const position = datapoint.tooltipPosition();
+
+            ctx.save();
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 13px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            ctx.fillText(
+              percentage,
+              position.x,
+              position.y
+            );
+
+            ctx.restore();
           });
         },
       };
@@ -55,11 +83,17 @@ const PollChart = ({ poll }) => {
       chartRef.current = new Chart(canvasRef.current, {
         type: "pie",
         data: {
-          labels,
+          labels: labels.map((label, index) => {
+            const percentage = ((dataValues[index] / total) * 100).toFixed(1);
+
+            return `${label} (${percentage}%)`;
+          }),
           datasets: [
             {
               data: dataValues,
               backgroundColor: colors.slice(0, labels.length),
+              borderWidth: 2,
+              borderColor: "#ffffff",
             },
           ],
         },
@@ -67,10 +101,17 @@ const PollChart = ({ poll }) => {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: "top" },
+            legend: {
+              position: "top",
+              labels: {
+                font: {
+                  size: 12,
+                },
+              },
+            },
           },
         },
-        plugins: [centerLabels],
+        plugins: [percentageLabels],
       });
     };
 
@@ -78,13 +119,16 @@ const PollChart = ({ poll }) => {
 
     return () => {
       mounted = false;
-      chartRef.current?.destroy();
+
+      if (chartRef.current) {
+        chartRef.current.destroy();
+      }
     };
   }, [poll]);
 
   return (
     <div className="flex justify-center">
-      <div className="w-72 h-72">
+      <div className="w-full max-w-md h-[320px]">
         <canvas ref={canvasRef}></canvas>
       </div>
     </div>

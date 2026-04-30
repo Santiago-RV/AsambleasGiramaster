@@ -1,83 +1,82 @@
 import { useEffect, useRef } from "react";
+import { Chart } from "chart.js/auto";
+
 
 const AttendanceChart = ({ summary }) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !summary) return;
 
-    let mounted = true;
+    const attended = summary.total_attended || 0;
+    const absent = summary.total_absent || 0;
 
-    const initChart = async () => {
-      const { default: Chart } = await import("chart.js/auto");
-      if (!mounted || !canvasRef.current) return;
+    if (attended === 0 && absent === 0) return;
 
-      if (chartRef.current) {
-        chartRef.current.destroy();
-      }
+    const ctx = canvasRef.current;
+    const total = attended + absent;
+  
+    if (!chartRef.current) {
 
-      const counts = [summary.total_attended, summary.total_absent];
-
-      const centerLabels = {
-        id: "centerLabels",
-        afterDatasetsDraw(chart) {
-          const { ctx } = chart;
-          chart.data.datasets.forEach((dataset, i) => {
-            const meta = chart.getDatasetMeta(i);
-            if (!meta.visible) return;
-            meta.data.forEach((element, index) => {
-              const value = counts[index];
-              if (!value) return;
-              const midAngle = (element.startAngle + element.endAngle) / 2;
-              const radius = element.outerRadius * 0.6;
-              const x = element.x + Math.cos(midAngle) * radius;
-              const y = element.y + Math.sin(midAngle) * radius;
-              ctx.save();
-              ctx.fillStyle = "#ffffff";
-              ctx.font = `bold ${Math.max(11, Math.round(element.outerRadius * 0.18))}px sans-serif`;
-              ctx.textAlign = "center";
-              ctx.textBaseline = "middle";
-              ctx.fillText(String(value), x, y);
-              ctx.restore();
-            });
-          });
-        },
-      };
-
-      chartRef.current = new Chart(canvasRef.current, {
-        type: "pie",
-        data: {
-          labels: ["Asistieron", "No asistieron"],
-          datasets: [
-            {
-              data: counts,
-              backgroundColor: ["#10b981", "#ef4444"],
-            },
-          ],
-        },
-        options: {
-          plugins: {
-            legend: { position: "top" },
+    chartRef.current = new Chart(ctx, {
+      type: "pie",
+      data: {
+        labels: [
+          `Asistieron (${((attended / total) * 100).toFixed(1)}%)`,
+          `No asistieron (${((absent / total) * 100).toFixed(1)}%)`
+        ],
+        datasets: [
+          {
+            data: [attended, absent],
+            backgroundColor: ["#10b981", "#ef4444"],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "top",
           },
         },
-        plugins: [centerLabels],
-      });
-    };
+      },
+      plugins: [{
+  id: 'textInside',
+  afterDraw(chart) {
+    const { ctx } = chart;
 
-    initChart();
+    chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
+      const { x, y } = datapoint.tooltipPosition();
 
-    return () => {
-      mounted = false;
-      chartRef.current?.destroy();
-    };
+      const value = chart.data.datasets[0].data[index];
+      const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+
+      const percentage = ((value / total) * 100).toFixed(1) + "%";
+
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 14px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      ctx.fillText(percentage, x, y);
+    });
+  }
+}]
+    });
+    } else {
+      chartRef.current.data.datasets[0].data = [attended, absent];
+      chartRef.current.update();
+    }
+
   }, [summary]);
 
   return (
     <div className="flex justify-center">
-      <div className="w-72 h-72">
-      <canvas ref={canvasRef} width={180} height={180}></canvas>
-    </div>
+      <div className="w-full max-w-xs h-[250px]">
+        <canvas ref={canvasRef}></canvas>
+      </div>
     </div>
   );
 };

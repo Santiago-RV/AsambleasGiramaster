@@ -65,26 +65,37 @@ const addFooter = (doc) => {
 
 // ─── PDF Graphics ────────────────────────────────────────────────────────────
 
-const centerLabelsPlugin = (labelValues) => ({
+const centerLabelsPlugin = () => ({
     id: 'centerLabels',
     afterDatasetsDraw(chart) {
         const { ctx } = chart;
+
         chart.data.datasets.forEach((dataset, i) => {
             const meta = chart.getDatasetMeta(i);
             if (!meta.visible) return;
+
+            const total = dataset.data.reduce((acc, val) => acc + val, 0);
+
             meta.data.forEach((element, index) => {
-                const value = labelValues ? labelValues[index] : dataset.data[index];
-                if (!value) return;
+                const rawValue = dataset.data[index];
+                if (!rawValue) return;
+
+                const percentage = total > 0 ? (rawValue / total) * 100 : 0;
+
                 const midAngle = (element.startAngle + element.endAngle) / 2;
                 const radius = element.outerRadius * 0.6;
+
                 const x = element.x + Math.cos(midAngle) * radius;
                 const y = element.y + Math.sin(midAngle) * radius;
+
                 ctx.save();
                 ctx.fillStyle = '#ffffff';
-                ctx.font = `bold ${Math.round(element.outerRadius * 0.2)}px sans-serif`;
+                ctx.font = `bold ${Math.round(element.outerRadius * 0.18)}px sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(String(value), x, y);
+
+                ctx.fillText(`${percentage.toFixed(1)}%`, x, y);
+
                 ctx.restore();
             });
         });
@@ -295,7 +306,7 @@ const generatePollsPDF = async (data) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, polls } = data;
     const pageWidth = doc.internal.pageSize.getWidth();
-    const imgWidth = 120;
+    const imgWidth = 65;
     const x = (pageWidth - imgWidth) / 2;
 
     let y = addHeader(doc, 'INFORME DE VOTACIÓN', meeting.title, meeting.residential_unit, meeting.scheduled_date);

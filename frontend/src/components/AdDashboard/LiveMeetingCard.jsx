@@ -107,7 +107,7 @@ export default function LiveMeetingCard({ meeting, onClick }) {
           <div className="flex items-center text-xs md:text-sm text-gray-600">
             <Users size={14} className="mr-2 text-green-500 md:size-4" />
             <span className="truncate">
-              {meeting.connected_users_count || 0} conectados de {meeting.int_total_invitated || 0} invitados
+              {meeting.connected_count || 0} conectados de {meeting.int_total_invitated || 0} invitados
             </span>
           </div>
         </div>
