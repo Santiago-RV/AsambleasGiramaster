@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Users, Vote, BarChart3, Calendar, Info, Eye, Loader2, CheckCircle } from 'lucide-react';
-import Swal from 'sweetalert2';
+import { FileText, Users, Vote, BarChart3, Calendar, Info, Eye, Loader2, CheckCircle, ChevronDown } from 'lucide-react';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import ReportModal from './ReportModal';
@@ -11,6 +10,7 @@ export default function ReportsPage() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState(null);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [selectedMeetingId, setSelectedMeetingId] = useState('');
 
   const { data: residentialUnitData, isLoading: isLoadingUnit } = useQuery({
     queryKey: ['admin-residential-unit'],
@@ -96,78 +96,22 @@ export default function ReportsPage() {
     }
   };
 
+  const meetings = meetingsData?.data || [];
+
+  // Auto-seleccionar la primera reunión cuando cargan los datos (debe estar antes del return temprano)
+  useEffect(() => {
+    if (meetings.length > 0 && !selectedMeetingId) {
+      setSelectedMeetingId(String(meetings[0].id));
+    }
+  }, [meetings.length]);
+
   const handleViewReport = (reportType) => {
-    if (!meetings || meetings.length === 0) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'No hay reuniones',
-        text: 'No hay reuniones disponibles para generar reportes',
-        confirmButtonColor: '#10b981'
-      });
-      return;
-    }
-
-    const completedMeetings = meetings.filter(m => 
-      m.str_status === 'Finalizada' || m.str_status === 'Completada' || m.str_status === 'En Curso'
-    );
-
-    if (completedMeetings.length === 0) {
-      Swal.fire({
-        icon: 'info',
-        title: 'Sin reuniones finalizadas',
-        text: 'No hay reuniones finalizadas o en curso para ver el reporte',
-        confirmButtonColor: '#10b981'
-      });
-      return;
-    }
-
-    if (completedMeetings.length === 1) {
-      setSelectedMeeting(completedMeetings[0]);
-      setSelectedReportType(reportType);
-      setShowReportModal(true);
-      return;
-    }
-
-    const meetingOptions = completedMeetings.map(m => ({
-      id: m.id,
-      title: m.str_title || m.titulo,
-      date: m.dat_schedule_date ? formatDateLong(m.dat_schedule_date) : 'Sin fecha',
-      status: m.str_status
-    }));
-
-    let optionsHtml = meetingOptions.map(m => 
-      `<option value="${m.id}">${m.title} - ${m.date} (${m.status})</option>`
-    ).join('');
-
-    Swal.fire({
-      title: 'Seleccionar Reunión',
-      width: '400px',
-      html: `
-        <div style="width: 100%; margin: 0; padding: 0;">
-          <p class="mb-3 text-sm text-gray-600">Selecciona una reunión para ver el reporte:</p>
-          <select id="meeting-select" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background-color: white; box-sizing: border-box;">
-            ${optionsHtml}
-          </select>
-        </div>
-      `,
-      confirmButtonText: 'Ver Reporte',
-      confirmButtonColor: '#10b981',
-      cancelButtonText: 'Cancelar',
-      cancelButtonColor: '#6b7280',
-      showCancelButton: true,
-      preConfirm: () => {
-        const select = document.getElementById('meeting-select');
-        const meetingId = select.value;
-        return meetingOptions.find(m => m.id === parseInt(meetingId));
-      }
-    }).then((result) => {
-      if (result.isConfirmed && result.value) {
-        const meeting = meetings.find(m => m.id === result.value.id);
-        setSelectedMeeting(meeting);
-        setSelectedReportType(reportType);
-        setShowReportModal(true);
-      }
-    });
+    if (!selectedMeetingId) return;
+    const meeting = meetings.find(m => m.id === parseInt(selectedMeetingId));
+    if (!meeting) return;
+    setSelectedMeeting(meeting);
+    setSelectedReportType(reportType);
+    setShowReportModal(true);
   };
 
   const handleCloseModal = () => {
@@ -184,10 +128,17 @@ export default function ReportsPage() {
     );
   }
 
-  const meetings = meetingsData?.data || [];
-  const completedMeetings = meetings.filter(m => 
-    m.str_status === 'Finalizada' || m.str_status === 'Completada' || m.str_status === 'En Curso'
-  );
+  const statusBadge = (status) => {
+    const map = {
+      'En Curso':   'bg-green-100 text-green-700',
+      'Completada': 'bg-blue-100 text-blue-700',
+      'Finalizada': 'bg-gray-100 text-gray-600',
+      'Programada': 'bg-yellow-100 text-yellow-700',
+    };
+    return map[status] || 'bg-gray-100 text-gray-600';
+  };
+
+  const activeMeeting = meetings.find(m => m.id === parseInt(selectedMeetingId));
 
   return (
     <section className="space-y-6">
@@ -204,7 +155,7 @@ export default function ReportsPage() {
             </p>
           </div>
         </div>
-        
+
         {/* Stats resumen */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
           <div className="bg-white/10 rounded-lg p-3 text-center">
@@ -212,8 +163,8 @@ export default function ReportsPage() {
             <p className="text-xs text-emerald-100">Total Reuniones</p>
           </div>
           <div className="bg-white/10 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold">{completedMeetings.length}</p>
-            <p className="text-xs text-emerald-100">Disponibles</p>
+            <p className="text-2xl font-bold">{meetings.filter(m => m.str_status === 'Completada' || m.str_status === 'Finalizada').length}</p>
+            <p className="text-xs text-emerald-100">Finalizadas</p>
           </div>
           <div className="bg-white/10 rounded-lg p-3 text-center">
             <p className="text-2xl font-bold">{meetings.filter(m => m.str_status === 'Programada').length}</p>
@@ -226,14 +177,51 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Grid de Reportes - Solo lectura */}
+      {/* Selector de reunión */}
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar className="text-emerald-600" size={20} />
+          <h3 className="font-semibold text-gray-800">Seleccionar Reunión</h3>
+        </div>
+
+        {meetings.length === 0 ? (
+          <p className="text-sm text-gray-500">No hay reuniones registradas para esta unidad residencial.</p>
+        ) : (
+          <div className="relative">
+            <select
+              value={selectedMeetingId}
+              onChange={e => setSelectedMeetingId(e.target.value)}
+              className="w-full appearance-none border border-gray-300 rounded-lg px-4 py-3 pr-10 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+            >
+              {meetings.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.str_title} — {m.dat_schedule_date ? formatDateLong(m.dat_schedule_date) : 'Sin fecha'} ({m.str_status})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          </div>
+        )}
+
+        {activeMeeting && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+            <span>Estado:</span>
+            <span className={`px-2 py-0.5 rounded-full font-medium ${statusBadge(activeMeeting.str_status)}`}>
+              {activeMeeting.str_status}
+            </span>
+            <span className="ml-2">Tipo: {activeMeeting.str_meeting_type}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Grid de Reportes */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {reports.map((report) => {
           const Icon = report.icon;
           const colors = colorClasses[report.color];
-          
+
           return (
-            <div 
+            <div
               key={report.id}
               className="bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300 flex flex-col h-full"
             >
@@ -247,7 +235,7 @@ export default function ReportsPage() {
                     <p className="text-sm text-gray-600 mt-1">{report.description}</p>
                   </div>
                 </div>
-                
+
                 {/* Features */}
                 <div className={`mt-4 p-4 rounded-lg ${colors.bg} border ${colors.border}`}>
                   <p className="text-xs font-semibold text-gray-600 mb-2">Incluye:</p>
@@ -260,12 +248,12 @@ export default function ReportsPage() {
                     ))}
                   </ul>
                 </div>
-                
-                {/* Botón Ver Reporte - siempre en parte inferior */}
+
+                {/* Botón Ver Reporte */}
                 <div className="mt-auto pt-4">
                   <button
                     onClick={() => handleViewReport(report.id)}
-                    disabled={completedMeetings.length === 0}
+                    disabled={!selectedMeetingId || meetings.length === 0}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r ${colors.button} text-white rounded-lg font-medium transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <Eye size={18} />
@@ -284,8 +272,7 @@ export default function ReportsPage() {
         <div>
           <h4 className="font-semibold text-blue-800 text-sm">Información</h4>
           <p className="text-xs text-blue-700 mt-1">
-            Los reportes contienen información histórica de las reuniones finalizadas o en curso de tu unidad residencial.
-            Selecciona una reunión para visualizar los datos en detalle.
+            Puedes ver reportes de cualquier reunión de tu unidad residencial sin importar su estado actual.
           </p>
         </div>
       </div>

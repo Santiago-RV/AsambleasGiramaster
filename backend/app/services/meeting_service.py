@@ -1171,14 +1171,16 @@ class MeetingService:
 
             # Solo calcular quórum para reuniones En Curso
             if meeting.str_status == "En Curso":
-                # Contar usuarios conectados
+                # Contar asistentes registrados (bln_actually_attended=True, sin exigir dat_left_at=None
+                # porque los usuarios que cierran el navegador tienen dat_left_at seteado aunque
+                # la reunión siga En Curso)
                 connected_count_query = await self.db.execute(
                     select(func.count(MeetingInvitationModel.id)).where(
                         and_(
                             MeetingInvitationModel.int_meeting_id == meeting.id,
                             MeetingInvitationModel.str_apartment_number != 'ADMIN',
                             MeetingInvitationModel.bln_actually_attended == True,
-                            MeetingInvitationModel.dat_left_at == None
+                            MeetingInvitationModel.bln_marked_absent == False
                         )
                     )
                 )

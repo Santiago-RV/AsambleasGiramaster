@@ -177,10 +177,18 @@ const ReunionEnCursoTab = () => {
   }
 
   const total = meeting.total_invited > 0 ? meeting.total_invited : 1;
+  const registeredBase = registeredUsers.length > 0 ? registeredUsers.length : 1;
+
+  // % para el donut (proporcional al total para que los segmentos sumen 100%)
   const registeredPercentage = Math.round((registeredUsers.length / total) * 100);
   const absentPercentage = Math.round((absentUsers.length / total) * 100);
   const disconnectedPercentage = 100 - registeredPercentage - absentPercentage;
   const connectedPercentage = registeredPercentage;
+
+  // % para la leyenda con denominadores correctos
+  const registeredPct = Math.round((registeredUsers.length / total) * 100);
+  const absentPct = parseFloat(((absentUsers.length / registeredBase) * 100).toFixed(1));
+  const disconnectedPct = Math.round((meeting.disconnected_count / total) * 100);
 
   return (
     <div className="flex flex-col h-[calc(100vh-88px)] md:h-[calc(100vh-104px)] overflow-hidden gap-3">
@@ -307,21 +315,30 @@ const ReunionEnCursoTab = () => {
                   <div className="w-2.5 h-2.5 rounded-sm bg-green-500 shrink-0"></div>
                   <span className="text-gray-600">Registrados</span>
                 </div>
-                <span className="font-semibold">{registeredUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{registeredUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
+                  <span className="text-green-600 font-bold w-11 text-right">{registeredPct}%</span>
+                </div>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-sm bg-orange-400 shrink-0"></div>
                   <span className="text-gray-600">Ausentes</span>
                 </div>
-                <span className="font-semibold">{absentUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{absentUsers.length} <span className="text-gray-400 font-normal">/ {registeredUsers.length}</span></span>
+                  <span className="text-orange-500 font-bold w-11 text-right">{absentPct}%</span>
+                </div>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-sm bg-red-500 shrink-0"></div>
                   <span className="text-gray-600">No registrados</span>
                 </div>
-                <span className="font-semibold">{meeting.disconnected_count} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{meeting.disconnected_count} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
+                  <span className="text-red-500 font-bold w-11 text-right">{disconnectedPct}%</span>
+                </div>
               </div>
             </div>
           </div>
@@ -399,6 +416,7 @@ const ReunionEnCursoTab = () => {
                     <div className="min-w-0">
                       <div className="font-medium text-xs truncate">{user.full_name}</div>
                       <div className="text-xs text-gray-500">Apto {user.apartment_number}</div>
+                      <div className="text-xs text-orange-600 font-medium">Q: {user.voting_weight ?? user.quorum_base ?? '—'}</div>
                     </div>
                   </div>
                   <button
