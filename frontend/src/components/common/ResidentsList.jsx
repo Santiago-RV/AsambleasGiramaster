@@ -47,6 +47,7 @@ const ResidentsList = ({
 	residentialUnitId = null,
 	onInviteToMeeting = null,
 	residentialUnitName: residentialUnitNameProp = null,
+	presencialMeetingId = null,
 }) => {
 	const [selectedResidents, setSelectedResidents] = useState([]);
 	const [selectAll, setSelectAll] = useState(false);
@@ -389,9 +390,7 @@ const ResidentsList = ({
 						user_ids: selectedResidents,
 						expiration_hours: 48,
 						frontend_url: window.location.origin,
-						...(selectedMeetingInfo?.str_modality === 'presencial' && selectedMeeting
-							? { meeting_id: parseInt(selectedMeeting) }
-							: {})
+						...(presencialMeetingId ? { meeting_id: presencialMeetingId } : {})
 					})
 				});
 
@@ -702,9 +701,7 @@ const ResidentsList = ({
 					user_ids: selectedResidents,
 					expiration_hours: 48,
 					frontend_url: window.location.origin,
-					...(selectedMeetingInfo?.str_modality === 'presencial' && selectedMeeting
-						? { meeting_id: parseInt(selectedMeeting) }
-						: {})
+					...(presencialMeetingId ? { meeting_id: presencialMeetingId } : {})
 				})
 			});
 
@@ -1043,9 +1040,7 @@ const ResidentsList = ({
 				body: JSON.stringify({
 					userId: resident.id,
 					frontend_url: window.location.origin,
-					...(selectedMeetingInfo?.str_modality === 'presencial' && selectedMeeting
-						? { meeting_id: parseInt(selectedMeeting) }
-						: {})
+					...(presencialMeetingId ? { meeting_id: presencialMeetingId } : {})
 				})
 			});
 
@@ -1058,14 +1053,12 @@ const ResidentsList = ({
 				}
 
 
-				if (!data.data || !data.data.auto_login_token) {
-					throw new Error('Respuesta inválida: falta token de acceso');
+				if (!data.data || !data.data.auto_login_url) {
+					throw new Error('Respuesta inválida: falta URL de acceso');
 				}
 
 
-				const token = data.data.auto_login_token;
-				const frontendUrl = window.location.origin;
-				const url = `${frontendUrl}/auto-login/${token}`;
+				const url = data.data.auto_login_url;
 
 				setAutoLoginUrl(url);
 				setSelectedResidentForQR(resident);

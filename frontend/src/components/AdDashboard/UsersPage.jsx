@@ -83,6 +83,11 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
     }))
     : [];
 
+  // Reunión presencial activa para incluir meeting_id en los QR generados
+  const presencialMeeting = meetings.find(
+    m => m.str_modality === 'presencial' && (m.estado === 'En Curso' || m.estado === 'Programada')
+  );
+
   // Mutación para eliminar residente individual
   const deleteResidentMutation = useMutation({
     mutationFn: ({ userId, unitId }) => ResidentService.deleteResident(unitId, userId),
@@ -689,6 +694,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
             isSendingBulk={sendBulkCredentialsMutation.isPending}
             showInviteButton={true}
             residentialUnitId={residentialUnitId}
+            presencialMeetingId={presencialMeeting?.id ?? null}
             onInviteToMeeting={() => {
               queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
               queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });

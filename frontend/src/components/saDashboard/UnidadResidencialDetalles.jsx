@@ -434,6 +434,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 						showInviteButton={true}
 						residentialUnitId={unitId}
 						residentialUnitName={unitData?.str_name || unitData?.str_residential_name || unitData?.name || 'Sin nombre'}
+						presencialMeetingId={
+							Array.isArray(meetingsData)
+								? (meetingsData.find(m => m.str_modality === 'presencial' && (m.estado === 'En Curso' || m.estado === 'Programada'))?.id ?? null)
+								: null
+						}
 					onInviteToMeeting={() => {
 						queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
 						queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
