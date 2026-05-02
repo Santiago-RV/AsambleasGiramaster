@@ -190,9 +190,14 @@ async def auto_login_simple(
             "auto_login": True
         }
         
-        if meeting_id is not None:
-            response_data["meeting_id"] = meeting_id
-        
+        # Usar meeting_id del token, o el de la asistencia registrada como fallback
+        effective_meeting_id = meeting_id
+        if effective_meeting_id is None and attendance_registered and attendance_registered.get("registered"):
+            effective_meeting_id = attendance_registered.get("meeting_id")
+
+        if effective_meeting_id is not None:
+            response_data["meeting_id"] = effective_meeting_id
+
         # Incluir info de asistencia si se registro
         if attendance_registered and attendance_registered.get("registered"):
             response_data["attendance_registered"] = attendance_registered
