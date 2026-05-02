@@ -479,9 +479,10 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                     
                     auto_login_token = auto_login_service.generate_auto_login_token(
                         username=user.str_username,
-                        expiration_hours=24
+                        expiration_hours=24,
+                        meeting_id=meeting_id if meeting.str_modality == "presencial" else None
                     )
-                    
+
                     auto_login_url = None
                     if auto_login_token:
                         if not frontend_url:
