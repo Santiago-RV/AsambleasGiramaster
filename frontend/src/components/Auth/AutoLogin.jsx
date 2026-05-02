@@ -61,16 +61,19 @@ const AutoLogin = () => {
           setStatus('success');
 
           if (meeting_id) {
+            const attendanceLabel = attendance_registered?.already_registered
+              ? '✅ Ya tenías asistencia registrada en esta reunión.'
+              : '✅ Tu asistencia ha sido registrada exitosamente.';
             await Swal.fire({
               icon: 'success',
               title: '¡Bienvenido!',
               html: `
                 <div style="text-align: left;">
-                  <p style="margin-bottom: 8px;"><strong>Autenticación exitosa</strong></p>
-                  <p style="margin-bottom: 8px;">Serás redirigido a la votación presencial.</p>
+                  <p style="margin-bottom: 10px;">${attendanceLabel}</p>
+                  <p style="color: #7f8c8d; font-size: 13px;">Serás dirigido a la votación en un momento...</p>
                 </div>
               `,
-              timer: 1500,
+              timer: 2000,
               timerProgressBar: true,
               showConfirmButton: false,
             });
