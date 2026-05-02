@@ -388,7 +388,10 @@ const ResidentsList = ({
 					body: JSON.stringify({
 						user_ids: selectedResidents,
 						expiration_hours: 48,
-						frontend_url: window.location.origin
+						frontend_url: window.location.origin,
+						...(selectedMeetingInfo?.str_modality === 'presencial' && selectedMeeting
+							? { meeting_id: parseInt(selectedMeeting) }
+							: {})
 					})
 				});
 
@@ -698,7 +701,10 @@ const ResidentsList = ({
 				body: JSON.stringify({
 					user_ids: selectedResidents,
 					expiration_hours: 48,
-					frontend_url: window.location.origin
+					frontend_url: window.location.origin,
+					...(selectedMeetingInfo?.str_modality === 'presencial' && selectedMeeting
+						? { meeting_id: parseInt(selectedMeeting) }
+						: {})
 				})
 			});
 
@@ -1036,7 +1042,10 @@ const ResidentsList = ({
 				},
 				body: JSON.stringify({
 					userId: resident.id,
-					frontend_url: window.location.origin
+					frontend_url: window.location.origin,
+					...(selectedMeetingInfo?.str_modality === 'presencial' && selectedMeeting
+						? { meeting_id: parseInt(selectedMeeting) }
+						: {})
 				})
 			});
 

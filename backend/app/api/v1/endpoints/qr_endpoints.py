@@ -49,6 +49,7 @@ class SimpleQRRequest(BaseModel):
     """Request para generar QR simple (usado por modal del frontend)"""
     userId: int
     frontend_url: Optional[str] = None
+    meeting_id: Optional[int] = None
 
 
 class SimpleQRResponse(BaseModel):
@@ -104,6 +105,7 @@ class BulkQRSimpleRequest(BaseModel):
     user_ids: List[int]
     expiration_hours: int = 48
     frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
+    meeting_id: Optional[int] = None
 
 
 class QRTokenData(BaseModel):
@@ -238,7 +240,8 @@ async def generate_qr_simple(
         # Generar token JWT (sin contraseña - solo valida el token)
         auto_login_token = simple_auto_login_service.generate_auto_login_token(
             username=target_user.str_username,
-            expiration_hours=24
+            expiration_hours=24,
+            meeting_id=request.meeting_id
         )
         
         # Guardar el token para el usuario (invalidar anteriores)
@@ -600,14 +603,16 @@ async def generate_qr_bulk_simple(
                     token = simple_auto_login_service.generate_auto_login_token_with_id(
                         username=target_user.str_username,
                         token_id=token_id,
-                        expiration_hours=request.expiration_hours if request.expiration_hours else 24
+                        expiration_hours=request.expiration_hours if request.expiration_hours else 24,
+                        meeting_id=request.meeting_id
                     )
                     logger.info(f"♻️ Token reutilizado para usuario {target_user.id}: {token_id}")
                 else:
                     # Generar nuevo token de auto-login
                     token = simple_auto_login_service.generate_auto_login_token(
                         username=target_user.str_username,
-                        expiration_hours=request.expiration_hours if request.expiration_hours else 24
+                        expiration_hours=request.expiration_hours if request.expiration_hours else 24,
+                        meeting_id=request.meeting_id
                     )
                     
                     # Guardar el token para el usuario
