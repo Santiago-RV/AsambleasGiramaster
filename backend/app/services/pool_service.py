@@ -3,6 +3,7 @@ from sqlalchemy import select, func, and_, text
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timedelta
+from app.utils.timezone_utils import colombia_now
 import secrets
 import string
 
@@ -63,7 +64,7 @@ class PollService:
         logger.info(f"  Acceso permitido para crear encuestas (sin validaciones)")
 
         # COMENTADO: Verificación de reunión finalizada
-        # now = datetime.now()
+        # now = colombia_now()
         # ONE_HOUR = timedelta(hours=1)
         # logger.info(f"   Hora actual: {now}")
         # logger.info(f"   Hora programada: {meeting.dat_schedule_date}")
@@ -203,12 +204,12 @@ class PollService:
 
         # Actualizar estado
         poll.str_status = 'active'
-        poll.dat_started_at = datetime.now()
+        poll.dat_started_at = colombia_now()
         
         # Calcular fecha de fin si hay duración
         duration = duration_minutes if duration_minutes else poll.int_duration_minutes
         if duration:
-            poll.dat_ended_at = datetime.now() + timedelta(minutes=duration)
+            poll.dat_ended_at = colombia_now() + timedelta(minutes=duration)
             poll.int_duration_minutes = duration
 
         poll.updated_by = user_id
@@ -236,7 +237,7 @@ class PollService:
             )
 
         poll.str_status = 'closed'
-        poll.dat_ended_at = datetime.now()
+        poll.dat_ended_at = colombia_now()
         poll.updated_by = user_id
 
         # Registrar votos por delegación ANTES de calcular estadísticas
@@ -266,7 +267,7 @@ class PollService:
             )
 
         # Verificar si la encuesta ha expirado por tiempo límite
-        if poll.dat_ended_at and datetime.now() > poll.dat_ended_at:
+        if poll.dat_ended_at and colombia_now() > poll.dat_ended_at:
             raise BusinessLogicException(
                 message="La encuesta ha expirado por tiempo límite",
                 error_code="POLL_EXPIRED"
@@ -300,7 +301,7 @@ class PollService:
             dec_response_number=response_data.dec_response_number,
             dec_voting_weight=voting_weight,
             bln_is_abstention=response_data.bln_is_abstention,
-            dat_response_at=datetime.now(),
+            dat_response_at=colombia_now(),
             str_ip_address=ip_address,
             str_user_agent=user_agent
         )
@@ -589,7 +590,7 @@ class PollService:
                 dec_response_number=voto_delegado.dec_response_number,
                 dec_voting_weight=peso_delegante,
                 bln_is_abstention=False,
-                dat_response_at=datetime.now(),
+                dat_response_at=colombia_now(),
                 str_ip_address="delegation",   # sentinel para identificar votos por delegación
                 str_user_agent="delegation"    # sentinel para identificar votos por delegación
             )

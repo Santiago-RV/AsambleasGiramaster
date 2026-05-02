@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric, UniqueConstraint
+﻿from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class MeetingAttendanceModel(Base):
     __tablename__ = "tbl_meeting_attendances"
@@ -21,8 +22,8 @@ class MeetingAttendanceModel(Base):
     bln_left_early = Column(Boolean, default=False)
     int_rejoined_count = Column(Integer, nullable=False, default=0)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
 
     # Relationships
     meeting = relationship("MeetingModel", back_populates="attendances")

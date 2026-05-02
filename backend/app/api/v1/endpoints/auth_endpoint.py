@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from datetime import timedelta
+from app.utils.timezone_utils import colombia_now
 from app.auth.auth import create_access_token, create_refresh_token, verify_refresh_token, get_current_user, get_token_jti, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from app.schemas.auth_token_schema import Token
 
@@ -236,7 +237,7 @@ async def register_participation(
     
     # Actualizar la invitación
     invitation.bln_actually_attended = True
-    invitation.dat_joined_at = datetime.now()
+    invitation.dat_joined_at = colombia_now()
     invitation.dat_left_at = None  # Limpiar hora de salida si era una reconexión
     
     await db.commit()

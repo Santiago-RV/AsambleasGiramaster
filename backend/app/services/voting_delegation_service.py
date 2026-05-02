@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from typing import List, Dict, Optional
 from decimal import Decimal
 
@@ -162,7 +163,7 @@ class VotingDelegationService:
             int_delegate_user_id=delegate_id,
             dec_delegated_weight=delegated_weight,
             str_status=DelegationStatusEnum.ACTIVE,
-            dat_delegated_at=datetime.now(),
+            dat_delegated_at=colombia_now(),
             dat_revoked_at=None,
             created_by=admin_user_id,
             updated_by=admin_user_id
@@ -199,9 +200,9 @@ class VotingDelegationService:
 
         if active_delegation:
             active_delegation.str_status = DelegationStatusEnum.REVOKED
-            active_delegation.dat_revoked_at = datetime.now()
+            active_delegation.dat_revoked_at = colombia_now()
             active_delegation.updated_by = admin_user_id
-            active_delegation.updated_at = datetime.now()
+            active_delegation.updated_at = colombia_now()
 
             await self.db.commit()
             logger.info(f"✅ Delegación marcada como revocada en histórico")
@@ -287,7 +288,7 @@ class VotingDelegationService:
             invitation = await self._get_invitation(meeting_id, delegator_id)
             invitation.int_delegated_id = delegate_id
             invitation.dec_voting_weight = Decimal('0.0')  # Peso actual = 0
-            invitation.updated_at = datetime.now()
+            invitation.updated_at = colombia_now()
             invitation.updated_by = admin_user_id
 
         # Actualizar delegado: sumar peso delegado
@@ -295,7 +296,7 @@ class VotingDelegationService:
         current_weight = Decimal(str(delegate_invitation.dec_voting_weight))
         new_weight = current_weight + total_weight_to_delegate
         delegate_invitation.dec_voting_weight = new_weight
-        delegate_invitation.updated_at = datetime.now()
+        delegate_invitation.updated_at = colombia_now()
         delegate_invitation.updated_by = admin_user_id
 
         # 10. Commit transacción de invitaciones
@@ -329,7 +330,7 @@ class VotingDelegationService:
             "delegators": delegator_infos,
             "delegate": delegate_info,
             "total_delegated_weight": float(total_weight_to_delegate),
-            "delegation_date": datetime.now()
+            "delegation_date": colombia_now()
         }
 
     async def revoke_delegation(
@@ -384,14 +385,14 @@ class VotingDelegationService:
         # Restaurar peso del delegador
         delegator_invitation.int_delegated_id = None
         delegator_invitation.dec_voting_weight = original_weight  # ✅ Restaurar al quorum base
-        delegator_invitation.updated_at = datetime.now()
+        delegator_invitation.updated_at = colombia_now()
         delegator_invitation.updated_by = admin_user_id
 
         # Reducir peso del delegado
         current_delegate_weight = Decimal(str(delegate_invitation.dec_voting_weight))
         new_delegate_weight = current_delegate_weight - original_weight
         delegate_invitation.dec_voting_weight = max(Decimal('0.0'), new_delegate_weight)
-        delegate_invitation.updated_at = datetime.now()
+        delegate_invitation.updated_at = colombia_now()
         delegate_invitation.updated_by = admin_user_id
 
         # 8. Commit transacción
@@ -415,7 +416,7 @@ class VotingDelegationService:
             "delegator": delegator_info,
             "delegate": delegate_info,
             "restored_weight": float(original_weight),
-            "revocation_date": datetime.now()
+            "revocation_date": colombia_now()
         }
 
     async def get_meeting_delegations(self, meeting_id: int) -> List[Dict]:

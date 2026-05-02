@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.utils.timezone_utils import colombia_now
 from typing import Any, Union, Optional
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -161,7 +162,7 @@ class RateLimiter:
       info_adicional contiene: remaining_requests, reset_time
     """
 
-    current_time = datetime.now()
+    current_time = colombia_now()
     window_start = current_time - timedelta(minutes=window_minutes)
 
     # Sanitizar key para evitar inyección

@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, DECIMAL, JSON
+﻿from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, DECIMAL, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class MeetingInvitationModel(Base):
     """
@@ -79,8 +80,8 @@ class MeetingInvitationModel(Base):
     )
 
     # === AUDITORÍA ===
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
     created_by = Column(
         Integer, 
         ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 

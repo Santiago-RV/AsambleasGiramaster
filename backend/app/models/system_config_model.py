@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+﻿from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class SystemConfigModel(Base):
     """
@@ -18,8 +19,8 @@ class SystemConfigModel(Base):
     bln_is_active = Column(Boolean, default=True, nullable=False)
     
     # Auditoría
-    created_at = Column(DateTime, default=datetime.now, nullable=False)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+    created_at = Column(DateTime, default=colombia_now, nullable=False)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now, nullable=False)
     updated_by = Column(
         Integer, 
         ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 

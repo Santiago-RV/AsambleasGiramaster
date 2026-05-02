@@ -17,6 +17,7 @@ from sqlalchemy import select
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Dict
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 import logging
 import secrets
 import string
@@ -201,7 +202,7 @@ async def _update_user_password(db: AsyncSession, user: UserModel, password: str
     """
     hashed_password = security_manager.create_password_hash(password)
     user.str_password_hash = hashed_password
-    user.updated_at = datetime.now()
+    user.updated_at = colombia_now()
     await db.commit()
 
 

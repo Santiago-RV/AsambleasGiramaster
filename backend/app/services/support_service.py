@@ -17,6 +17,7 @@ El usuario de soporte tiene bln_allow_entry = False → no accede a la plataform
 """
 
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -208,9 +209,9 @@ class SupportService:
                 data_user.str_lastname = lastname
                 data_user.str_email = email
                 data_user.str_phone = phone
-                data_user.updated_at = datetime.now()
+                data_user.updated_at = colombia_now()
 
-                existing_unit_record.updated_at = datetime.now()
+                existing_unit_record.updated_at = colombia_now()
 
                 await self.db.commit()
                 await self.db.refresh(data_user)
@@ -236,8 +237,8 @@ class SupportService:
                     str_lastname=lastname,
                     str_email=email,
                     str_phone=phone,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    created_at=colombia_now(),
+                    updated_at=colombia_now()
                 )
                 self.db.add(data_user)
                 await self.db.flush()  # Obtener ID sin commit
@@ -245,7 +246,7 @@ class SupportService:
                 # 2. tbl_users (sin acceso a la plataforma)
                 #    Generamos una contraseña aleatoria irrelevante ya que nunca podrá iniciar sesión
                 dummy_password = security_manager.create_password_hash(
-                    f"SoporteNoAccede_{unit_id}_{datetime.now().timestamp()}"
+                    f"SoporteNoAccede_{unit_id}_{colombia_now().timestamp()}"
                 )
                 support_user = UserModel(
                     int_data_user_id=data_user.id,
@@ -255,8 +256,8 @@ class SupportService:
                     bln_allow_entry=False,       # ← SIN ACCESO a la plataforma
                     bln_is_external_delegate=False,
                     bln_user_temporary=False,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    created_at=colombia_now(),
+                    updated_at=colombia_now()
                 )
                 self.db.add(support_user)
                 await self.db.flush()
@@ -268,8 +269,8 @@ class SupportService:
                     str_apartment_number=SUPPORT_IDENTIFIER,  # ← 'SOPORTE'
                     bool_is_admin=False,
                     dec_default_voting_weight=0,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    created_at=colombia_now(),
+                    updated_at=colombia_now()
                 )
                 self.db.add(unit_record)
 

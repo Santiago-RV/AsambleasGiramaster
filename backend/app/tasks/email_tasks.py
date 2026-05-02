@@ -4,6 +4,7 @@ import string
 import threading
 from typing import List, Dict, Any
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from app.celery_app import celery_app
 from app.utils.email_sender import EmailSender
 from app.core.logging_config import get_logger
@@ -447,7 +448,7 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
             meeting_time = meeting.dat_schedule_date.strftime('%H:%M') if meeting.dat_schedule_date else ''
             
             template = Template(template_content)
-            meeting_year = str(datetime.now().year)
+            meeting_year = str(colombia_now().year)
             email_sender = EmailSender(db)
             
             # Obtener información de soporte técnico UNA SOLA VEZ antes del loop
@@ -533,10 +534,10 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                         existing_invitation = existing_result.scalar_one_or_none()
                         
                         if existing_invitation:
-                            existing_invitation.dat_sent_at = datetime.now()
+                            existing_invitation.dat_sent_at = colombia_now()
                             existing_invitation.str_invitation_status = "sent"
                             existing_invitation.int_delivery_attemps += 1
-                            existing_invitation.updated_at = datetime.now()
+                            existing_invitation.updated_at = colombia_now()
                         else:
                             invitation = MeetingInvitationModel(
                                 int_meeting_id=meeting_id,
@@ -546,7 +547,7 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                                 str_apartment_number=user_residential_unit.str_apartment_number if user_residential_unit else "N/A",
                                 str_invitation_status="sent",
                                 str_response_status="no_response",
-                                dat_sent_at=datetime.now(),
+                                dat_sent_at=colombia_now(),
                                 int_delivery_attemps=1,
                                 bln_will_attend=False,
                                 bln_actually_attended=False,
@@ -565,7 +566,7 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
             await db.commit()
             
             meeting.int_total_invitated = total
-            meeting.updated_at = datetime.now()
+            meeting.updated_at = colombia_now()
             await db.commit()
             await engine.dispose()
             
@@ -639,7 +640,7 @@ def send_qr_email(self, user_id: int, recipient_email: str = None, frontend_url:
                 temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits + "!@#$%") for _ in range(12))
                 hashed_password = security_manager.create_password_hash(temp_password)
                 user.str_password_hash = hashed_password
-                user.updated_at = datetime.now()
+                user.updated_at = colombia_now()
                 await db.commit()
                 
                 user_info = {
@@ -749,7 +750,7 @@ def send_welcome_email(
                     voting_weight=f"{voting_weight_percent:.2f}",
                     user_email=user_email,
                     phone=phone,
-                    current_year=str(datetime.now().year),
+                    current_year=str(colombia_now().year),
                     auto_login_url=auto_login_url
                 )
                 
@@ -832,7 +833,7 @@ def send_single_credential_email(
                 
                 hashed_password = security_manager.create_password_hash(temp_password)
                 user.str_password_hash = hashed_password
-                user.updated_at = datetime.now()
+                user.updated_at = colombia_now()
                 await db.commit()
                 
                 auto_login_token = simple_auto_login_service.generate_auto_login_token(
@@ -883,7 +884,7 @@ def send_single_credential_email(
                     voting_weight=f"{voting_weight_percent:.2f}",
                     user_email=data_user.str_email,
                     phone=data_user.str_phone,
-                    current_year=str(datetime.now().year),
+                    current_year=str(colombia_now().year),
                     auto_login_url=auto_login_url,
                     support_name=support_data.get("str_support_name") if support_data else None,
                     support_email=support_data.get("str_support_email") if support_data else None,

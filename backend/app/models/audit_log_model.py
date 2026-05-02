@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class AuditLogModel(Base):
     __tablename__ = "tbl_audit_logs"
@@ -21,5 +22,5 @@ class AuditLogModel(Base):
     str_severity = Column(String(50), index=True, nullable=False)
     json_tags = Column(JSON, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
 

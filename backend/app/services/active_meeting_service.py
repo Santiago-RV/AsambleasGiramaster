@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, update as sa_update
 from typing import List, Optional
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from sqlalchemy.orm import selectinload, aliased
 
 from app.models.meeting_model import MeetingModel
@@ -1011,7 +1012,7 @@ class ActiveMeetingService:
         if not invitation:
             return {"success": False, "message": "Invitación no encontrada"}
         
-        invitation.dat_left_at = datetime.now()
+        invitation.dat_left_at = colombia_now()
         await self.db.commit()
         
         from app.services.session_service import SessionService

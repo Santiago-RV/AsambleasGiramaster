@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
+from app.utils.timezone_utils import colombia_now
 from typing import List, Optional, Dict, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +45,7 @@ class SessionService:
         if expires_in_minutes is None:
             expires_in_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
         
-        expires_at = datetime.now() + timedelta(minutes=expires_in_minutes)
+        expires_at = colombia_now() + timedelta(minutes=expires_in_minutes)
         
         session = UserSessionModel(
             user_id=user_id,
@@ -76,7 +77,7 @@ class SessionService:
             and_(
                 UserSessionModel.user_id == user_id,
                 UserSessionModel.is_active == True,
-                UserSessionModel.expires_at > datetime.now()
+                UserSessionModel.expires_at > colombia_now()
             )
         ).order_by(UserSessionModel.created_at.desc())
         
@@ -237,7 +238,7 @@ class SessionService:
             Número de sesiones eliminadas
         """
         query = select(UserSessionModel).where(
-            UserSessionModel.expires_at < datetime.now()
+            UserSessionModel.expires_at < colombia_now()
         )
         result = await self.db.execute(query)
         sessions = result.scalars().all()

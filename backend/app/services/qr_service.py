@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 import logging
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 from app.core.config import settings
 from app.services.simple_auto_login_service import simple_auto_login_service
@@ -136,7 +137,7 @@ class QRCodeService:
                 
                 # Fecha de generación
                 text_y += 20
-                date_text = f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+                date_text = f"Generado: {colombia_now().strftime('%d/%m/%Y %H:%M')}"
                 date_bbox = draw.textbbox((0, 0), date_text, font=font)
                 date_width = date_bbox[2] - date_bbox[0]
                 draw.text(((size - date_width) // 2, text_y), date_text, fill="#718096", font=font)
@@ -235,7 +236,7 @@ class QRCodeService:
             )
             
             # Guardar QR en archivo (opcional)
-            qr_filename = f"qr_user_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            qr_filename = f"qr_user_{user_id}_{colombia_now().strftime('%Y%m%d_%H%M%S')}.png"
             qr_filepath = self.qr_codes_dir / qr_filename
             
             # Decodificar base64 y guardar

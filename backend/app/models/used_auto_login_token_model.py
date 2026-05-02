@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 from app.core.database import Base
 
@@ -11,7 +12,7 @@ class UsedAutoLoginTokenModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     token_id = Column(String(36), unique=True, index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("tbl_users.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    created_at = Column(DateTime, default=colombia_now, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     ip_address = Column(String(45), nullable=True)
 
