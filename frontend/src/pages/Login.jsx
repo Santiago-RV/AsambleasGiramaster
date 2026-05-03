@@ -31,7 +31,7 @@ const Login = () => {
 			} else if (role === 'Administrador') {
 				navigate('/admin', { replace: true });
 			} else {
-				navigate('/dashboard', { replace: true });
+				navigate('/copropietario', { replace: true });
 			}
 		}
 	}, [navigate]);

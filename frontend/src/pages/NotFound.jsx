@@ -32,7 +32,7 @@ const NotFound = () => {
 					{/* Botones */}
 					<div className="space-y-3">
 						<button
-							onClick={() => navigate('/')}
+							onClick={() => navigate('/login')}
 							className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3498db] to-[#2980b9] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
 						>
 							<Home size={20} />

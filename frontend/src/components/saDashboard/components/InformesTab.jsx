@@ -5,12 +5,13 @@ import Swal from 'sweetalert2';
 import { ReportsService } from '../../../services/api/ReportsService';
 import { getLlamadoReportSA } from '../../../services/api/ActiveMeetingService';
 import { formatDateLong, formatDateTime } from '../../../utils/dateUtils';
+import logoGiramaster from '../../../assets/logo-giramaster.jpeg';
 
 // ─── Helpers PDF ────────────────────────────────────────────────────────────
 
 const addHeader = (doc, title, meetingTitle, unitName, date) => {
     const pw = doc.internal.pageSize.getWidth();
-    const logo = '/src/assets/logo-giramaster.jpeg'; 
+    const logo = logoGiramaster;
 
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pw, 32, 'F');
