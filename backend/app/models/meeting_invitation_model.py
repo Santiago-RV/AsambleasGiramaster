@@ -1,39 +1,38 @@
 ﻿from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, DECIMAL, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
-from datetime import datetime
 from app.utils.timezone_utils import colombia_now
 
 class MeetingInvitationModel(Base):
     """
     Modelo de invitaciones a reuniones con soporte para delegación de poderes.
-    
+
     Campos importantes para delegación:
     - dec_quorum_base: Peso/quorum ORIGINAL del usuario (NUNCA cambia)
     - dec_voting_weight: Peso/quorum ACTUAL en la reunión (cambia con delegaciones)
     - int_delegated_id: Si tiene valor, indica que este usuario delegó su poder
-    
+
     Lógica de delegación:
     - Al crear invitación: dec_quorum_base = dec_voting_weight (mismo valor inicial)
     - Al delegar poder: dec_voting_weight = 0, dec_quorum_base se mantiene
     - Al recibir poder: dec_voting_weight aumenta, dec_quorum_base se mantiene
     - Al revocar: dec_voting_weight vuelve a dec_quorum_base
     """
-    
+
     __tablename__ = "tbl_meeting_invitations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     int_meeting_id = Column(
-        Integer, 
-        ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False
     )
     int_user_id = Column(
-        Integer, 
-        ForeignKey("tbl_users.id", ondelete="CASCADE", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_users.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False
     )
-    
+
     # === CAMPOS DE PESO/QUORUM ===
     dec_voting_weight = Column(
         DECIMAL(10, 6),
@@ -45,7 +44,7 @@ class MeetingInvitationModel(Base):
         nullable=False,
         comment="Quorum base/original del usuario (NUNCA cambia, es el peso sin delegaciones)"
     )
-    
+
     # === INFORMACIÓN DE LA INVITACIÓN ===
     str_apartment_number = Column(String(20), nullable=False)
     str_invitation_status = Column(String(50), index=True, nullable=False)
@@ -56,16 +55,16 @@ class MeetingInvitationModel(Base):
     int_delivery_attemps = Column(Integer, nullable=False)
     str_last_delivery_error = Column(String(500), nullable=True)
     bln_will_attend = Column(Boolean, default=False)
-    
+
     # === DELEGACIÓN ===
     int_delegated_id = Column(
-        Integer, 
-        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 
-        nullable=True, 
+        Integer,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
         index=True,
         comment="ID del usuario al que se delegó el poder (NULL si no delegó)"
     )
-    
+
     # === ASISTENCIA ===
     bln_actually_attended = Column(Boolean, default=False)
     bln_marked_absent = Column(Boolean, default=False, nullable=False,
@@ -83,13 +82,13 @@ class MeetingInvitationModel(Base):
     created_at = Column(DateTime, default=colombia_now)
     updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
     created_by = Column(
-        Integer, 
-        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True
     )
     updated_by = Column(
-        Integer, 
-        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True
     )
 

@@ -1,7 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import relationship
 from app.core.database import Base
-from datetime import datetime
 from app.utils.timezone_utils import colombia_now
 
 class AuditLogModel(Base):

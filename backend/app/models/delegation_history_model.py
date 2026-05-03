@@ -1,6 +1,5 @@
-﻿from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, Enum, ForeignKey, Index
+﻿from sqlalchemy import Column, Integer, DECIMAL, DateTime, Enum, ForeignKey, Index
 from sqlalchemy.orm import relationship
-from datetime import datetime
 from app.utils.timezone_utils import colombia_now
 import enum
 
@@ -16,10 +15,10 @@ class DelegationStatusEnum(str, enum.Enum):
 class DelegationHistoryModel(Base):
     """
     Modelo para el histórico de delegaciones de poder de votación.
-    
+
     Registra cada vez que un copropietario cede su poder a otro durante una reunión,
     permitiendo generar reportes y mantener trazabilidad completa.
-    
+
     Campos clave:
     - int_delegator_user_id: Usuario que CEDE su poder (origen)
     - int_delegate_user_id: Usuario que RECIBE el poder (destino)
@@ -28,7 +27,7 @@ class DelegationHistoryModel(Base):
     - dat_delegated_at: Momento en que se cedió el poder
     - dat_revoked_at: Momento en que se revocó (NULL si sigue activa)
     """
-    
+
     __tablename__ = "delegation_history"
 
     # Primary Key
@@ -36,13 +35,13 @@ class DelegationHistoryModel(Base):
 
     # Foreign Keys
     int_meeting_id = Column(
-        Integer, 
+        Integer,
         ForeignKey("tbl_meetings.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
         index=True,
         comment="ID de la reunión donde se realizó la delegación"
     )
-    
+
     int_delegator_user_id = Column(
         Integer,
         ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
@@ -50,7 +49,7 @@ class DelegationHistoryModel(Base):
         index=True,
         comment="ID del usuario que CEDE su poder (origen). SET NULL si se elimina el usuario."
     )
-    
+
     int_delegate_user_id = Column(
         Integer,
         ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
@@ -65,7 +64,7 @@ class DelegationHistoryModel(Base):
         nullable=False,
         comment="Cantidad de quorum cedido (quorum base del delegador en ese momento)"
     )
-    
+
     str_status = Column(
         Enum(DelegationStatusEnum),
         nullable=False,
@@ -81,7 +80,7 @@ class DelegationHistoryModel(Base):
         default=colombia_now,
         comment="Fecha y hora en que se cedió el poder"
     )
-    
+
     dat_revoked_at = Column(
         DateTime,
         nullable=True,
@@ -111,13 +110,13 @@ class DelegationHistoryModel(Base):
     __table_args__ = (
         # Índice para buscar delegaciones de un delegador específico en una reunión
         Index('idx_meeting_delegator', 'int_meeting_id', 'int_delegator_user_id'),
-        
+
         # Índice para buscar delegaciones recibidas por un delegado en una reunión
         Index('idx_meeting_delegate', 'int_meeting_id', 'int_delegate_user_id'),
-        
+
         # Índice para buscar delegaciones activas/revocadas en una reunión
         Index('idx_meeting_status', 'int_meeting_id', 'str_status'),
-        
+
         # Índice para buscar todas las delegaciones activas de una reunión (consulta MÁS frecuente)
         Index('idx_meeting_active', 'int_meeting_id', 'str_status', 'dat_delegated_at'),
     )

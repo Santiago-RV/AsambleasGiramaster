@@ -1,26 +1,25 @@
 ﻿from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
-from datetime import datetime
 from app.utils.timezone_utils import colombia_now
 
 class MeetingModel(Base):
     """
     Modelo de reuniones/asambleas.
-    
+
     Gestiona toda la información de las reuniones incluyendo:
     - Información básica (título, descripción, fecha)
     - Integración con Zoom
     - Control de quorum
     - Delegación de poderes (a través de delegation_history)
     """
-    
+
     __tablename__ = "tbl_meetings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     int_id_residential_unit = Column(
-        Integer, 
-        ForeignKey("tbl_residential_units.id", ondelete="CASCADE", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_residential_units.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False
     )
     str_meeting_code = Column(String(50), index=True, nullable=False)
@@ -30,8 +29,8 @@ class MeetingModel(Base):
     dat_schedule_date = Column(DateTime, nullable=False)
     int_estimated_duration = Column(Integer, nullable=False, default=0)  # 0 = duración indefinida
     int_organizer_id = Column(
-        Integer, 
-        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True
     )
     int_meeting_leader_id = Column(Integer, nullable=False)
@@ -52,13 +51,13 @@ class MeetingModel(Base):
     created_at = Column(DateTime, default=colombia_now)
     updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
     created_by = Column(
-        Integer, 
-        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True
     )
     updated_by = Column(
-        Integer, 
-        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 
+        Integer,
+        ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True
     )
 
@@ -69,8 +68,8 @@ class MeetingModel(Base):
     attendances = relationship("MeetingAttendanceModel", back_populates="meeting", cascade="all, delete-orphan", passive_deletes=True)
     zoom_sessions = relationship("ZoomSessionModel", back_populates="meeting", cascade="all, delete-orphan", passive_deletes=True)
     delegation_history = relationship(
-        "DelegationHistoryModel", 
-        back_populates="meeting", 
+        "DelegationHistoryModel",
+        back_populates="meeting",
         cascade="all, delete-orphan",
         passive_deletes=True,
         doc="Histórico completo de todas las delegaciones de poder realizadas en esta reunión"
