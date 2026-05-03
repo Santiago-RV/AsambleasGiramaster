@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+﻿from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class ResidentialUnitModel(Base):
     __tablename__ = "tbl_residential_units"
@@ -23,8 +24,8 @@ class ResidentialUnitModel(Base):
     str_contact_person = Column(String(200), nullable=True)
     str_contact_phone = Column(String(50), nullable=True)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
     created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
     updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
 

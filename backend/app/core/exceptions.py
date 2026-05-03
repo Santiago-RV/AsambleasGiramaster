@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class BaseAPIException(Exception):
     """Excepción base para todas las excepciones de la API"""
@@ -16,7 +17,7 @@ class BaseAPIException(Exception):
         self.message = message
         self.error_code = error_code
         self.details = details or {}
-        self.timestamp = timestamp or datetime.now()
+        self.timestamp = timestamp or colombia_now()
         
         super().__init__(self.message)
     

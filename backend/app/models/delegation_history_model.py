@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, Enum, ForeignKey, Index
+﻿from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, Enum, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 import enum
 
 from app.core.database import Base
@@ -77,7 +78,7 @@ class DelegationHistoryModel(Base):
     dat_delegated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.now,
+        default=colombia_now,
         comment="Fecha y hora en que se cedió el poder"
     )
     
@@ -88,8 +89,8 @@ class DelegationHistoryModel(Base):
     )
 
     # Auditoría
-    created_at = Column(DateTime, default=datetime.now, nullable=False)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+    created_at = Column(DateTime, default=colombia_now, nullable=False)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now, nullable=False)
     created_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
     updated_by = Column(Integer, ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
 

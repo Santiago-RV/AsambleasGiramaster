@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import { PollService } from '../services/api/PollService';
 import { MeetingService } from '../services/api/MeetingService';
 import { DelegationService } from '../services/api/DelegationService';
-import { formatDateTime } from '../utils/dateUtils';
+import { formatDateTime, parseColombiaDate } from '../utils/dateUtils';
 
 export default function PresencialVotingPage() {
   const { meetingId } = useParams();
@@ -59,7 +59,7 @@ export default function PresencialVotingPage() {
           const isActive = p.str_status === 'active' || p.str_status === 'Activa';
           if (!isActive || p.has_voted) return false;
           if (p.dat_ended_at) {
-            const endDate = new Date(p.dat_ended_at);
+            const endDate = parseColombiaDate(p.dat_ended_at);
             if (currentTime > endDate) return false;
           }
           return true;
@@ -120,7 +120,7 @@ export default function PresencialVotingPage() {
 
   const getTimeRemaining = (endDateStr) => {
     if (!endDateStr) return null;
-    const endDate = new Date(endDateStr);
+    const endDate = parseColombiaDate(endDateStr);
     const diff = endDate - currentTime;
     if (diff <= 0) return { expired: true, minutes: 0, seconds: 0 };
     return { expired: false, minutes: Math.floor(diff / 60000), seconds: Math.floor((diff % 60000) / 1000) };

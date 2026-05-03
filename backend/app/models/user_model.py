@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+﻿from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class UserModel(Base):
     __tablename__ = "tbl_users"
@@ -16,8 +17,8 @@ class UserModel(Base):
     dat_temporary_expiration_date = Column(DateTime, nullable=True)
     bln_allow_entry = Column(Boolean, default=False)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
 
     data_user = relationship("DataUserModel", back_populates="users")
     rol = relationship("RolModel", back_populates="users")

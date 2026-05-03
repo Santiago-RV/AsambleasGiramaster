@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from datetime import datetime, timedelta
+from app.utils.timezone_utils import colombia_now
 from typing import Dict, List
 
 from app.models.residential_unit_model import ResidentialUnitModel
@@ -64,7 +65,7 @@ class DashboardService:
         total_residents = total_residents_result.scalar() or 0
 
         # Reuniones activas (En Curso o Programadas para hoy)
-        now = datetime.now()
+        now = colombia_now()
         today_start = datetime(now.year, now.month, now.day)
         today_end = today_start + timedelta(days=1)
 
@@ -192,7 +193,7 @@ class DashboardService:
         Returns:
             Lista de UpcomingMeetingSchema
         """
-        now = datetime.now()
+        now = colombia_now()
 
         query = (
             select(

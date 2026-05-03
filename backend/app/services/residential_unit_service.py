@@ -1,5 +1,6 @@
 from ast import Dict
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from decimal import Decimal
 from typing import List, Optional
 import pandas as pd
@@ -224,14 +225,14 @@ class ResidentialUnitService:
                             str_apartment_number="ADMIN",  # Identificador especial para administradores
                             bool_is_admin=True,
                             dec_default_voting_weight=0,  # Los admins no votan por defecto
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
+                            created_at=colombia_now(),
+                            updated_at=colombia_now()
                         )
                         self.db.add(user_unit)
 
                         # Actualizar bln_allow_entry en tbl_users
                         existing_user.bln_allow_entry = True
-                        existing_user.updated_at = datetime.now()
+                        existing_user.updated_at = colombia_now()
 
                         logger.info(f"Usuario {existing_user.id} asignado como administrador de la unidad {residential_unit.id}")
 
@@ -245,8 +246,8 @@ class ResidentialUnitService:
                             str_lastname=admin_data.str_lastname,
                             str_email=admin_data.str_email,
                             str_phone=admin_data.str_phone,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
+                            created_at=colombia_now(),
+                            updated_at=colombia_now()
                         )
                         self.db.add(data_user)
                         await self.db.flush()
@@ -266,8 +267,8 @@ class ResidentialUnitService:
                             bln_allow_entry=True,  # Administrador tiene acceso habilitado
                             bln_is_external_delegate=False,
                             bln_user_temporary=False,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
+                            created_at=colombia_now(),
+                            updated_at=colombia_now()
                         )
                         self.db.add(user)
                         await self.db.flush()
@@ -284,8 +285,8 @@ class ResidentialUnitService:
                             str_apartment_number="ADMIN",  # Identificador especial
                             bool_is_admin=True,
                             dec_default_voting_weight=0,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
+                            created_at=colombia_now(),
+                            updated_at=colombia_now()
                         )
                         self.db.add(user_unit)
 
@@ -613,8 +614,8 @@ class ResidentialUnitService:
                         str_lastname=lastname,
                         str_email=email,
                         str_phone=phone,
-                        created_at=datetime.now(),
-                        updated_at=datetime.now()
+                        created_at=colombia_now(),
+                        updated_at=colombia_now()
                     )
                     
                     self.db.add(data_user)
@@ -654,8 +655,8 @@ class ResidentialUnitService:
                         bln_allow_entry=False,  # Acceso deshabilitado (0)
                         bln_is_external_delegate=False,
                         bln_user_temporary=False,
-                        created_at=datetime.now(),
-                        updated_at=datetime.now()
+                        created_at=colombia_now(),
+                        updated_at=colombia_now()
                     )
 
                     self.db.add(user)
@@ -698,7 +699,7 @@ class ResidentialUnitService:
                             )
                         
                         if needs_update:
-                            existing_assignment.updated_at = datetime.now()
+                            existing_assignment.updated_at = colombia_now()
                     else:
                         # Crear relación usuario-unidad residencial
                         user_unit = UserResidentialUnitModel(
@@ -707,8 +708,8 @@ class ResidentialUnitService:
                             str_apartment_number=apartment_number,
                             dec_default_voting_weight=voting_weight,
                             bool_is_admin=False,
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
+                            created_at=colombia_now(),
+                            updated_at=colombia_now()
                         )
                         
                         self.db.add(user_unit)
@@ -838,8 +839,8 @@ class ResidentialUnitService:
                 str_lastname=lastname,
                 str_email=email,
                 str_phone=phone,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             
             self.db.add(data_user)
@@ -859,8 +860,8 @@ class ResidentialUnitService:
                 bln_allow_entry=is_active,  # Usar el valor proporcionado
                 bln_is_external_delegate=False,
                 bln_user_temporary=False,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             
             self.db.add(user)
@@ -878,8 +879,8 @@ class ResidentialUnitService:
                 str_apartment_number=apartment_number,
                 dec_default_voting_weight=voting_weight,
                 bool_is_admin=False,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             
             self.db.add(user_unit)
@@ -1044,7 +1045,7 @@ class ResidentialUnitService:
                 voting_weight=f"{voting_weight_percent:.2f}",
                 user_email=user_email,
                 phone=phone,
-                current_year=str(datetime.now().year),
+                current_year=str(colombia_now().year),
                 auto_login_url=auto_login_url
             )
             
@@ -1187,7 +1188,7 @@ class ResidentialUnitService:
             if 'phone' in update_data:
                 data_user.str_phone = _normalize_phone_co(update_data['phone'])
             
-            data_user.updated_at = datetime.now()
+            data_user.updated_at = colombia_now()
             
             # Actualizar contraseña si se proporciona
             if 'password' in update_data and update_data['password']:
@@ -1199,7 +1200,7 @@ class ResidentialUnitService:
             if 'is_active' in update_data and update_data['is_active'] is not None:
                 user.bln_allow_entry = update_data['is_active']
             
-            user.updated_at = datetime.now()
+            user.updated_at = colombia_now()
             
             # Actualizar datos de la unidad
             if 'apartment_number' in update_data and update_data['apartment_number']:
@@ -1208,7 +1209,7 @@ class ResidentialUnitService:
             if 'voting_weight' in update_data and update_data['voting_weight'] is not None:
                 user_unit.dec_default_voting_weight = update_data['voting_weight']
             
-            user_unit.updated_at = datetime.now()
+            user_unit.updated_at = colombia_now()
             
             await self.db.commit()
             await self.db.refresh(user)
@@ -1725,8 +1726,8 @@ class ResidentialUnitService:
                     str_lastname=admin_data.str_lastname,
                     str_email=admin_data.str_email,
                     str_phone=admin_data.str_phone,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    created_at=colombia_now(),
+                    updated_at=colombia_now()
                 )
                 self.db.add(data_user)
                 await self.db.flush()
@@ -1769,8 +1770,8 @@ class ResidentialUnitService:
                 bln_allow_entry=True,  # Acceso HABILITADO
                 bln_is_external_delegate=False,
                 bln_user_temporary=False,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             self.db.add(user)
             await self.db.flush()
@@ -1799,13 +1800,13 @@ class ResidentialUnitService:
 
                 # Marcar como NO administrador
                 old_admin_unit.bool_is_admin = False
-                old_admin_unit.updated_at = datetime.now()
+                old_admin_unit.updated_at = colombia_now()
 
                 # Deshabilitar acceso (solo si NO es copropietario de la unidad)
                 # Si str_apartment_number es "ADMIN", significa que es admin puro, no copropietario
                 if old_admin_unit.str_apartment_number == "ADMIN":
                     old_admin_user.bln_allow_entry = False
-                    old_admin_user.updated_at = datetime.now()
+                    old_admin_user.updated_at = colombia_now()
 
                 logger.info(
                     f"Administrador anterior removido: Usuario ID {old_admin_user.id}"
@@ -1820,8 +1821,8 @@ class ResidentialUnitService:
                 str_apartment_number="ADMIN",  # Identificador especial para administradores
                 bool_is_admin=True,
                 dec_default_voting_weight=0,  # Administradores no votan
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             self.db.add(user_unit)
 
@@ -1877,9 +1878,9 @@ class ResidentialUnitService:
                     int_user_id=user.id,
                     str_status="sent",  
                     str_template="admin_credentials",  
-                    dat_sent_at=datetime.now(),
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    dat_sent_at=colombia_now(),
+                    created_at=colombia_now(),
+                    updated_at=colombia_now()
                 )
                 self.db.add(email_notification)
 
@@ -1893,8 +1894,8 @@ class ResidentialUnitService:
                     str_status="failed",  
                     str_template="admin_credentials",  
                     dat_sent_at=None,  # No se envió
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    created_at=colombia_now(),
+                    updated_at=colombia_now()
                 )
                 self.db.add(email_notification)
 
@@ -2006,11 +2007,11 @@ class ResidentialUnitService:
 
                 # Quitar privilegios al anterior
                 old_admin_unit.bool_is_admin = False
-                old_admin_unit.updated_at = datetime.now()
+                old_admin_unit.updated_at = colombia_now()
 
                 old_admin_user.bln_allow_entry = False
                 old_admin_user.int_id_rol = 3  # Cambiar rol a Copropietario
-                old_admin_user.updated_at = datetime.now()
+                old_admin_user.updated_at = colombia_now()
 
                 logger.info(
                     f"Privilegios de administrador removidos del usuario {old_admin_user.id} "
@@ -2019,11 +2020,11 @@ class ResidentialUnitService:
 
             # Asignar privilegios al nuevo administrador
             new_admin_unit.bool_is_admin = True
-            new_admin_unit.updated_at = datetime.now()
+            new_admin_unit.updated_at = colombia_now()
 
             new_admin_user.bln_allow_entry = True
             new_admin_user.int_id_rol = 2  # Cambiar rol a Administrador
-            new_admin_user.updated_at = datetime.now()
+            new_admin_user.updated_at = colombia_now()
 
             logger.info(
                 f"Usuario {new_admin_user_id} asignado como administrador "
@@ -2170,8 +2171,8 @@ class ResidentialUnitService:
                 str_lastname=guest_data['lastname'],
                 str_email=guest_data['email'],
                 str_phone=None,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             self.db.add(data_user)
             await self.db.flush()
@@ -2205,8 +2206,8 @@ class ResidentialUnitService:
                 bln_allow_entry=False,  # Acceso habilitado
                 bln_is_external_delegate=False,
                 bln_user_temporary=False,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             self.db.add(user)
             await self.db.flush()
@@ -2223,8 +2224,8 @@ class ResidentialUnitService:
                 str_apartment_number="INVITADO",
                 bool_is_admin=False,
                 dec_default_voting_weight=0.0,  # Sin derecho a voto
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             self.db.add(user_unit)
             

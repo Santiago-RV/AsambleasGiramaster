@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, Numeric, String, DateTime, Boolean, ForeignKey
+﻿from sqlalchemy import Column, Integer, Numeric, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class UserResidentialUnitModel(Base):
     __tablename__ = "tbl_user_residential_units"
@@ -13,8 +14,8 @@ class UserResidentialUnitModel(Base):
     bool_is_admin = Column(Boolean, default=False)
     dec_default_voting_weight = Column(Numeric(10, 4), nullable=False, default=0)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
 
     # Relationships
     user = relationship("UserModel", back_populates="user_residential_units", lazy="selectin")

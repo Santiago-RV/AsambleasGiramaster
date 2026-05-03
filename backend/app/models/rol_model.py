@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class RolModel(Base):
     __tablename__ = "tbl_rols"
@@ -11,7 +12,7 @@ class RolModel(Base):
     str_description = Column(String(500), nullable=False)
     bln_is_active = Column(Boolean, default=True)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now)
 
     users = relationship("UserModel", back_populates="rol")

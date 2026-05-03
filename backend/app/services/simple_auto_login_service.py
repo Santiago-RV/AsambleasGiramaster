@@ -1,6 +1,7 @@
-import uuid
+﻿import uuid
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
+from app.utils.timezone_utils import colombia_now
 from typing import Optional, Dict, List
 from app.core.config import settings
 from app.core.logging_config import get_logger
@@ -194,7 +195,7 @@ class SimpleAutoLoginService:
             return
         
         if expires_at is None:
-            expires_at = datetime.now() + timedelta(hours=24)
+            expires_at = colombia_now() + timedelta(hours=24)
         
         new_token = UsedAutoLoginTokenModel(
             token_id=token_id,
@@ -220,7 +221,7 @@ class SimpleAutoLoginService:
         from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
         from sqlalchemy import select
         
-        now = datetime.now()
+        now = colombia_now()
         
         result = await db.execute(
             select(UsedAutoLoginTokenModel).where(
@@ -268,7 +269,7 @@ class SimpleAutoLoginService:
             return False
         
         # Verificar que el token no haya expirado
-        if user_token.expires_at and user_token.expires_at < datetime.now():
+        if user_token.expires_at and user_token.expires_at < colombia_now():
             logger.info(f"⛔ Token {token_id} ha expirado para usuario {user_id}")
             return False
         
@@ -312,7 +313,7 @@ class SimpleAutoLoginService:
         
         result = await db.execute(
             delete(UsedAutoLoginTokenModel).where(
-                UsedAutoLoginTokenModel.expires_at < datetime.now()
+                UsedAutoLoginTokenModel.expires_at < colombia_now()
             )
         )
         await db.commit()

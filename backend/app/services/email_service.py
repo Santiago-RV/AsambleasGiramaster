@@ -5,6 +5,7 @@ Carga credenciales SMTP desde la base de datos (tbl_system_config).
 """
 from typing import List, Optional
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pathlib import Path
@@ -83,7 +84,7 @@ class EmailService:
                 apartment_number=apartment_number,
                 auto_login_url=auto_login_url,
                 qr_image_url=qr_image_url,
-                current_year=str(datetime.now().year),
+                current_year=str(colombia_now().year),
                 support_name=support_data.get("str_support_name") if support_data else None,
                 support_email=support_data.get("str_support_email") if support_data else None,
                 support_phone=support_data.get("str_support_phone") if support_data else None,
@@ -278,7 +279,7 @@ class EmailService:
                     "zoom_password": meeting.str_zoom_password or "",
                     "zoom_join_url": meeting.str_zoom_join_url or "",
                     "str_modality": meeting.str_modality or "presencial",
-                    "current_year": str(datetime.now().year),
+                    "current_year": str(colombia_now().year),
                     "auto_login_url": None,
                     "auto_login_token": None,
                     "support_name": support_data.get("str_support_name") if support_data else None,
@@ -338,7 +339,7 @@ class EmailService:
             # 6️⃣ ACTUALIZAR CONTADOR DE INVITADOS EN LA REUNIÓN
             total_invitados = len(notification_mapping)
             meeting.int_total_invitated = total_invitados
-            meeting.updated_at = datetime.now()
+            meeting.updated_at = colombia_now()
 
             # 7️⃣ COMMIT DE TODAS LAS NOTIFICACIONES Y ACTUALIZACIÓN DE REUNIÓN
             await db.commit()

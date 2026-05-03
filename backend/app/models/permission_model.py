@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class PermissionModel(Base):
     __tablename__ = "tbl_permissions"
@@ -12,5 +13,5 @@ class PermissionModel(Base):
     str_module = Column(String(100), nullable=False)
     bln_is_active = Column(Boolean, default=True)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now)

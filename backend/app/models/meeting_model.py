@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey
+﻿from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class MeetingModel(Base):
     """
@@ -48,8 +49,8 @@ class MeetingModel(Base):
     dat_actual_start_time = Column(DateTime, nullable=True)
     dat_actual_end_time = Column(DateTime, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
     created_by = Column(
         Integer, 
         ForeignKey("tbl_users.id", ondelete="SET NULL", onupdate="CASCADE"), 

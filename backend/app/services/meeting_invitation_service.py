@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from typing import List, Dict, Optional
 import pandas as pd
 from decimal import Decimal
@@ -44,7 +45,7 @@ class MeetingInvitationService:
                 str_apartment_number=invitation_data.str_apartment_number,
                 str_invitation_status=invitation_data.str_invitation_status,
                 str_response_status=invitation_data.str_response_status,
-                dat_sent_at=datetime.now(),
+                dat_sent_at=colombia_now(),
                 int_delivery_attemps=0,
                 bln_will_attend=invitation_data.bln_will_attend,
                 int_delegated_id=invitation_data.int_delegated_id,
@@ -204,7 +205,7 @@ class MeetingInvitationService:
                         str_apartment_number=apartment_number,
                         str_invitation_status='pending',
                         str_response_status='no_response',
-                        dat_sent_at=datetime.now(),
+                        dat_sent_at=colombia_now(),
                         int_delivery_attemps=0,
                         bln_will_attend=False,
                         bln_actually_attended=False,
@@ -285,7 +286,7 @@ class MeetingInvitationService:
                 return None
             
             invitation.str_invitation_status = new_status
-            invitation.updated_at = datetime.now()
+            invitation.updated_at = colombia_now()
             invitation.updated_by = updated_by
             
             await self.db.commit()
@@ -404,7 +405,7 @@ class MeetingInvitationService:
                         str_apartment_number=apt_number,
                         str_invitation_status="pending",
                         str_response_status="no_response",
-                        dat_sent_at=datetime.now(),
+                        dat_sent_at=colombia_now(),
                         int_delivery_attemps=0,
                         bln_will_attend=False,
                         bln_actually_attended=False,
@@ -447,7 +448,7 @@ class MeetingInvitationService:
             meeting = await self.db.get(MeetingModel, meeting_id)
             if meeting and results["invitations_created"] > 0:
                 meeting.int_total_invitated = (meeting.int_total_invitated or 0) + results["invitations_created"]
-                meeting.updated_at = datetime.now()
+                meeting.updated_at = colombia_now()
                 await self.db.commit()
                 logger.info(f"✅ Contador actualizado: {meeting.int_total_invitated} invitados")
             

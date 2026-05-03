@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric
+﻿from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class PollOptionModel(Base):
     __tablename__ = "tbl_poll_options"
@@ -15,8 +16,8 @@ class PollOptionModel(Base):
     dec_weight_total = Column(Numeric, nullable=False)
     dec_percentage = Column(Numeric, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
 
     poll = relationship("PollModel", back_populates="options")
     responses = relationship("PollResponseModel", back_populates="option", cascade="all, delete-orphan", passive_deletes=True)

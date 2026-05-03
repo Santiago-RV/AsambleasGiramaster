@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON
+﻿from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class ZoomSessionModel(Base):
     __tablename__ = "tbl_zoom_sessions"
@@ -27,8 +28,8 @@ class ZoomSessionModel(Base):
     json_zoom_report_data = Column(JSON, nullable=False)
     json_participants_report = Column(JSON, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
+    updated_at = Column(DateTime, default=colombia_now, onupdate=colombia_now)
 
     # Relationships
     meeting = relationship("MeetingModel", back_populates="zoom_sessions")

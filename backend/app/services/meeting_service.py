@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 import secrets
 import string
 import time
@@ -292,7 +293,7 @@ class MeetingService:
                         str_apartment_number=apt_number,
                         str_invitation_status="pending",
                         str_response_status="no_response",
-                        dat_sent_at=datetime.now(),
+                        dat_sent_at=colombia_now(),
                         int_delivery_attemps=0,
                         bln_will_attend=False,
                         bln_actually_attended=False,
@@ -409,7 +410,7 @@ class MeetingService:
             elif status is not None:
                 meeting.str_status = status
 
-            meeting.updated_at = datetime.now()
+            meeting.updated_at = colombia_now()
             if user_id:
                 meeting.updated_by = user_id
 
@@ -469,8 +470,8 @@ class MeetingService:
             # Solo iniciar si está en estado Programada
             if meeting.str_status == "Programada":
                 meeting.str_status = "En Curso"
-                meeting.dat_actual_start_time = datetime.now()
-                meeting.updated_at = datetime.now()
+                meeting.dat_actual_start_time = colombia_now()
+                meeting.updated_at = colombia_now()
                 meeting.updated_by = user_id
 
                 await self.db.commit()
@@ -511,7 +512,7 @@ class MeetingService:
             # Caso 1: Está en curso → Completada
             if meeting.str_status == "En Curso":
                 meeting.str_status = "Completada"
-                meeting.dat_actual_end_time = datetime.now()
+                meeting.dat_actual_end_time = colombia_now()
                 
                 # Si es reunion presencial, actualizar asistencias
                 if meeting.str_modality == "presencial":
@@ -528,7 +529,7 @@ class MeetingService:
                 # No se guarda hora de inicio ni fin real para reuniones que no iniciaron
                 logger.info(f"Reunión {meeting_id} finalizada sin iniciar - Estado: Finalizada")
             
-            meeting.updated_at = datetime.now()
+            meeting.updated_at = colombia_now()
             meeting.updated_by = user_id
 
             await self.db.commit()
@@ -641,10 +642,10 @@ class MeetingService:
 
             # Solo registrar si no se ha registrado antes
             if invitation.dat_joined_at is None:
-                invitation.dat_joined_at = datetime.now()
+                invitation.dat_joined_at = colombia_now()
                 invitation.bln_actually_attended = True
                 invitation.str_response_status = "attended"
-                invitation.updated_at = datetime.now()
+                invitation.updated_at = colombia_now()
                 invitation.updated_by = user_id
 
                 await self.db.commit()
@@ -663,7 +664,7 @@ class MeetingService:
                 # Si el admin cerró la sesión y el usuario re-ingresa, limpiar dat_left_at
                 if invitation.dat_left_at is not None:
                     invitation.dat_left_at = None
-                    invitation.updated_at = datetime.now()
+                    invitation.updated_at = colombia_now()
                     await self.db.commit()
                     logger.info(f"✅ dat_left_at limpiado: usuario {user_id} re-ingresó a reunión {meeting_id}")
                 return {
@@ -702,8 +703,8 @@ class MeetingService:
                     "message": "No se encontró invitación para este usuario"
                 }
 
-            invitation.dat_left_at = datetime.now()
-            invitation.updated_at = datetime.now()
+            invitation.dat_left_at = colombia_now()
+            invitation.updated_at = colombia_now()
             invitation.updated_by = user_id
 
             await self.db.commit()
@@ -878,11 +879,11 @@ class MeetingService:
                     str_apartment_number=apartment_number,
                     str_invitation_status="delivered",
                     str_response_status="no_response",
-                    dat_sent_at=datetime.now(),
+                    dat_sent_at=colombia_now(),
                     int_delivery_attemps=0,
                     bln_will_attend=True,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=colombia_now(),
+                    updated_at=colombia_now(),
                     created_by=admin_user_id,
                     updated_by=admin_user_id
                 )
@@ -993,7 +994,7 @@ class MeetingService:
                     str_apartment_number=user_unit.str_apartment_number or "N/A",
                     str_invitation_status="pending",
                     str_response_status="no_response",
-                    dat_sent_at=datetime.now(),
+                    dat_sent_at=colombia_now(),
                     int_delivery_attemps=0,
                     bln_will_attend=True,
                     bln_actually_attended=False,
@@ -1019,7 +1020,7 @@ class MeetingService:
                 # limpiar dat_left_at para que vuelva a aparecer como conectado
                 if invitation.dat_left_at is not None:
                     invitation.dat_left_at = None
-                    invitation.updated_at = datetime.now()
+                    invitation.updated_at = colombia_now()
                     await self.db.commit()
                     logger.info(
                         f"Auto-attendance: dat_left_at limpiado para usuario {user_id} "
@@ -1052,7 +1053,7 @@ class MeetingService:
                 invitation.dat_joined_at = existing_attendance.dat_joined_at
                 invitation.bln_actually_attended = True
                 invitation.str_response_status = "attended"
-                invitation.updated_at = datetime.now()
+                invitation.updated_at = colombia_now()
                 await self.db.commit()
                 return {
                     "registered": True,
@@ -1064,7 +1065,7 @@ class MeetingService:
                 }
             
             # 6. Registrar la asistencia en la invitacion
-            now = datetime.now()
+            now = colombia_now()
             invitation.dat_joined_at = now
             invitation.bln_actually_attended = True
             invitation.str_response_status = "attended"

@@ -2,6 +2,7 @@ from sqlalchemy import DECIMAL, Column, Integer, String, DateTime, Boolean, Fore
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 
 class PollResponseModel(Base):
     __tablename__ = "tbl_poll_responses"
@@ -18,7 +19,7 @@ class PollResponseModel(Base):
     str_ip_address = Column(String(45), nullable=False)
     str_user_agent = Column(String(500), nullable=False)
 
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=colombia_now)
 
     poll = relationship("PollModel", back_populates="responses")
     option = relationship("PollOptionModel", back_populates="responses")

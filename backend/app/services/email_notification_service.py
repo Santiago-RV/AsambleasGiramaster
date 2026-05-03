@@ -2,6 +2,7 @@
 Servicio para gestionar el registro de notificaciones de email en la base de datos
 """
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -43,9 +44,9 @@ class EmailNotificationService:
                 int_meeting_id=meeting_id,
                 str_template=template,
                 str_status=status,
-                dat_sent_at=datetime.now() if status == "sent" else None,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                dat_sent_at=colombia_now() if status == "sent" else None,
+                created_at=colombia_now(),
+                updated_at=colombia_now()
             )
             
             self.db.add(notification)
@@ -88,10 +89,10 @@ class EmailNotificationService:
             
             if notification:
                 notification.str_status = status
-                notification.updated_at = datetime.now()
+                notification.updated_at = colombia_now()
                 
                 if status == "sent":
-                    notification.dat_sent_at = datetime.now()
+                    notification.dat_sent_at = colombia_now()
                 
                 if commit:
                     await self.db.commit()

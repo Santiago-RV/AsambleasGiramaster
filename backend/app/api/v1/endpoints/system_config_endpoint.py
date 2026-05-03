@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.utils.timezone_utils import colombia_now
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.auth import get_current_user
 from app.schemas.responses_schema import SuccessResponse
@@ -732,7 +733,7 @@ async def test_smtp_connection(
         # Preparar email de prueba
         smtp_host = credentials.get("SMTP_HOST", "N/A")
         smtp_port = credentials.get("SMTP_PORT", "N/A")
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        timestamp = colombia_now().strftime("%d/%m/%Y %H:%M:%S")
         
         html_content = f"""
         <html>

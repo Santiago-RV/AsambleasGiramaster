@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.utils.timezone_utils import colombia_now
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select
@@ -328,7 +329,7 @@ class UserService:
             
             # Habilitar acceso
             user.bln_allow_entry = True
-            user.updated_at = datetime.now()
+            user.updated_at = colombia_now()
             
             await self.db.commit()
             await self.db.refresh(user)
@@ -439,7 +440,7 @@ class UserService:
             
             # Deshabilitar acceso
             user.bln_allow_entry = False
-            user.updated_at = datetime.now()
+            user.updated_at = colombia_now()
             
             await self.db.commit()
             await self.db.refresh(user)
@@ -531,7 +532,7 @@ class UserService:
                     already_enabled_count += 1
                 else:
                     user.bln_allow_entry = True
-                    user.updated_at = datetime.now()
+                    user.updated_at = colombia_now()
                     enabled_count += 1
                     
                     # Enviar correo individual (opcional)

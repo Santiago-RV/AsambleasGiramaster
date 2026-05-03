@@ -7,7 +7,7 @@ import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import { DelegationService } from '../../services/api/DelegationService';
 import DelegatedPowersHeader from './DelegatedPowersHeader';
-import { formatDateTime } from '../../utils/dateUtils';
+import { formatDateTime, parseColombiaDate } from '../../utils/dateUtils';
 
 export default function VotingPage({ onNavigate }) {
   const queryClient = useQueryClient();
@@ -25,7 +25,7 @@ export default function VotingPage({ onNavigate }) {
 
   const getTimeRemaining = (endDateStr) => {
     if (!endDateStr) return null;
-    const endDate = new Date(endDateStr);
+    const endDate = parseColombiaDate(endDateStr);
     const diff = endDate - currentTime;
     if (diff <= 0) return { expired: true, minutes: 0, seconds: 0 };
     const minutes = Math.floor(diff / 60000);
@@ -124,7 +124,7 @@ export default function VotingPage({ onNavigate }) {
     const isActive = poll.str_status === 'active' || poll.str_status === 'Activa';
     if (!isActive || poll.has_voted) return false;
     if (poll.dat_ended_at) {
-      const endDate = new Date(poll.dat_ended_at);
+      const endDate = parseColombiaDate(poll.dat_ended_at);
       if (currentTime > endDate) return false;
     }
     return true;
