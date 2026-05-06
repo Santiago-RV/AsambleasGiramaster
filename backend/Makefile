@@ -13,13 +13,15 @@ NC = \033[0m # No Color
 .DEFAULT_GOAL := help
 
 # PHONY indica que no son archivos reales
-.PHONY: help install dev prod test clean docker-build docker-run docker-run-detached docker-stop docker-logs docker-clean migrate
+.PHONY: help install dev celery celery-beat prod test clean docker-build docker-run docker-run-detached docker-stop docker-logs docker-clean migrate
 
 ## Ayuda
 help:
 	@echo "$(GREEN)Comandos disponibles:$(NC)"
 	@echo "  $(YELLOW)make install$(NC)    - Instalar dependencias"
 	@echo "  $(YELLOW)make dev$(NC)        - Ejecutar servidor de desarrollo"
+	@echo "  $(YELLOW)make celery$(NC)     - Ejecutar Celery worker"
+	@echo "  $(YELLOW)make celery-beat$(NC) - Ejecutar Celery beat"
 	@echo "  $(YELLOW)make test$(NC)       - Ejecutar tests"
 	@echo "  $(YELLOW)make migrate$(NC)    - Ejecutar migraciones"
 	@echo "  $(YELLOW)make clean$(NC)      - Limpiar archivos temporales"
@@ -40,6 +42,15 @@ install:
 dev:
 	@echo "$(GREEN)🚀 Iniciando servidor de desarrollo...$(NC)"
 	$(PYTHON) -m app.main
+
+## Celery
+celery:
+	@echo "$(GREEN)📨 Iniciando Celery worker...$(NC)"
+	$(PYTHON) -m celery -A app.celery_app worker -Q email_tasks -l info --concurrency=4
+
+celery-beat:
+	@echo "$(GREEN)⏰ Iniciando Celery beat...$(NC)"
+	$(PYTHON) -m celery -A app.celery_app beat -l info --scheduler celery.beat:PersistentScheduler
 
 ## Base de datos
 migrate:

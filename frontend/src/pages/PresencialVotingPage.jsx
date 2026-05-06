@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import AuthService from '../services/api/AuthService';
 import { Loader2, CheckCircle, Clock, AlertCircle, Timer, MapPin, LogOut, ShieldOff, UserPlus, Hash } from "lucide-react";
 import Swal from 'sweetalert2';
 import { PollService } from '../services/api/PollService';
@@ -10,6 +12,7 @@ import { formatDateTime, parseColombiaDate } from '../utils/dateUtils';
 export default function PresencialVotingPage() {
   const { meetingId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [meeting, setMeeting] = useState(null);
   const [poll, setPoll] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState([]);
@@ -23,9 +26,9 @@ export default function PresencialVotingPage() {
   const [delegationCountdown, setDelegationCountdown] = useState(0);
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
+    AuthService.logout();
     localStorage.removeItem('meeting_id');
+    queryClient.clear();
     navigate('/');
   };
 

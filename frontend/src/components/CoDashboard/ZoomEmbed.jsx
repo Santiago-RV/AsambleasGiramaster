@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../services/api/axiosconfig';
 import { PollService } from '../../services/api/PollService';
 import { UserService } from '../../services/api/UserService';
+import { useMeetingPollsSSE } from '../../hooks/useMeetingPollsSSE';
+import AuthService from '../../services/api/AuthService';
 import '../../styles/swal-custom.css';
 
 /**
@@ -76,12 +78,18 @@ const ZoomEmbed = ({
 			return result;
 		},
 		enabled: !!meetingData?.id && !isGuest,
-		refetchInterval: isGuest ? false : 5000,
+		refetchInterval: false,
+	});
+
+	useMeetingPollsSSE({
+		meetingId: meetingData?.id,
+		enabled: !!meetingData?.id && !isGuest,
+		onEvent: () => refetchPolls(),
 	});
 
 	// Obtener la encuesta activa
 	const activePoll = !isGuest ? pollsData?.data?.find(poll => {
-		const isActive = poll.str_status === 'Activa' || poll.str_status === 'active';
+		const isActive = poll.str_status === 'active';
 		const hasNotVoted = !poll.has_voted; // ✅ Verificar que NO haya votado
 		console.log('🔍 [ZoomEmbed] Evaluando encuesta:', {
 			id: poll.id,
@@ -232,8 +240,8 @@ const ZoomEmbed = ({
 			}
 		}).then((result) => {
 			if (result.isConfirmed) {
-				localStorage.removeItem('access_token');
-				localStorage.removeItem('user');
+				AuthService.logout();
+				queryClient.clear();
 				navigate('/login');
 			}
 		});

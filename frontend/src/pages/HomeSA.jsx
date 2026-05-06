@@ -138,9 +138,38 @@ const HomeSA = () => {
 			return;
 		}
 
-		// Reunion virtual - abrir Zoom
-		setMeetingData(meeting);
-		setActiveTab('zoom-meeting');
+		// Reunion virtual - validar y marcar como En Curso antes de abrir Zoom
+		if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
+			Swal.fire({
+				icon: 'error',
+				title: 'URL no disponible',
+				text: 'La URL de la reunión no está disponible. Verifica que la reunión haya sido creada correctamente en Zoom.',
+				confirmButtonColor: '#3498db',
+			});
+			return;
+		}
+
+		try {
+			await MeetingService.startMeeting(meeting.id);
+			queryClient.invalidateQueries({ queryKey: ['meetings'] });
+			setMeetingData({
+				id: meeting.id,
+				str_title: meeting.str_title || meeting.titulo,
+				int_zoom_meeting_id: meeting.int_zoom_meeting_id,
+				str_zoom_join_url: meeting.str_zoom_join_url || meeting.meeting_url,
+				str_zoom_password: meeting.str_zoom_password || meeting.zoom_password,
+				int_zoom_account_id: meeting.int_zoom_account_id,
+				str_modality: meeting.str_modality,
+			});
+			setActiveTab('zoom-meeting');
+		} catch (error) {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error al iniciar la reunion',
+				text: error.response?.data?.message || error.message || 'No se pudo marcar la reunion como En Curso. Intenta de nuevo.',
+				confirmButtonColor: '#dc2626',
+			});
+		}
 	};
 
 	// Función para cerrar la reunión

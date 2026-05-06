@@ -8,6 +8,7 @@ import { MeetingService } from '../../services/api/MeetingService';
 import { DelegationService } from '../../services/api/DelegationService';
 import DelegatedPowersHeader from './DelegatedPowersHeader';
 import { formatDateTime, parseColombiaDate } from '../../utils/dateUtils';
+import { useMeetingPollsSSE } from '../../hooks/useMeetingPollsSSE';
 
 export default function VotingPage({ onNavigate }) {
   const queryClient = useQueryClient();
@@ -60,7 +61,7 @@ export default function VotingPage({ onNavigate }) {
       return response;
     },
     enabled: !!residentialUnitId,
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   const { data: allPollsData, isLoading: isLoadingPolls, refetch: refetchPolls } = useQuery({
@@ -80,7 +81,7 @@ export default function VotingPage({ onNavigate }) {
       return { polls: pollsArrays.flat() };
     },
     enabled: !!meetingsData?.data && meetingsData.data.length > 0,
-    refetchInterval: 5000,
+    refetchInterval: false,
   });
 
   // Reunión activa para verificar delegación (cubre todos los estados posibles del backend)
@@ -91,6 +92,12 @@ export default function VotingPage({ onNavigate }) {
     // Fallback: cualquier reunión que no esté finalizada ni programada
     const status = m.str_status?.toLowerCase();
     return !['completed', 'finalizada', 'cerrada', 'scheduled', 'programada'].includes(status);
+  });
+
+  useMeetingPollsSSE({
+    meetingId: activeMeeting?.id ?? null,
+    enabled: !!activeMeeting?.id,
+    onEvent: () => refetchPolls(),
   });
 
   const { data: delegationData } = useQuery({

@@ -62,7 +62,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         
         # Security headers adicionales
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
-        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
-        
+
+        # SSE streams no deben tener COEP/CORP restrictivos (bloquearían el stream cross-origin)
+        if "/events" in request.url.path:
+            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        else:
+            response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+            response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+
         return response

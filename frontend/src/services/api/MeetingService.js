@@ -154,4 +154,14 @@ export class MeetingService {
     );
     return response.data;
   }
+
+  static async registerAttendance(meetingId) {
+    const response = await axiosInstance.post(`/meetings/${meetingId}/register-attendance`);
+    return response.data;
+  }
+
+  static async registerLeave(meetingId) {
+    const response = await axiosInstance.post(`/meetings/${meetingId}/register-leave`);
+    return response.data;
+  }
 }

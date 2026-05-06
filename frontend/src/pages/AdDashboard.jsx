@@ -502,10 +502,8 @@ export default function AppAdmin() {
     }
 
     try {
-      // Registrar la hora de inicio en la base de datos
       await MeetingService.startMeeting(meeting.id);
-
-      // Mostrar el contenedor de Zoom embebido
+      queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
       setShowZoomMeeting({
         id: meeting.id,
         str_title: meeting.titulo,
@@ -516,15 +514,11 @@ export default function AppAdmin() {
         str_modality: meeting.str_modality,
       });
     } catch (error) {
-      // Si falla el registro, mostrar Zoom de todas formas
-      setShowZoomMeeting({
-        id: meeting.id,
-        str_title: meeting.titulo,
-        int_zoom_meeting_id: meeting.zoom_meeting_id,
-        str_zoom_join_url: meeting.meeting_url,
-        str_zoom_password: meeting.zoom_password,
-        int_zoom_account_id: meeting.int_zoom_account_id,
-        str_modality: meeting.str_modality,
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al iniciar la reunion',
+        text: error.response?.data?.message || error.message || 'No se pudo marcar la reunion como En Curso. Intenta de nuevo.',
+        confirmButtonColor: '#dc2626',
       });
     }
   };

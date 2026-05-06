@@ -160,25 +160,30 @@ class MeetingService:
                 logger.info(f"Creando reunión de Zoom: {title}")
 
                 try:
+                    from app.services.system_config_service import SystemConfigService
+                    config_service = SystemConfigService(self.db)
+
                     # Si se especifica una cuenta Zoom, cargar sus credenciales
                     zoom_credentials = None
                     if zoom_account_id:
-                        from app.services.system_config_service import SystemConfigService
-                        config_service = SystemConfigService(self.db)
                         zoom_credentials = await config_service.get_zoom_account_credentials(zoom_account_id)
                         if not zoom_credentials:
-                            logger.warning(f"Cuenta Zoom {zoom_account_id} sin credenciales, usando cuenta por defecto")
-                            zoom_credentials = None
-                            resolved_zoom_account_id = None
+                            raise ServiceException(
+                                message=f"La cuenta Zoom {zoom_account_id} no tiene credenciales configuradas.",
+                                details={"zoom_account_id": zoom_account_id}
+                            )
                     else:
-                        # Si no se especifica, intentar usar la cuenta 1
-                        from app.services.system_config_service import SystemConfigService
-                        config_service = SystemConfigService(self.db)
+                        # Si no se especifica, usar la primera cuenta completamente configurada
                         accounts = await config_service.get_zoom_accounts()
-                        if accounts:
-                            first_account = accounts[0]
-                            resolved_zoom_account_id = first_account["id"]
-                            zoom_credentials = await config_service.get_zoom_account_credentials(resolved_zoom_account_id)
+                        configured = [a for a in accounts if a.get("is_configured")]
+                        if not configured:
+                            raise ServiceException(
+                                message="No hay cuentas Zoom configuradas. Configure las credenciales en el sistema antes de crear reuniones virtuales.",
+                                details={"zoom_configured": False}
+                            )
+                        first_account = configured[0]
+                        resolved_zoom_account_id = first_account["id"]
+                        zoom_credentials = await config_service.get_zoom_account_credentials(resolved_zoom_account_id)
                     
                     zoom_service = ZoomAPIService(self.db, credentials=zoom_credentials)
 
@@ -204,18 +209,13 @@ class MeetingService:
                     else:
                         logger.info(f"Reunion REAL de Zoom creada: ID {zoom_meeting_id} (duracion indefinida, creada con {zoom_duration} min en Zoom)")
 
+                except ServiceException:
+                    raise
                 except Exception as zoom_error:
-                    # Si falla, usar ID temporal
                     logger.error(f"Error al crear reunion en Zoom: {str(zoom_error)}")
-                    logger.warning("Usando ID temporal. La reunion no existira realmente en Zoom.")
-
-                    zoom_meeting_id = int(time.time() * 1000) % 10000000000
-                    zoom_join_url = f"https://zoom.us/j/{zoom_meeting_id}"
-                    zoom_start_url = f"https://zoom.us/s/{zoom_meeting_id}"
-
-                    logger.info(
-                        "SOLUCION: Configura ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID y ZOOM_CLIENT_SECRET "
-                        "en el .env para crear reuniones reales."
+                    raise ServiceException(
+                        message="Error al crear la reunion en Zoom. Verifica que las credenciales sean validas y que la cuenta Zoom este activa.",
+                        details={"original_error": str(zoom_error)}
                     )
             else:
                 # Reunión presencial - no se crea en Zoom
@@ -475,7 +475,8 @@ class MeetingService:
                 meeting.updated_by = user_id
 
                 await self.db.commit()
-                await self.db.refresh(meeting)
+                # Recargar con relaciones para evitar MissingGreenlet al serializar
+                meeting = await self.get_meeting_by_id(meeting_id)
                 logger.info(f"✅ Reunión {meeting_id} iniciada - Estado: En Curso")
             else:
                 logger.info(f"ℹ️ Reunión {meeting_id} ya está en estado: {meeting.str_status}")

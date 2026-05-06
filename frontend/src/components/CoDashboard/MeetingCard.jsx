@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { Calendar, Clock, Users, Video, MapPin, Loader2, Play, CalendarX } from 'lucide-react';
+import { Calendar, Clock, Users, Video, MapPin, Loader2, CalendarX } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import toast from 'react-hot-toast';
-import ZoomMeetingContainer from './ZoomEmbed';
-import { MeetingService } from '../../services/api/MeetingService';
 
-export default function MeetingCard({ meeting }) {
-	const [showZoom, setShowZoom] = useState(false);
+export default function MeetingCard({ meeting, onJoinMeeting }) {
 	const [isJoining, setIsJoining] = useState(false);
 
 	// Obtener estado desde la base de datos
@@ -61,72 +57,15 @@ export default function MeetingCard({ meeting }) {
 
 	const handleJoinMeeting = async () => {
 		if (!status.canJoin || !isVirtual) return;
-
-		// Verificar que tenemos datos de Zoom
-		if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
-			toast.error('Esta reunión no tiene datos de Zoom válidos');
-			return;
-		}
-
+		setIsJoining(true);
 		try {
-			setIsJoining(true);
-
-			// Registrar la hora de inicio en la base de datos
-			console.log('📝 Registrando hora de inicio de la reunión...');
-			await MeetingService.startMeeting(meeting.id);
-			console.log('Hora de inicio registrada exitosamente');
-
-			// Mostrar el contenedor de Zoom
-			setShowZoom(true);
-		} catch (error) {
-			console.error('❌ Error al registrar inicio de reunión:', error);
-			// Mostrar Zoom de todas formas, el registro del inicio es secundario
-			setShowZoom(true);
+			await onJoinMeeting(meeting);
 		} finally {
 			setIsJoining(false);
 		}
 	};
 
-	const handleCloseMeeting = () => {
-		setShowZoom(false);
-	};
-
-	// Si está mostrando Zoom, renderizar el contenedor
-	if (showZoom) {
-		return (
-			<div className="space-y-4">
-				{/* Card colapsado con info básica */}
-				<div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-600">
-					<div className="flex items-center justify-between">
-						<div>
-							<h3 className="text-lg font-bold text-gray-800">
-								{meeting.str_title}
-							</h3>
-							<span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
-								<Play size={12} className="fill-green-800" />
-								En vivo
-							</span>
-						</div>
-						<button
-							onClick={handleCloseMeeting}
-							className="text-gray-500 hover:text-gray-700 text-sm"
-						>
-							Minimizar
-						</button>
-					</div>
-				</div>
-
-				{/* Zoom embebido usando SDK Embedded */}
-				<ZoomMeetingContainer
-					meetingData={meeting}
-					onClose={handleCloseMeeting}
-					startFullscreen={false}
-				/>
-			</div>
-		);
-	}
-
-	// Card normal (cuando NO está mostrando Zoom) - ALTURA COMPLETA
+	// Card normal
 	return (
 		<div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 flex flex-col">
 			{/* SIN min-h ya que las cards van una debajo de otra */}

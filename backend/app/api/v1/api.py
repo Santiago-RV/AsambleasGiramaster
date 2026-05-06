@@ -6,6 +6,7 @@ from app.api.v1.endpoints import residential_enpoint
 from app.api.v1.endpoints import meeting_endpoint
 from app.api.v1.endpoints import zoom_endpoint
 from app.api.v1.endpoints import poll_endpoint
+from app.api.v1.endpoints.poll_endpoint import sse_router as poll_sse_router
 from app.api.v1.endpoints import super_admin
 from app.api.v1.endpoints import user_endpoint
 from app.api.v1.endpoints import zoom_signature_endpoint
@@ -68,6 +69,11 @@ api_router.include_router(
     prefix="/polls",
     tags=["Polls"],
     dependencies=[Depends(get_current_user)]
+)
+
+api_router.include_router(
+    poll_sse_router,
+    prefix="/polls",
 )
 
 api_router.include_router(

@@ -18,6 +18,7 @@ import SystemConfigService from '../../../../services/api/SystemConfigService';
 const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = 'virtual', meetingToEdit = null }) => {
 	const [zoomAccounts, setZoomAccounts] = useState([]);
 	const [loadingAccounts, setLoadingAccounts] = useState(false);
+	const [zoomConfigError, setZoomConfigError] = useState(false);
 
 	const isEditing = useMemo(() => !!meetingToEdit, [meetingToEdit]);
 
@@ -25,6 +26,7 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 		register,
 		handleSubmit,
 		reset,
+		setValue,
 		formState: { errors },
 		watch,
 	} = useForm({
@@ -92,15 +94,22 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 
 	const loadZoomAccounts = async () => {
 		setLoadingAccounts(true);
+		setZoomConfigError(false);
 		try {
 			const response = await SystemConfigService.getZoomAccounts();
 			if (response.success) {
-				const accounts = response.data.accounts || [];
+				const accounts = (response.data.accounts || []).filter(a => a.is_configured);
 				setZoomAccounts(accounts);
+				if (accounts.length === 0) {
+					setZoomConfigError(true);
+				} else if (accounts.length === 1) {
+					setValue('int_zoom_account_id', accounts[0].id);
+				}
 			}
 		} catch (error) {
 			console.error('Error al cargar cuentas Zoom:', error);
 			setZoomAccounts([]);
+			setZoomConfigError(true);
 		} finally {
 			setLoadingAccounts(false);
 		}
@@ -123,6 +132,7 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 
 	const isVirtual = meetingMode === 'virtual';
 	const showZoomAccountSelector = isVirtual && zoomAccounts.length > 1;
+	const blockSubmit = isVirtual && !loadingAccounts && zoomConfigError;
 
 	return (
 		<Modal 
@@ -198,6 +208,19 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 									La reunion sera en un lugar fisico. Se enviaran las invitaciones por correo electronico a todos los copropietarios.
 								</p>
 							</div>
+						</div>
+					</div>
+				)}
+
+				{/* BANNER: Sin configuracion Zoom */}
+				{isVirtual && !loadingAccounts && zoomConfigError && (
+					<div className="flex items-start gap-3 bg-red-50 border border-red-300 rounded-xl p-4">
+						<AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+						<div>
+							<p className="text-sm font-semibold text-red-700">Sin configuracion Zoom</p>
+							<p className="text-xs text-red-600 mt-0.5">
+								No hay cuentas Zoom completamente configuradas. Ve a Configuracion del Sistema para agregar credenciales antes de crear reuniones virtuales.
+							</p>
 						</div>
 					</div>
 				)}
@@ -443,9 +466,9 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 
 					<button
 						type="submit"
-						disabled={isSubmitting}
+						disabled={isSubmitting || blockSubmit}
 						className={`flex-1 sm:flex-auto flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold px-8 py-2.5 rounded-lg transition-all duration-200 shadow-md ${
-							isSubmitting
+							isSubmitting || blockSubmit
 								? 'opacity-50 cursor-not-allowed'
 								: 'hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
 						}`}

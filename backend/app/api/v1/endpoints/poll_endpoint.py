@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from jose import jwt, JWTError
+import json
+import asyncio
+import redis.asyncio as aioredis
 
 from app.auth.auth import get_current_user
 from app.core.database import get_db
+from app.core.config import settings
 from app.schemas.responses_schema import SuccessResponse
 from app.schemas.poll_schema import PollCreate, PollBase
 from app.schemas.pool_response_schema import PollResponseCreate
@@ -25,6 +31,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+sse_router = APIRouter()
 
 # ==================== CRUD de Encuestas ====================
 
@@ -894,3 +901,60 @@ async def get_poll_votes(
             message=f"Error al obtener votos: {str(e)}",
             details={"original_error": str(e)}
         )
+
+
+# ==================== SSE: Eventos en tiempo real ====================
+
+@sse_router.get(
+    "/meeting/{meeting_id}/events",
+    summary="SSE: eventos de encuestas de una reunión",
+    description="Stream Server-Sent Events. Acepta token como query param porque EventSource no soporta headers custom.",
+    tags=["Polls SSE"],
+)
+async def meeting_poll_events(meeting_id: int, token: str):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+    async def event_generator():
+        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = r.pubsub()
+        channel = f"polls:meeting:{meeting_id}"
+        await pubsub.subscribe(channel)
+        logger.info(f"[SSE] Usuario '{username}' suscrito a {channel}")
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(
+                        pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1),
+                        timeout=30.0
+                    )
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+                    continue
+                if msg is None:
+                    await asyncio.sleep(0.1)
+                    continue
+                if msg["type"] == "message":
+                    yield f"data: {msg['data']}\n\n"
+        except asyncio.CancelledError:
+            logger.info(f"[SSE] Usuario '{username}' desconectado de {channel}")
+        except Exception as e:
+            logger.error(f"[SSE] Error en stream para '{username}': {e}")
+        finally:
+            await pubsub.unsubscribe(channel)
+            await r.aclose()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )

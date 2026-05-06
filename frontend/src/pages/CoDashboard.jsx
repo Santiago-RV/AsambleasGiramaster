@@ -1,7 +1,7 @@
 // CoDashboard.jsx - VERSIÓN CON HEADER DE PODERES DELEGADOS
 
 import { useState, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Video, FileText, User, LogOut, Building2, Hash, UserCircle, HandCoins, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -11,10 +11,12 @@ import VotingPage from '../components/CoDashboard/VotingPage';
 import MeetingsPage from '../components/CoDashboard/MeetingsPage';
 import PowersViewPage from '../components/CoDashboard/PowersViewPage';
 import DelegatedPowersHeader from '../components/CoDashboard/DelegatedPowersHeader';
+import ZoomEmbed from '../components/CoDashboard/ZoomEmbed';
 import { UserService } from '../services/api/UserService';
 import { PollService } from '../services/api/PollService';
 import { MeetingService } from '../services/api/MeetingService';
 import { DelegationService } from '../services/api/DelegationService';
+import AuthService from '../services/api/AuthService';
 
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');
@@ -24,7 +26,9 @@ export default function AppCopropietario() {
   const [userCoefficient, setUserCoefficient] = useState(null);
   const [unitName, setUnitName] = useState('');
   const [checkedInPersonMeeting, setCheckedInPersonMeeting] = useState(false);
+  const [showZoomMeeting, setShowZoomMeeting] = useState(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isGuest = userRole === "Invitado";
 
   // OBTENER DATOS DEL USUARIO DESDE LOCALSTORAGE
@@ -169,6 +173,43 @@ export default function AppCopropietario() {
     showDelegatedPowers: !isGuest && !!activeMeeting
   });
 
+  const handleJoinMeeting = async (meeting) => {
+    if (!meeting.int_zoom_meeting_id && !meeting.str_zoom_join_url) {
+      Swal.fire({
+        icon: 'error',
+        title: 'URL no disponible',
+        text: 'Esta reunión no tiene datos de Zoom válidos.',
+        confirmButtonColor: '#3498db',
+      });
+      return;
+    }
+
+    try {
+      await MeetingService.startMeeting(meeting.id);
+      queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+      setShowZoomMeeting({
+        id: meeting.id,
+        str_title: meeting.str_title,
+        int_zoom_meeting_id: meeting.int_zoom_meeting_id,
+        str_zoom_join_url: meeting.str_zoom_join_url,
+        str_zoom_password: meeting.str_zoom_password,
+        int_zoom_account_id: meeting.int_zoom_account_id,
+        str_modality: meeting.str_modality,
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al unirse a la reunion',
+        text: error.response?.data?.message || error.message || 'No se pudo iniciar la reunion. Intenta de nuevo.',
+        confirmButtonColor: '#dc2626',
+      });
+    }
+  };
+
+  const handleCloseZoom = () => {
+    setShowZoomMeeting(null);
+  };
+
   const handleLogout = () => {
     Swal.fire({
       title: '¿Cerrar Sesión?',
@@ -182,8 +223,8 @@ export default function AppCopropietario() {
       reverseButtons: true
     }).then((result) => {
       if (result.isConfirmed) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
+        AuthService.logout();
+        queryClient.clear();
         navigate('/login');
       }
     });
@@ -392,6 +433,18 @@ export default function AppCopropietario() {
     );
   }
 
+  if (showZoomMeeting) {
+    return (
+      <div className="tw-w-screen tw-h-screen tw-overflow-hidden tw-bg-gray-900">
+        <ZoomEmbed
+          meetingData={showZoomMeeting}
+          onClose={handleCloseZoom}
+          startFullscreen={true}
+        />
+      </div>
+    );
+  }
+
   return (
     <DashboardLayout
       title="GIRAMASTER"
@@ -410,7 +463,7 @@ export default function AppCopropietario() {
       {/* Contenido de las secciones */}
       <div className="p-6">
         {section === 'meetings' && (
-          <MeetingsPage residentialUnitId={residentialUnitId} />
+          <MeetingsPage residentialUnitId={residentialUnitId} onJoinMeeting={handleJoinMeeting} />
         )}
         {section === 'voting' && !isGuest && <VotingPage onNavigate={setSection} />}
         {section === 'powers' && !isGuest && <PowersViewPage />}

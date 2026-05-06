@@ -31,13 +31,30 @@ async def verify_super_admin(
     """Dependency para verificar que el usuario es Super Admin"""
     user_service = UserService(db)
     user = await user_service.get_user_by_username(current_user)
-    
+
     if not user or user.int_id_rol != 1:  # 1 = Super Admin
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo Super Admin puede acceder a esta configuración"
         )
-    
+
+    return user
+
+
+async def verify_admin_or_super(
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Dependency para Super Admin y Admin (lectura de config necesaria para crear reuniones)"""
+    user_service = UserService(db)
+    user = await user_service.get_user_by_username(current_user)
+
+    if not user or user.int_id_rol not in (1, 2):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para acceder a esta configuración"
+        )
+
     return user
 
 @router.get(
@@ -229,7 +246,7 @@ async def test_zoom_connection(
     description="Obtiene la lista de cuentas Zoom configuradas (máximo 3)"
 )
 async def list_zoom_accounts(
-    user = Depends(verify_super_admin),
+    user = Depends(verify_admin_or_super),
     db: AsyncSession = Depends(get_db)
 ):
     """Lista todas las cuentas Zoom configuradas con su estado"""

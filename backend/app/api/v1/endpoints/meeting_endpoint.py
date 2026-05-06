@@ -313,55 +313,58 @@ async def start_meeting(
         
         user = await user_service.get_user_by_username(current_user)
         meeting = await meeting_service.start_meeting(meeting_id, user.id)
-        
+
         logger.info(f"✅ Reunión {meeting_id} iniciada con estado: {meeting.str_status}")
-        
+
+        # Serializar ANTES de cualquier commit adicional para evitar MissingGreenlet
+        # (los commits expiran las relaciones lazy del objeto ORM)
+        meeting_data = MeetingResponse.from_orm(meeting).dict()
+
         # 2. Obtener la unidad residencial de la reunión
         residential_unit_id = meeting.int_id_residential_unit
-        
+
         # 3. Verificar si ya existen invitaciones
         existing_invitations_query = select(MeetingInvitationModel).where(
             MeetingInvitationModel.int_meeting_id == meeting_id
         )
         result = await db.execute(existing_invitations_query)
         existing_invitations = result.scalars().all()
-        
+
         if existing_invitations:
             logger.info(f"⚠️ Ya existen {len(existing_invitations)} invitaciones para esta reunión")
             return SuccessResponse(
                 success=True,
                 status_code=status.HTTP_200_OK,
                 message=f"Reunión iniciada. Ya existen {len(existing_invitations)} invitaciones.",
-                data=MeetingResponse.from_orm(meeting).dict()
+                data=meeting_data
             )
-        
+
         # 4. Obtener copropietarios de la unidad residencial
         coowners_query = select(UserResidentialUnitModel).where(
             UserResidentialUnitModel.int_residential_unit_id == residential_unit_id
         )
         result = await db.execute(coowners_query)
         coowners = result.scalars().all()
-        
+
         if not coowners:
             logger.warning(f"⚠️ No hay copropietarios en la unidad residencial {residential_unit_id}")
             return SuccessResponse(
                 success=True,
                 status_code=status.HTTP_200_OK,
                 message="Reunión iniciada pero no hay copropietarios para invitar",
-                data=MeetingResponse.from_orm(meeting).dict()
+                data=meeting_data
             )
-        
+
         # 5. Crear invitaciones automáticamente
         invitations_created = 0
         for coowner in coowners:
-            # Manejar NULL en quorum base
             quorum_base = coowner.dec_default_voting_weight if coowner.dec_default_voting_weight is not None else Decimal('0.0')
 
             invitation = MeetingInvitationModel(
                 int_meeting_id=meeting_id,
                 int_user_id=coowner.int_user_id,
-                dec_voting_weight=quorum_base,       # Peso actual
-                dec_quorum_base=quorum_base,         # Quorum base (NUNCA será None)
+                dec_voting_weight=quorum_base,
+                dec_quorum_base=quorum_base,
                 str_apartment_number=coowner.str_apartment_number,
                 str_invitation_status='sent',
                 str_response_status='pending',
@@ -369,16 +372,16 @@ async def start_meeting(
             )
             db.add(invitation)
             invitations_created += 1
-        
+
         await db.commit()
-        
+
         logger.info(f"✅ Se crearon {invitations_created} invitaciones automáticamente")
-        
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_200_OK,
             message=f"Reunión iniciada exitosamente. Se enviaron {invitations_created} invitaciones.",
-            data=MeetingResponse.from_orm(meeting).dict()
+            data=meeting_data
         )
         
     except ResourceNotFoundException as e:
@@ -438,7 +441,7 @@ async def end_meeting(
 async def register_attendance(
     meeting_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: str = Depends(get_current_user)
 ):
     """
     Registra la asistencia de un usuario cuando entra a una reunión.
@@ -446,7 +449,9 @@ async def register_attendance(
     """
     try:
         meeting_service = MeetingService(db)
-        user_id = current_user.get("user_id")
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        user_id = user.id
 
         result = await meeting_service.register_attendance(meeting_id, user_id)
 
@@ -473,7 +478,7 @@ async def register_attendance(
 async def register_leave(
     meeting_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: str = Depends(get_current_user)
 ):
     """
     Registra la hora de salida de un usuario de una reunión.
@@ -481,7 +486,9 @@ async def register_leave(
     """
     try:
         meeting_service = MeetingService(db)
-        user_id = current_user.get("user_id")
+        user_service = UserService(db)
+        user = await user_service.get_user_by_username(current_user)
+        user_id = user.id
 
         result = await meeting_service.register_leave(meeting_id, user_id)
 

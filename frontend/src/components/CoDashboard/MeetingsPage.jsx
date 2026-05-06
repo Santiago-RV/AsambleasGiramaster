@@ -6,7 +6,7 @@ import { Video, Calendar, Clock, AlertCircle } from 'lucide-react';
 import { MeetingService } from '../../services/api/MeetingService';
 import MeetingCard from './MeetingCard';
 
-const MeetingsPage = ({ residentialUnitId }) => {
+const MeetingsPage = ({ residentialUnitId, onJoinMeeting }) => {
   const {
     data: meetingsData,
     isLoading: isLoadingMeetings,
@@ -165,7 +165,7 @@ const MeetingsPage = ({ residentialUnitId }) => {
           {/* CAMBIAR A UNA SOLA COLUMNA */}
           <div className="space-y-4">
             {sortedActiveOrUpcoming.map((meeting) => (
-              <MeetingCard key={meeting.id} meeting={meeting} />
+              <MeetingCard key={meeting.id} meeting={meeting} onJoinMeeting={onJoinMeeting} />
             ))}
           </div>
         </div>
@@ -183,7 +183,7 @@ const MeetingsPage = ({ residentialUnitId }) => {
           {/* CAMBIAR A UNA SOLA COLUMNA */}
           <div className="space-y-4">
             {finished.map((meeting) => (
-              <MeetingCard key={meeting.id} meeting={meeting} />
+              <MeetingCard key={meeting.id} meeting={meeting} onJoinMeeting={onJoinMeeting} />
             ))}
           </div>
         </div>

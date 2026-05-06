@@ -6,6 +6,12 @@ from datetime import datetime, timedelta
 from app.utils.timezone_utils import colombia_now
 import secrets
 import string
+import json
+import logging
+import redis.asyncio as aioredis
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 from app.models.poll_model import PollModel
 from app.models.poll_response_model import PollResponseModel
@@ -26,6 +32,17 @@ class PollService:
     def _generate_poll_code(self) -> str:
         """Genera un código único para la encuesta"""
         return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+
+    async def _publish_poll_event(self, meeting_id: int, event_type: str, poll_id: int) -> None:
+        try:
+            r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+            await r.publish(
+                f"polls:meeting:{meeting_id}",
+                json.dumps({"type": event_type, "poll_id": poll_id})
+            )
+            await r.aclose()
+        except Exception as e:
+            logger.warning(f"[SSE] No se pudo publicar en Redis: {e}")
 
     async def _verify_admin_permissions(self, meeting_id: int, user_id: int):
         """Verifica que el usuario sea administrador de la reunión y que la reunión esté en horario válido"""
@@ -216,7 +233,9 @@ class PollService:
         
         await self.db.commit()
         await self.db.refresh(poll)
-        
+
+        await self._publish_poll_event(poll.int_meeting_id, "poll_started", poll.id)
+
         return poll
 
     async def end_poll(self, poll_id: int, user_id: int) -> PollModel:
@@ -247,6 +266,8 @@ class PollService:
 
         await self.db.commit()
         await self.db.refresh(poll)
+
+        await self._publish_poll_event(poll.int_meeting_id, "poll_ended", poll.id)
 
         return poll
 
