@@ -9,7 +9,7 @@ import ResidentDetailsModal from './ResidentDetailsModal';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import { ResidentService } from '../../services/api/ResidentService';
-import logoGiramaster from '../../assets/logo-giramaster.jpeg';
+import logoGiramaster from '../../assets/logo-giramaster.png';
 import HelpModalCopro from "./HelpModalCopro";
 import { showMeetingInvitationProgressModal } from '../common/BulkDeleteConfirmModal';
 import { useProgressNotification } from '../../contexts/ProgressNotificationContext';

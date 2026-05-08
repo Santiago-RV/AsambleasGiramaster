@@ -454,27 +454,27 @@ const ZoomMeetingContainer = ({
 					title="Gestión de Encuestas"
 					style={{
 						position: 'fixed',
-						bottom: '24px',
+						bottom: '138px',
 						left: '24px',
 						zIndex: 10002,
 						display: 'flex',
 						alignItems: 'center',
-						gap: '8px',
-						padding: '12px 20px',
+						gap: '9px',
+						padding: '13px 22px',
 						background: showPollPanel
 							? 'linear-gradient(to right, #5b21b6, #4c1d95)'
 							: 'linear-gradient(to right, #7c3aed, #6d28d9)',
 						color: 'white',
 						border: 'none',
-						borderRadius: '14px',
+						borderRadius: '15px',
 						fontWeight: '700',
-						fontSize: '14px',
+						fontSize: '15px',
 						cursor: 'pointer',
 						boxShadow: '0 4px 20px rgba(124,58,237,0.5)',
 						transition: 'all 0.2s',
 					}}
 				>
-					<BarChart3 size={20} />
+					<BarChart3 size={22} />
 					{showPollPanel ? 'Cerrar panel' : 'Encuestas'}
 				</button>,
 				document.body

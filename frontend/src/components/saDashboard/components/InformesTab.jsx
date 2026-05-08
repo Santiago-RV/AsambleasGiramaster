@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import { ReportsService } from '../../../services/api/ReportsService';
 import { getLlamadoReportSA } from '../../../services/api/ActiveMeetingService';
 import { formatDateLong, formatDateTime } from '../../../utils/dateUtils';
-import logoGiramaster from '../../../assets/logo-giramaster.jpeg';
+import logoGiramaster from '../../../assets/logo-giramaster.png';
 
 // ─── Helpers PDF ────────────────────────────────────────────────────────────
 

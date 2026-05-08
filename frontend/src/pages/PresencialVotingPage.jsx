@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import AuthService from '../services/api/AuthService';
+import { AuthService } from '../services/api/AuthService';
 import { Loader2, CheckCircle, Clock, AlertCircle, Timer, MapPin, LogOut, ShieldOff, UserPlus, Hash } from "lucide-react";
 import Swal from 'sweetalert2';
 import { PollService } from '../services/api/PollService';

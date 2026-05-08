@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* SweetAlert2 siempre por encima de portales y paneles flotantes */
+.swal2-container {
+  z-index: 20000 !important;
+}
+
 @keyframes slide-in {
   from {
     transform: translateX(-100%);

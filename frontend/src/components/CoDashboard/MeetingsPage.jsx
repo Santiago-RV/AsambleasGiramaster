@@ -162,8 +162,7 @@ const MeetingsPage = ({ residentialUnitId, onJoinMeeting }) => {
               Reuniones Activas y Próximas
             </h2>
           </div>
-          {/* CAMBIAR A UNA SOLA COLUMNA */}
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sortedActiveOrUpcoming.map((meeting) => (
               <MeetingCard key={meeting.id} meeting={meeting} onJoinMeeting={onJoinMeeting} />
             ))}
@@ -180,8 +179,7 @@ const MeetingsPage = ({ residentialUnitId, onJoinMeeting }) => {
               Reuniones Finalizadas
             </h2>
           </div>
-          {/* CAMBIAR A UNA SOLA COLUMNA */}
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {finished.map((meeting) => (
               <MeetingCard key={meeting.id} meeting={meeting} onJoinMeeting={onJoinMeeting} />
             ))}

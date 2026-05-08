@@ -123,7 +123,6 @@ export class AuthService {
 		localStorage.removeItem('access_token');
 		localStorage.removeItem('refresh_token');
 		localStorage.removeItem('user');
-		// console.log('✅ Logout exitoso');
 	}
 
 	/**

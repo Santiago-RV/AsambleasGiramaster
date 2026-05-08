@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { User, Lock, AlertCircle, ArrowRight, Eye, EyeOff, Mail, Video } from 'lucide-react';
 import Swal from 'sweetalert2';
-import logo from '../assets/logo-giramaster.jpeg';
+import logo from '../assets/logo-giramaster.png';
 import background from '../assets/background_giramaster.jpeg';
 import MeetingParticipationModal from '../components/common/MeetingParticipationModal';
 import { publicAxios } from '../services/api/axiosconfig';
@@ -25,7 +25,7 @@ const Login = () => {
 		if (AuthService.isAuthenticated()) {
 			const user = JSON.parse(localStorage.getItem('user') || '{}');
 			const role = user?.role; // El rol ya es un string directo
-			
+
 			if (role === 'Super Administrador') {
 				navigate('/super-admin', { replace: true });
 			} else if (role === 'Administrador') {
@@ -36,31 +36,38 @@ const Login = () => {
 		}
 	}, [navigate]);
 
+	const savedUsername = localStorage.getItem('remembered_username') ?? '';
+
 	const {
 		register,
 		handleSubmit,
 		formState: { errors, isSubmitting },
 	} = useForm({
 		defaultValues: {
-			username: '',
+			username: savedUsername,
 			password: '',
-			rememberMe: false,
+			rememberMe: savedUsername !== '',
 		},
 	});
 	const { login, navigateByRole } = useAuth();
 
 	const onSubmit = async (data) => {
 		try {
+			if (data.rememberMe) {
+				localStorage.setItem('remembered_username', data.username);
+			} else {
+				localStorage.removeItem('remembered_username');
+			}
+
 			const credentials = {
 				username: data.username,
 				password: data.password,
 			};
 
 			await login(credentials);
-			
-			// Obtener datos del usuario desde localStorage
-			const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-			
+
+			const storedUser = JSON.parse(localStorage.getItem('user') ?? '{}');
+
 			// Mostrar mensaje de éxito
 			Swal.fire({
 				icon: 'success',
@@ -73,7 +80,7 @@ const Login = () => {
 			// Verificar si hay una reunión activa
 			// Los datos vienen en AuthService y se almacenan también en data
 			const authData = AuthService.getLastAuthData?.() || null;
-			
+
 			if (authData && authData.active_meeting) {
 				setLoggedInUser(storedUser);
 				setActiveMeeting(authData.active_meeting);
@@ -83,8 +90,6 @@ const Login = () => {
 				handleNavigateWithConfigCheck(storedUser.role);
 			}
 		} catch (error) {
-			console.error('Error al iniciar sesión:', error);
-
 			let errorMessage = 'Error al iniciar sesión';
 
 			if (error.response?.data) {
@@ -131,7 +136,7 @@ const Login = () => {
 	// Función para mostrar modal de advertencia de configuración
 	const showConfigWarning = (configStatus, navigateFn) => {
 		const missingConfigs = [];
-		
+
 		if (!configStatus.smtpConfigured) {
 			const missingFields = configStatus.smtpMissingFields || [];
 			const fieldLabels = {
@@ -140,10 +145,10 @@ const Login = () => {
 				'SMTP_USER': 'Usuario SMTP',
 				'SMTP_PASSWORD': 'Contraseña SMTP'
 			};
-			const fieldsText = missingFields.length > 0 
+			const fieldsText = missingFields.length > 0
 				? `<span class="text-sm text-gray-500">(${missingFields.map(f => fieldLabels[f] || f).join(', ')})</span>`
 				: '';
-				
+
 			missingConfigs.push({
 				name: 'Correo SMTP',
 				icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
@@ -151,7 +156,7 @@ const Login = () => {
 				fields: fieldsText
 			});
 		}
-		
+
 		if (!configStatus.zoomConfigured) {
 			missingConfigs.push({
 				name: 'Cuentas Zoom',
@@ -160,7 +165,7 @@ const Login = () => {
 			});
 		}
 
-		const configList = missingConfigs.map(c => 
+		const configList = missingConfigs.map(c =>
 			`<div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
 				<span class="${c.color}">${c.icon}</span>
 				<div class="flex flex-col">
@@ -198,11 +203,11 @@ const Login = () => {
 	const handleNavigateWithConfigCheck = async (role) => {
 		if (role === 'Administrador' || role === 'Super Administrador') {
 			setIsCheckingConfig(true);
-			
+
 			const configStatus = await checkSystemConfig();
-			
+
 			setIsCheckingConfig(false);
-			
+
 			if (!configStatus.smtpConfigured || !configStatus.zoomConfigured) {
 				showConfigWarning(configStatus, (action) => {
 					if (action === 'config') {
@@ -225,7 +230,7 @@ const Login = () => {
 
 	const handleConfirmParticipation = async () => {
 		if (!activeMeeting || !loggedInUser) return;
-		
+
 		setIsRegisteringParticipation(true);
 		try {
 			const token = localStorage.getItem('access_token');
@@ -238,30 +243,30 @@ const Login = () => {
 					},
 				}
 			);
-			
+
 			Swal.fire({
 				icon: 'success',
 				title: 'Participación Registrada',
-				text: activeMeeting.already_participated 
+				text: activeMeeting.already_participated
 					? 'Su reconexión ha sido registrada correctamente'
 					: 'Su participación ha sido registrada correctamente',
 				confirmButtonColor: '#2563eb',
 			});
-			
+
 			setShowMeetingModal(false);
 			// Navegar después de registrar participación verificando configuración
 			handleNavigateWithConfigCheck(loggedInUser.role);
 		} catch (error) {
 			console.error('Error al registrar participación:', error);
-			
+
 			let errorMessage = 'No se pudo registrar la participación. Intente más tarde.';
-			
+
 			if (error.response?.status === 429) {
 				errorMessage = 'Demasiadas peticiones. Espere un momento e intente de nuevo.';
 			} else if (error.response?.data?.detail) {
 				errorMessage = error.response.data.detail;
 			}
-			
+
 			Swal.fire({
 				icon: 'error',
 				title: 'Error',
@@ -283,7 +288,10 @@ const Login = () => {
 	};
 
 	return (
-		<div className="min-h-screen flex">
+		<div
+			className="min-h-screen relative"
+			style={{ backgroundImage: `url(${background})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'local' }}
+		>
 			{/* Overlay de carga mientras verifica configuración */}
 			{isCheckingConfig && (
 				<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
@@ -295,26 +303,18 @@ const Login = () => {
 				</div>
 			)}
 
-			{/* Sección izquierda - Branding */}
-			<div className="hidden lg:flex lg:w-1/2 p-12 flex-col justify-center items-center text-white relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url(${background})` }}>
-				
-			</div>
-
-			{/* Sección derecha - Login */}
-			<div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
-				<div className="w-full max-w-md">
-					{/* Logo sobre el formulario */}
-					<div className="mb-8 flex justify-center">
-						<div className="inline-flex items-center justify-center w-full h-40">
+			{/* Panel flotante - Login */}
+			<div className="relative z-10 min-h-screen flex items-center justify-center lg:justify-end lg:pr-20">
+				<div className="w-full max-w-md px-4 py-8 lg:px-0">
+					<div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/50">
+						{/* Logo en cabecera del card */}
+						<div className="flex justify-center mb-6">
 							<img
 								src={logo}
 								alt="Logo GIRAMASTER"
-								className="w-full h-full object-contain"
+								className="h-auto w-65 object-contain drop-shadow"
 							/>
 						</div>
-					</div>
-
-					<div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
 						<div className="mb-8">
 							<h2 className="text-3xl font-bold text-gray-800 mb-2">
 								Bienvenido
@@ -412,7 +412,7 @@ const Login = () => {
 								)}
 							</div>
 
-							{/* Recordarme y Olvidaste contraseña */}
+							{/* Recordarme */}
 							<div className="flex items-center justify-between">
 								<div className="flex items-center">
 									<input
@@ -463,7 +463,7 @@ const Login = () => {
 						</div>
 					</div>
 
-					<p className="text-center text-sm text-gray-500 mt-6">
+					<p className="text-center text-sm text-white/80 mt-6 drop-shadow">
 						© 2025 Sistema de Asambleas. Todos los derechos
 						reservados.
 					</p>

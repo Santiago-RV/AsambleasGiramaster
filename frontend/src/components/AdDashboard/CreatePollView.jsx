@@ -149,28 +149,26 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
   const requiresOptions = ['single', 'multiple'].includes(formData.str_poll_type);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+      {/* Header fijo */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-3 transition-colors"
         >
           <ArrowLeft size={20} />
           <span className="font-medium">Volver a reuniones</span>
         </button>
+        <h2 className="text-xl font-bold text-gray-800">Crear Encuesta</h2>
+        <p className="text-gray-600 text-sm mt-0.5">Reunión: {meeting.str_title}</p>
+      </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-          <div className="border-b border-gray-200 pb-4 mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Crear Encuesta
-            </h2>
-            <p className="text-gray-600 mt-1">
-              Reunión: {meeting.str_title}
-            </p>
-          </div>
-
+      {/* Contenido scrollable */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="space-y-6">
-            <div>
+<div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Título de la Encuesta *
               </label>
@@ -354,45 +352,82 @@ export default function CreatePollView({ meeting, onBack, onPollCreated }) {
               </div>
             )}
 
-            <div className="flex gap-4 pt-6 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={() => handleSubmit(false)}
-                disabled={isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 bg-gray-600 text-white font-semibold py-3 rounded-lg hover:bg-gray-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-600"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save size={20} />
-                    Guardar como Borrador
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSubmit(true)}
-                disabled={isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-600 disabled:hover:to-green-700"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Creando...
-                  </>
-                ) : (
-                  <>
-                    <Play size={20} />
-                    Crear e Iniciar
-                  </>
-                )}
-              </button>
-            </div>
           </div>
+        </div>
+        </div>
+      </div>
+
+      {/* Botones fijos al fondo */}
+      <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '16px 24px' }}>
+        <div style={{ maxWidth: '896px', margin: '0 auto', display: 'flex', gap: '16px' }}>
+          <button
+            type="button"
+            onClick={() => handleSubmit(false)}
+            disabled={isSubmitting}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: '#4b5563',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '15px',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              opacity: isSubmitting ? 0.5 : 1,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+            }}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save size={20} />
+                Guardar como Borrador
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit(true)}
+            disabled={isSubmitting}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: 'linear-gradient(to right, #16a34a, #15803d)',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '15px',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              opacity: isSubmitting ? 0.5 : 1,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+            }}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Creando...
+              </>
+            ) : (
+              <>
+                <Play size={20} />
+                Crear e Iniciar
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

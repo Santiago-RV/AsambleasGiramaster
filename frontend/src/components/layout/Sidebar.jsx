@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Building2 } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import favicon from '../../assets/Favicon-giramaster.png';
 
 /**
  * Componente Sidebar genérico y reutilizable
@@ -23,7 +24,7 @@ const Sidebar = ({
   gradientTo = '#34495e',
   accentColor = '#3498db',
   footer,
-  sidebarOpen = false, 
+  sidebarOpen = false,
 }) => {
 
 	const [expandedItems, setExpandedItems] = useState({});
@@ -66,10 +67,8 @@ const Sidebar = ({
 			{/* Logo y título */}
 			<div className="px-6 py-8 border-b border-white/10">
 				<div className="flex flex-col items-center text-center">
-					<div
-						className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center mb-3 shadow-lg"
-					>
-						<Building2 size={32} />
+					<div className="mb-3">
+						<img src={favicon} alt="Giramaster" className="w-30 h-30 object-contain drop-shadow-lg" />
 					</div>
 					<h2 className="text-xl font-bold">{title}</h2>
 					<p className="text-sm text-gray-400 mt-1">{subtitle}</p>

@@ -16,7 +16,7 @@ import { UserService } from '../services/api/UserService';
 import { PollService } from '../services/api/PollService';
 import { MeetingService } from '../services/api/MeetingService';
 import { DelegationService } from '../services/api/DelegationService';
-import AuthService from '../services/api/AuthService';
+import { AuthService } from '../services/api/AuthService';
 
 export default function AppCopropietario() {
   const [section, setSection] = useState('meetings');

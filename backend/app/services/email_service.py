@@ -18,6 +18,7 @@ from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.residential_unit_model import ResidentialUnitModel
 from app.utils.email_sender import EmailSender
 from app.services.email_notification_service import EmailNotificationService
+from app.core.config import settings
 from app.services.qr_service import qr_service
 from jinja2 import Template
         
@@ -413,11 +414,13 @@ class EmailService:
             
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
-            
+
             auto_login_url = None
             if auto_login_token:
-                auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
-            
+                effective_url = (frontend_url or settings.FRONTEND_URL or "").rstrip("/")
+                if effective_url:
+                    auto_login_url = f"{effective_url}/auto-login/{auto_login_token}"
+
             # Obtener información de soporte técnico
             from app.services.support_service import SupportService
             support_service = SupportService(db)

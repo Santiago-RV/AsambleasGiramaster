@@ -109,7 +109,11 @@ export default function ZoomPollsPanel({ meetingData, isOpen, onClose }) {
 			});
 		},
 		onError: (error) => {
-			Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || 'Error al finalizar la encuesta' });
+			const msg = error?.response?.data?.message
+				|| error?.response?.data?.detail
+				|| error?.message
+				|| 'Error al finalizar la encuesta';
+			Swal.fire({ icon: 'error', title: 'Error al finalizar', text: msg });
 		},
 	});
 
@@ -545,7 +549,7 @@ export default function ZoomPollsPanel({ meetingData, isOpen, onClose }) {
 
 			{/* Modal fullscreen de creación */}
 			{showCreateForm && ReactDOM.createPortal(
-				<div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10004, overflowY: 'auto' }}>
+				<div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10004, overflow: 'hidden' }}>
 					<CreatePollView
 						meeting={meetingData}
 						onBack={() => setShowCreateForm(false)}
