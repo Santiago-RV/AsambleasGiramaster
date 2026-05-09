@@ -24,6 +24,7 @@ export default function PresencialVotingPage() {
   const [hasVoted, setHasVoted] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
   const [delegationCountdown, setDelegationCountdown] = useState(0);
+  const [pollExpired, setPollExpired] = useState(false);
 
   const handleLogout = () => {
     AuthService.logout();
@@ -120,6 +121,32 @@ export default function PresencialVotingPage() {
       setCountdown(5);
     }
   }, [noPoll, isLoading]);
+ //Logica para cerrar sesion una vez termina la duracion de la encuesta
+  useEffect(() => {
+    if (!poll?.dat_ended_at || meeting?.str_modality !== "presencial") return;
+
+    const time = getTimeRemaining(poll.dat_ended_at);
+
+    if (time?.expired && !pollExpired) {
+      setPollExpired(true);
+      setCountdown(5);
+    }
+  }, [currentTime, poll, meeting, pollExpired]);
+
+  useEffect(() => {
+    if (!pollExpired || countdown === null) return;
+
+    if (countdown <= 0) {
+      handleLogout();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(prev => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [pollExpired, countdown]);
 
   const getTimeRemaining = (endDateStr) => {
     if (!endDateStr) return null;
@@ -227,7 +254,7 @@ export default function PresencialVotingPage() {
     );
   }
 
-  if (noPoll) {
+  if (noPoll && meeting?.str_modality === "presencial") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-100">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
@@ -256,8 +283,29 @@ export default function PresencialVotingPage() {
       </div>
     );
   }
-
-  if (hasVoted || countdown !== null) {
+ //Logica para cerrar sesion una vez termina la duracion de la encuesta
+  if (pollExpired) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-100">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
+        <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Timer className="w-10 h-10 text-orange-600" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800 mb-3">Encuesta Finalizada</h1>
+        <p className="text-gray-600 mb-6">El tiempo de votación para{" "}<strong>"{poll?.str_title}"</strong> ha terminado.</p>
+        {countdown !== null && (
+          <div className="bg-gray-100 rounded-xl p-6">
+            <p className="text-gray-600 mb-2">Cerrando sesión en:</p>
+            <div className="text-5xl font-bold text-orange-600">{countdown}</div>
+            <div className="text-sm text-gray-500 mt-1">segundos</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+  
+if (hasVoted && !pollExpired) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
@@ -275,6 +323,7 @@ export default function PresencialVotingPage() {
       </div>
     );
   }
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
