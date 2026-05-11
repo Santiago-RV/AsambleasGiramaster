@@ -966,7 +966,7 @@ class MeetingService:
             meeting_query = select(MeetingModel).where(
                 MeetingModel.int_id_residential_unit == residential_unit_id,
                 MeetingModel.str_status == "En Curso",
-                MeetingModel.str_modality == "presencial"
+                MeetingModel.str_modality.in_(["presencial", "virtual"])
             )
             meeting_result = await self.db.execute(meeting_query)
             active_meeting = meeting_result.scalar_one_or_none()
@@ -1080,7 +1080,7 @@ class MeetingService:
                 attendance = MeetingAttendanceModel(
                     int_meeting_id=active_meeting.id,
                     int_user_id=user_id,
-                    str_attendance_type="presencial",
+                    str_attendance_type=active_meeting.str_modality,
                     dec_voting_weight=invitation.dec_voting_weight,
                     dat_joined_at=now,
                     int_total_duration_minutes=0,
