@@ -533,8 +533,8 @@ export default function AppAdmin() {
     mutationFn: async (meetingId) => {
       return await MeetingService.endMeeting(meetingId);
     },
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
+    onSuccess: async (response) => {
+      await queryClient.refetchQueries({ queryKey: ['meetings', residentialUnitId] });
       Swal.fire({
         icon: 'success',
         title: 'Reunión Finalizada',

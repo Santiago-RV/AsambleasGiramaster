@@ -110,6 +110,7 @@ const MeetingsPage = ({ residentialUnitId, onJoinMeeting }) => {
       case 'programada':
         return 'Programada';
       case 'completed':
+      case 'completada':
       case 'finalizada':
       case 'cerrada':
         return 'Finalizada';
@@ -124,67 +125,47 @@ const MeetingsPage = ({ residentialUnitId, onJoinMeeting }) => {
     computedStatus: getMeetingStatus(meeting)
   }));
 
-  // Separar reuniones por estado CALCULADO
-  const activeOrUpcoming = meetingsWithStatus.filter(
-    (m) => m.computedStatus !== 'Finalizada'
-  );
-  const finished = meetingsWithStatus.filter(
-    (m) => m.computedStatus === 'Finalizada'
-  );
+  const byDate = (a, b) => new Date(a.dat_schedule_date) - new Date(b.dat_schedule_date);
 
-  // ORDENAR REUNIONES ACTIVAS PARA QUE "EN CURSO" APAREZCA PRIMERO
-  const sortedActiveOrUpcoming = activeOrUpcoming.sort((a, b) => {
-    const statusOrder = {
-      'En Curso': 0,
-      'Disponible': 1,
-      'Programada': 2
-    };
-    
-    const statusA = statusOrder[a.computedStatus] ?? 3;
-    const statusB = statusOrder[b.computedStatus] ?? 3;
-    
-    if (statusA !== statusB) {
-      return statusA - statusB;
-    }
-    
-    // Si tienen el mismo estado, ordenar por fecha (más reciente primero)
-    return new Date(a.dat_schedule_date) - new Date(b.dat_schedule_date);
-  });
+  const sections = [
+    {
+      meetings: meetingsWithStatus.filter((m) => m.computedStatus === 'En Curso').sort(byDate),
+      icon: <Video className="text-green-600" size={24} />,
+      title: 'En Curso',
+      titleClass: 'text-green-800',
+    },
+    {
+      meetings: meetingsWithStatus
+        .filter((m) => m.computedStatus === 'Programada' || m.computedStatus === 'Disponible')
+        .sort(byDate),
+      icon: <Calendar className="text-blue-600" size={24} />,
+      title: 'Programadas',
+      titleClass: 'text-gray-800',
+    },
+    {
+      meetings: meetingsWithStatus.filter((m) => m.computedStatus === 'Finalizada').sort(byDate),
+      icon: <Clock className="text-gray-500" size={24} />,
+      title: 'Completadas',
+      titleClass: 'text-gray-700',
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Reuniones Activas/Próximas */}
-      {sortedActiveOrUpcoming.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="text-blue-600" size={24} />
-            <h2 className="text-xl font-bold text-gray-800">
-              Reuniones Activas y Próximas
-            </h2>
+      {sections.map(({ meetings, icon, title, titleClass }) =>
+        meetings.length > 0 ? (
+          <div key={title}>
+            <div className="flex items-center gap-2 mb-4">
+              {icon}
+              <h2 className={`text-xl font-bold ${titleClass}`}>{title}</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {meetings.map((meeting) => (
+                <MeetingCard key={meeting.id} meeting={meeting} onJoinMeeting={onJoinMeeting} />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sortedActiveOrUpcoming.map((meeting) => (
-              <MeetingCard key={meeting.id} meeting={meeting} onJoinMeeting={onJoinMeeting} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Reuniones Finalizadas */}
-      {finished.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="text-gray-500" size={24} />
-            <h2 className="text-xl font-bold text-gray-700">
-              Reuniones Finalizadas
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {finished.map((meeting) => (
-              <MeetingCard key={meeting.id} meeting={meeting} onJoinMeeting={onJoinMeeting} />
-            ))}
-          </div>
-        </div>
+        ) : null
       )}
     </div>
   );

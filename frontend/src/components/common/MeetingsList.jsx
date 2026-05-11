@@ -317,13 +317,23 @@ const MeetingsList = ({
 											{/* Botones de acción (editar/eliminar) - al final con ml-auto */}
 											<div className="flex gap-1 ml-auto shrink-0">
 												{onEditMeeting && (
-													<button
-														onClick={() => onEditMeeting(meeting)}
-														className="p-1.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-														title="Editar reunión"
-													>
-														<Edit size={14} className="text-gray-600" />
-													</button>
+													isActive ? (
+														<button
+															disabled
+															className="p-1.5 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed opacity-50"
+															title="No se puede editar una reunión en curso"
+														>
+															<Edit size={14} className="text-gray-400" />
+														</button>
+													) : (
+														<button
+															onClick={() => onEditMeeting(meeting)}
+															className="p-1.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+															title="Editar reunión"
+														>
+															<Edit size={14} className="text-gray-600" />
+														</button>
+													)
 												)}
 												{onDeleteMeeting && (
 													meeting.estado?.toLowerCase() === 'en curso' || meeting.estado?.toLowerCase() === 'activa' ? (
@@ -690,13 +700,23 @@ const MeetingsList = ({
 										{/* Botones de acción */}
 										<div className="flex gap-1 ml-auto shrink-0">
 											{onEditMeeting && (
-												<button
-													onClick={() => onEditMeeting(reunion)}
-													className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all"
-													title="Editar reunión"
-												>
-													<Edit size={14} className="text-gray-600" />
-												</button>
+												isActive ? (
+													<button
+														disabled
+														className="p-1.5 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed opacity-50"
+														title="No se puede editar una reunión en curso"
+													>
+														<Edit size={14} className="text-gray-400" />
+													</button>
+												) : (
+													<button
+														onClick={() => onEditMeeting(reunion)}
+														className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all"
+														title="Editar reunión"
+													>
+														<Edit size={14} className="text-gray-600" />
+													</button>
+												)
 											)}
 											{onDeleteMeeting && (
 												reunion.estado?.toLowerCase() === 'en curso' || reunion.estado?.toLowerCase() === 'activa' ? (

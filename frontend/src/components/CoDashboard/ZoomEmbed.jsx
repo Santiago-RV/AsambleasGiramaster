@@ -1,7 +1,7 @@
 // ZoomEmbed.jsx - VERSIÓN CON BURBUJA INFORMATIVA
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Loader2, CheckCircle, UserCircle, Building2, Hash, AlertTriangle, Eye, BarChart3, LogOut, RefreshCw } from 'lucide-react';
+import { X, Loader2, CheckCircle, UserCircle, Building2, Hash, AlertTriangle, Eye, BarChart3, LogOut, RefreshCw, EyeOff, Hand } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
@@ -31,7 +31,10 @@ const ZoomEmbed = ({
 	const [showPollButton, setShowPollButton] = useState(false);
 	const [showPollModal, setShowPollModal] = useState(false);
 	const [selectedOptions, setSelectedOptions] = useState([]);
+	const [textResponse, setTextResponse] = useState('');
+	const [numericResponse, setNumericResponse] = useState('');
 	const [isSubmittingVote, setIsSubmittingVote] = useState(false);
+	const [currentTime, setCurrentTime] = useState(new Date());
 
 	// ✅ Hook para invalidar queries
 	const queryClient = useQueryClient();
@@ -101,6 +104,28 @@ const ZoomEmbed = ({
 		});
 		return isActive && hasNotVoted; // ✅ Solo mostrar si está activa Y no ha votado
 	}) : null;
+
+	// Reloj interno para el countdown
+	useEffect(() => {
+		const t = setInterval(() => setCurrentTime(new Date()), 1000);
+		return () => clearInterval(t);
+	}, []);
+
+	// Programar cierre del modal y refetch exactamente cuando venza la encuesta activa
+	useEffect(() => {
+		if (!activePoll?.dat_ended_at) return;
+		const msLeft = new Date(activePoll.dat_ended_at).getTime() - Date.now();
+		if (msLeft <= 0) {
+			if (showPollModal) setShowPollModal(false);
+			refetchPolls();
+			return;
+		}
+		const timer = setTimeout(() => {
+			if (showPollModal) setShowPollModal(false);
+			refetchPolls();
+		}, msLeft + 300);
+		return () => clearTimeout(timer);
+	}, [activePoll?.dat_ended_at]);
 
 	// Mostrar botón cuando hay encuesta activa
 	useEffect(() => {
@@ -197,6 +222,22 @@ const ZoomEmbed = ({
 		onClose();
 	};
 
+	const getPollTimeRemaining = (poll) => {
+		if (!poll?.dat_ended_at) return null;
+		const end = new Date(poll.dat_ended_at);
+		const diff = end - currentTime;
+		if (diff <= 0) return { expired: true, total: 0, left: 0, minutes: 0, seconds: 0 };
+		const start = poll.dat_started_at ? new Date(poll.dat_started_at) : null;
+		const total = start ? end - start : diff;
+		return {
+			expired: false,
+			total,
+			left: diff,
+			minutes: Math.floor(diff / 60000),
+			seconds: Math.floor((diff % 60000) / 1000),
+		};
+	};
+
 	const handleViewPoll = () => {
 		if (isGuest) {
 			console.log('🚫 [ZoomEmbed] Invitado intentó abrir encuesta - Acción bloqueada');
@@ -204,6 +245,8 @@ const ZoomEmbed = ({
 		}
 		console.log('📊 Abriendo modal de encuesta activa');
 		setSelectedOptions([]);
+		setTextResponse('');
+		setNumericResponse('');
 		setShowPollModal(true);
 	};
 
@@ -211,6 +254,8 @@ const ZoomEmbed = ({
 		console.log('📊 Cerrando modal de encuesta');
 		setShowPollModal(false);
 		setSelectedOptions([]);
+		setTextResponse('');
+		setNumericResponse('');
 	};
 
 	const handleManualRefresh = async () => {
@@ -254,15 +299,15 @@ const ZoomEmbed = ({
 		}
 
 		setSelectedOptions((prev) => {
-			const isMultiple = activePoll?.bln_allow_multiple_selection;
-
-			if (!isMultiple) {
+			if (activePoll?.str_poll_type !== 'multiple') {
 				return prev.includes(optionId) ? [] : [optionId];
-			} else {
-				return prev.includes(optionId)
-					? prev.filter(id => id !== optionId)
-					: [...prev, optionId];
 			}
+			if (prev.includes(optionId)) {
+				return prev.filter(id => id !== optionId);
+			}
+			const maxSelections = activePoll?.int_max_selections || activePoll?.options?.length || 999;
+			if (prev.length >= maxSelections) return prev;
+			return [...prev, optionId];
 		});
 	};
 
@@ -274,26 +319,42 @@ const ZoomEmbed = ({
 				text: 'Los invitados no pueden participar en votaciones',
 				icon: 'warning',
 				confirmButtonText: 'Entendido',
-				customClass: {
-					popup: 'swal-wide',
-					title: 'swal-title',
-					confirmButton: 'swal-confirm-btn'
-				}
+				customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' }
 			});
 			return;
 		}
 
-		if (selectedOptions.length === 0) {
+		const pollType = activePoll.str_poll_type;
+
+		if (pollType === 'text' && !textResponse.trim()) {
+			Swal.fire({
+				title: 'Respuesta requerida',
+				text: 'Debes ingresar una respuesta de texto',
+				icon: 'warning',
+				confirmButtonText: 'Entendido',
+				customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' }
+			});
+			return;
+		}
+
+		if (pollType === 'numeric' && (numericResponse === '' || isNaN(numericResponse))) {
+			Swal.fire({
+				title: 'Respuesta requerida',
+				text: 'Debes ingresar un valor numérico',
+				icon: 'warning',
+				confirmButtonText: 'Entendido',
+				customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' }
+			});
+			return;
+		}
+
+		if ((pollType === 'single' || pollType === 'multiple') && selectedOptions.length === 0) {
 			Swal.fire({
 				title: 'Selecciona una opción',
 				text: 'Debes seleccionar al menos una opción antes de votar',
 				icon: 'warning',
 				confirmButtonText: 'Entendido',
-				customClass: {
-					popup: 'swal-wide',
-					title: 'swal-title',
-					confirmButton: 'swal-confirm-btn'
-				}
+				customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' }
 			});
 			return;
 		}
@@ -301,54 +362,48 @@ const ZoomEmbed = ({
 		setIsSubmittingVote(true);
 
 		try {
-			const result = await PollService.submitVote(activePoll.id, selectedOptions);
-
-			if (result.success) {
-				// ✅ Invalidar TODAS las queries relacionadas con polls
-				await Promise.all([
-					refetchPolls(), // Refrescar en Zoom
-					queryClient.invalidateQueries({ queryKey: ['all-polls'] }), // Refrescar en VotingPage
-					queryClient.invalidateQueries({ queryKey: ['meeting-polls'] }) // Cualquier otra query de polls
-				]);
-
-				await Swal.fire({
-					title: '¡Voto Registrado!',
-					html: `
-						<div class="text-center">
-							<p class="text-lg mb-4">Tu voto ha sido registrado exitosamente</p>
-							<div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-								<p class="text-sm text-blue-800 font-semibold">
-									${activePoll.str_title}
-								</p>
-							</div>
-						</div>
-					`,
-					icon: 'success',
-					confirmButtonText: 'Cerrar',
-					customClass: {
-						popup: 'swal-wide',
-						title: 'swal-title',
-						confirmButton: 'swal-confirm-btn'
-					}
-				});
-
-				handleClosePollModal();
+			if (pollType === 'text') {
+				await PollService.vote(activePoll.id, { str_response_text: textResponse.trim(), bln_is_abstention: false });
+			} else if (pollType === 'numeric') {
+				await PollService.vote(activePoll.id, { dec_response_number: parseFloat(numericResponse), bln_is_abstention: false });
+			} else if (pollType === 'single') {
+				await PollService.vote(activePoll.id, { int_option_id: selectedOptions[0], bln_is_abstention: false });
+			} else {
+				for (const optionId of selectedOptions) {
+					await PollService.vote(activePoll.id, { int_option_id: optionId, bln_is_abstention: false });
+				}
 			}
+
+			await Promise.all([
+				refetchPolls(),
+				queryClient.invalidateQueries({ queryKey: ['all-polls'] }),
+				queryClient.invalidateQueries({ queryKey: ['meeting-polls'] })
+			]);
+
+			await Swal.fire({
+				title: '¡Respuesta Registrada!',
+				html: `
+					<div class="text-center">
+						<p class="text-lg mb-4">Tu respuesta ha sido registrada exitosamente</p>
+						<div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+							<p class="text-sm text-blue-800 font-semibold">${activePoll.str_title}</p>
+						</div>
+					</div>
+				`,
+				icon: 'success',
+				confirmButtonText: 'Cerrar',
+				customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' }
+			});
+
+			handleClosePollModal();
 		} catch (error) {
 			console.error('❌ Error al enviar voto:', error);
-			
-			const errorMessage = error.response?.data?.message || 'No se pudo registrar el voto';
-			
 			Swal.fire({
 				title: 'Error al Votar',
-				text: errorMessage,
+				text: error.response?.data?.message || 'No se pudo registrar el voto',
 				icon: 'error',
 				confirmButtonText: 'Entendido',
-				customClass: {
-					popup: 'swal-wide',
-					title: 'swal-title',
-					confirmButton: 'swal-confirm-btn'
-				}
+				customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' }
 			});
 		} finally {
 			setIsSubmittingVote(false);
@@ -698,9 +753,19 @@ const ZoomEmbed = ({
 								<span style={{ fontWeight: 'bold', fontSize: '1.5rem', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
 									<BarChart3 size={24} /> Encuesta Activa
 								</span>
-								<span style={{ fontSize: '1rem', color: '#d1fae5', lineHeight: 1.2 }}>
-									Haz clic para votar ahora
-								</span>
+								{(() => {
+									const rem = getPollTimeRemaining(activePoll);
+									if (!rem || rem.expired) return (
+										<span style={{ fontSize: '1rem', color: '#d1fae5', lineHeight: 1.2 }}>Haz clic para votar ahora</span>
+									);
+									const timeStr = `${rem.minutes}:${String(rem.seconds).padStart(2, '0')}`;
+									const isUrgent = rem.left < 30000;
+									return (
+										<span style={{ fontSize: '1rem', color: isUrgent ? '#fca5a5' : '#d1fae5', lineHeight: 1.2, fontFamily: 'monospace', fontWeight: isUrgent ? 'bold' : 'normal' }}>
+											⏱ {timeStr} restantes
+										</span>
+									);
+								})()}
 							</div>
 
 							{/* Indicador pulsante */}
@@ -790,13 +855,110 @@ const ZoomEmbed = ({
 									{activePoll.str_description}
 								</p>
 							)}
+							{activePoll.bln_is_anonymous && (
+								<div style={{
+									display: 'flex', alignItems: 'center', gap: '8px',
+									marginTop: '12px', padding: '10px 14px',
+									background: '#f8fafc', border: '1px solid #cbd5e1',
+									borderRadius: '10px'
+								}}>
+									<EyeOff size={15} style={{ color: '#64748b', flexShrink: 0 }} />
+									<p style={{ fontSize: '0.85rem', color: '#475569', margin: 0 }}>
+										<strong>Voto anónimo:</strong> tu identidad no será revelada al registrar tu respuesta.
+									</p>
+								</div>
+							)}
 						</div>
 
+						{activePoll.dat_ended_at && (() => {
+							const rem = getPollTimeRemaining(activePoll);
+							if (!rem || rem.expired) return null;
+							const pct = Math.max(0, Math.min(100, (rem.left / rem.total) * 100));
+							const isUrgent = rem.left < 30000;
+							const timeStr = `${rem.minutes}:${String(rem.seconds).padStart(2, '0')}`;
+							return (
+								<div style={{ marginBottom: '20px', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+									<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+										<span style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+											⏱ Tiempo restante
+										</span>
+										<span style={{
+											fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1.25rem',
+											color: isUrgent ? '#ef4444' : '#1e293b',
+											animation: isUrgent ? 'pulse 1s infinite' : 'none',
+										}}>
+											{timeStr}
+										</span>
+									</div>
+									<div style={{ width: '100%', background: '#e2e8f0', borderRadius: '999px', height: '8px' }}>
+										<div style={{
+											height: '8px', borderRadius: '999px',
+											width: `${pct}%`,
+											background: isUrgent ? '#ef4444' : pct > 50 ? '#22c55e' : '#eab308',
+											transition: 'width 1s linear',
+										}} />
+									</div>
+								</div>
+							);
+						})()}
+
 						<div style={{ marginBottom: '24px' }}>
-							{activePoll.options?.map((option) => (
+							{activePoll.str_poll_type === 'text' && (
+								<textarea
+									value={textResponse}
+									onChange={(e) => setTextResponse(e.target.value)}
+									placeholder="Escribe tu respuesta..."
+									rows={4}
+									style={{
+										width: '100%',
+										padding: '12px 16px',
+										border: '2px solid #e5e7eb',
+										borderRadius: '12px',
+										fontSize: '1rem',
+										outline: 'none',
+										resize: 'none',
+										fontFamily: 'inherit',
+										boxSizing: 'border-box'
+									}}
+									onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; }}
+									onBlur={(e) => { e.target.style.borderColor = '#e5e7eb'; }}
+								/>
+							)}
+
+							{activePoll.str_poll_type === 'numeric' && (
+								<input
+									type="number"
+									value={numericResponse}
+									onChange={(e) => setNumericResponse(e.target.value)}
+									placeholder="Ingresa un número"
+									style={{
+										width: '100%',
+										padding: '12px 16px',
+										border: '2px solid #e5e7eb',
+										borderRadius: '12px',
+										fontSize: '1rem',
+										outline: 'none',
+										boxSizing: 'border-box'
+									}}
+									onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; }}
+									onBlur={(e) => { e.target.style.borderColor = '#e5e7eb'; }}
+								/>
+							)}
+
+							{activePoll.str_poll_type === 'multiple' && activePoll.int_max_selections && (
+								<p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '12px' }}>
+									Selecciona hasta <strong>{activePoll.int_max_selections}</strong> opción{activePoll.int_max_selections !== 1 ? 'es' : ''} · {selectedOptions.length} de {activePoll.int_max_selections} seleccionada{selectedOptions.length !== 1 ? 's' : ''}
+								</p>
+							)}
+							{(activePoll.str_poll_type === 'single' || activePoll.str_poll_type === 'multiple') && activePoll.options?.map((option) => {
+								const atLimit = activePoll.str_poll_type === 'multiple'
+									&& activePoll.int_max_selections
+									&& selectedOptions.length >= activePoll.int_max_selections
+									&& !selectedOptions.includes(option.id);
+								return (
 								<div
 									key={option.id}
-									onClick={() => handleOptionToggle(option.id)}
+									onClick={() => !atLimit && handleOptionToggle(option.id)}
 									style={{
 										padding: '16px',
 										marginBottom: '12px',
@@ -804,28 +966,19 @@ const ZoomEmbed = ({
 											? '3px solid #3b82f6'
 											: '2px solid #e5e7eb',
 										borderRadius: '12px',
-										cursor: 'pointer',
-										backgroundColor: selectedOptions.includes(option.id)
-											? '#eff6ff'
-											: 'white',
+										cursor: atLimit ? 'not-allowed' : 'pointer',
+										backgroundColor: selectedOptions.includes(option.id) ? '#eff6ff' : atLimit ? '#f9fafb' : 'white',
+										opacity: atLimit ? 0.5 : 1,
 										transition: 'all 0.2s'
 									}}
 								>
-									<div style={{
-										display: 'flex',
-										alignItems: 'center',
-										gap: '12px'
-									}}>
+									<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
 										<div style={{
 											width: '24px',
 											height: '24px',
-											borderRadius: activePoll.bln_allow_multiple_selection ? '4px' : '50%',
-											border: selectedOptions.includes(option.id)
-												? '2px solid #3b82f6'
-												: '2px solid #d1d5db',
-											backgroundColor: selectedOptions.includes(option.id)
-												? '#3b82f6'
-												: 'white',
+											borderRadius: activePoll.str_poll_type === 'multiple' ? '4px' : '50%',
+											border: selectedOptions.includes(option.id) ? '2px solid #3b82f6' : '2px solid #d1d5db',
+											backgroundColor: selectedOptions.includes(option.id) ? '#3b82f6' : 'white',
 											display: 'flex',
 											alignItems: 'center',
 											justifyContent: 'center',
@@ -844,61 +997,100 @@ const ZoomEmbed = ({
 										</span>
 									</div>
 								</div>
-							))}
+								);
+							})}
 						</div>
 
-						<div style={{
-							display: 'flex',
-							gap: '12px',
-							justifyContent: 'flex-end'
-						}}>
-							<button
-								onClick={handleClosePollModal}
-								style={{
-									padding: '12px 24px',
-									borderRadius: '8px',
-									border: '1px solid #d1d5db',
-									backgroundColor: 'white',
-									color: '#374151',
-									fontSize: '1rem',
-									fontWeight: '500',
-									cursor: 'pointer'
-								}}
-							>
-								Cancelar
-							</button>
-							<button
-								onClick={handleSubmitVote}
-								disabled={isSubmittingVote || selectedOptions.length === 0}
-								style={{
-									padding: '12px 32px',
-									borderRadius: '8px',
-									border: 'none',
-									background: selectedOptions.length === 0
-										? '#e5e7eb'
-										: 'linear-gradient(to right, #3b82f6, #2563eb)',
-									color: 'white',
-									fontSize: '1rem',
-									fontWeight: '600',
-									cursor: selectedOptions.length === 0 ? 'not-allowed' : 'pointer',
-									display: 'flex',
-									alignItems: 'center',
-									gap: '8px'
-								}}
-							>
-								{isSubmittingVote ? (
-									<>
-										<Loader2 size={20} className="animate-spin" />
-										<span>Enviando...</span>
-									</>
-								) : (
-									<>
-										<CheckCircle size={20} />
-										<span>Confirmar Voto</span>
-									</>
-								)}
-							</button>
-						</div>
+						{(() => {
+							const pollType = activePoll.str_poll_type;
+							const isDisabled = isSubmittingVote ||
+								(pollType === 'text' && !textResponse.trim()) ||
+								(pollType === 'numeric' && (numericResponse === '' || isNaN(numericResponse))) ||
+								((pollType === 'single' || pollType === 'multiple') && selectedOptions.length === 0);
+							return (
+								<div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+									{activePoll.bln_allows_abstention && (
+										<button
+											onClick={async () => {
+												setIsSubmittingVote(true);
+												try {
+													await PollService.vote(activePoll.id, { bln_is_abstention: true });
+													await Promise.all([
+														refetchPolls(),
+														queryClient.invalidateQueries({ queryKey: ['all-polls'] }),
+														queryClient.invalidateQueries({ queryKey: ['meeting-polls'] }),
+													]);
+													await Swal.fire({
+														title: 'Abstención registrada',
+														text: 'Tu abstención ha sido registrada exitosamente',
+														icon: 'success',
+														confirmButtonText: 'Cerrar',
+														customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' },
+													});
+													handleClosePollModal();
+												} catch (error) {
+													Swal.fire({ title: 'Error', text: error.response?.data?.message || 'No se pudo registrar la abstención', icon: 'error', confirmButtonText: 'Entendido', customClass: { popup: 'swal-wide', title: 'swal-title', confirmButton: 'swal-confirm-btn' } });
+												} finally {
+													setIsSubmittingVote(false);
+												}
+											}}
+											disabled={isSubmittingVote}
+											style={{
+												display: 'flex', alignItems: 'center', gap: '8px',
+												padding: '12px 20px', borderRadius: '8px',
+												border: '2px solid #fcd34d', background: '#fffbeb',
+												color: '#92400e', fontSize: '0.95rem', fontWeight: '600',
+												cursor: isSubmittingVote ? 'not-allowed' : 'pointer',
+												opacity: isSubmittingVote ? 0.5 : 1,
+											}}
+										>
+											<Hand size={18} />
+											Abstenerme
+										</button>
+									)}
+									<div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
+									<button
+										onClick={handleClosePollModal}
+										style={{
+											padding: '12px 24px',
+											borderRadius: '8px',
+											border: '1px solid #d1d5db',
+											backgroundColor: 'white',
+											color: '#374151',
+											fontSize: '1rem',
+											fontWeight: '500',
+											cursor: 'pointer'
+										}}
+									>
+										Cancelar
+									</button>
+									<button
+										onClick={handleSubmitVote}
+										disabled={isDisabled}
+										style={{
+											padding: '12px 32px',
+											borderRadius: '8px',
+											border: 'none',
+											background: isDisabled ? '#e5e7eb' : 'linear-gradient(to right, #3b82f6, #2563eb)',
+											color: 'white',
+											fontSize: '1rem',
+											fontWeight: '600',
+											cursor: isDisabled ? 'not-allowed' : 'pointer',
+											display: 'flex',
+											alignItems: 'center',
+											gap: '8px'
+										}}
+									>
+										{isSubmittingVote ? (
+											<><Loader2 size={20} className="animate-spin" /><span>Enviando...</span></>
+										) : (
+											<><CheckCircle size={20} /><span>{pollType === 'single' || pollType === 'multiple' ? 'Confirmar Voto' : 'Enviar Respuesta'}</span></>
+										)}
+									</button>
+									</div>
+								</div>
+							);
+						})()}
 					</div>
 				</div>,
 				document.body

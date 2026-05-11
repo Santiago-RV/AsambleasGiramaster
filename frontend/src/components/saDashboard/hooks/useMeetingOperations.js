@@ -105,9 +105,9 @@ export const useMeetingOperations = (unitId) => {
 	// Mutación para finalizar reunión
 	const endMeetingMutation = useMutation({
 		mutationFn: (meetingId) => MeetingService.endMeeting(meetingId),
-		onSuccess: (response) => {
-			queryClient.invalidateQueries({ queryKey: ['meetings', unitId] });
-			queryClient.invalidateQueries({ queryKey: ['meetings'] });
+		onSuccess: async (response) => {
+			await queryClient.refetchQueries({ queryKey: ['meetings', unitId] });
+			await queryClient.refetchQueries({ queryKey: ['meetings'] });
 			Swal.fire({
 				icon: 'success',
 				title: 'Reunion Finalizada',

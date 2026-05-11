@@ -238,6 +238,21 @@ class PollService:
 
         return poll
 
+    async def auto_close_poll(self, poll_id: int) -> PollModel:
+        """Cierra automáticamente una encuesta expirada por tiempo (sin requerir permisos de admin)"""
+        poll = await self.get_poll_by_id(poll_id)
+        if not poll or poll.str_status != 'active':
+            return poll  # Ya cerrada o no existe; idempotente
+
+        poll.str_status = 'closed'
+        # dat_ended_at ya tiene el timestamp configurado; no lo sobreescribimos
+        await self._register_delegation_votes(poll_id, poll.int_meeting_id)
+        await self._calculate_poll_statistics(poll_id)
+        await self.db.commit()
+        await self.db.refresh(poll)
+        await self._publish_poll_event(poll.int_meeting_id, "poll_ended", poll.id)
+        return poll
+
     async def end_poll(self, poll_id: int, user_id: int) -> PollModel:
         """Finaliza una encuesta"""
         poll = await self.get_poll_by_id(poll_id)
@@ -294,9 +309,13 @@ class PollService:
                 error_code="POLL_EXPIRED"
             )
 
-        # Verificar si ya votó (solo si no es anónima y tenemos user_id)
-        if not poll.bln_is_anonymous and user_id:
-            existing = await self._user_has_voted(poll_id, user_id)
+        # Verificar si ya votó (aplica para todos los tipos, incluidas anónimas)
+        if user_id:
+            if poll.str_poll_type == 'multiple':
+                # Para múltiple: permitir varias opciones, pero bloquear la misma opción dos veces
+                existing = await self._user_has_voted_option(poll_id, user_id, response_data.int_option_id)
+            else:
+                existing = await self._user_has_voted(poll_id, user_id)
             if existing:
                 raise BusinessLogicException(
                     message="Ya has votado en esta encuesta",
@@ -338,12 +357,25 @@ class PollService:
         return db_response
 
     async def _user_has_voted(self, poll_id: int, user_id: int) -> bool:
-        """Verifica si el usuario ya votó"""
+        """Verifica si el usuario ya votó en la encuesta (cualquier opción)"""
         result = await self.db.execute(
             select(PollResponseModel)
             .where(and_(
                 PollResponseModel.int_poll_id == poll_id,
                 PollResponseModel.int_user_id == user_id
+            ))
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def _user_has_voted_option(self, poll_id: int, user_id: int, option_id: Optional[int]) -> bool:
+        """Verifica si el usuario ya votó por una opción específica (para encuestas tipo multiple)"""
+        result = await self.db.execute(
+            select(PollResponseModel)
+            .where(and_(
+                PollResponseModel.int_poll_id == poll_id,
+                PollResponseModel.int_user_id == user_id,
+                PollResponseModel.int_option_id == option_id
             ))
         )
         return result.scalar_one_or_none() is not None
@@ -583,8 +615,8 @@ class PollService:
                 logger.info(f"   Delegante {delegante_id} ya votó directamente, saltando.")
                 continue
 
-            # 3. Buscar el voto del delegado
-            voto_delegado_result = await self.db.execute(
+            # 3. Buscar el/los voto(s) del delegado (puede ser múltiples en encuestas tipo multiple)
+            votos_delegado_result = await self.db.execute(
                 select(PollResponseModel).where(
                     and_(
                         PollResponseModel.int_poll_id == poll_id,
@@ -592,40 +624,45 @@ class PollService:
                     )
                 )
             )
-            voto_delegado = voto_delegado_result.scalar_one_or_none()
+            votos_delegado = votos_delegado_result.scalars().all()
 
-            if not voto_delegado:
+            if not votos_delegado:
                 logger.info(f"   Delegado {delegado_id} no votó, no se registra voto para delegante {delegante_id}.")
                 continue
 
-            if voto_delegado.bln_is_abstention:
+            # Filtrar abstenciones; si solo hay abstención no copiar
+            votos_reales = [v for v in votos_delegado if not v.bln_is_abstention]
+            if not votos_reales and votos_delegado[0].bln_is_abstention:
                 logger.info(f"   Delegado {delegado_id} se abstuvo, no se copia voto para delegante {delegante_id}.")
                 continue
 
-            # 4. Registrar voto del delegante copiando la opción del delegado
-            voto_delegante = PollResponseModel(
-                int_poll_id=poll_id,
-                int_user_id=delegante_id,
-                int_option_id=voto_delegado.int_option_id,
-                str_response_text=voto_delegado.str_response_text,
-                dec_response_number=voto_delegado.dec_response_number,
-                dec_voting_weight=peso_delegante,
-                bln_is_abstention=False,
-                dat_response_at=colombia_now(),
-                str_ip_address="delegation",   # sentinel para identificar votos por delegación
-                str_user_agent="delegation"    # sentinel para identificar votos por delegación
-            )
-            self.db.add(voto_delegante)
+            # 4. Registrar voto(s) del delegante copiando las opciones del delegado
+            # Para encuestas múltiples puede haber varias filas; para single/text/numeric solo una
+            # Distribuimos el peso equitativamente entre las opciones copiadas
+            peso_por_opcion = peso_delegante / len(votos_reales) if votos_reales else 0
+            for voto_delegado in votos_reales:
+                voto_delegante = PollResponseModel(
+                    int_poll_id=poll_id,
+                    int_user_id=delegante_id,
+                    int_option_id=voto_delegado.int_option_id,
+                    str_response_text=voto_delegado.str_response_text,
+                    dec_response_number=voto_delegado.dec_response_number,
+                    dec_voting_weight=peso_por_opcion,
+                    bln_is_abstention=False,
+                    dat_response_at=colombia_now(),
+                    str_ip_address="delegation",
+                    str_user_agent="delegation"
+                )
+                self.db.add(voto_delegante)
 
             # 5. NO actualizar estadísticas de la opción aquí:
             # el delegado ya votó con dec_voting_weight que incluye el peso delegado,
             # por lo tanto _update_option_stats ya fue llamado con el total correcto.
             # Llamarlo de nuevo con peso_delegante causaría doble conteo.
 
-            votos_registrados += 1
+            votos_registrados += len(votos_reales)
             logger.info(
-                f"   ✅ Voto registrado: delegante={delegante_id} → "
-                f"opción={voto_delegado.int_option_id}, peso={peso_delegante}"
+                f"   ✅ {len(votos_reales)} voto(s) registrado(s): delegante={delegante_id}, peso_total={peso_delegante}"
             )
 
         # Flush para persistir antes del commit del caller

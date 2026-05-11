@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AuthService } from '../services/api/AuthService';
-import { Loader2, CheckCircle, Clock, AlertCircle, Timer, MapPin, LogOut, ShieldOff, UserPlus, Hash } from "lucide-react";
+import { Loader2, CheckCircle, Clock, AlertCircle, Timer, MapPin, LogOut, ShieldOff, UserPlus, Hash, EyeOff, Hand } from "lucide-react";
 import Swal from 'sweetalert2';
 import { PollService } from '../services/api/PollService';
 import { MeetingService } from '../services/api/MeetingService';
@@ -24,6 +24,8 @@ export default function PresencialVotingPage() {
   const [hasVoted, setHasVoted] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
   const [delegationCountdown, setDelegationCountdown] = useState(0);
+  const [textResponse, setTextResponse] = useState('');
+  const [numericResponse, setNumericResponse] = useState('');
 
   const handleLogout = () => {
     AuthService.logout();
@@ -121,6 +123,15 @@ export default function PresencialVotingPage() {
     }
   }, [noPoll, isLoading]);
 
+  // Auto-cierre cuando la encuesta activa expira por tiempo
+  useEffect(() => {
+    if (!poll?.dat_ended_at || hasVoted) return;
+    const endDate = parseColombiaDate(poll.dat_ended_at);
+    if (currentTime >= endDate) {
+      setNoPoll(true);
+    }
+  }, [currentTime, poll?.dat_ended_at, hasVoted]);
+
   const getTimeRemaining = (endDateStr) => {
     if (!endDateStr) return null;
     const endDate = parseColombiaDate(endDateStr);
@@ -149,6 +160,44 @@ export default function PresencialVotingPage() {
   };
 
   const handleVote = async () => {
+    if (poll.str_poll_type === 'text') {
+      if (!textResponse.trim()) {
+        Swal.fire({ icon: 'warning', title: 'Respuesta requerida', text: 'Debes ingresar una respuesta de texto', confirmButtonColor: '#3b82f6' });
+        return;
+      }
+      setIsVoting(true);
+      try {
+        await PollService.vote(poll.id, { str_response_text: textResponse.trim(), bln_is_abstention: false });
+        setHasVoted(true);
+        setCountdown(5);
+      } catch (error) {
+        console.error('Error al votar:', error);
+        Swal.fire({ icon: 'error', title: 'Error al votar', text: error.response?.data?.message || 'Intenta nuevamente', confirmButtonColor: '#ef4444' });
+      } finally {
+        setIsVoting(false);
+      }
+      return;
+    }
+
+    if (poll.str_poll_type === 'numeric') {
+      if (numericResponse === '' || isNaN(numericResponse)) {
+        Swal.fire({ icon: 'warning', title: 'Respuesta requerida', text: 'Debes ingresar un valor numérico', confirmButtonColor: '#3b82f6' });
+        return;
+      }
+      setIsVoting(true);
+      try {
+        await PollService.vote(poll.id, { dec_response_number: parseFloat(numericResponse), bln_is_abstention: false });
+        setHasVoted(true);
+        setCountdown(5);
+      } catch (error) {
+        console.error('Error al votar:', error);
+        Swal.fire({ icon: 'error', title: 'Error al votar', text: error.response?.data?.message || 'Intenta nuevamente', confirmButtonColor: '#ef4444' });
+      } finally {
+        setIsVoting(false);
+      }
+      return;
+    }
+
     if (poll.str_poll_type === 'single' && selectedOptions.length === 0) {
       Swal.fire({ icon: 'warning', title: 'Selecciona una opción', text: 'Debes seleccionar al menos una opción', confirmButtonColor: '#3b82f6' });
       return;
@@ -354,62 +403,156 @@ export default function PresencialVotingPage() {
               </div>
               <span className="px-3 py-1 bg-green-500 rounded-full text-xs font-semibold">ACTIVA</span>
             </div>
-            <div className="flex items-center gap-4 mt-4 text-sm text-blue-100">
+            <div className="flex items-center gap-4 mt-3 text-sm text-blue-100">
               <div className="flex items-center gap-1"><Clock size={16} />{formatDateTime(poll.dat_started_at)}</div>
-              {poll.dat_ended_at && (
-                <div className="flex items-center gap-1">
-                  <Timer size={16} />
-                  {formatTimeRemaining(poll.dat_ended_at) ? (
-                    <span className="font-mono font-bold bg-white/20 px-2 py-0.5 rounded">{formatTimeRemaining(poll.dat_ended_at)}</span>
-                  ) : <span className="text-red-300">Expirada</span>}
-                </div>
-              )}
             </div>
+            {poll.dat_ended_at && (() => {
+              const rem = getTimeRemaining(poll.dat_ended_at);
+              if (!rem || rem.expired) return null;
+              const totalMs = parseColombiaDate(poll.dat_ended_at) - parseColombiaDate(poll.dat_started_at);
+              const leftMs = rem.minutes * 60000 + rem.seconds * 1000;
+              const pct = Math.max(0, Math.min(100, (leftMs / totalMs) * 100));
+              const isUrgent = leftMs < 30000;
+              const timeStr = `${rem.minutes}:${String(rem.seconds).padStart(2, '0')}`;
+              return (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-xs text-blue-100 mb-1">
+                    <span className="flex items-center gap-1"><Timer size={13} />Tiempo restante</span>
+                    <span className={`font-mono font-bold text-lg ${isUrgent ? 'text-red-300 animate-pulse' : 'text-white'}`}>{timeStr}</span>
+                  </div>
+                  <div className="w-full bg-white/20 rounded-full h-2.5">
+                    <div
+                      className={`h-2.5 rounded-full transition-all duration-1000 ${isUrgent ? 'bg-red-400' : pct > 50 ? 'bg-green-400' : 'bg-yellow-400'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="p-6">
             <p className="font-semibold text-gray-700 mb-4">
-              {poll.str_poll_type === 'single' ? 'Selecciona una opción:' : `Selecciona hasta ${poll.int_max_selections || poll.options?.length} opciones:`}
+              {poll.str_poll_type === 'single'
+                ? 'Selecciona una opción:'
+                : poll.str_poll_type === 'multiple'
+                ? `Selecciona hasta ${poll.int_max_selections || poll.options?.length} opciones:`
+                : poll.str_poll_type === 'text'
+                ? 'Ingresa tu respuesta:'
+                : 'Ingresa tu valor numérico:'}
             </p>
 
-            <div className="space-y-3 mb-6">
-              {poll.options?.map((option, index) => {
-                const isSelected = selectedOptions.includes(option.id);
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => handleOptionToggle(option.id)}
-                    disabled={isVoting}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between ${
-                      isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                    } ${isVoting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {String.fromCharCode(65 + index)}
-                      </span>
-                      <span className="font-medium text-gray-800">{option.str_option_text}</span>
-                    </div>
-                    {isSelected && <CheckCircle className="text-blue-600" size={24} />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {poll.str_poll_type === 'multiple' && selectedOptions.length > 0 && (
-              <p className="text-sm text-gray-600 mb-4 text-center">{selectedOptions.length} de {poll.int_max_selections || poll.options?.length} seleccionada(s)</p>
+            {poll.bln_is_anonymous && (
+              <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <EyeOff size={16} className="text-slate-500 flex-shrink-0" />
+                <p className="text-sm text-slate-600"><span className="font-semibold">Voto anónimo:</span> tu identidad no será revelada al registrar tu respuesta.</p>
+              </div>
             )}
 
-            <button
-              onClick={handleVote}
-              disabled={(poll.str_poll_type === 'single' && selectedOptions.length === 0) || (poll.str_poll_type === 'multiple' && selectedOptions.length === 0) || isVoting}
-              className={`w-full py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
-                ((poll.str_poll_type === 'single' && selectedOptions.length === 0) || (poll.str_poll_type === 'multiple' && selectedOptions.length === 0) || isVoting)
-                  ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl'
-              }`}
-            >
-              {isVoting ? <><Loader2 className="animate-spin" size={20} />Enviando voto...</> : <><CheckCircle size={20} />Votar</>}
-            </button>
+            {poll.str_poll_type === 'text' && (
+              <div className="mb-6">
+                <textarea
+                  value={textResponse}
+                  onChange={(e) => setTextResponse(e.target.value)}
+                  placeholder="Escribe tu respuesta..."
+                  disabled={isVoting}
+                  rows={4}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none resize-none disabled:opacity-50"
+                />
+              </div>
+            )}
+
+            {poll.str_poll_type === 'numeric' && (
+              <div className="mb-6">
+                <input
+                  type="number"
+                  value={numericResponse}
+                  onChange={(e) => setNumericResponse(e.target.value)}
+                  placeholder="Ingresa un número"
+                  disabled={isVoting}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                />
+              </div>
+            )}
+
+            {(poll.str_poll_type === 'single' || poll.str_poll_type === 'multiple') && (
+              <>
+                <div className="space-y-3 mb-6">
+                  {poll.options?.map((option, index) => {
+                    const isSelected = selectedOptions.includes(option.id);
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => handleOptionToggle(option.id)}
+                        disabled={isVoting}
+                        className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between ${
+                          isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                        } ${isVoting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                            {String.fromCharCode(65 + index)}
+                          </span>
+                          <span className="font-medium text-gray-800">{option.str_option_text}</span>
+                        </div>
+                        {isSelected && <CheckCircle className="text-blue-600" size={24} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {poll.str_poll_type === 'multiple' && selectedOptions.length > 0 && (
+                  <p className="text-sm text-gray-600 mb-4 text-center">{selectedOptions.length} de {poll.int_max_selections || poll.options?.length} seleccionada(s)</p>
+                )}
+              </>
+            )}
+
+            <div className={`flex gap-3 ${poll.bln_allows_abstention ? 'flex-col sm:flex-row' : ''}`}>
+              <button
+                onClick={handleVote}
+                disabled={
+                  (poll.str_poll_type === 'single' && selectedOptions.length === 0) ||
+                  (poll.str_poll_type === 'multiple' && selectedOptions.length === 0) ||
+                  (poll.str_poll_type === 'text' && !textResponse.trim()) ||
+                  (poll.str_poll_type === 'numeric' && (numericResponse === '' || isNaN(numericResponse))) ||
+                  isVoting
+                }
+                className={`flex-1 py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
+                  (
+                    (poll.str_poll_type === 'single' && selectedOptions.length === 0) ||
+                    (poll.str_poll_type === 'multiple' && selectedOptions.length === 0) ||
+                    (poll.str_poll_type === 'text' && !textResponse.trim()) ||
+                    (poll.str_poll_type === 'numeric' && (numericResponse === '' || isNaN(numericResponse))) ||
+                    isVoting
+                  ) ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {isVoting
+                  ? <><Loader2 className="animate-spin" size={20} />Enviando...</>
+                  : <><CheckCircle size={20} />{(poll.str_poll_type === 'single' || poll.str_poll_type === 'multiple') ? 'Votar' : 'Enviar Respuesta'}</>
+                }
+              </button>
+              {poll.bln_allows_abstention && (
+                <button
+                  onClick={async () => {
+                    setIsVoting(true);
+                    try {
+                      await PollService.vote(poll.id, { bln_is_abstention: true });
+                      setHasVoted(true);
+                      setCountdown(5);
+                    } catch (error) {
+                      Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || 'Intenta nuevamente', confirmButtonColor: '#ef4444' });
+                    } finally {
+                      setIsVoting(false);
+                    }
+                  }}
+                  disabled={isVoting}
+                  className="sm:w-auto py-4 px-6 rounded-xl font-semibold border-2 border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Hand size={20} />
+                  Abstenerme
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

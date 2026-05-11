@@ -1,0 +1,133 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      skip_frontend_build:
+        description: 'Omitir build del frontend (si no hubo cambios)'
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          command_timeout: 25m
+          script: |
+            set -euo pipefail
+
+            DEPLOY_PATH="/srv/proyectos/AsambleasGiramaster"
+            KUBECTL="sudo kubectl"
+            NAMESPACE="default"
+
+            echo "=========================================="
+            echo "  GIRAMASTER - Deploy $(date '+%Y-%m-%d %H:%M:%S')"
+            echo "=========================================="
+
+            # ── 1. Actualizar código ───────────────────────────────────────
+            echo ""
+            echo "📥 [1/6] Actualizando código desde master..."
+            cd "$DEPLOY_PATH"
+            git fetch origin master
+            git reset --hard origin/master
+            echo "✓ Código actualizado → $(git log -1 --oneline)"
+
+            # ── 2. Build frontend ──────────────────────────────────────────
+            if [ "${{ github.event.inputs.skip_frontend_build }}" != "true" ]; then
+              echo ""
+              echo "🔨 [2/6] Compilando frontend..."
+              cd "$DEPLOY_PATH/frontend"
+              pnpm install --frozen-lockfile
+              pnpm build
+              echo "✓ Frontend compilado (dist/)"
+            else
+              echo ""
+              echo "⏭  [2/6] Build frontend omitido (skip_frontend_build=true)"
+            fi
+
+            cd "$DEPLOY_PATH"
+
+            # ── 3. Build imágenes Docker ───────────────────────────────────
+            echo ""
+            echo "🐳 [3/6] Construyendo imágenes Docker..."
+
+            echo "  → Backend..."
+            docker build \
+              --no-cache \
+              --label "git-commit=$(git rev-parse --short HEAD)" \
+              --label "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              -t giramaster-backend:latest \
+              -t giramaster-backend:$(git rev-parse --short HEAD) \
+              ./backend
+            echo "  ✓ giramaster-backend:latest"
+
+            echo "  → Frontend..."
+            docker build \
+              --no-cache \
+              --label "git-commit=$(git rev-parse --short HEAD)" \
+              --label "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              -t giramaster-frontend:latest \
+              -t giramaster-frontend:$(git rev-parse --short HEAD) \
+              ./frontend
+            echo "  ✓ giramaster-frontend:latest"
+
+            # ── 4. Importar imágenes a k3s containerd ─────────────────────
+            echo ""
+            echo "📦 [4/6] Importando imágenes a k3s..."
+
+            echo "  → Importando backend..."
+            docker save giramaster-backend:latest | sudo k3s ctr images import -
+            echo "  ✓ Backend importado"
+
+            echo "  → Importando frontend..."
+            docker save giramaster-frontend:latest | sudo k3s ctr images import -
+            echo "  ✓ Frontend importado"
+
+            # Verificar que las imágenes quedaron registradas
+            echo "  → Imágenes en k3s:"
+            sudo k3s ctr images ls | grep giramaster | awk '{print "    •", $1}'
+
+            # ── 5. Rollout restart ─────────────────────────────────────────
+            echo ""
+            echo "♻️  [5/6] Reiniciando deployments..."
+
+            $KUBECTL rollout restart deployment/backend   -n $NAMESPACE
+            $KUBECTL rollout restart deployment/frontend  -n $NAMESPACE
+            $KUBECTL rollout restart deployment/celery-worker -n $NAMESPACE
+            echo "  ✓ Restart solicitado a los 3 deployments"
+
+            # ── 6. Verificar rollout ───────────────────────────────────────
+            echo ""
+            echo "⏳ [6/6] Esperando que los pods estén Ready..."
+
+            $KUBECTL rollout status deployment/backend       -n $NAMESPACE --timeout=120s
+            echo "  ✓ backend OK"
+            $KUBECTL rollout status deployment/frontend      -n $NAMESPACE --timeout=120s
+            echo "  ✓ frontend OK"
+            $KUBECTL rollout status deployment/celery-worker -n $NAMESPACE --timeout=120s
+            echo "  ✓ celery-worker OK"
+
+            # ── Resumen final ──────────────────────────────────────────────
+            echo ""
+            echo "=========================================="
+            echo "  ✅ Deploy exitoso"
+            echo "  Commit : $(git log -1 --oneline)"
+            echo "  Pods   :"
+            $KUBECTL get pods -n $NAMESPACE \
+              -l 'app in (backend,frontend,celery-worker)' \
+              --no-headers \
+              | awk '{printf "    • %-45s %s\n", $1, $3}'
+            echo "=========================================="

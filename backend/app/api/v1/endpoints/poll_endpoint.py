@@ -25,6 +25,7 @@ from app.core.exceptions import (
 from sqlalchemy import select, and_
 from app.models.poll_response_model import PollResponseModel
 from app.models.poll_option_model import PollOptionModel
+from app.utils.timezone_utils import colombia_now
 
 import logging
 
@@ -287,7 +288,20 @@ async def get_meeting_polls(
         # ✅ MODIFICACIÓN PRINCIPAL: Obtener todas las encuestas y filtrar por rol
         # ============================================================================
         all_polls = await poll_service.get_polls_by_meeting(meeting_id)
-        
+
+        # ⏱ AUTO-CIERRE: cerrar encuestas activas cuyo tiempo expiró
+        now = colombia_now()
+        for poll in all_polls:
+            if poll.str_status == 'active' and poll.dat_ended_at and now >= poll.dat_ended_at:
+                try:
+                    await poll_service.auto_close_poll(poll.id)
+                    logger.info(f"⏱ Encuesta {poll.id} cerrada automáticamente por tiempo")
+                except Exception as exc:
+                    logger.warning(f"⏱ No se pudo auto-cerrar encuesta {poll.id}: {exc}")
+
+        # Recargar lista tras posibles cierres automáticos
+        all_polls = await poll_service.get_polls_by_meeting(meeting_id)
+
         # 🔒 FILTRO DE SEGURIDAD: Ocultar encuestas 'draft' a copropietarios e invitados
         # Roles del sistema:
         #   1 = Super Admin    → Ve TODAS las encuestas (incluyendo draft)
@@ -321,32 +335,33 @@ async def get_meeting_polls(
         polls_data = []
         for poll in polls:
             # Verificar si el usuario ya votó en esta encuesta
-            has_voted = await poll_service.user_has_voted(poll.id, user.id) if not poll.bln_is_anonymous else False
-            
-            # ✅ Obtener las opciones votadas por el usuario
+            has_voted = await poll_service.user_has_voted(poll.id, user.id)
+
+            # Obtener las respuestas del usuario (solo en encuestas no anónimas)
             user_voted_options = []
             if has_voted and not poll.bln_is_anonymous:
-                # Buscar los votos del usuario en esta encuesta
                 from app.models.poll_response_model import PollResponseModel
                 from app.models.poll_option_model import PollOptionModel
-                
+
                 vote_query = (
                     select(PollResponseModel, PollOptionModel)
-                    .join(PollOptionModel, PollResponseModel.int_option_id == PollOptionModel.id)
+                    .outerjoin(PollOptionModel, PollResponseModel.int_option_id == PollOptionModel.id)
                     .where(and_(
                         PollResponseModel.int_poll_id == poll.id,
                         PollResponseModel.int_user_id == user.id,
                         PollResponseModel.bln_is_abstention == False
                     ))
                 )
-                
+
                 vote_result = await db.execute(vote_query)
                 votes = vote_result.all()
-                
+
                 for vote_response, vote_option in votes:
                     user_voted_options.append({
-                        "option_id": vote_option.id,
-                        "option_text": vote_option.str_option_text,
+                        "option_id": vote_option.id if vote_option else None,
+                        "option_text": vote_option.str_option_text if vote_option else None,
+                        "str_response_text": vote_response.str_response_text,
+                        "dec_response_number": float(vote_response.dec_response_number) if vote_response.dec_response_number is not None else None,
                         "voted_at": vote_response.dat_response_at
                     })
             
@@ -796,87 +811,105 @@ async def get_poll_votes(
         options = options_result.scalars().all()
         
         options_with_votes = []
-        
-        for option in options:
-            votes_query = (
-                select(
-                    PollResponseModel,
-                    UserModel.id.label("voter_id"),
-                    DataUserModel.str_firstname,
-                    DataUserModel.str_lastname,
-                    UserResidentialUnitModel.str_apartment_number,
-                    PollResponseModel.dat_response_at
-                )
-                .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
-                .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-                .join(
-                    UserResidentialUnitModel,
-                    UserResidentialUnitModel.int_user_id == UserModel.id
-                )
-                .where(
-                    and_(
-                        PollResponseModel.int_option_id == option.id,
-                        PollResponseModel.bln_is_abstention == False
-                    )
-                )
-                .order_by(PollResponseModel.dat_response_at.desc())
-            )
-            
-            votes_result = await db.execute(votes_query)
-            votes = votes_result.all()
-            
-            votes_list = []
-            for vote in votes:
-                votes_list.append({
-                    "user_id": vote.voter_id,
-                    "full_name": f"{vote.str_firstname} {vote.str_lastname}".strip(),
-                    "apartment_number": vote.str_apartment_number or "N/A",
-                    "voted_at": vote.dat_response_at.isoformat() if vote.dat_response_at else None
-                })
-            
-            options_with_votes.append({
-                "option_id": option.id,
-                "option_text": option.str_option_text,
-                "votes_count": len(votes_list),
-                "votes": votes_list
-            })
-        
-        # Obtener abstenciones
-        abstentions_query = (
-            select(
-                PollResponseModel,
-                UserModel.id.label("voter_id"),
-                DataUserModel.str_firstname,
-                DataUserModel.str_lastname,
-                UserResidentialUnitModel.str_apartment_number,
-                PollResponseModel.dat_response_at
-            )
+
+        def build_voter_row(row):
+            return {
+                "user_id": row.voter_id,
+                "full_name": f"{row.str_firstname} {row.str_lastname}".strip(),
+                "apartment_number": row.str_apartment_number or "N/A",
+                "voting_weight": float(row.dec_voting_weight) if row.dec_voting_weight is not None else None,
+                "voted_at": row.dat_response_at.isoformat() if row.dat_response_at else None,
+            }
+
+        base_joins = (
+            lambda q: q
             .join(UserModel, PollResponseModel.int_user_id == UserModel.id)
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-            .join(
-                UserResidentialUnitModel,
-                UserResidentialUnitModel.int_user_id == UserModel.id
-            )
-            .where(
+            .join(UserResidentialUnitModel, UserResidentialUnitModel.int_user_id == UserModel.id)
+        )
+
+        voter_cols = (
+            PollResponseModel,
+            UserModel.id.label("voter_id"),
+            DataUserModel.str_firstname,
+            DataUserModel.str_lastname,
+            UserResidentialUnitModel.str_apartment_number,
+            PollResponseModel.dat_response_at,
+            PollResponseModel.dec_voting_weight,
+        )
+
+        if poll.str_poll_type in ('text', 'numeric'):
+            # Para estos tipos no hay opciones predefinidas; se leen las respuestas directamente
+            text_numeric_query = base_joins(
+                select(
+                    *voter_cols,
+                    PollResponseModel.str_response_text,
+                    PollResponseModel.dec_response_number,
+                )
+            ).where(
                 and_(
                     PollResponseModel.int_poll_id == poll_id,
-                    PollResponseModel.bln_is_abstention == True
+                    PollResponseModel.bln_is_abstention == False,
                 )
-            )
-            .order_by(PollResponseModel.dat_response_at.desc())
-        )
+            ).order_by(PollResponseModel.dat_response_at.desc())
+
+            tn_result = await db.execute(text_numeric_query)
+            tn_votes = tn_result.all()
+
+            votes_list = []
+            for row in tn_votes:
+                entry = build_voter_row(row)
+                entry["response_text"] = row.str_response_text
+                entry["response_number"] = float(row.dec_response_number) if row.dec_response_number is not None else None
+                votes_list.append(entry)
+
+            options_with_votes.append({
+                "option_id": None,
+                "option_text": "Texto libre" if poll.str_poll_type == 'text' else "Numérica",
+                "votes_count": len(votes_list),
+                "votes": votes_list,
+            })
+        else:
+            for option in options:
+                votes_query = base_joins(
+                    select(*voter_cols)
+                ).where(
+                    and_(
+                        PollResponseModel.int_option_id == option.id,
+                        PollResponseModel.bln_is_abstention == False,
+                    )
+                ).order_by(PollResponseModel.dat_response_at.desc())
+
+                votes_result = await db.execute(votes_query)
+                votes = votes_result.all()
+
+                options_with_votes.append({
+                    "option_id": option.id,
+                    "option_text": option.str_option_text,
+                    "votes_count": len(votes),
+                    "votes": [build_voter_row(v) for v in votes],
+                })
         
+        # Obtener abstenciones
+        abstentions_query = base_joins(
+            select(
+                *voter_cols,
+            )
+        ).where(
+            and_(
+                PollResponseModel.int_poll_id == poll_id,
+                PollResponseModel.bln_is_abstention == True,
+            )
+        ).order_by(PollResponseModel.dat_response_at.desc())
+
         abstentions_result = await db.execute(abstentions_query)
         abstentions = abstentions_result.all()
-        
+
         abstentions_list = []
         for abst in abstentions:
-            abstentions_list.append({
-                "user_id": abst.voter_id,
-                "full_name": f"{abst.str_firstname} {abst.str_lastname}".strip(),
-                "apartment_number": abst.str_apartment_number or "N/A",
-                "abstained_at": abst.dat_response_at.isoformat() if abst.dat_response_at else None
-            })
+            entry = build_voter_row(abst)
+            entry["abstained_at"] = entry.pop("voted_at")
+            abstentions_list.append(entry)
         
         return SuccessResponse(
             success=True,

@@ -68,7 +68,7 @@ const Sidebar = ({
 			<div className="px-6 py-8 border-b border-white/10">
 				<div className="flex flex-col items-center text-center">
 					<div className="mb-3">
-						<img src={favicon} alt="Giramaster" className="w-30 h-30 object-contain drop-shadow-lg" />
+						<img src={favicon} alt="Giramaster" className="w-20 h-20 object-contain drop-shadow-lg" />
 					</div>
 					<h2 className="text-xl font-bold">{title}</h2>
 					<p className="text-sm text-gray-400 mt-1">{subtitle}</p>

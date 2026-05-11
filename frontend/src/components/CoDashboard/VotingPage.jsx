@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Info, Loader2, CheckCircle, Clock, AlertCircle, Users, History, Award, Timer, ShieldOff } from "lucide-react";
+import { FileText, Info, Loader2, CheckCircle, Clock, AlertCircle, Users, History, Award, Timer, ShieldOff, EyeOff, Hand } from "lucide-react";
 import Swal from 'sweetalert2';
 import { PollService } from '../../services/api/PollService';
 import { UserService } from '../../services/api/UserService';
@@ -17,12 +17,28 @@ export default function VotingPage({ onNavigate }) {
   const [numericResponses, setNumericResponses] = useState({});
   const [votedPolls, setVotedPolls] = useState(new Set());
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedClosedPolls, setExpandedClosedPolls] = useState(new Set());
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Programar refetch exactamente cuando venza cada encuesta activa con duración
+  useEffect(() => {
+    if (!allPollsData?.polls) return;
+    const now = Date.now();
+    const timers = allPollsData.polls
+      .filter(p => (p.str_status === 'active' || p.str_status === 'Activa') && p.dat_ended_at)
+      .map(p => {
+        const msLeft = parseColombiaDate(p.dat_ended_at).getTime() - now;
+        if (msLeft <= 0) { refetchPolls(); return null; }
+        return setTimeout(() => refetchPolls(), msLeft + 300);
+      })
+      .filter(Boolean);
+    return () => timers.forEach(clearTimeout);
+  }, [allPollsData?.polls]);
 
   const getTimeRemaining = (endDateStr) => {
     if (!endDateStr) return null;
@@ -285,7 +301,7 @@ export default function VotingPage({ onNavigate }) {
                       {userVotes.length > 0 && (
                         <div className="ml-9 mb-3 bg-green-50 border border-green-200 rounded-lg p-3">
                           <p className="text-xs font-semibold text-green-800 mb-2 uppercase">{userVotes.length > 1 ? 'Tus votos:' : 'Tu voto:'}</p>
-                          <div className="space-y-2">{userVotes.map((vote, index) => (<div key={index} className="flex items-start gap-2"><CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={16} /><span className="text-sm font-medium text-gray-800">{vote.option_text}</span></div>))}</div>
+                          <div className="space-y-2">{userVotes.map((vote, index) => (<div key={index} className="flex items-start gap-2"><CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={16} /><span className="text-sm font-medium text-gray-800">{vote.option_text || vote.str_response_text || (vote.dec_response_number !== null && vote.dec_response_number !== undefined ? String(vote.dec_response_number) : null)}</span></div>))}</div>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2 ml-9 text-sm">
@@ -320,14 +336,31 @@ export default function VotingPage({ onNavigate }) {
                   </div>
                   <div className="flex items-center gap-4 mt-4 text-sm text-blue-100">
                     <div className="flex items-center gap-1"><Clock size={16} />Iniciada: {formatDateTime(poll.dat_started_at)}</div>
-                    {poll.dat_ended_at && (
-                      <div className="flex items-center gap-1">
-                        <Timer size={16} />
-                        {formatTimeRemaining(poll.dat_ended_at) ? <span className="font-mono font-bold bg-white/20 px-2 py-0.5 rounded">{formatTimeRemaining(poll.dat_ended_at)}</span> : <span className="text-red-300 font-semibold">Expirada</span>}
-                      </div>
-                    )}
                     {poll.bln_requires_quorum && <div className="flex items-center gap-1 bg-purple-500/30 px-2 py-1 rounded"><Users size={14} />Requiere {poll.dec_minimum_quorum_percentage}% quórum</div>}
                   </div>
+                  {poll.dat_ended_at && (() => {
+                    const rem = getTimeRemaining(poll.dat_ended_at);
+                    if (!rem || rem.expired) return null;
+                    const totalMs = parseColombiaDate(poll.dat_ended_at) - parseColombiaDate(poll.dat_started_at);
+                    const leftMs = rem.minutes * 60000 + rem.seconds * 1000;
+                    const pct = Math.max(0, Math.min(100, (leftMs / totalMs) * 100));
+                    const isUrgent = leftMs < 30000;
+                    const timeStr = `${rem.minutes}:${String(rem.seconds).padStart(2, '0')}`;
+                    return (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-xs text-blue-100 mb-1">
+                          <span className="flex items-center gap-1"><Timer size={13} />Tiempo restante</span>
+                          <span className={`font-mono font-bold text-lg ${isUrgent ? 'text-red-300 animate-pulse' : 'text-white'}`}>{timeStr}</span>
+                        </div>
+                        <div className="w-full bg-white/20 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-1000 ${isUrgent ? 'bg-red-400' : pct > 50 ? 'bg-green-400' : 'bg-yellow-400'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="p-6">
                   {hasVoted ? (
@@ -336,11 +369,16 @@ export default function VotingPage({ onNavigate }) {
                     <>
                       <div className="mb-4">
                         <p className="font-semibold text-gray-700 mb-2">{poll.str_poll_type === 'single' ? 'Selecciona una opción:' : poll.str_poll_type === 'multiple' ? `Selecciona hasta ${poll.int_max_selections || 'todas las'} opciones:` : poll.str_poll_type === 'text' ? 'Ingresa tu respuesta:' : 'Ingresa tu valor numérico:'}</p>
-                        <div className="flex items-center gap-2 text-sm text-gray-600 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${poll.str_poll_type === 'single' ? 'bg-blue-100 text-blue-700' : poll.str_poll_type === 'multiple' ? 'bg-indigo-100 text-indigo-700' : poll.str_poll_type === 'text' ? 'bg-amber-100 text-amber-700' : 'bg-cyan-100 text-cyan-700'}`}>{poll.str_poll_type === 'single' ? 'Opción única' : poll.str_poll_type === 'multiple' ? 'Múltiple opción' : poll.str_poll_type === 'text' ? 'Texto libre' : 'Numérica'}</span>
-                          {poll.bln_is_anonymous && <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">Anónima</span>}
                         </div>
                       </div>
+                      {poll.bln_is_anonymous && (
+                        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
+                          <EyeOff size={16} className="text-slate-500 flex-shrink-0" />
+                          <p className="text-sm text-slate-600"><span className="font-semibold">Voto anónimo:</span> tu identidad no será revelada al registrar tu respuesta.</p>
+                        </div>
+                      )}
                       {poll.str_poll_type === 'text' && <div className="mb-6"><textarea value={textResponses[poll.id] || ''} onChange={(e) => setTextResponses(prev => ({ ...prev, [poll.id]: e.target.value }))} placeholder="Escribe tu respuesta..." disabled={isVoting} rows={4} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none resize-none disabled:opacity-50" /></div>}
                       {poll.str_poll_type === 'numeric' && <div className="mb-6"><input type="number" value={numericResponses[poll.id] || ''} onChange={(e) => setNumericResponses(prev => ({ ...prev, [poll.id]: e.target.value }))} placeholder="Ingresa un número" disabled={isVoting} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none disabled:opacity-50" /></div>}
                       {(poll.str_poll_type === 'single' || poll.str_poll_type === 'multiple') && (
@@ -358,9 +396,21 @@ export default function VotingPage({ onNavigate }) {
                           {poll.str_poll_type === 'multiple' && currentSelections.length > 0 && <p className="text-sm text-gray-600 mb-4 text-center">{currentSelections.length} de {poll.int_max_selections || poll.options?.length} seleccionada(s)</p>}
                         </>
                       )}
-                      <button onClick={() => handleVote(poll)} disabled={(poll.str_poll_type === 'single' && currentSelections.length === 0) || (poll.str_poll_type === 'multiple' && currentSelections.length === 0) || (poll.str_poll_type === 'text' && !textResponses[poll.id]?.trim()) || (poll.str_poll_type === 'numeric' && (numericResponses[poll.id] === undefined || numericResponses[poll.id] === '')) || isVoting} className={`w-full py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 ${((poll.str_poll_type === 'single' && currentSelections.length === 0) || (poll.str_poll_type === 'multiple' && currentSelections.length === 0) || (poll.str_poll_type === 'text' && !textResponses[poll.id]?.trim()) || (poll.str_poll_type === 'numeric' && (numericResponses[poll.id] === undefined || numericResponses[poll.id] === '')) || isVoting) ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl'}`}>
-                        {isVoting ? <><Loader2 className="animate-spin" size={20} />Enviando respuesta...</> : <><CheckCircle size={20} />{(poll.str_poll_type === 'single' || poll.str_poll_type === 'multiple') ? `Votar${currentSelections.length > 1 ? ` (${currentSelections.length})` : ''}` : 'Enviar Respuesta'}</>}
-                      </button>
+                      <div className={`flex gap-3 ${poll.bln_allows_abstention ? 'flex-col sm:flex-row' : ''}`}>
+                        <button onClick={() => handleVote(poll)} disabled={(poll.str_poll_type === 'single' && currentSelections.length === 0) || (poll.str_poll_type === 'multiple' && currentSelections.length === 0) || (poll.str_poll_type === 'text' && !textResponses[poll.id]?.trim()) || (poll.str_poll_type === 'numeric' && (numericResponses[poll.id] === undefined || numericResponses[poll.id] === '')) || isVoting} className={`flex-1 py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 ${((poll.str_poll_type === 'single' && currentSelections.length === 0) || (poll.str_poll_type === 'multiple' && currentSelections.length === 0) || (poll.str_poll_type === 'text' && !textResponses[poll.id]?.trim()) || (poll.str_poll_type === 'numeric' && (numericResponses[poll.id] === undefined || numericResponses[poll.id] === '')) || isVoting) ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl'}`}>
+                          {isVoting ? <><Loader2 className="animate-spin" size={20} />Enviando...</> : <><CheckCircle size={20} />{(poll.str_poll_type === 'single' || poll.str_poll_type === 'multiple') ? `Votar${currentSelections.length > 1 ? ` (${currentSelections.length})` : ''}` : 'Enviar Respuesta'}</>}
+                        </button>
+                        {poll.bln_allows_abstention && (
+                          <button
+                            onClick={() => voteMutation.mutateAsync({ pollId: poll.id, voteData: { bln_is_abstention: true } }).catch(() => {})}
+                            disabled={isVoting}
+                            className="sm:w-auto py-4 px-6 rounded-xl font-semibold border-2 border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Hand size={20} />
+                            Abstenerme
+                          </button>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -376,14 +426,59 @@ export default function VotingPage({ onNavigate }) {
         <div className="space-y-4 mt-8">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileText className="text-gray-600" size={24} />Encuestas Cerradas ({closedPolls.length})</h2>
           <div className="space-y-3">
-            {closedPolls.map((poll) => (
-              <div key={poll.id} className="bg-gray-50 rounded-lg border border-gray-300 p-4">
-                <div className="flex items-start justify-between">
-                  <div><h4 className="font-semibold text-gray-800">{poll.str_title}</h4><p className="text-sm text-gray-600 mt-1">Finalizada: {formatDateTime(poll.dat_ended_at)}</p></div>
-                  <span className="px-3 py-1 bg-gray-300 text-gray-700 rounded-full text-xs font-semibold">CERRADA</span>
+            {closedPolls.map((poll) => {
+              const isExpanded = expandedClosedPolls.has(poll.id);
+              const userVotes = poll.user_votes || [];
+              const toggleExpand = () =>
+                setExpandedClosedPolls(prev => {
+                  const next = new Set(prev);
+                  next.has(poll.id) ? next.delete(poll.id) : next.add(poll.id);
+                  return next;
+                });
+              return (
+                <div key={poll.id} className="bg-gray-50 rounded-lg border border-gray-300 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-800">{poll.str_title}</h4>
+                      <p className="text-sm text-gray-500 mt-1">Finalizada: {formatDateTime(poll.dat_ended_at)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="px-3 py-1 bg-gray-300 text-gray-700 rounded-full text-xs font-semibold">CERRADA</span>
+                      {poll.has_voted && (
+                        <button
+                          onClick={toggleExpand}
+                          className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                        >
+                          <CheckCircle size={13} />
+                          {isExpanded ? 'Ocultar' : 'Mi respuesta'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {isExpanded && poll.has_voted && (
+                    <div className="mt-3 bg-white border border-purple-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-purple-800 uppercase mb-2">
+                        {userVotes.length > 1 ? 'Tus votos:' : 'Tu voto:'}
+                      </p>
+                      {userVotes.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {userVotes.map((vote, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={15} />
+                              <span className="text-sm text-gray-800">
+                                {vote.option_text || vote.str_response_text || vote.dec_response_number}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">Respuesta registrada</p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

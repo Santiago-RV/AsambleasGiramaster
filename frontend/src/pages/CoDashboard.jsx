@@ -186,6 +186,11 @@ export default function AppCopropietario() {
 
     try {
       await MeetingService.startMeeting(meeting.id);
+      try {
+        await MeetingService.registerAttendance(meeting.id);
+      } catch {
+        // La asistencia puede fallar si ya fue registrada; no bloquear el acceso
+      }
       queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
       setShowZoomMeeting({
         id: meeting.id,
@@ -206,7 +211,14 @@ export default function AppCopropietario() {
     }
   };
 
-  const handleCloseZoom = () => {
+  const handleCloseZoom = async () => {
+    if (showZoomMeeting?.id) {
+      try {
+        await MeetingService.registerLeave(showZoomMeeting.id);
+      } catch {
+        // No bloquear el cierre si falla
+      }
+    }
     setShowZoomMeeting(null);
   };
 

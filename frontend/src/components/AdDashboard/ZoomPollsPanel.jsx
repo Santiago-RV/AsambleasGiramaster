@@ -532,7 +532,7 @@ export default function ZoomPollsPanel({ meetingData, isOpen, onClose }) {
 											)}
 
 											{/* VotersList */}
-											<VotersList pollId={selectedPoll.id} />
+											<VotersList pollId={selectedPoll.id} meetingId={meetingData?.id} />
 										</>
 									) : (
 										<div style={{ textAlign: 'center', padding: '32px', background: '#f9fafb', borderRadius: '10px' }}>

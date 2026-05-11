@@ -38,22 +38,11 @@ export const useResidentialUnitData = (unitId) => {
 		queryFn: () => MeetingService.getMeetingsByResidentialUnit(unitId),
 		select: (response) => {
 			if (response.success && response.data) {
-				const ahora = new Date();
-				const inicioDelDia = new Date(
-					ahora.getFullYear(),
-					ahora.getMonth(),
-					ahora.getDate(),
-					0,
-					0,
-					0
-				);
-
-				// Filtrar reuniones: incluir En Curso/Activa siempre, o del día actual/futuras
+				// Filtrar reuniones: excluir solo las ya finalizadas/completadas
+				const ESTADOS_FINALES = ['completada', 'finalizada', 'cancelada'];
 				const reunionesFiltradas = response.data.filter((reunion) => {
-					const fechaReunion = new Date(reunion.dat_schedule_date);
-					const esEnCurso = reunion.str_status?.toLowerCase() === 'en curso' || 
-					                  reunion.str_status?.toLowerCase() === 'activa';
-					return esEnCurso || fechaReunion >= inicioDelDia;
+					const estadoLower = reunion.str_status?.toLowerCase() ?? '';
+					return !ESTADOS_FINALES.includes(estadoLower);
 				});
 
 				return reunionesFiltradas.map((reunion) => {
