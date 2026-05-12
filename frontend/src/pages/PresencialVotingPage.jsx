@@ -39,6 +39,7 @@ export default function PresencialVotingPage() {
     const [delegationCountdown, setDelegationCountdown] = useState(0);
     const [textResponse, setTextResponse] = useState("");
     const [numericResponse, setNumericResponse] = useState("");
+    const [pollExpired, setPollExpired] = useState(false);
 
     const handleLogout = () => {
         AuthService.logout();
@@ -143,42 +144,22 @@ export default function PresencialVotingPage() {
             setCountdown(5);
         }
     }, [noPoll, isLoading]);
-    //Logica para cerrar sesion una vez termina la duracion de la encuesta
-    useEffect(() => {
-        if (!poll?.dat_ended_at || meeting?.str_modality !== "presencial")
-            return;
-
-        const time = getTimeRemaining(poll.dat_ended_at);
-
-        if (time?.expired && !pollExpired) {
-            setPollExpired(true);
-            setCountdown(5);
-        }
-    }, [currentTime, poll, meeting, pollExpired]);
-
-    useEffect(() => {
-        if (!pollExpired || countdown === null) return;
-
-        if (countdown <= 0) {
-            handleLogout();
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            setCountdown((prev) => prev - 1);
-        }, 1000);
-
-        return () => clearTimeout(timer);
-    }, [pollExpired, countdown]);
-
-    // Auto-cierre cuando la encuesta activa expira por tiempo
+    // Auto-cierre exacto cuando la encuesta expira por tiempo
     useEffect(() => {
         if (!poll?.dat_ended_at || hasVoted) return;
         const endDate = parseColombiaDate(poll.dat_ended_at);
-        if (currentTime >= endDate) {
-            setNoPoll(true);
+        const msLeft = endDate - Date.now();
+        if (msLeft <= 0) {
+            setPollExpired(true);
+            setCountdown(5);
+            return;
         }
-    }, [currentTime, poll?.dat_ended_at, hasVoted]);
+        const timer = setTimeout(() => {
+            setPollExpired(true);
+            setCountdown(5);
+        }, msLeft);
+        return () => clearTimeout(timer);
+    }, [poll?.dat_ended_at, hasVoted]);
 
     const getTimeRemaining = (endDateStr) => {
         if (!endDateStr) return null;

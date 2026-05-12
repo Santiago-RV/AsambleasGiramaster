@@ -111,16 +111,16 @@ async def generate_zoom_signature(
         # Validar y limpiar el numero de reunion
         clean_meeting_number = zoom_service.validate_meeting_number(request.meeting_number)
         
-        # Generar el signature
+        # Generar el signature (carga credenciales internamente si no estaban cargadas)
         signature = await zoom_service.generate_signature(
             meeting_number=clean_meeting_number,
             role=request.role,
             expire_hours=2
         )
-        
-        # Obtener sdk_key desde el servicio (BD con fallback a .env)
-        sdk_key = await _get_sdk_key_from_db(db, request.zoom_account_id) or settings.ZOOM_SDK_KEY
-        
+
+        # Usar el sdk_key del mismo servicio que generó el JWT para garantizar coherencia
+        sdk_key = zoom_service.sdk_key or settings.ZOOM_SDK_KEY
+
         # Preparar la respuesta
         response_data = ZoomSignatureResponse(
             signature=signature,

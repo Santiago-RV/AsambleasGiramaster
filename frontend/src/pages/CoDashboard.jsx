@@ -82,31 +82,57 @@ export default function AppCopropietario() {
     }
   }, [userData]);
 
-  // DETECTAR REUNIÓN PRESENCIAL ACTIVA Y REDIRIGIR
+  // DETECTAR REUNIÓN PRESENCIAL ACTIVA Y VERIFICAR QUE HAYA REUNIONES VIGENTES
   useEffect(() => {
-    if (checkedInPersonMeeting || !residentialUnitId || isGuest) return;
+    if (checkedInPersonMeeting || !residentialUnitId) return;
     setCheckedInPersonMeeting(true);
 
-    const checkInPersonMeeting = async () => {
+    const checkMeetings = async () => {
       try {
         const response = await MeetingService.getMeetingsByResidentialUnit(residentialUnitId);
         const meetings = response.data || [];
-        
-        const inPersonMeeting = meetings.find(m => 
-          m.str_modality === 'presencial' && 
-          (m.str_status === 'En Curso' || m.str_status === 'In Progress' || m.str_status === 'active')
-        );
-        
-        if (inPersonMeeting) {
-          navigate(`/votacion-presencial/${inPersonMeeting.id}`, { replace: true });
+
+        const ACTIVE_STATUSES = ['en curso', 'in progress', 'active'];
+        const SCHEDULED_STATUSES = ['programada', 'scheduled', 'disponible', 'available'];
+
+        // Redirigir a votación presencial si hay una reunión presencial activa
+        if (!isGuest) {
+          const inPersonMeeting = meetings.find(m =>
+            m.str_modality === 'presencial' &&
+            ACTIVE_STATUSES.includes(m.str_status?.toLowerCase())
+          );
+          if (inPersonMeeting) {
+            navigate(`/votacion-presencial/${inPersonMeeting.id}`, { replace: true });
+            return;
+          }
+        }
+
+        // Si no hay ninguna reunión activa ni programada, cerrar sesión con mensaje
+        const hasValidMeeting = meetings.some(m => {
+          const s = m.str_status?.toLowerCase();
+          return ACTIVE_STATUSES.includes(s) || SCHEDULED_STATUSES.includes(s);
+        });
+
+        if (!hasValidMeeting) {
+          await Swal.fire({
+            icon: 'info',
+            title: 'Sin reuniones activas',
+            text: 'No tienes reuniones activas ni programadas en este momento. Por favor, contacta al administrador de tu unidad.',
+            confirmButtonText: 'Cerrar sesión',
+            confirmButtonColor: '#3b82f6',
+            allowOutsideClick: false,
+          });
+          AuthService.logout();
+          queryClient.clear();
+          navigate('/login', { replace: true });
         }
       } catch (error) {
-        console.error('[CoDashboard] Error checking for in-person meeting:', error);
+        console.error('[CoDashboard] Error verificando reuniones:', error);
       }
     };
 
-    checkInPersonMeeting();
-  }, [residentialUnitId, isGuest, checkedInPersonMeeting, navigate]);
+    checkMeetings();
+  }, [residentialUnitId, isGuest, checkedInPersonMeeting, navigate, queryClient]);
 
   // QUERY PARA OBTENER REUNIONES EN VIVO (para mostrar poderes delegados)
   const { data: liveMeetingsData } = useQuery({
