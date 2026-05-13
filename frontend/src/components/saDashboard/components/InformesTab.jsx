@@ -311,13 +311,20 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     doc.save(`Asistencia_${meeting.title.replace(/\s/g, '_')}.pdf`);
 };
 
+
+
 const generatePollsPDF = async (data) => {
     const [{ default: jsPDF }, { default: autoTable }, { Chart }] = await Promise.all([
         import('jspdf'),
         import('jspdf-autotable'),
         import('chart.js/auto')
     ]);
-    
+     //Variables para diferenciar tipos de encuestas
+    const graphTypes = [
+        'single',
+        'multiple',
+    ];
+
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const { meeting, polls } = data;
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -333,9 +340,17 @@ const generatePollsPDF = async (data) => {
 
     for (let idx = 0; idx < polls.length; idx++) {
         const poll = polls[idx];
-
+        //Variables para diferenciar tipos de encuestas
+        const isGraphType = graphTypes.includes(poll.type);
+        const isFreeText = poll.type === 'text';
+        const isNumeric = poll.type === 'numeric';
+        const responses = poll.responses || [];
         // Generar gráfica al inicio de cada encuesta
-        const chartImage = await generatePollChartImage(poll);
+        let chartImage = null;
+
+        if (isGraphType) {
+            chartImage = await generatePollChartImage(poll);
+        }
 
         // Título encuesta
         doc.setFillColor(238, 242, 255);
@@ -347,13 +362,16 @@ const generatePollsPDF = async (data) => {
         y += 14;
 
         // GRÁFICO ANTES DE LAS TABLAS
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(30, 58, 138);
-        doc.text('Resultados de votación', 14, y);
-        y += 6;
-        doc.addImage(chartImage, 'PNG', x, y, imgWidth, imgWidth);
-        y += imgWidth + 8;
+        if (isGraphType && chartImage) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(30, 58, 138);
+            doc.text('Resultados de votación', 14, y);
+            y += 6;
+
+            doc.addImage(chartImage, 'PNG', x, y, imgWidth, imgWidth);
+            y += imgWidth + 8;
+}
 
         if (y > 240) { doc.addPage(); y = 20; }
 
@@ -368,50 +386,153 @@ const generatePollsPDF = async (data) => {
             tableWidth: 'auto',
         });
         y = doc.lastAutoTable.finalY + 4;
-          
-        // Resultados por opción
-        poll.options.forEach(opt => {
-            if (opt.voters.length === 0) return;
-            if (y > 240) { doc.addPage(); y = 20; }
+        
+        // RESPUESTAS TEXTO LIBRE
+        if (isFreeText) {
+
+            if (y > 240) {
+                doc.addPage();
+                y = 20;
+            }
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(9);
-            doc.setTextColor(55, 65, 81);
-            doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Peso: ${opt.votes_weight.toFixed(4)}`, 16, y);
+            doc.setTextColor(30, 58, 138);
+            doc.text('Respuestas de los participantes', 14, y);
+
+            y += 4;
+
+            
+
+            autoTable(doc, {
+                startY: y,
+                head: [['Copropietario', 'Apartamento', 'Respuesta']],
+                body: responses.map(r => [
+                    r.full_name,
+                    r.apartment || '—',
+                    r.answer || '—'
+                ]),
+                styles: {
+                    fontSize: 8,
+                    cellWidth: 'wrap',
+                    valign: 'top'
+                },
+                headStyles: {
+                    fillColor: [67, 56, 202]
+                },
+                columnStyles: {
+                    0: { cellWidth: 45 },
+                    1: { cellWidth: 20 },
+                    2: { cellWidth: 105 }
+                },
+                margin: { left: 14, right: 14 },
+            });
+
+            y = doc.lastAutoTable.finalY + 6;
+        }
+        // RESPUESTAS NUMÉRICAS
+        if (isNumeric) {
+
+            if (y > 240) {
+                doc.addPage();
+                y = 20;
+            }
+
+            const values = responses
+                .map(r => Number(r.answer))
+                .filter(v => !isNaN(v));
+
+            const avg = values.length
+                ? values.reduce((a, b) => a + b, 0) / values.length
+                : 0;
+
+            const min = values.length ? Math.min(...values) : 0;
+            const max = values.length ? Math.max(...values) : 0;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(30, 58, 138);
+            doc.text('Resultados numéricos', 14, y);
+
             y += 4;
 
             autoTable(doc, {
                 startY: y,
-                head: [['Copropietario', 'Apto', 'Tipo', 'Fecha y Hora del Voto', 'Q. Real', 'Q. Cedido']],
-                body: opt.voters.map(v => [
-                    v.full_name,
-                    v.apartment || '—',
-                    v.is_delegation_vote ? 'Vía delegado' : 'Directo',
-                    v.voted_at ? formatDateTime(v.voted_at) : '—',
-                    parseFloat(v.quorum_base || 0).toFixed(4),
-                    Math.max(0, (v.voting_weight || 0) - (v.quorum_base || 0)).toFixed(4),
+                head: [['Copropietario', 'Apartamento', 'Valor']],
+                body: responses.map(r => [
+                    r.full_name,
+                    r.apartment || '—',
+                    r.answer || '—'
                 ]),
-                styles: { fontSize: 8 },
-                headStyles: { fillColor: [67, 56, 202] },
-                alternateRowStyles: { fillColor: [238, 242, 255] },
-                didParseCell: (hookData) => {
-                    if (hookData.section === 'body' && opt.voters[hookData.row.index]?.is_delegation_vote) {
-                        hookData.cell.styles.fillColor = [254, 243, 199];
-                        hookData.cell.styles.textColor = [120, 53, 15];
-                    }
+                styles: {
+                    fontSize: 8
                 },
-                columnStyles: {
-                    0: { cellWidth: 52 },
-                    1: { cellWidth: 12 },
-                    2: { cellWidth: 22 },
-                    3: { cellWidth: 37 },
-                    4: { cellWidth: 18 },
-                    5: { cellWidth: 18 },
+                headStyles: {
+                    fillColor: [67, 56, 202]
                 },
-                margin: { left: 20, right: 14 },
+                margin: { left: 14, right: 14 },
             });
+
             y = doc.lastAutoTable.finalY + 4;
-        });
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(55, 65, 81);
+
+            doc.text(`Promedio: ${avg.toFixed(2)}`, 14, y);
+            y += 4;
+
+            doc.text(`Mínimo: ${min}`, 14, y);
+            y += 4;
+
+            doc.text(`Máximo: ${max}`, 14, y);
+            y += 6;
+        }
+        // Resultados por opción
+        if (isGraphType) {
+            poll.options.forEach(opt => {
+                if (opt.voters.length === 0) return;
+                if (y > 240) { doc.addPage(); y = 20; }
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.setTextColor(55, 65, 81);
+                doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Peso: ${opt.votes_weight.toFixed(4)}`, 16, y);
+                y += 4;
+
+                autoTable(doc, {
+                    startY: y,
+                    head: [['Copropietario', 'Apto', 'Tipo', 'Fecha y Hora del Voto', 'Q. Real', 'Q. Cedido']],
+                    body: opt.voters.map(v => [
+                        v.full_name,
+                        v.apartment || '—',
+                        v.is_delegation_vote ? 'Vía delegado' : 'Directo',
+                        v.voted_at ? formatDateTime(v.voted_at) : '—',
+                        parseFloat(v.quorum_base || 0).toFixed(4),
+                        Math.max(0, (v.voting_weight || 0) - (v.quorum_base || 0)).toFixed(4),
+                    ]),
+                    styles: { fontSize: 8 },
+                    headStyles: { fillColor: [67, 56, 202] },
+                    alternateRowStyles: { fillColor: [238, 242, 255] },
+                    didParseCell: (hookData) => {
+                        if (hookData.section === 'body' && opt.voters[hookData.row.index]?.is_delegation_vote) {
+                            hookData.cell.styles.fillColor = [254, 243, 199];
+                            hookData.cell.styles.textColor = [120, 53, 15];
+                        }
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 52 },
+                        1: { cellWidth: 12 },
+                        2: { cellWidth: 22 },
+                        3: { cellWidth: 37 },
+                        4: { cellWidth: 18 },
+                        5: { cellWidth: 18 },
+                    },
+                    margin: { left: 20, right: 14 },
+                });
+                y = doc.lastAutoTable.finalY + 4;
+            });
+           } 
 
         // Abstenciones
         if (poll.abstentions.length > 0) {
@@ -454,9 +575,9 @@ const generatePollsPDF = async (data) => {
             });
             y = doc.lastAutoTable.finalY + 4;
         }
-
+        console.log(poll.type);
     };
-
+    
     addFooter(doc);
     doc.save(`Votacion_${(polls[0]?.title?.replace(/\s/g, '_') || meeting.title.replace(/\s/g, '_'))}.pdf`);
 };

@@ -20,6 +20,7 @@ class PollCreate(BaseModel):
     int_max_selections: Optional[int] = Field(default=1, gt=0, description="Máximo de selecciones (para tipo multiple)")
     int_duration_minutes: Optional[int] = Field(None, gt=0, description="Duración en minutos")
     options: List[PollOptionInput] = Field(default=[], description="Lista de opciones")
+    
 
     @validator('str_poll_type')
     def validate_poll_type(cls, v):
