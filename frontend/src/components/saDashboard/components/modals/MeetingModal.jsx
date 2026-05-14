@@ -14,11 +14,13 @@ import {
 	Edit,
 } from 'lucide-react';
 import SystemConfigService from '../../../../services/api/SystemConfigService';
+import axiosInstance from '../../../../services/api/axiosInstance';
 
 const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = 'virtual', meetingToEdit = null }) => {
 	const [zoomAccounts, setZoomAccounts] = useState([]);
 	const [loadingAccounts, setLoadingAccounts] = useState(false);
 	const [zoomConfigError, setZoomConfigError] = useState(false);
+	const [conflictingAccounts, setConflictingAccounts] = useState([]);
 
 	const isEditing = useMemo(() => !!meetingToEdit, [meetingToEdit]);
 
@@ -48,6 +50,30 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 			loadZoomAccounts();
 		}
 	}, [isOpen, meetingMode]);
+
+	// Verificar conflictos de cuenta Zoom cuando cambia la fecha
+	useEffect(() => {
+		if (meetingMode !== 'virtual' || !watchStart) {
+			setConflictingAccounts([]);
+			return;
+		}
+		const controller = new AbortController();
+		axiosInstance
+			.get('/meetings/zoom-account-conflicts', {
+				params: {
+					schedule_date: watchStart,
+					...(meetingToEdit?.id ? { exclude_id: meetingToEdit.id } : {}),
+				},
+				signal: controller.signal,
+			})
+			.then((res) => {
+				if (res.data.success) {
+					setConflictingAccounts(res.data.data.conflicting_account_ids || []);
+				}
+			})
+			.catch(() => {});
+		return () => controller.abort();
+	}, [watchStart, meetingMode, meetingToEdit?.id]);
 
 	// Cargar datos de la reunión a editar
 	useEffect(() => {
@@ -389,12 +415,21 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 									}`}
 								>
 									<option value="">-- Seleccionar cuenta Zoom --</option>
-									{zoomAccounts.map((account) => (
-										<option key={account.id} value={account.id}>
-											{account.name} (Cuenta #{account.id})
-										</option>
-									))}
+									{zoomAccounts.map((account) => {
+										const hasConflict = conflictingAccounts.includes(account.id);
+										return (
+											<option key={account.id} value={account.id}>
+												{hasConflict ? '⚠️ ' : ''}{account.name} (Cuenta #{account.id}){hasConflict ? ' — ya tiene reunión en esta hora' : ''}
+											</option>
+										);
+									})}
 								</select>
+								{conflictingAccounts.length > 0 && (
+									<p className="text-amber-600 text-xs mt-1 flex items-center gap-1">
+										<AlertCircle className="w-3 h-3" />
+										Una o más cuentas ya tienen reunión programada en esta hora
+									</p>
+								)}
 								{errors.int_zoom_account_id && (
 									<p className="text-red-500 text-xs mt-1 flex items-center gap-1">
 										<AlertCircle className="w-3 h-3" />

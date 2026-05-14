@@ -678,21 +678,39 @@ class PollService:
                 error_code="POLL_NOT_FOUND"
             )
 
+        # Para encuestas tipo multiple, contar participantes únicos (no filas)
+        is_multiple = poll.str_poll_type == 'multiple'
+
         # Contar respuestas
-        total_responses_result = await self.db.execute(
-            select(func.count(PollResponseModel.id))
-            .where(PollResponseModel.int_poll_id == poll_id)
-        )
+        if is_multiple:
+            total_responses_result = await self.db.execute(
+                select(func.count(PollResponseModel.int_user_id.distinct()))
+                .where(PollResponseModel.int_poll_id == poll_id)
+            )
+        else:
+            total_responses_result = await self.db.execute(
+                select(func.count(PollResponseModel.id))
+                .where(PollResponseModel.int_poll_id == poll_id)
+            )
         total_responses = total_responses_result.scalar()
 
         # Contar votos (sin abstenciones)
-        total_votes_result = await self.db.execute(
-            select(func.count(PollResponseModel.id))
-            .where(and_(
-                PollResponseModel.int_poll_id == poll_id,
-                PollResponseModel.bln_is_abstention == False
-            ))
-        )
+        if is_multiple:
+            total_votes_result = await self.db.execute(
+                select(func.count(PollResponseModel.int_user_id.distinct()))
+                .where(and_(
+                    PollResponseModel.int_poll_id == poll_id,
+                    PollResponseModel.bln_is_abstention == False
+                ))
+            )
+        else:
+            total_votes_result = await self.db.execute(
+                select(func.count(PollResponseModel.id))
+                .where(and_(
+                    PollResponseModel.int_poll_id == poll_id,
+                    PollResponseModel.bln_is_abstention == False
+                ))
+            )
         total_votes = total_votes_result.scalar()
 
         # Contar abstenciones

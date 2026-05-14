@@ -1,6 +1,6 @@
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
@@ -97,6 +97,37 @@ class MeetingService:
             raise ServiceException(
                 message=f"Error al obtener las reuniones de la unidad residencial: {str(e)}",
                 details={"original_error": str(e), "residential_unit_id": residential_unit_id}
+            )
+
+    async def get_zoom_account_conflicts(
+        self,
+        schedule_date: datetime,
+        exclude_meeting_id: Optional[int] = None
+    ) -> list[int]:
+        """
+        Retorna los IDs de cuentas Zoom que ya tienen una reunión virtual programada
+        en la misma hora (truncada al minuto) que schedule_date.
+        """
+        try:
+            conditions = [
+                MeetingModel.int_zoom_account_id != None,
+                MeetingModel.str_modality == 'virtual',
+                MeetingModel.str_status != 'Cancelada',
+                func.date_trunc('hour', MeetingModel.dat_schedule_date) == func.date_trunc('hour', schedule_date),
+            ]
+            if exclude_meeting_id:
+                conditions.append(MeetingModel.id != exclude_meeting_id)
+
+            result = await self.db.execute(
+                select(MeetingModel.int_zoom_account_id)
+                .where(and_(*conditions))
+                .distinct()
+            )
+            return [row[0] for row in result.all()]
+        except Exception as e:
+            raise ServiceException(
+                message=f"Error al verificar conflictos de cuenta Zoom: {str(e)}",
+                details={"original_error": str(e)}
             )
 
     async def create_meeting(

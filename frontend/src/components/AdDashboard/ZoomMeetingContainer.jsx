@@ -88,20 +88,12 @@ const ZoomMeetingContainer = ({
 				throw new Error('No se pudo extraer el número de reunión');
 			}
 
-			console.log('🔵 Obteniendo configuracion de Zoom...');
-			setLoadingMessage('Configurando conexion...');
-
-			// Obtener SDK Key del backend (usando cuenta Zoom correcta)
-			const zoomAccountId = meetingData?.int_zoom_account_id;
-			const configUrl = zoomAccountId ? `/zoom/config?zoom_account_id=${zoomAccountId}` : '/zoom/config';
-			const configResponse = await axiosInstance.get(configUrl);
-			const sdkKey = configResponse.data.data.sdk_key;
-
 			console.log('🔵 Generando firma...');
 			setLoadingMessage('Autenticando...');
 
 			// Generar firma (role: 1 para anfitriones/administradores)
-			const signature = await generateSignature(meetingNumber);
+			// sdkKey y signature vienen del mismo endpoint para garantizar que coincidan
+			const { signature, sdkKey } = await generateSignature(meetingNumber);
 
 			console.log('🔵 Iniciando Zoom SDK Web...');
 			setLoadingMessage('Cargando sala de reunión...');
@@ -303,7 +295,10 @@ const ZoomMeetingContainer = ({
 			);
 
 			if (response.data.success) {
-				return response.data.data.signature;
+				return {
+					signature: response.data.data.signature,
+					sdkKey: response.data.data.sdk_key,
+				};
 			} else {
 				throw new Error('No se pudo generar el signature');
 			}
