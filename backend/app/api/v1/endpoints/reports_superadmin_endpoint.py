@@ -221,6 +221,7 @@ async def get_polls_report(
             .where(PollResponseModel.int_poll_id == poll.id)
         )
         responses = responses_result.all()
+        responses_data = []
 
         abstentions = []
         option_direct_voters = {}  # opt_id -> [(user_id, voted_at), ...]
@@ -234,6 +235,18 @@ async def get_polls_report(
                 "is_delegation_vote": resp.str_ip_address == "delegation",
                 "weight_note": "Peso cedido al delegado" if resp.str_ip_address == "delegation" else None,
             }
+            # Respuestas para encuestas de texto libre o numéricas
+            responses_data.append({
+                "full_name": f"{data_user.str_firstname} {data_user.str_lastname}",
+                "apartment": inv.str_apartment_number if inv else "—",
+                "answer": (
+                    resp.str_response_text
+                    if resp.str_response_text is not None
+                    else float(resp.dec_response_number)
+                    if resp.dec_response_number is not None
+                    else None
+                )
+            })
             if resp.bln_is_abstention:
                 abstentions.append(voter_info)
             elif resp.int_option_id in options_map:
@@ -287,7 +300,11 @@ async def get_polls_report(
                             delegator_row["voted_at"] = voted_at
                             options_map[opt_id]["voters"].append(delegator_row)
 
-        total_weight_voted = sum(opt["votes_weight"] for opt in options_map.values())
+        total_weight_voted = sum(
+            float(resp.dec_voting_weight)
+            for resp, user, data_user, inv in responses
+            if resp.dec_voting_weight and resp.str_ip_address != "delegation"
+        )
 
         voted_user_ids = {resp.int_user_id for resp, user, data_user, inv in responses}
         # For active polls, also mark delegators whose delegate voted as "voted" (they delegated)
@@ -329,6 +346,7 @@ async def get_polls_report(
             "description": poll.str_description,
             "type": poll.str_poll_type,
             "status": poll.str_status,
+            "responses": responses_data,
             "is_anonymous": poll.bln_is_anonymous,
             "requires_quorum": poll.bln_requires_quorum,
             "minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,

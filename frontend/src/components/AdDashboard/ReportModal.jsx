@@ -367,7 +367,19 @@ const optionColors = [
   { bar: 'from-purple-400 to-purple-500', badge: 'bg-purple-100 text-purple-700' },
 ];
 
-const PollDetailView = ({ poll }) => (
+const PollDetailView = ({ poll }) => {
+ //Variables para diferenciar tipos de encuestas
+  const graphTypes = ['single', 'multiple'];
+
+  const isGraphType = graphTypes.includes(poll.type);
+  const isFreeText = poll.type === 'text';
+  const isNumeric = poll.type === 'numeric';
+
+  const responses = poll.responses || [];
+  console.log(poll.type);
+  console.log(poll.responses);
+  return (
+
   <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
 
     {/* Header encuesta */}
@@ -408,24 +420,26 @@ const PollDetailView = ({ poll }) => (
         </div>
       </div>
     </div>
+    
     {/* 📊 GRÁFICO */}
-    <div className="p-5 pb-0">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">
-        Resultados de la votación
-      </h3>
+    {isGraphType && (
+      <div className="p-5 pb-0">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+          Resultados de la votación
+        </h3>
 
-      <PollChart poll={poll} />
-    </div>
+        <PollChart poll={poll} />
+      </div>
+    )}
 
 <div className="p-5 space-y-5"></div>
     <div className="p-5 space-y-5">
       {/* Opciones con barras + tabla de votantes */}
-      {poll.options.map((option, optIdx) => {
+      {isGraphType && poll.options.map((option, optIdx) => {
         const color = optionColors[optIdx % optionColors.length];
         const percentage = poll.total_weight_voted > 0
           ? (option.votes_weight / poll.total_weight_voted * 100)
           : 0;
-
         return (
           <div key={optIdx} className="space-y-2">
             {/* Barra de progreso */}
@@ -499,6 +513,134 @@ const PollDetailView = ({ poll }) => (
           </div>
         );
       })}
+      {/* RESPUESTAS TEXTO LIBRE */}
+      {isFreeText && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <h3 className="font-semibold text-gray-800">
+              Respuestas de los participantes
+            </h3>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Peso total votado: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
+            </p>
+          </div>
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="text-left px-4 py-3 font-semibold text-gray-500">
+                  Copropietario
+                </th>
+
+                <th className="text-left px-4 py-3 font-semibold text-gray-500">
+                  Apto
+                </th>
+
+                <th className="text-left px-4 py-3 font-semibold text-gray-500">
+                  Respuesta
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {responses.map((r, idx) => (
+                <tr
+                  key={idx}
+                  className={`border-t border-gray-100 ${
+                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                  }`}
+                >
+                  <td className="px-4 py-3 font-medium text-gray-700">
+                    {r.full_name}
+                  </td>
+
+                  <td className="px-4 py-3 text-gray-500">
+                    {r.apartment || '—'}
+                  </td>
+
+                  <td className="px-4 py-3 text-gray-700 whitespace-pre-wrap">
+                    {r.answer || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* RESPUESTAS NUMÉRICAS */}
+      {isNumeric && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <h3 className="font-semibold text-gray-800">
+              Resultados numéricos
+            </h3>
+
+            <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-600">
+              <span>
+                Peso total: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
+              </span>
+
+              <span>
+                Promedio: {
+                  responses.length
+                    ? (
+                        responses.reduce(
+                          (acc, r) => acc + Number(r.answer || 0),
+                          0
+                        ) / responses.length
+                      ).toFixed(2)
+                    : '0.00'
+                }
+              </span>
+            </div>
+          </div>
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="text-left px-4 py-3 font-semibold text-gray-500">
+                  Copropietario
+                </th>
+
+                <th className="text-left px-4 py-3 font-semibold text-gray-500">
+                  Apto
+                </th>
+
+                <th className="text-right px-4 py-3 font-semibold text-gray-500">
+                  Valor
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {responses.map((r, idx) => (
+                <tr
+                  key={idx}
+                  className={`border-t border-gray-100 ${
+                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                  }`}
+                >
+                  <td className="px-4 py-3 font-medium text-gray-700">
+                    {r.full_name}
+                  </td>
+
+                  <td className="px-4 py-3 text-gray-500">
+                    {r.apartment || '—'}
+                  </td>
+
+                  <td className="px-4 py-3 text-right font-mono text-gray-700">
+                    {r.answer}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Abstenciones */}
       {poll.abstentions && poll.abstentions.length > 0 && (
@@ -566,7 +708,7 @@ const PollDetailView = ({ poll }) => (
     </div>
   </div>
 );
-
+};
 const PollsReportContent = ({ data }) => {
   const { polls } = data;
   const [selectedPollId, setSelectedPollId] = useState(polls && polls.length > 0 ? polls[0].id : null);
