@@ -1195,6 +1195,7 @@ class MeetingService:
                 "dat_actual_end_time": meeting.dat_actual_end_time.isoformat() if meeting.dat_actual_end_time else None,
                 "str_zoom_join_url": meeting.str_zoom_join_url,
                 "int_zoom_meeting_id": meeting.int_zoom_meeting_id,
+                "int_zoom_account_id": meeting.int_zoom_account_id,
                 "bln_quorum_reached": meeting.bln_quorum_reached or False,
                 "int_total_invitated": meeting.int_total_invitated or 0,
                 "quorum_total": 0.0,
