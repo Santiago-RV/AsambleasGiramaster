@@ -117,12 +117,11 @@ class ZoomService:
         iat = int(time.time())
         exp = iat + (60 * 60 * expire_hours)  # Expira en X horas (en segundos)
 
-        # Payload del JWT para Zoom SDK 4.x
+        # Payload del JWT para Zoom SDK 5.x+
         # Documentación: https://developers.zoom.us/docs/meeting-sdk/auth/
-        # Nota: Los timestamps deben estar en SEGUNDOS (no milisegundos)
-        # El JWT estándar usa segundos desde epoch
+        # Nota: "appKey" reemplaza a "sdkKey" desde v5.0.0
         payload = {
-            "sdkKey": self.sdk_key,
+            "appKey": self.sdk_key,
             "mn": meeting_number,
             "role": role,
             "iat": iat,

@@ -69,7 +69,7 @@ async def generate_zoom_signature(
         
         # Crear payload
         payload = {
-            "sdkKey": sdk_key,
+            "appKey": sdk_key,
             "mn": request.meeting_number,
             "role": request.role,
             "iat": iat,

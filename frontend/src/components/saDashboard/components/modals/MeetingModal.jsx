@@ -14,7 +14,7 @@ import {
 	Edit,
 } from 'lucide-react';
 import SystemConfigService from '../../../../services/api/SystemConfigService';
-import axiosInstance from '../../../../services/api/axiosInstance';
+import axiosInstance from '../../../../services/api/axiosconfig';
 
 const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = 'virtual', meetingToEdit = null }) => {
 	const [zoomAccounts, setZoomAccounts] = useState([]);
