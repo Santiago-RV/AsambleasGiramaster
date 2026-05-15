@@ -339,7 +339,10 @@ async def get_polls_report(
             }
             for inv_nv, user_nv, du in non_voters_result.all()
         ]
-
+        unique_voters = {
+            resp.int_user_id
+            for resp, user, data_user, inv in responses
+        }
         polls_data.append({
             "id": poll.id,
             "title": poll.str_title,
@@ -353,7 +356,7 @@ async def get_polls_report(
             "options": list(options_map.values()),
             "abstentions": abstentions,
             "non_voters": non_voters,
-            "total_voters": len(responses),
+            "total_voters": len(unique_voters),
             "total_weight_voted": total_weight_voted,
         })
 
