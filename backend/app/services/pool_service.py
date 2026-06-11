@@ -309,6 +309,25 @@ class PollService:
                 error_code="POLL_EXPIRED"
             )
 
+        # Verificar que el usuario esté presente en la reunión (presencial o virtual)
+        if user_id and poll.int_meeting_id:
+            from app.models.meeting_attendance_model import MeetingAttendanceModel
+            attendance_result = await self.db.execute(
+                select(MeetingAttendanceModel).where(
+                    and_(
+                        MeetingAttendanceModel.int_meeting_id == poll.int_meeting_id,
+                        MeetingAttendanceModel.int_user_id == user_id,
+                        MeetingAttendanceModel.bln_is_present == True
+                    )
+                ).limit(1)
+            )
+            attendance = attendance_result.scalar_one_or_none()
+            if not attendance:
+                raise BusinessLogicException(
+                    message="No puedes votar porque no estás registrado como presente en esta reunión.",
+                    error_code="USER_NOT_PRESENT"
+                )
+
         # Verificar si ya votó (aplica para todos los tipos, incluidas anónimas)
         if user_id:
             if poll.str_poll_type == 'multiple':

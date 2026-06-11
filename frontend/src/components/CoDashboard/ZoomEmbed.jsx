@@ -479,9 +479,17 @@ const ZoomEmbed = ({
 						userEmail: userEmail,
 						passWord: password,
 						tk: '',
-						success: (joinSuccess) => {
+						success: async (joinSuccess) => {
 							console.log('✅ Unido a la reunión exitosamente:', joinSuccess);
-							
+
+							if (meetingData?.id) {
+								try {
+									await axiosInstance.post(`/meetings/${meetingData.id}/register-attendance`);
+								} catch (attendanceError) {
+									console.warn('⚠️ Error al registrar asistencia (no crítico):', attendanceError);
+								}
+							}
+
 							setTimeout(() => {
 								console.log('✅ Quitando pantalla de carga después de 3 segundos');
 								setIsLoading(false);

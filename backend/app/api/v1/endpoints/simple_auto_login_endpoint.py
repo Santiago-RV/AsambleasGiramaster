@@ -15,6 +15,7 @@ from app.core.logging_config import get_logger
 from app.core.exceptions import ServiceException
 from sqlalchemy import select
 from app.models.data_user_model import DataUserModel
+from app.models.meeting_model import MeetingModel
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -192,11 +193,27 @@ async def auto_login_simple(
         
         # Usar meeting_id del token, o el de la asistencia registrada como fallback
         effective_meeting_id = meeting_id
+        meeting_modality = None
         if effective_meeting_id is None and attendance_registered and attendance_registered.get("registered"):
             effective_meeting_id = attendance_registered.get("meeting_id")
+            meeting_modality = attendance_registered.get("str_modality")
+
+        # Si el meeting_id viene del token, consultar su modalidad
+        if effective_meeting_id is not None and meeting_modality is None:
+            try:
+                token_meeting_result = await db.execute(
+                    select(MeetingModel).where(MeetingModel.id == effective_meeting_id)
+                )
+                token_meeting = token_meeting_result.scalar_one_or_none()
+                if token_meeting:
+                    meeting_modality = token_meeting.str_modality
+            except Exception as e:
+                logger.warning(f"No se pudo obtener modalidad de reunion {effective_meeting_id}: {str(e)}")
 
         if effective_meeting_id is not None:
             response_data["meeting_id"] = effective_meeting_id
+        if meeting_modality is not None:
+            response_data["meeting_modality"] = meeting_modality
 
         # Incluir info de asistencia si se registro
         if attendance_registered and attendance_registered.get("registered"):

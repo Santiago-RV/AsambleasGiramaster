@@ -649,6 +649,27 @@ class MeetingService:
             logger.error(f"Error al finalizar asistencias: {str(e)}")
             raise
 
+    async def _mark_delegators_attended(self, meeting_id: int, delegate_user_id: int, joined_at) -> int:
+        """Marca como asistentes a todos los usuarios que delegaron su voto al delegate en esta reunión."""
+        result = await self.db.execute(
+            select(MeetingInvitationModel).where(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.int_delegated_id == delegate_user_id,
+                MeetingInvitationModel.dat_joined_at == None
+            )
+        )
+        delegators = result.scalars().all()
+        for inv in delegators:
+            inv.dat_joined_at = joined_at
+            inv.bln_actually_attended = True
+            inv.str_response_status = "attended"
+            inv.updated_at = colombia_now()
+            inv.updated_by = delegate_user_id
+            logger.info(
+                f"Asistencia por delegación: usuario {inv.int_user_id} → delegado a {delegate_user_id} en reunión {meeting_id}"
+            )
+        return len(delegators)
+
     async def register_attendance(self, meeting_id: int, user_id: int) -> dict:
         """
         Registra la asistencia de un usuario a una reunión.
@@ -674,16 +695,19 @@ class MeetingService:
 
             # Solo registrar si no se ha registrado antes
             if invitation.dat_joined_at is None:
-                invitation.dat_joined_at = colombia_now()
+                now = colombia_now()
+                invitation.dat_joined_at = now
                 invitation.bln_actually_attended = True
                 invitation.str_response_status = "attended"
-                invitation.updated_at = colombia_now()
+                invitation.updated_at = now
                 invitation.updated_by = user_id
+
+                delegators_count = await self._mark_delegators_attended(meeting_id, user_id, now)
 
                 await self.db.commit()
                 await self.db.refresh(invitation)
 
-                logger.info(f"✅ Asistencia registrada: Usuario {user_id} en reunión {meeting_id} a las {invitation.dat_joined_at}")
+                logger.info(f"✅ Asistencia registrada: Usuario {user_id} en reunión {meeting_id} a las {invitation.dat_joined_at} ({delegators_count} delegadores)")
 
                 return {
                     "success": True,
@@ -693,12 +717,17 @@ class MeetingService:
                 }
             else:
                 logger.info(f"ℹ️ Usuario {user_id} ya registrado en reunión {meeting_id} desde {invitation.dat_joined_at}")
+                needs_commit = False
                 # Si el admin cerró la sesión y el usuario re-ingresa, limpiar dat_left_at
                 if invitation.dat_left_at is not None:
                     invitation.dat_left_at = None
                     invitation.updated_at = colombia_now()
-                    await self.db.commit()
+                    needs_commit = True
                     logger.info(f"✅ dat_left_at limpiado: usuario {user_id} re-ingresó a reunión {meeting_id}")
+                # Registrar delegadores que aún no hayan sido marcados
+                delegators_count = await self._mark_delegators_attended(meeting_id, user_id, invitation.dat_joined_at)
+                if needs_commit or delegators_count > 0:
+                    await self.db.commit()
                 return {
                     "success": True,
                     "message": "Usuario ya registrado previamente",
@@ -1050,14 +1079,18 @@ class MeetingService:
                 )
                 # Si el admin cerró la sesión (dat_left_at set) y el usuario re-ingresa,
                 # limpiar dat_left_at para que vuelva a aparecer como conectado
+                needs_commit = False
                 if invitation.dat_left_at is not None:
                     invitation.dat_left_at = None
                     invitation.updated_at = colombia_now()
-                    await self.db.commit()
+                    needs_commit = True
                     logger.info(
                         f"Auto-attendance: dat_left_at limpiado para usuario {user_id} "
                         f"que re-ingresó a reunión {active_meeting.id}"
                     )
+                delegators_count = await self._mark_delegators_attended(active_meeting.id, user_id, invitation.dat_joined_at)
+                if needs_commit or delegators_count > 0:
+                    await self.db.commit()
                 return {
                     "registered": True,
                     "already_registered": True,
@@ -1086,6 +1119,7 @@ class MeetingService:
                 invitation.bln_actually_attended = True
                 invitation.str_response_status = "attended"
                 invitation.updated_at = colombia_now()
+                await self._mark_delegators_attended(active_meeting.id, user_id, existing_attendance.dat_joined_at)
                 await self.db.commit()
                 return {
                     "registered": True,
@@ -1093,6 +1127,7 @@ class MeetingService:
                     "meeting_id": active_meeting.id,
                     "meeting_title": active_meeting.str_title,
                     "meeting_type": active_meeting.str_meeting_type,
+                    "str_modality": active_meeting.str_modality,
                     "joined_at": existing_attendance.dat_joined_at.isoformat()
                 }
             
@@ -1120,7 +1155,10 @@ class MeetingService:
                     int_rejoined_count=0
                 )
                 self.db.add(attendance)
-                
+
+                # 8. Registrar asistencia de usuarios que delegaron su poder a este usuario
+                await self._mark_delegators_attended(active_meeting.id, user_id, now)
+
                 await self.db.commit()
                 await self.db.refresh(invitation)
                 await self.db.refresh(attendance)
@@ -1138,6 +1176,7 @@ class MeetingService:
                     "meeting_id": active_meeting.id,
                     "meeting_title": active_meeting.str_title,
                     "meeting_type": active_meeting.str_meeting_type,
+                    "str_modality": active_meeting.str_modality,
                     "joined_at": invitation.dat_joined_at.isoformat(),
                     "attendance_id": attendance.id
                 }

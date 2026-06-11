@@ -60,7 +60,11 @@ const AutoLogin = () => {
 
           setStatus('success');
 
-          if (meeting_id) {
+          const isAdmin = ['Administrador', 'Super Administrador'].includes(user.role);
+
+          if (meeting_id && !isAdmin) {
+            const { meeting_modality } = response.data.data;
+            const isPresencial = meeting_modality === 'presencial';
             const attendanceLabel = attendance_registered?.already_registered
               ? '✅ Ya tenías asistencia registrada en esta reunión.'
               : '✅ Tu asistencia ha sido registrada exitosamente.';
@@ -77,7 +81,11 @@ const AutoLogin = () => {
               timerProgressBar: true,
               showConfirmButton: false,
             });
-            navigate(`/votacion-presencial/${meeting_id}`, { replace: true });
+            if (isPresencial) {
+              navigate(`/votacion-presencial/${meeting_id}`, { replace: true });
+            } else {
+              navigate('/copropietario', { replace: true });
+            }
             return;
           }
 
