@@ -4,10 +4,11 @@ from app.utils.timezone_utils import colombia_now
 from decimal import Decimal
 from typing import List, Optional
 import pandas as pd
+from io import BytesIO
 import secrets
 import string
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, and_, func
+from sqlalchemy import select, delete, insert, and_, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 import logging
@@ -23,6 +24,7 @@ from app.core.security import security_manager
 from app.services.email_notification_service import EmailNotificationService
 
 from app.services.simple_auto_login_service import simple_auto_login_service
+from app.core.config import settings
 
 from app.models.email_notification_model import EmailNotificationModel
 from app.models.meeting_invitation_model import MeetingInvitationModel
@@ -508,6 +510,130 @@ class ResidentialUnitService:
                 details={"original_error": str(e)}
             )
             
+    async def _publish_resident_event(self, unit_id: int, event_type: str, count: int = 0) -> None:
+        import redis.asyncio as aioredis
+        import json
+        try:
+            r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+            await r.publish(f"residents:unit:{unit_id}", json.dumps({"type": event_type, "count": count}))
+            await r.aclose()
+        except Exception as e:
+            logger.warning(f"[SSE] Error publicando evento de residentes: {e}")
+
+    async def _delete_existing_residents(self, unit_id: int) -> int:
+        """Elimina copropietarios de la unidad antes de reimportar, exceptuando admin y soporte."""
+        result = await self.db.execute(
+            select(UserResidentialUnitModel).where(
+                and_(
+                    UserResidentialUnitModel.int_residential_unit_id == unit_id,
+                    UserResidentialUnitModel.bool_is_admin == False,
+                    UserResidentialUnitModel.str_apartment_number != 'SOPORTE'
+                )
+            )
+        )
+        records = result.scalars().all()
+        if not records:
+            return 0
+
+        user_ids = [r.int_user_id for r in records]
+
+        du_result = await self.db.execute(
+            select(UserModel.int_data_user_id).where(UserModel.id.in_(user_ids))
+        )
+        data_user_ids = [row[0] for row in du_result.all()]
+
+        await self.db.execute(delete(UserModel).where(UserModel.id.in_(user_ids)))
+
+        if data_user_ids:
+            still_ref = await self.db.execute(
+                select(UserModel.int_data_user_id).where(
+                    and_(
+                        UserModel.int_data_user_id.in_(data_user_ids),
+                        UserModel.id.not_in(user_ids)
+                    )
+                )
+            )
+            keep_ids = {row[0] for row in still_ref.all()}
+            deletable = [did for did in data_user_ids if did not in keep_ids]
+            if deletable:
+                await self.db.execute(delete(DataUserModel).where(DataUserModel.id.in_(deletable)))
+
+        await self.db.commit()
+        await self._publish_resident_event(unit_id, "residents_cleared")
+        logger.info(f"🗑️ {len(user_ids)} copropietarios eliminados de unidad {unit_id} antes de reimportar")
+        return len(user_ids)
+
+    async def _insert_resident_batch(self, batch: list, unit_id: int, results: dict):
+        """Inserta un lote de copropietarios en 3 bulk INSERTs: DataUsers → Users → UserResidentialUnits."""
+        base_usernames = [b['base_username'] for b in batch]
+
+        # Una sola query para encontrar conflictos de username (exacto y con sufijo)
+        like_clauses = []
+        for uname in set(base_usernames):
+            like_clauses.append(UserModel.str_username == uname)
+            like_clauses.append(UserModel.str_username.like(f"{uname}.%"))
+        existing_result = await self.db.execute(
+            select(UserModel.str_username).where(or_(*like_clauses))
+        )
+        existing_in_db = {row[0] for row in existing_result.all()}
+
+        used_in_batch: set = set()
+        final_usernames = []
+        for base_uname in base_usernames:
+            username = base_uname
+            counter = 0
+            while username in existing_in_db or username in used_in_batch:
+                counter += 1
+                username = f"{base_uname}.{counter}"
+            final_usernames.append(username)
+            used_in_batch.add(username)
+
+        now = colombia_now()
+        from sqlalchemy import text
+
+        # Bulk insert DataUsers — MySQL no soporta RETURNING; usamos LAST_INSERT_ID()
+        await self.db.execute(
+            insert(DataUserModel).values([
+                {'str_firstname': b['firstname'], 'str_lastname': b['lastname'],
+                 'str_email': b['email'], 'str_phone': b['phone'],
+                 'created_at': now, 'updated_at': now}
+                for b in batch
+            ])
+        )
+        first_du_id = (await self.db.execute(text("SELECT LAST_INSERT_ID()"))).scalar()
+        data_user_ids = list(range(first_du_id, first_du_id + len(batch)))
+
+        # Bulk insert Users
+        await self.db.execute(
+            insert(UserModel).values([
+                {'int_data_user_id': du_id, 'str_username': uname,
+                 'str_password_hash': b['password_hash'], 'int_id_rol': 3,
+                 'bln_allow_entry': False, 'bln_is_external_delegate': False,
+                 'bln_user_temporary': False, 'created_at': now, 'updated_at': now}
+                for du_id, uname, b in zip(data_user_ids, final_usernames, batch)
+            ])
+        )
+        first_u_id = (await self.db.execute(text("SELECT LAST_INSERT_ID()"))).scalar()
+        user_ids = list(range(first_u_id, first_u_id + len(batch)))
+
+        # Bulk insert UserResidentialUnits
+        await self.db.execute(
+            insert(UserResidentialUnitModel).values([
+                {'int_user_id': u_id, 'int_residential_unit_id': unit_id,
+                 'str_apartment_number': b['apartment_number'],
+                 'dec_default_voting_weight': b['voting_weight'],
+                 'bool_is_admin': False, 'created_at': now, 'updated_at': now}
+                for u_id, b in zip(user_ids, batch)
+            ])
+        )
+
+        await self.db.commit()
+        await self._publish_resident_event(unit_id, "batch_added", len(batch))
+        results['successful'] += len(batch)
+        results['users_created'] += len(batch)
+        results['user_ids'].extend(user_ids)
+        logger.info(f"💾 Batch de {len(batch)} registros insertados en bulk")
+
     async def process_residents_excel_file(
         self,
         file_content: bytes,
@@ -544,9 +670,12 @@ class ResidentialUnitService:
                 raise ValueError(f"Unidad residencial con ID {unit_id} no encontrada")
             
             residential_unit_name = residential_unit.str_name
-            
+
+            # Eliminar copropietarios existentes antes de reimportar
+            await self._delete_existing_residents(unit_id)
+
             # Leer el archivo Excel
-            df = pd.read_excel(file_content)
+            df = pd.read_excel(BytesIO(file_content))
             
             # Validar columnas requeridas
             required_columns = ['email', 'firstname', 'lastname', 'apartment_number', 'voting_weight']
@@ -567,34 +696,28 @@ class ResidentialUnitService:
                 'errors': []
             }
             
-            batch_size = 100
-            processed_in_batch = 0
-            # Procesar cada fila
+            batch_size = 50
+            batch = []
+
             for index, row in df.iterrows():
+                row_dict = row.to_dict()
                 try:
-                    row_dict = row.to_dict()
-                    
-                    # Validar y limpiar datos
                     email = str(row_dict['email']).strip().lower()
                     firstname = str(row_dict['firstname']).strip()
                     lastname = str(row_dict['lastname']).strip()
                     apartment_number = str(row_dict['apartment_number']).strip()
                     phone = _normalize_phone_co(str(row_dict.get('phone', '')).strip() if pd.notna(row_dict.get('phone')) else None)
                     password_from_excel = str(row_dict.get('password', '')).strip()
-                    if password_from_excel and len(password_from_excel) >= 8:
-                        password = password_from_excel
-                    else:
-                        password = self._generate_secure_password(firstname, lastname, apartment_number)
-                    
-                    # Validar y convertir voting_weight
+                    password = password_from_excel if password_from_excel and len(password_from_excel) >= 8 \
+                        else self._generate_secure_password(firstname, lastname, apartment_number)
+
                     try:
                         voting_weight = Decimal(str(row_dict['voting_weight']))
                         if voting_weight <= 0 or voting_weight > 100:
                             raise ValueError("El peso de votación debe estar entre 0 y 100")
-                    except (ValueError, TypeError) as e:
+                    except (ValueError, TypeError):
                         raise ValueError(f"Peso de votación inválido: {row_dict.get('voting_weight')}. Debe ser un número (ej: 0.25 o 1)")
 
-                    # Validaciones básicas
                     if len(firstname) < 2:
                         raise ValueError("El nombre debe tener al menos 2 caracteres")
                     if len(lastname) < 2:
@@ -604,132 +727,26 @@ class ResidentialUnitService:
                     if len(apartment_number) == 0:
                         raise ValueError("Número de apartamento requerido")
 
-                    # SIEMPRE crear nuevos registros - no buscar por email existente
-                    user_was_created = False
-                    
-                    # ============================================
-                    # PASO 1: Crear registro en tbl_data_users
-                    # ============================================
-                    data_user = DataUserModel(
-                        str_firstname=firstname,
-                        str_lastname=lastname,
-                        str_email=email,
-                        str_phone=phone,
-                        created_at=colombia_now(),
-                        updated_at=colombia_now()
-                    )
-                    
-                    self.db.add(data_user)
-                    await self.db.flush()
-                    
-                    logger.info(f"📝 DataUser creado: {email} (ID: {data_user.id})")
+                    batch.append({
+                        'email': email,
+                        'firstname': firstname,
+                        'lastname': lastname,
+                        'phone': phone,
+                        'password_hash': security_manager.create_password_hash(password),
+                        'base_username': f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", ""),
+                        'apartment_number': apartment_number,
+                        'voting_weight': voting_weight,
+                    })
 
-                    # ============================================
-                    # PASO 2: Crear registro en tbl_users
-                    # ============================================
-                    # Generar username como nombre.apellido.nroapartamento
-                    base_username = f"{firstname.lower()}.{lastname.lower()}.{apartment_number}".replace(" ", "")
-                    
-                    # Verificar si el username ya existe y generar uno único si es necesario
-                    username = base_username
-                    counter = 0
-                    while True:
-                        from sqlalchemy import select
-                        result_username = await self.db.execute(
-                            select(UserModel).where(UserModel.str_username == username)
-                        )
-                        existing_username = result_username.scalar_one_or_none()
-                        if not existing_username:
-                            break
-                        counter += 1
-                        username = f"{base_username}.{counter}"
-                    
-                    # Hashear contraseña
-                    hashed_password = security_manager.create_password_hash(password)
-
-                    # Crear User con rol 3 (copropietario) y acceso DESHABILITADO
-                    user = UserModel(
-                        int_data_user_id=data_user.id,
-                        str_username=username,
-                        str_password_hash=hashed_password,
-                        int_id_rol=3,  # 3: Copropietario (FIJO)
-                        bln_allow_entry=False,  # Acceso deshabilitado (0)
-                        bln_is_external_delegate=False,
-                        bln_user_temporary=False,
-                        created_at=colombia_now(),
-                        updated_at=colombia_now()
-                    )
-
-                    self.db.add(user)
-                    await self.db.flush()
-                    
-                    user_was_created = True
-                    results['users_created'] += 1
-                    results['user_ids'].append(user.id)
-                    logger.info(
-                        f"👤 Usuario creado: {username} - Email: {email} - "
-                        f"Rol: 3 (Copropietario) - Acceso: Deshabilitado"
-                    )
-
-                    # ============================================
-                    # PASO 3: Crear/actualizar registro en tbl_user_residential_units
-                    # ============================================
-                    existing_assignment = await self._check_user_unit_assignment(
-                        user.id, 
-                        unit_id
-                    )
-                    
-                    if existing_assignment:
-                        # Actualizar si hay cambios
-                        needs_update = False
-                        
-                        if existing_assignment.str_apartment_number != apartment_number:
-                            existing_assignment.str_apartment_number = apartment_number
-                            needs_update = True
-                            logger.info(
-                                f"🏠 Apartamento actualizado para {email}: "
-                                f"{existing_assignment.str_apartment_number} -> {apartment_number}"
-                            )
-                        
-                        if existing_assignment.dec_default_voting_weight != voting_weight:
-                            existing_assignment.dec_default_voting_weight = voting_weight
-                            needs_update = True
-                            logger.info(
-                                f"⚖️ Peso de votación actualizado para {email}: "
-                                f"{existing_assignment.dec_default_voting_weight} -> {voting_weight}"
-                            )
-                        
-                        if needs_update:
-                            existing_assignment.updated_at = colombia_now()
-                    else:
-                        # Crear relación usuario-unidad residencial
-                        user_unit = UserResidentialUnitModel(
-                            int_user_id=user.id,
-                            int_residential_unit_id=unit_id,
-                            str_apartment_number=apartment_number,
-                            dec_default_voting_weight=voting_weight,
-                            bool_is_admin=False,
-                            created_at=colombia_now(),
-                            updated_at=colombia_now()
-                        )
-                        
-                        self.db.add(user_unit)
-                        logger.info(
-                            f"🔗 Usuario asignado a unidad: {email} - "
-                            f"Apt: {apartment_number} - Peso: {voting_weight}"
-                    )
-
-                    results['successful'] += 1
-                    processed_in_batch += 1
-
-                    if processed_in_batch >= batch_size:
-                        await self.db.commit()
-                        processed_in_batch = 0
-                        logger.info(f"💾 Batch guardado de {batch_size} registros")
+                    if len(batch) >= batch_size:
+                        await self._insert_resident_batch(batch, unit_id, results)
+                        if progress_callback:
+                            await progress_callback(results['successful'] + results['failed'], results['total_rows'])
+                        batch = []
 
                 except Exception as e:
                     results['errors'].append({
-                        'row': index + 2,  # +2 porque Excel empieza en 1 y tiene header
+                        'row': index + 2,
                         'email': row_dict.get('email', 'N/A'),
                         'apartment': row_dict.get('apartment_number', 'N/A'),
                         'error': str(e)
@@ -737,23 +754,15 @@ class ResidentialUnitService:
                     results['failed'] += 1
                     logger.error(f"Error procesando fila {index + 2}: {e}")
 
+            if batch:
+                await self._insert_resident_batch(batch, unit_id, results)
                 if progress_callback:
-                    processed_count = results['successful'] + results['failed']
-                    if processed_count % 10 == 0 or processed_count == results['total_rows']:
-                        await progress_callback(processed_count, results['total_rows'])
+                    await progress_callback(results['successful'] + results['failed'], results['total_rows'])
 
-            # Commit de todas las operaciones exitosas
-            # Guardar lo que quedó pendiente
-                if processed_in_batch > 0:
-                    await self.db.commit()
-                    logger.info(f"💾 Último batch guardado: {processed_in_batch} registros")
-                logger.info(
-                    f"Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
-                    f"{results['users_created']} usuarios nuevos creados"
-                )
-            else:
-                await self.db.rollback()
-                logger.warning("No se procesó ningún copropietario exitosamente")
+            logger.info(
+                f"Proceso completado exitosamente: {results['successful']} copropietarios procesados, "
+                f"{results['users_created']} usuarios nuevos creados"
+            )
 
             return results
 
@@ -901,7 +910,8 @@ class ResidentialUnitService:
             await self.db.refresh(user)
             await self.db.refresh(data_user)
             await self.db.refresh(user_unit)
-            
+            await self._publish_resident_event(unit_id, "resident_added")
+
             # 10. Generar token de auto-login
             from app.services.simple_auto_login_service import simple_auto_login_service
             from app.core.config import settings
@@ -1374,7 +1384,8 @@ class ResidentialUnitService:
             await self.db.execute(delete(DataUserModel).where(DataUserModel.id == data_user_id))
             
             await self.db.commit()
-            
+            await self._publish_resident_event(unit_id, "resident_deleted")
+
             admin_label = "administrador" if is_target_admin else "copropietario"
             logger.info(f"{admin_label.capitalize()} eliminado: {username} ({email})")
             

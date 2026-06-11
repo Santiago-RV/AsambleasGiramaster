@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 from typing import Optional
+from jose import jwt, JWTError
+import asyncio
+import redis.asyncio as aioredis
+from app.core.config import settings
 
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
@@ -23,6 +28,7 @@ class ResendCredentialsRequest(BaseModel):
 
 
 router = APIRouter()
+sse_router = APIRouter()
 
 @router.get(
     "/units",
@@ -433,3 +439,57 @@ async def delete_residential_unit(
             message=f"Error al eliminar la unidad residencial: {str(e)}",
             details={"original_error": str(e)}
         )
+
+
+@sse_router.get(
+    "/units/{unit_id}/residents/events",
+    summary="SSE: eventos de copropietarios de una unidad",
+    description="Stream SSE. Token como query param porque EventSource no soporta headers custom.",
+    tags=["Residentes SSE"],
+)
+async def residents_events(unit_id: int, token: str):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+    async def event_generator():
+        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = r.pubsub()
+        channel = f"residents:unit:{unit_id}"
+        await pubsub.subscribe(channel)
+        import logging as _log
+        _log.getLogger(__name__).info(f"[SSE] '{username}' suscrito a {channel}")
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(
+                        pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1),
+                        timeout=30.0,
+                    )
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+                    continue
+                if msg is None:
+                    await asyncio.sleep(0.1)
+                    continue
+                if msg["type"] == "message":
+                    yield f"data: {msg['data']}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await pubsub.unsubscribe(channel)
+            await r.aclose()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

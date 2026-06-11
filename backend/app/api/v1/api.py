@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from app.api.v1.endpoints import auth_endpoint
 from app.api.v1.endpoints import administrator
 from app.api.v1.endpoints import residential_enpoint
+from app.api.v1.endpoints.residential_enpoint import sse_router as residential_sse_router
 from app.api.v1.endpoints import meeting_endpoint
 from app.api.v1.endpoints import zoom_endpoint
 from app.api.v1.endpoints import poll_endpoint
@@ -74,6 +75,11 @@ api_router.include_router(
 api_router.include_router(
     poll_sse_router,
     prefix="/polls",
+)
+
+api_router.include_router(
+    residential_sse_router,
+    prefix="/residential",
 )
 
 api_router.include_router(
