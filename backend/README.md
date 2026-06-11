@@ -85,6 +85,11 @@ make celery
 celery -A app.celery_app worker -Q email_tasks -l info --concurrency=4
 ```
 
+**Manual desde windows en backend:**
+```bash
+.\venv\Scripts\python -m celery -A app.celery_app worker -Q email_tasks -l info --pool=solo
+```
+
 **Con Python module:**
 ```bash
 python -m celery -A app.celery_app worker -Q email_tasks -l info --concurrency=4

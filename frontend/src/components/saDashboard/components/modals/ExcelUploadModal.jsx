@@ -72,137 +72,93 @@ const ExcelUploadModal = ({ isOpen, onClose, unitId, onSuccess }) => {
 
 		try {
 			const response = await ResidentialUnitService.uploadResidentsExcel(unitId, selectedFile);
-
-			const { total_rows, successful, failed, users_created, task_id, errors } =
-				response.data;
+			const { task_id } = response.data;
 
 			setSelectedFile(null);
 			setIsUploading(false);
+			onClose();
 
-			if (task_id) {
-				const total = response.data.user_ids?.length || successful;
-				
-				startProgress({
-					title: 'Enviando Credenciales',
-					message: `Enviando enlaces de acceso (0/${total})`,
-					total: total,
-					type: 'info'
-				});
-
-				const pollingInterval = setInterval(async () => {
-					try {
-						const statusResponse = await ResidentService.getEmailTaskStatus(task_id);
-						const current = statusResponse.data?.current || 0;
-						const progress = statusResponse.data?.progress || 0;
-						const status = statusResponse.data?.status || 'processing';
-
-						updateProgress({
-							current,
-							total,
-							message: `Enviando enlaces de acceso (${current}/${total})`,
-							status,
-							progress
-						});
-
-						if (status === 'completed' || status === 'failed') {
-							clearInterval(pollingInterval);
-							
-							const successCount = statusResponse.data?.successful || successful;
-							
-							finishProgress({
-								status: status === 'completed' ? 'completed' : 'failed',
-								message: status === 'completed'
-									? `Credenciales enviadas a ${successCount} copropietario(s)`
-									: 'Error al enviar credenciales'
-							});
-						}
-					} catch (error) {
-						console.error('Error polling credentials progress:', error);
-						clearInterval(pollingInterval);
-						finishProgress({
-							status: 'failed',
-							message: 'Error al obtener progreso'
-						});
-					}
-				}, 1500);
+			if (!task_id) {
+				Swal.fire({ icon: 'error', title: 'Error', text: 'No se recibió task_id del servidor', confirmButtonColor: '#3498db' });
+				return;
 			}
 
-			let htmlContent = `
-			<div class="text-left space-y-3">
-				<div class="bg-blue-50 p-3 rounded-lg">
-					<p class="font-semibold text-blue-800">${SVG_ICONS.barChart3} Resumen del Proceso</p>
-					<p class="text-sm text-blue-700">Total de filas procesadas: <strong>${total_rows}</strong></p>
-					<p class="text-sm text-green-700">Copropietarios creados exitosamente: <strong>${successful}</strong></p>
-					<p class="text-sm text-green-700">Nuevos usuarios creados: <strong>${users_created}</strong></p>
-					${failed > 0
-					? `<p class="text-sm text-red-700">Filas con errores: <strong>${failed}</strong></p>`
-					: ''
-				}
-				</div>
-		`;
-
-			if (errors && errors.length > 0) {
-				htmlContent += `
-				<div class="bg-red-50 p-3 rounded-lg max-h-48 overflow-y-auto">
-					<p class="font-semibold text-red-800 mb-2">${SVG_ICONS.xCircle} Errores Encontrados:</p>
-					<ul class="text-sm text-red-700 space-y-1">
-			`;
-
-				errors.forEach((error) => {
-					htmlContent += `<li>Fila ${error.row} (${error.email}): ${error.error}</li>`;
-				});
-
-				htmlContent += `
-					</ul>
-				</div>
-			`;
-			}
-
-			htmlContent += `
-				<div class="text-xs text-gray-600 mt-2">
-					<p>${SVG_ICONS.lightbulb} Los copropietarios creados ya pueden iniciar sesión con su email y la contraseña configurada.</p>
-				</div>
-			</div>
-		`;
-
-			Swal.fire({
-				icon: successful > 0 ? 'success' : 'error',
-				title: successful > 0 ? '¡Carga completada!' : 'Error en la carga',
-				html: htmlContent,
-				confirmButtonColor: '#3498db',
-				width: '600px',
+			const notifId = startProgress({
+				title: 'Procesando Excel',
+				message: 'Preparando copropietarios...',
+				total: 0,
+				type: 'info',
 			});
 
-			onSuccess();
-			onClose();
+			const excelInterval = setInterval(async () => {
+				try {
+					const statusResponse = await ResidentService.getExcelTaskStatus(task_id);
+					const current = statusResponse.data?.current ?? 0;
+					const total = statusResponse.data?.total ?? 0;
+					const progress = statusResponse.data?.progress ?? 0;
+					const st = statusResponse.data?.status || 'processing';
+					const emailTaskId = statusResponse.data?.email_task_id || '';
+
+					updateProgress({
+						id: notifId,
+						current,
+						total,
+						message: total > 0
+							? `Procesando copropietarios (${current}/${total})`
+							: 'Procesando...',
+						status: st,
+						progress,
+					});
+
+					if (st === 'completed' || st === 'failed') {
+						clearInterval(excelInterval);
+						const successful = statusResponse.data?.successful || 0;
+						const failed = statusResponse.data?.failed || 0;
+
+						if (st === 'failed') {
+							finishProgress({
+								id: notifId,
+								status: 'failed',
+								message: 'Error al procesar el archivo Excel',
+							});
+							return;
+						}
+
+						onSuccess();
+						finishProgress({
+							id: notifId,
+							status: 'completed',
+							message: `${successful} copropietario(s) creado(s)${failed > 0 ? `, ${failed} con error` : ''}`,
+						});
+					}
+				} catch (err) {
+					console.error('Error polling excel progress:', err);
+					clearInterval(excelInterval);
+					finishProgress({ id: notifId, status: 'failed', message: 'Error consultando progreso' });
+				}
+			}, 1500);
+
 		} catch (error) {
 			console.error('Error uploading Excel:', error);
 			setIsUploading(false);
 
-			// Detectar específicamente si fue timeout
-			const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
-
-			const errorMsg = isTimeout
-				? 'La operación tardó más de lo esperado, pero puede que se haya procesado en segundo plano. Verifica la lista de copropietarios antes de intentar nuevamente.'
-				: (error.response?.data?.detail || error.response?.data?.message || error.message || 'Error desconocido');
+			const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error desconocido';
 
 			Swal.fire({
-				icon: isTimeout ? 'warning' : 'error',
-				title: isTimeout ? 'Tiempo de espera agotado' : 'Error al cargar archivo',
+				icon: 'error',
+				title: 'Error al cargar archivo',
 				html: `
 					<div class="text-left">
 						<p class="mb-2">${errorMsg}</p>
-						${!isTimeout ? `
 						<div class="bg-gray-50 p-3 rounded text-sm">
-						<p class="font-semibold mb-1">Verifica que:</p>
-						<ul class="list-disc list-inside space-y-1">
-							<li>El archivo sea formato Excel (.xlsx o .xls)</li>
-							<li>Contenga las columnas requeridas: firstname, lastname, email, apartment_number</li>
-							<li>Los emails sean válidos y únicos</li>
-						</ul>
-						</div>` : ''}
-					</div>
-					`,
+							<p class="font-semibold mb-1">Verifica que:</p>
+							<ul class="list-disc list-inside space-y-1">
+								<li>El archivo sea formato Excel (.xlsx o .xls)</li>
+								<li>Contenga las columnas requeridas: firstname, lastname, email, apartment_number</li>
+								<li>Los emails sean válidos y únicos</li>
+							</ul>
+						</div>
+					</div>`,
 				confirmButtonColor: '#3498db',
 				width: '600px',
 			});

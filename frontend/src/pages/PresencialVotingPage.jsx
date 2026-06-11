@@ -141,7 +141,7 @@ export default function PresencialVotingPage() {
 
     useEffect(() => {
         if (noPoll && !isLoading) {
-            setCountdown(5);
+            setCountdown(3);
         }
     }, [noPoll, isLoading]);
     // Auto-cierre exacto cuando la encuesta expira por tiempo

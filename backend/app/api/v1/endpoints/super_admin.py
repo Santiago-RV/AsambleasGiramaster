@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
+import base64
 import logging
 
 from app.auth.auth import get_current_user
@@ -23,9 +24,9 @@ router = APIRouter()
 @router.post(
     "/residential-units/{unit_id}/upload-residents-excel",
     response_model=SuccessResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Carga masiva de copropietarios desde Excel",
-    description="Permite al Super Admin cargar copropietarios masivamente desde un archivo Excel"
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Carga masiva de copropietarios desde Excel (asíncrono)",
+    description="Inicia el procesamiento en segundo plano y retorna un task_id para seguir el progreso"
 )
 async def upload_residents_excel(
     unit_id: int,
@@ -33,38 +34,16 @@ async def upload_residents_excel(
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Carga masiva de copropietarios desde Excel para una unidad residencial.
-
-    El Excel debe contener las siguientes columnas:
-    - firstname: Nombre del copropietario (requerido)
-    - lastname: Apellido del copropietario (requerido)
-    - email: Email del copropietario (requerido, único)
-    - phone: Teléfono del copropietario (opcional)
-    - apartment_number: Número de apartamento (requerido)
-    - password: Contraseña inicial (opcional, default: Temporal123!)
-
-    Solo usuarios Super Admin pueden usar este endpoint.
-
-    Returns:
-        SuccessResponse con estadísticas de la carga:
-        - total_rows: Total de filas procesadas
-        - successful: Copropietarios creados exitosamente
-        - failed: Filas que fallaron
-        - errors: Lista de errores detallados
-    """
     try:
-        # Verificar que el usuario actual sea super admin
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
 
-        if not user or user.int_id_rol not in [1, 2]:  # 1: Super Admin, 2: Administrator
+        if not user or user.int_id_rol not in [1, 2]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para realizar esta acción. Solo Super Admin puede cargar copropietarios."
             )
 
-        # Validar que la unidad residencial exista
         residential_service = ResidentialUnitService(db)
         unit = await residential_service.get_residential_unit_by_id(unit_id)
 
@@ -74,51 +53,32 @@ async def upload_residents_excel(
                 detail=f"La unidad residencial con ID {unit_id} no existe"
             )
 
-        # Validar tipo de archivo
         if not file.filename.endswith(('.xlsx', '.xls')):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El archivo debe ser un Excel (.xlsx o .xls)"
             )
 
-        # Leer contenido del archivo
         file_content = await file.read()
+        file_content_b64 = base64.b64encode(file_content).decode('utf-8')
+        task_id = str(uuid.uuid4())
 
-        # Procesar el archivo usando el servicio
-        results = await residential_service.process_residents_excel_file(
-            file_content=file_content,
-            unit_id=unit_id,
-            created_by=user.id
+        celery_app.send_task(
+            'app.tasks.excel_tasks.process_excel_upload',
+            args=[file_content_b64, unit_id, user.id, task_id],
+            task_id=task_id,
+            queue='email_tasks',
         )
 
-        task_id = None
-        user_ids = results.get('user_ids', [])
-
-        # Enviar credenciales con Celery si hay usuarios creados
-        if user_ids and len(user_ids) > 0:
-            task_id = str(uuid.uuid4())
-            celery_app.send_task(
-                'app.tasks.email_tasks.send_bulk_emails',
-                args=[user_ids, unit_id, task_id, None, 'email_coproprietario_credentials'],
-                task_id=task_id,
-                queue='email_tasks'
-            )
-            logger.info(
-                f"📧 Tarea de envío de credenciales creada para {len(user_ids)} usuarios: task_id={task_id}"
-            )
+        logger.info(f"📊 Excel upload task creada: task_id={task_id}, unit_id={unit_id}, user={current_user}")
 
         return SuccessResponse(
             success=True,
-            status_code=status.HTTP_201_CREATED,
-            message=f"Proceso completado: {results['successful']} copropietarios creados, {results['failed']} fallidos",
+            status_code=status.HTTP_202_ACCEPTED,
+            message="Proceso de carga iniciado. Usa el task_id para consultar el progreso.",
             data={
-                "total_rows": results['total_rows'],
-                "successful": results['successful'],
-                "failed": results['failed'],
-                "users_created": results['users_created'],
-                "user_ids": user_ids,
                 "task_id": task_id,
-                "errors": results['errors']
+                "status": "processing"
             }
         )
 
@@ -131,8 +91,61 @@ async def upload_residents_excel(
         )
     except Exception as e:
         raise ServiceException(
-            message=f"Error al procesar el archivo Excel: {str(e)}",
+            message=f"Error al iniciar la carga del archivo Excel: {str(e)}",
             details={"original_error": str(e)}
+        )
+
+
+@router.get(
+    "/residential-units/excel-task-status/{task_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Estado del proceso de carga de Excel",
+    description="Retorna el progreso de una tarea de carga masiva de copropietarios"
+)
+async def get_excel_task_status(
+    task_id: str,
+    current_user: str = Depends(get_current_user)
+):
+    import redis.asyncio as aioredis
+    from app.core.config import settings as _settings
+
+    try:
+        r = await aioredis.from_url(_settings.REDIS_URL)
+        key = f"excel_task:{task_id}"
+        data = await r.hgetall(key)
+        await r.close()
+
+        if not data:
+            return SuccessResponse(
+                success=True,
+                status_code=status.HTTP_200_OK,
+                message="Tarea no encontrada o expirada",
+                data={"status": "not_found", "progress": 0, "current": 0, "total": 0}
+            )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Estado obtenido",
+            data={
+                "status": data.get(b'status', b'processing').decode(),
+                "phase": data.get(b'phase', b'processing').decode(),
+                "progress": int(data.get(b'progress', b'0')),
+                "current": int(data.get(b'current', b'0')),
+                "total": int(data.get(b'total', b'0')),
+                "successful": int(data.get(b'successful', b'0')),
+                "failed": int(data.get(b'failed', b'0')),
+                "email_task_id": data.get(b'email_task_id', b'').decode(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error consultando excel task status {task_id}: {str(e)}")
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Error consultando estado",
+            data={"status": "error", "progress": 0, "current": 0, "total": 0}
         )
 
 

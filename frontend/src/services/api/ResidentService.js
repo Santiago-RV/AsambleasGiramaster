@@ -119,6 +119,19 @@ export class ResidentService {
         return response.data;
     }
 
+    static async getExcelTaskStatus(taskId) {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const response = await axiosInstance.get(
+            `/super-admin/residential-units/excel-task-status/${taskId}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
+        return response.data;
+    }
+
     static async checkCeleryStatus() {
         const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
         const response = await axiosInstance.get(
