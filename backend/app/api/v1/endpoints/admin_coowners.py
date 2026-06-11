@@ -714,7 +714,7 @@ async def toggle_coowners_access_bulk(
             'app.tasks.coowner_tasks.bulk_toggle_access_task',
             args=[request_data.user_ids, admin_unit['id'], request_data.enabled, user.id, task_id],
             task_id=task_id,
-            queue='celery'
+            queue='email_tasks'
         )
 
         action_text = "habilitar" if request_data.enabled else "deshabilitar"
@@ -773,7 +773,7 @@ async def delete_coowners_bulk(
         'app.tasks.coowner_tasks.bulk_delete_task',
         args=[request_data.user_ids, unit_id, user.int_id_rol, task_id],
         task_id=task_id,
-        queue='celery'
+        queue='email_tasks'
     )
 
     logger.info(f"🗑️ {current_user} encoló eliminación masiva en unit_id={unit_id}: {len(request_data.user_ids)} usuarios, task_id={task_id}")
