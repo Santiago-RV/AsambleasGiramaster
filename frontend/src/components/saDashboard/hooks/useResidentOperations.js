@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ResidentService } from '../../../services/api/ResidentService';
 import CoownerService from '../../../services/api/coownerService';
 import Swal from 'sweetalert2';
-import { showBulkDeleteWithLoading, showBulkSendProgressModal } from '../../common/BulkDeleteConfirmModal';
+import { showBulkDeleteWithLoading, showBulkSendProgressModal, showBulkToggleAccessWithLoading } from '../../common/BulkDeleteConfirmModal';
 import { useProgressNotification } from '../../../contexts/ProgressNotificationContext';
 import { Mail } from 'lucide-react';
 
@@ -373,7 +373,10 @@ export const useResidentOperations = (unitId) => {
 
 		const result = await Swal.fire({
 			title: `¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso?`,
-			html: `<p>${resident.firstname} ${resident.lastname} ${newStatus ? 'PODRÁ' : 'NO PODRÁ'} acceder al sistema.</p>`,
+			html: newStatus
+				? `<p>${resident.firstname} ${resident.lastname} PODRÁ acceder al sistema.</p>
+				   <p class="text-sm text-blue-600 mt-2">Si hay una reunión activa, quedará invitado y recibirá el correo de invitación.</p>`
+				: `<p>${resident.firstname} ${resident.lastname} NO PODRÁ acceder al sistema.</p>`,
 			icon: 'question',
 			showCancelButton: true,
 			confirmButtonColor: newStatus ? '#27ae60' : '#e74c3c',
@@ -398,23 +401,15 @@ export const useResidentOperations = (unitId) => {
 			return;
 		}
 
-		const action = enabled ? 'habilitar' : 'deshabilitar';
-		const result = await Swal.fire({
-			title: `¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso?`,
-			text: `Se ${action}á el acceso de ${selectedResidents.length} usuario(s)`,
-			icon: 'question',
-			showCancelButton: true,
-			confirmButtonColor: enabled ? '#27ae60' : '#e74c3c',
-			confirmButtonText: `Sí, ${action}`,
-			cancelButtonText: 'Cancelar',
+		await showBulkToggleAccessWithLoading({
+			count: selectedResidents.length,
+			enabled,
+			togglePromise: () => ResidentService.toggleUsersAccessBulk(unitId, selectedResidents, enabled),
+			pollProgressFn: (taskId) => ResidentService.getBulkTaskStatus(taskId),
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
+			},
 		});
-
-		if (result.isConfirmed) {
-			toggleAccessBulkMutation.mutate({
-				userIds: selectedResidents,
-				enabled,
-			});
-		}
 	};
 
 	// Mutación para eliminar residentes de forma masiva
@@ -465,6 +460,7 @@ export const useResidentOperations = (unitId) => {
 			count: selectedIds.length,
 			unitName: unitName,
 			deletePromise: () => CoownerService.deleteCoownersBulk(selectedIds, unitId),
+			pollProgressFn: (taskId) => CoownerService.getBulkTaskStatus(taskId),
 			onSuccess: () => {
 				queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
 			},

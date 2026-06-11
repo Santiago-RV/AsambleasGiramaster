@@ -792,8 +792,23 @@ async def toggle_resident_access(
                 user_id=user_id,
                 unit_id=unit_id,
                 send_email=False,
-                is_super_admin=True
+                is_super_admin=True,
+                created_by=user.id
             )
+
+            # Si se creó invitación automática, enviar correo por Celery
+            if result.get("meeting_invitation_created") and result.get("active_meeting_id"):
+                task_id = str(uuid.uuid4())
+                try:
+                    celery_app.send_task(
+                        'app.tasks.email_tasks.send_meeting_invitations',
+                        args=[result["active_meeting_id"], task_id, None, [user_id]],
+                        task_id=task_id,
+                        queue='email_tasks'
+                    )
+                    logger.info(f"📧 Correo de invitación encolado para user_id={user_id} en meeting_id={result['active_meeting_id']}")
+                except Exception as celery_err:
+                    logger.warning(f"⚠️ No se pudo encolar correo de invitación: {celery_err}")
         else:
             result = await user_service.disable_coowner_access(
                 user_id=user_id,
@@ -822,9 +837,9 @@ async def toggle_resident_access(
 @router.post(
     "/{unit_id}/residents/toggle-access-bulk",
     response_model=SuccessResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Toggle acceso masivo (Super Admin)",
-    description="Habilita o deshabilita el acceso de múltiples residentes seleccionados"
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Toggle acceso masivo (Super Admin, Celery)",
+    description="Encola una tarea Celery para modificar el acceso de múltiples residentes en batches de 50"
 )
 async def toggle_residents_access_bulk(
     unit_id: int,
@@ -832,16 +847,13 @@ async def toggle_residents_access_bulk(
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Toggle acceso masivo de residentes (Super Admin).
-    """
     try:
         from app.services.user_service import UserService
 
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
 
-        if not user or user.int_id_rol != 1:  # 1: Super Admin
+        if not user or user.int_id_rol != 1:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo los super administradores pueden acceder a esta función"
@@ -853,91 +865,87 @@ async def toggle_residents_access_bulk(
                 detail="Debe proporcionar al menos un ID de usuario"
             )
 
-        # Procesar cada residente
-        successful = 0
-        failed = 0
-        already_in_state = 0
-        errors = []
-        processed_users = []
-
-        for user_id in request_data.user_ids:
-            try:
-                # SuperAdmin puede modificar acceso de todos, incluyendo administradores
-                if request_data.enabled:
-                    result = await user_service.enable_coowner_access(
-                        user_id=user_id,
-                        unit_id=unit_id,
-                        send_email=False,
-                        is_super_admin=True
-                    )
-                else:
-                    result = await user_service.disable_coowner_access(
-                        user_id=user_id,
-                        unit_id=unit_id,
-                        send_email=False,
-                        is_super_admin=True
-                    )
-
-                if result['status'] in ['already_enabled', 'already_disabled']:
-                    already_in_state += 1
-                else:
-                    successful += 1
-
-                processed_users.append({
-                    "user_id": result["user_id"],
-                    "username": result["username"],
-                    "name": result["name"],
-                    "email": result["email"],
-                    "status": result["status"]
-                })
-
-            except Exception as e:
-                failed += 1
-                errors.append({
-                    "user_id": user_id,
-                    "error": str(e)
-                })
-
-        action_text = "habilitados" if request_data.enabled else "deshabilitados"
-
-        if successful == len(request_data.user_ids):
-            message = f"✅ {successful} residentes {action_text} exitosamente"
-        elif successful > 0:
-            message = f"⚠️ Proceso completado: {successful} exitosos"
-            if already_in_state > 0:
-                message += f", {already_in_state} sin cambios"
-            if failed > 0:
-                message += f", {failed} fallidos"
-        elif already_in_state == len(request_data.user_ids):
-            message = f"ℹ️ Todos los residentes ya estaban {action_text}"
-        else:
-            message = "❌ No se pudo modificar el acceso de ningún residente"
-
-        logger.info(
-            f"✅ Super Admin {current_user} modificó acceso masivo en unit_id={unit_id}: "
-            f"{successful} exitosos, {failed} fallidos, {already_in_state} sin cambios"
+        task_id = str(uuid.uuid4())
+        celery_app.send_task(
+            'app.tasks.coowner_tasks.bulk_toggle_access_task',
+            args=[request_data.user_ids, unit_id, request_data.enabled, user.id, task_id],
+            task_id=task_id,
+            queue='celery'
         )
+
+        action_text = "habilitar" if request_data.enabled else "deshabilitar"
+        logger.info(f"🔄 SuperAdmin {current_user} encoló toggle masivo en unit_id={unit_id}: {len(request_data.user_ids)} usuarios, task_id={task_id}")
 
         return SuccessResponse(
             success=True,
-            status_code=status.HTTP_200_OK,
-            message=message,
+            status_code=status.HTTP_202_ACCEPTED,
+            message=f"Proceso de {action_text} iniciado para {len(request_data.user_ids)} residente(s)",
             data={
-                "total_processed": len(request_data.user_ids),
-                "successful": successful,
-                "failed": failed,
-                "already_in_state": already_in_state,
-                "errors": errors,
-                "processed_users": processed_users,
-                "action": "enabled" if request_data.enabled else "disabled"
+                "task_id": task_id,
+                "total": len(request_data.user_ids),
+                "status": "processing"
             }
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al modificar acceso masivo: {str(e)}")
+        logger.error(f"Error al encolar toggle masivo: {str(e)}")
         raise ServiceException(
-            message=f"Error al modificar acceso masivo: {str(e)}",
+            message=f"Error al encolar toggle masivo: {str(e)}",
             details={"original_error": str(e)}
+        )
+
+
+@router.get(
+    "/residential-units/bulk-task-status/{task_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Consultar estado de tarea masiva (toggle/delete)",
+)
+async def get_bulk_task_status_sa(
+    task_id: str,
+    current_user: str = Depends(get_current_user)
+):
+    import redis.asyncio as aioredis
+    from app.core.config import settings as _settings
+
+    try:
+        r = await aioredis.from_url(_settings.REDIS_URL)
+        key = f"coowner_task:{task_id}"
+        data = await r.hgetall(key)
+        await r.close()
+
+        if not data:
+            return SuccessResponse(
+                success=True,
+                status_code=status.HTTP_200_OK,
+                message="Tarea no encontrada o expirada",
+                data={"status": "not_found", "progress": 0, "current": 0, "total": 0}
+            )
+
+        def _int(k):
+            return int(data.get(k, b'0'))
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Estado obtenido",
+            data={
+                "status": data.get(b'status', b'unknown').decode(),
+                "progress": _int(b'progress'),
+                "current": _int(b'current'),
+                "total": _int(b'total'),
+                "successful": _int(b'successful'),
+                "failed": _int(b'failed'),
+                "already_in_state": _int(b'already_in_state'),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error consultando bulk-task-status {task_id}: {e}")
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Error consultando estado",
+            data={"status": "error", "error": str(e)}
         )

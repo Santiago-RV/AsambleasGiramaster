@@ -98,7 +98,7 @@ const showBulkDeleteConfirmModal = async ({ count, unitName, onConfirm, onCancel
  * @param {Function} options.onError - Callback cuando hay error en la eliminación
  * @returns {Promise}
  */
-export const showBulkDeleteWithLoading = async ({ count, unitName, deletePromise, onSuccess, onError }) => {
+export const showBulkDeleteWithLoading = async ({ count, unitName, deletePromise, pollProgressFn, onSuccess, onError }) => {
   const unitNameToShow = unitName || 'Unidad Residencial';
 
   const htmlContent = `
@@ -164,25 +164,94 @@ export const showBulkDeleteWithLoading = async ({ count, unitName, deletePromise
     return;
   }
 
-  // Mostrar loading mientras se elimina
-  Swal.fire({
-    title: 'Eliminando copropietarios...',
-    html: `Procesando <strong>${count}</strong> usuario(s), por favor espera.`,
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    didOpen: () => {
-      Swal.showLoading();
-    },
-  });
+  let progressData = { current: 0, total: count, progress: 1 };
+  let pollingInterval = null;
+  const startTime = Date.now();
+  const timeoutMs = 300000;
+
+  const updateDeleteProgressHtml = () => {
+    const { current, total, progress } = progressData;
+    return `
+      <div style="text-align:left;">
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+            <span style="color:#374151;">Eliminando usuarios...</span>
+            <span style="color:#dc2626;font-weight:600;">${current} / ${total}</span>
+          </div>
+          <div style="width:100%;background:#e5e7eb;border-radius:9999px;height:10px;">
+            <div style="background:#dc2626;height:10px;border-radius:9999px;transition:width 0.3s;width:${progress}%;"></div>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#9ca3af;text-align:center;margin:0;">Eliminando en batches de 50</p>
+      </div>
+    `;
+  };
 
   try {
     const response = await deletePromise();
-    
-    Swal.close();
-    
-    // Mostrar modal de éxito con auto-cierre
-    const { successful = 0, failed = 0 } = response.data || {};
-    
+    const taskId = response.data?.task_id;
+    const total = response.data?.total || count;
+    progressData.total = total;
+
+    if (!taskId || !pollProgressFn) {
+      // Respuesta síncrona (fallback)
+      const { successful = 0, failed = 0 } = response.data || {};
+      Swal.fire({
+        icon: 'success',
+        title: '¡Eliminación completada!',
+        html: `<p class="text-green-800 font-semibold text-center">${successful} copropietario(s) eliminado(s) exitosamente${failed > 0 ? `<br><span style="color:#dc2626;font-size:13px;">${failed} no pudieron eliminarse</span>` : ''}</p>`,
+        confirmButtonColor: '#27ae60',
+        timer: 3000, timerProgressBar: true, showConfirmButton: false,
+      });
+      if (onSuccess) onSuccess(response);
+      return;
+    }
+
+    // Modo Celery: mostrar barra de progreso y polling
+    await Swal.fire({
+      title: 'Eliminando copropietarios...',
+      html: updateDeleteProgressHtml(),
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+        pollingInterval = setInterval(async () => {
+          try {
+            if (Date.now() - startTime >= timeoutMs) {
+              clearInterval(pollingInterval);
+              Swal.close();
+              Swal.fire({ icon: 'warning', title: 'Tiempo agotado', text: 'El proceso tardó más de lo esperado. Verifica el listado.', confirmButtonColor: '#3498db' });
+              if (onSuccess) onSuccess(null);
+              return;
+            }
+            const statusResponse = await pollProgressFn(taskId);
+            const st = statusResponse.data?.status || 'unknown';
+            if (st === 'not_found' || st === 'unknown') return;
+
+            progressData = {
+              current: statusResponse.data?.current || 0,
+              total: statusResponse.data?.total || total,
+              progress: statusResponse.data?.progress || 0,
+            };
+            Swal.update({ html: updateDeleteProgressHtml() });
+
+            if (st === 'completed' || st === 'failed') {
+              clearInterval(pollingInterval);
+              Swal.close();
+            }
+          } catch (err) {
+            console.error('Error polling delete progress:', err);
+          }
+        }, 1500);
+      },
+      willClose: () => { if (pollingInterval) clearInterval(pollingInterval); },
+    });
+
+    // Obtener estado final
+    const finalResponse = await pollProgressFn(taskId);
+    const { successful = 0, failed = 0 } = finalResponse.data || {};
+
     Swal.fire({
       icon: 'success',
       title: '¡Eliminación completada!',
@@ -192,15 +261,9 @@ export const showBulkDeleteWithLoading = async ({ count, unitName, deletePromise
             <p class="text-green-800 font-semibold text-center">
               ${successful} copropietario(s) eliminado(s) exitosamente
             </p>
-            ${failed > 0 ? `
-              <p class="text-red-600 text-sm text-center mt-2">
-                ${failed} no pudieron ser eliminados
-              </p>
-            ` : ''}
+            ${failed > 0 ? `<p class="text-red-600 text-sm text-center mt-2">${failed} no pudieron ser eliminados</p>` : ''}
           </div>
-          <p class="text-gray-500 text-sm text-center">
-            El listado se ha actualizado automáticamente
-          </p>
+          <p class="text-gray-500 text-sm text-center">El listado se ha actualizado automáticamente</p>
         </div>
       `,
       confirmButtonColor: '#27ae60',
@@ -210,15 +273,14 @@ export const showBulkDeleteWithLoading = async ({ count, unitName, deletePromise
       allowOutsideClick: false,
       allowEscapeKey: false,
     });
-    
-    if (onSuccess) {
-      onSuccess(response);
-    }
+
+    if (onSuccess) onSuccess(finalResponse);
   } catch (error) {
+    if (pollingInterval) clearInterval(pollingInterval);
     Swal.close();
-    
+
     const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
-    
+
     Swal.fire({
       icon: isTimeout ? 'warning' : 'error',
       title: isTimeout ? 'Tiempo agotado' : 'Error al eliminar',
@@ -228,9 +290,7 @@ export const showBulkDeleteWithLoading = async ({ count, unitName, deletePromise
       confirmButtonColor: '#3498db',
     });
 
-    if (onError) {
-      onError(error);
-    }
+    if (onError) onError(error);
   }
 };
 
@@ -642,16 +702,17 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
 };
 
 /**
- * Muestra un modal de confirmación + loading para habilitar/deshabilitar acceso masivo.
+ * Muestra un modal de confirmación + progreso Celery para habilitar/deshabilitar acceso masivo.
  *
  * @param {Object} options
  * @param {number} options.count - Cantidad de usuarios a modificar
  * @param {boolean} options.enabled - true = habilitar, false = deshabilitar
- * @param {Function} options.togglePromise - Función que ejecuta la operación y retorna la respuesta
+ * @param {Function} options.togglePromise - Función que ejecuta la operación (retorna { data: { task_id, total } })
+ * @param {Function} options.pollProgressFn - Función (taskId) => Promise para consultar el estado
  * @param {Function} options.onSuccess - Callback en éxito
  * @param {Function} options.onError - Callback en error (opcional)
  */
-export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePromise, onSuccess, onError }) => {
+export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePromise, pollProgressFn, onSuccess, onError }) => {
   const action = enabled ? 'habilitar' : 'deshabilitar';
   const actionTitle = enabled ? 'Habilitar' : 'Deshabilitar';
   const actionColor = enabled ? '#27ae60' : '#e74c3c';
@@ -672,6 +733,7 @@ export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePr
               ? 'Los usuarios seleccionados podrán ingresar al sistema.'
               : 'Los usuarios seleccionados NO podrán ingresar al sistema.'}
           </p>
+          ${enabled ? '<p style="color:#1d4ed8;font-size:12px;margin:8px 0 0 0;">Si hay una reunión activa, quedarán invitados y recibirán el correo de invitación.</p>' : ''}
         </div>
       </div>
     `,
@@ -684,19 +746,94 @@ export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePr
 
   if (!confirmResult.isConfirmed) return;
 
-  Swal.fire({
-    title: `${actionTitle}ndo acceso...`,
-    html: `Procesando <strong>${count}</strong> usuario(s), por favor espera.`,
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    didOpen: () => Swal.showLoading(),
-  });
+  let progressData = { current: 0, total: count, progress: 1 };
+  let pollingInterval = null;
+  const startTime = Date.now();
+  const timeoutMs = 300000;
+
+  const updateProgressHtml = () => {
+    const { current, total, progress } = progressData;
+    return `
+      <div style="text-align:left;">
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+            <span style="color:#374151;">Procesando usuarios...</span>
+            <span style="color:#2563eb;font-weight:600;">${current} / ${total}</span>
+          </div>
+          <div style="width:100%;background:#e5e7eb;border-radius:9999px;height:10px;">
+            <div style="background:#2563eb;height:10px;border-radius:9999px;transition:width 0.3s;width:${progress}%;"></div>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#9ca3af;text-align:center;margin:0;">
+          Habilitando/deshabilitando accesos en batches de 50
+        </p>
+      </div>
+    `;
+  };
 
   try {
     const response = await togglePromise();
-    Swal.close();
+    const taskId = response.data?.task_id;
+    const total = response.data?.total || count;
+    progressData.total = total;
 
-    const { successful = 0, failed = 0, already_in_state = 0 } = response.data || {};
+    if (!taskId || !pollProgressFn) {
+      // Respuesta síncrona (fallback)
+      const { successful = 0, failed = 0, already_in_state = 0 } = response.data || {};
+      Swal.fire({
+        icon: successful > 0 ? 'success' : 'warning',
+        title: `Acceso ${enabled ? 'habilitado' : 'deshabilitado'}`,
+        html: `<p style="color:#166534;font-weight:600;text-align:center;">${successful} usuario(s) procesados</p>`,
+        timer: 3000, timerProgressBar: true, showConfirmButton: false,
+      });
+      if (onSuccess) onSuccess(response);
+      return;
+    }
+
+    // Modo Celery: mostrar barra de progreso y polling
+    await Swal.fire({
+      title: `${actionTitle}ndo acceso...`,
+      html: updateProgressHtml(),
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+        pollingInterval = setInterval(async () => {
+          try {
+            if (Date.now() - startTime >= timeoutMs) {
+              clearInterval(pollingInterval);
+              Swal.close();
+              Swal.fire({ icon: 'warning', title: 'Tiempo agotado', text: 'El proceso tardó más de lo esperado. Verifica el listado.', confirmButtonColor: '#3498db' });
+              if (onSuccess) onSuccess(null);
+              return;
+            }
+            const statusResponse = await pollProgressFn(taskId);
+            const st = statusResponse.data?.status || 'unknown';
+            if (st === 'not_found' || st === 'unknown') return;
+
+            progressData = {
+              current: statusResponse.data?.current || 0,
+              total: statusResponse.data?.total || total,
+              progress: statusResponse.data?.progress || 0,
+            };
+            Swal.update({ html: updateProgressHtml() });
+
+            if (st === 'completed' || st === 'failed') {
+              clearInterval(pollingInterval);
+              Swal.close();
+            }
+          } catch (err) {
+            console.error('Error polling toggle progress:', err);
+          }
+        }, 1500);
+      },
+      willClose: () => { if (pollingInterval) clearInterval(pollingInterval); },
+    });
+
+    // Obtener estado final
+    const finalResponse = await pollProgressFn(taskId);
+    const { successful = 0, failed = 0, already_in_state = 0 } = finalResponse.data || {};
 
     Swal.fire({
       icon: successful > 0 ? 'success' : 'warning',
@@ -720,8 +857,9 @@ export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePr
       allowEscapeKey: false,
     });
 
-    if (onSuccess) onSuccess(response);
+    if (onSuccess) onSuccess(finalResponse);
   } catch (error) {
+    if (pollingInterval) clearInterval(pollingInterval);
     Swal.close();
     Swal.fire({
       icon: 'error',

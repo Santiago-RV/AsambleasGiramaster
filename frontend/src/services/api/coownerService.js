@@ -136,7 +136,7 @@ const CoownerService = {
 	},
 
 	/**
-	 * Elimina múltiples copropietarios seleccionados
+	 * Elimina múltiples copropietarios seleccionados (Celery)
 	 * @param {number[]} coownerIds - Array de IDs de copropietarios
 	 * @param {number} unitId - ID de la unidad residencial (requerido para SuperAdmin)
 	 */
@@ -144,12 +144,22 @@ const CoownerService = {
 		const response = await axiosInstance.delete(
 			'/admin/coowners/delete-bulk',
 			{
-				data: { 
+				data: {
 					user_ids: coownerIds,
 					unit_id: unitId
 				},
-				timeout: 120000,
+				timeout: 30000,
 			}
+		);
+		return response.data;
+	},
+
+	/**
+	 * Consulta el estado de una tarea masiva (toggle/delete) en Redis
+	 */
+	getBulkTaskStatus: async (taskId) => {
+		const response = await axiosInstance.get(
+			`/admin/coowners/bulk-task-status/${taskId}`
 		);
 		return response.data;
 	},

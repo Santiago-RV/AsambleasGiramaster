@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { UsersIcon, MoreVertical, Mail, Send, Shield, Loader2, ShieldOff, UserCheck, UserX, Search, Info , QrCode, Calendar, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { UsersIcon, MoreVertical, Mail, Send, Shield, Loader2, ShieldOff, UserCheck, UserX, Search, Info, QrCode, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
 import QRCodeModal from './QRCodeModal';
@@ -1274,18 +1274,6 @@ const ResidentsList = ({
 									<span>Deshabilitar</span>
 								</button>
 
-								{/* Botón invitar a reunión - solo si showInviteButton es true */}
-								{showInviteButton && (
-									<button
-										onClick={handleOpenInviteModal}
-										className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors text-xs font-medium"
-										title="Invitar a reunión programada"
-									>
-										<Calendar size={14} />
-										<span>Invitar</span>
-									</button>
-								)}
-
 								{onBulkDelete && selectedResidents.length > 0 && (
 									<button
 										onClick={handleDeleteClick}
@@ -1599,129 +1587,6 @@ const ResidentsList = ({
 				/>
 			)}
 
-			{/* Modal de Invitación a Reunión */}
-			{showInviteButton && (
-				<Modal
-					isOpen={showInviteModal}
-					onClose={handleCloseInviteModal}
-					title="Invitar a Reunión"
-					size="md"
-				>
-					<div className="space-y-4">
-						{/* Información de selección */}
-						<div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-							<p className="text-blue-800 text-sm">
-								<strong>{selectedResidents.length}</strong> residente(s) seleccionado(s)
-							</p>
-						</div>
-
-						{/* Selector de reunión */}
-						<div>
-							<label className="block text-sm font-semibold text-gray-700 mb-2">
-								Seleccionar Reunión
-							</label>
-							{loadingMeetings ? (
-								<div className="flex items-center justify-center py-4">
-									<div className="animate-spin h-5 w-5 border-2 border-[#3498db] border-t-transparent rounded-full"></div>
-									<span className="ml-2 text-gray-600 text-sm">Cargando reuniones...</span>
-								</div>
-							) : invitableMeetings.length === 0 ? (
-								<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-									<p className="text-yellow-800 text-sm">
-										No hay reuniones disponibles para enviar invitaciones en esta unidad residencial.
-									</p>
-								</div>
-							) : (
-								<select
-									value={selectedMeeting}
-									onChange={(e) => handleMeetingChange(e.target.value)}
-									className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3498db] focus:border-transparent text-sm"
-								>
-									<option value="">-- Seleccione una reunión --</option>
-									{invitableMeetings.map((meeting) => (
-										<option key={meeting.id} value={meeting.id}>
-											{meeting.str_title} - {' '}
-											{meeting.str_status === 'En Curso' ? (
-												<span className="text-green-600 font-semibold">[EN CURSO]</span>
-											) : (
-												<span className="text-blue-600 font-semibold">[PROGRAMADA]</span>
-											)}{' - '}
-											{formatDateTime(meeting.dat_schedule_date)}
-										</option>
-									))}
-								</select>
-							)}
-						</div>
-
-						{/* Advertencia si la reunión está en curso */}
-						{selectedMeetingInfo?.str_status === 'En Curso' && (
-							<div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
-								<AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
-								<div>
-									<p className="text-amber-800 text-sm font-medium">
-										Reunión en Curso
-									</p>
-									<p className="text-amber-700 text-xs mt-1">
-										Esta reunión ya está en curso. Los invitados recibirán un correo de invitación,
-										pero no podrán unirse si la reunión ya ha finalizado.
-									</p>
-								</div>
-							</div>
-						)}
-
-						{/* Lista de residentes seleccionados */}
-						{selectedResidents.length > 0 && (
-							<div>
-								<label className="block text-sm font-semibold text-gray-700 mb-2">
-									Residentes a invitar:
-								</label>
-								<div className="bg-gray-50 border border-gray-200 rounded-lg p-2 max-h-32 overflow-y-auto">
-									<ul className="space-y-1">
-										{residents
-											.filter((r) => selectedResidents.includes(r.id))
-											.map((r) => (
-												<li key={r.id} className="flex items-center gap-2 text-xs text-gray-700">
-													<CheckCircle size={14} className="text-green-500" />
-													{r.firstname} {r.lastname} - {r.apartment_number}
-												</li>
-											))}
-									</ul>
-								</div>
-							</div>
-						)}
-
-						{/* Botones de acción */}
-						<div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
-							<button
-								onClick={handleCloseInviteModal}
-								className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-							>
-								Cancelar
-							</button>
-							<button
-								onClick={handleSendInvitations}
-								disabled={!selectedMeeting || selectedResidents.length === 0 || inviting}
-								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedMeeting && selectedResidents.length > 0 && !inviting
-									? 'bg-green-500 text-white hover:bg-green-600'
-									: 'bg-gray-200 text-gray-400 cursor-not-allowed'
-									}`}
-							>
-								{inviting ? (
-									<>
-										<div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-										Enviando...
-									</>
-								) : (
-									<>
-										<Send size={16} />
-										Enviar Invitaciones
-									</>
-								)}
-							</button>
-						</div>
-					</div>
-				</Modal>
-			)}
 
 			<HelpModalCopro
 				isOpen={isHelpModalCopro}

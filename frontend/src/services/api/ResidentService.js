@@ -97,6 +97,13 @@ export class ResidentService {
         return response.data;
     }
 
+    static async getBulkTaskStatus(taskId) {
+        const response = await axiosInstance.get(
+            `/super-admin/residential-units/bulk-task-status/${taskId}`
+        );
+        return response.data;
+    }
+
     static async toggleUserAccess(unitId, userId, enabled) {
         const response = await axiosInstance.post(
             `/super-admin/${unitId}/residents/${userId}/toggle-access`,

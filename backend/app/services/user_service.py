@@ -260,10 +260,12 @@ class UserService:
         user_id: int,
         unit_id: int,
         send_email: bool = True,
-        is_super_admin: bool = False
+        is_super_admin: bool = False,
+        created_by: Optional[int] = None
     ) -> dict:
         """
         Habilita el acceso de un copropietario al sistema.
+        Si existe una reunión activa (Programada/En Curso) crea la invitación automáticamente.
         Usado por: POST /admin/coowners/{coowner_id}/enable
 
         Args:
@@ -271,30 +273,31 @@ class UserService:
             unit_id: ID de la unidad residencial
             send_email: Si se debe enviar correo de notificación
             is_super_admin: Si es SuperAdmin puede modificar acceso de administradores
+            created_by: ID del usuario que realiza la acción (para auditoría de invitaciones)
 
         Returns:
-            dict: Información del copropietario habilitado
+            dict: Información del copropietario habilitado, incluye meeting_invitation_created y active_meeting_id
         """
         try:
             logger.info(f"Habilitando acceso para user_id={user_id} en unit_id={unit_id}")
-            
+
             # Buscar el copropietario con sus datos
             query = select(UserModel, DataUserModel).join(
                 DataUserModel,
                 UserModel.int_data_user_id == DataUserModel.id
             ).where(UserModel.id == user_id)
-            
+
             result = await self.db.execute(query)
             user_data = result.first()
-            
+
             if not user_data:
                 raise ResourceNotFoundException(
                     message=f"Copropietario con ID {user_id} no encontrado",
                     error_code="COOWNER_NOT_FOUND"
                 )
-            
+
             user, data_user = user_data
-            
+
             # Verificar que pertenece a la unidad
             verify_query = select(UserResidentialUnitModel).where(
                 and_(
@@ -303,12 +306,13 @@ class UserService:
                 )
             )
             verify_result = await self.db.execute(verify_query)
-            if not verify_result.scalar_one_or_none():
+            user_unit = verify_result.scalar_one_or_none()
+            if not user_unit:
                 raise ResourceNotFoundException(
                     message="El copropietario no pertenece a esta unidad residencial",
                     error_code="COOWNER_NOT_IN_UNIT"
                 )
-            
+
             # Verificar que no sea un administrador (solo si no es SuperAdmin)
             if user.int_id_rol == 2 and not is_super_admin:
                 raise ServiceException(
@@ -324,35 +328,87 @@ class UserService:
                     "email": data_user.str_email,
                     "name": f"{data_user.str_firstname} {data_user.str_lastname}",
                     "status": "already_enabled",
-                    "message": "El copropietario ya tenía acceso habilitado"
+                    "message": "El copropietario ya tenía acceso habilitado",
+                    "meeting_invitation_created": False,
+                    "active_meeting_id": None
                 }
-            
+
             # Habilitar acceso
             user.bln_allow_entry = True
             user.updated_at = colombia_now()
-            
+
             await self.db.commit()
             await self.db.refresh(user)
-            
-            # Enviar correo de notificación (opcional)
-            if send_email:
-                try:
-                    # TODO: Implementar envío de correo de notificación
-                    # Puedes usar email_service para enviar un correo personalizado
-                    logger.info(f"📧 Correo de habilitación enviado a {data_user.str_email}")
-                except Exception as email_error:
-                    logger.warning(f"No se pudo enviar correo de notificación: {email_error}")
-                    # No fallar si el correo falla
-            
+
             logger.info(f"✅ Acceso habilitado para {data_user.str_email} (user_id={user_id})")
-            
+
+            # Crear invitación automática si hay reunión activa para la unidad
+            meeting_invitation_created = False
+            active_meeting_id = None
+
+            try:
+                from app.models.meeting_model import MeetingModel
+                from app.models.meeting_invitation_model import MeetingInvitationModel
+                from decimal import Decimal
+
+                meeting_query = select(MeetingModel).where(
+                    and_(
+                        MeetingModel.int_id_residential_unit == unit_id,
+                        MeetingModel.str_status.in_(["Programada", "En Curso"])
+                    )
+                )
+                meeting_result = await self.db.execute(meeting_query)
+                active_meeting = meeting_result.scalars().first()
+
+                if active_meeting:
+                    existing_inv_result = await self.db.execute(
+                        select(MeetingInvitationModel).where(
+                            and_(
+                                MeetingInvitationModel.int_meeting_id == active_meeting.id,
+                                MeetingInvitationModel.int_user_id == user_id
+                            )
+                        )
+                    )
+                    if not existing_inv_result.scalar_one_or_none():
+                        is_admin_no_apt = user_unit.bool_is_admin and not user_unit.str_apartment_number
+                        quorum_val = Decimal("0") if is_admin_no_apt else (user_unit.dec_default_voting_weight or Decimal("0"))
+                        apt_number = "ADMIN" if is_admin_no_apt else (user_unit.str_apartment_number or "N/A")
+
+                        invitation = MeetingInvitationModel(
+                            int_meeting_id=active_meeting.id,
+                            int_user_id=user_id,
+                            dec_voting_weight=quorum_val,
+                            dec_quorum_base=quorum_val,
+                            str_apartment_number=apt_number,
+                            str_invitation_status="pending",
+                            str_response_status="no_response",
+                            dat_sent_at=colombia_now(),
+                            int_delivery_attemps=0,
+                            bln_will_attend=False,
+                            bln_actually_attended=False,
+                            created_by=created_by,
+                            updated_by=created_by
+                        )
+                        self.db.add(invitation)
+                        active_meeting.int_total_invitated = (active_meeting.int_total_invitated or 0) + 1
+                        await self.db.commit()
+
+                        meeting_invitation_created = True
+                        active_meeting_id = active_meeting.id
+                        logger.info(f"✅ Invitación creada automáticamente para user_id={user_id} en meeting_id={active_meeting.id}")
+
+            except Exception as inv_error:
+                logger.warning(f"⚠️ No se pudo crear invitación automática para user_id={user_id}: {inv_error}")
+
             return {
                 "user_id": user.id,
                 "username": user.str_username,
                 "email": data_user.str_email,
                 "name": f"{data_user.str_firstname} {data_user.str_lastname}",
                 "status": "enabled",
-                "message": "Acceso habilitado exitosamente"
+                "message": "Acceso habilitado exitosamente",
+                "meeting_invitation_created": meeting_invitation_created,
+                "active_meeting_id": active_meeting_id
             }
             
         except (ResourceNotFoundException, ServiceException):

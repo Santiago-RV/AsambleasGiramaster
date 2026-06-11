@@ -310,12 +310,27 @@ async def enable_coowner(
                 detail="No se encontró una unidad residencial asignada"
             )
 
-        # Habilitar el copropietario
+        # Habilitar el copropietario (también crea invitación si hay reunión activa)
         result = await user_service.enable_coowner_access(
             user_id=coowner_id,
             unit_id=admin_unit['id'],
-            send_email=send_email
+            send_email=send_email,
+            created_by=user.id
         )
+
+        # Si se creó invitación automática, enviar correo por Celery
+        if result.get("meeting_invitation_created") and result.get("active_meeting_id"):
+            task_id = str(uuid.uuid4())
+            try:
+                celery_app.send_task(
+                    'app.tasks.email_tasks.send_meeting_invitations',
+                    args=[result["active_meeting_id"], task_id, None, [coowner_id]],
+                    task_id=task_id,
+                    queue='email_tasks'
+                )
+                logger.info(f"📧 Correo de invitación encolado para user_id={coowner_id} en meeting_id={result['active_meeting_id']}")
+            except Exception as celery_err:
+                logger.warning(f"⚠️ No se pudo encolar correo de invitación: {celery_err}")
 
         return SuccessResponse(
             success=True,
@@ -660,25 +675,15 @@ async def get_email_task_status(
 @router.post(
     "/toggle-access-bulk",
     response_model=SuccessResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Habilitar/Deshabilitar acceso de múltiples copropietarios seleccionados",
-    description="Modifica el estado de acceso de múltiples copropietarios seleccionados específicamente"
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Habilitar/Deshabilitar acceso de múltiples copropietarios (Celery)",
+    description="Encola una tarea Celery para modificar el acceso de múltiples copropietarios en batches de 50"
 )
 async def toggle_coowners_access_bulk(
     request_data: BulkToggleAccessRequest,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Habilita o deshabilita el acceso de múltiples copropietarios SELECCIONADOS.
-    A diferencia de enable-all, este endpoint permite seleccionar usuarios específicos.
-
-    Body:
-        {
-            "user_ids": [5, 8, 12],
-            "enabled": true/false
-        }
-    """
     try:
         user_service = UserService(db)
         user = await user_service.get_user_by_username(current_user)
@@ -704,103 +709,45 @@ async def toggle_coowners_access_bulk(
                 detail="Debe proporcionar al menos un ID de usuario"
             )
 
-        # Procesar cada copropietario
-        successful = 0
-        failed = 0
-        already_in_state = 0
-        errors = []
-        processed_users = []
-
-        for user_id in request_data.user_ids:
-            try:
-                if request_data.enabled:
-                    result = await user_service.enable_coowner_access(
-                        user_id=user_id,
-                        unit_id=admin_unit['id'],
-                        send_email=False  # No enviar correos individuales en operación masiva
-                    )
-                else:
-                    result = await user_service.disable_coowner_access(
-                        user_id=user_id,
-                        unit_id=admin_unit['id'],
-                        send_email=False
-                    )
-
-                if result['status'] in ['already_enabled', 'already_disabled']:
-                    already_in_state += 1
-                else:
-                    successful += 1
-
-                processed_users.append({
-                    "user_id": result["user_id"],
-                    "username": result["username"],
-                    "name": result["name"],
-                    "email": result["email"],
-                    "status": result["status"]
-                })
-
-            except Exception as e:
-                failed += 1
-                errors.append({
-                    "user_id": user_id,
-                    "error": str(e)
-                })
-
-        action_text = "habilitados" if request_data.enabled else "deshabilitados"
-
-        # Preparar mensaje de respuesta
-        if successful == len(request_data.user_ids):
-            message = f"✅ {successful} copropietarios {action_text} exitosamente"
-        elif successful > 0:
-            message = (
-                f"⚠️ Proceso completado: {successful} exitosos"
-            )
-            if already_in_state > 0:
-                message += f", {already_in_state} ya estaban {action_text}"
-            if failed > 0:
-                message += f", {failed} fallidos"
-        elif already_in_state == len(request_data.user_ids):
-            message = f"ℹ️ Todos los copropietarios ya estaban {action_text}"
-        else:
-            message = f"❌ No se pudo modificar el acceso de ningún copropietario"
-
-        logger.info(
-            f"✅ Admin {current_user} modificó acceso masivo en unit_id={admin_unit['id']}: "
-            f"{successful} exitosos, {failed} fallidos, {already_in_state} sin cambios"
+        task_id = str(uuid.uuid4())
+        celery_app.send_task(
+            'app.tasks.coowner_tasks.bulk_toggle_access_task',
+            args=[request_data.user_ids, admin_unit['id'], request_data.enabled, user.id, task_id],
+            task_id=task_id,
+            queue='celery'
         )
+
+        action_text = "habilitar" if request_data.enabled else "deshabilitar"
+        logger.info(f"🔄 Admin {current_user} encoló toggle masivo en unit_id={admin_unit['id']}: {len(request_data.user_ids)} usuarios, task_id={task_id}")
 
         return SuccessResponse(
             success=True,
-            status_code=status.HTTP_200_OK,
-            message=message,
+            status_code=status.HTTP_202_ACCEPTED,
+            message=f"Proceso de {action_text} iniciado para {len(request_data.user_ids)} copropietario(s)",
             data={
-                "total_processed": len(request_data.user_ids),
-                "successful": successful,
-                "failed": failed,
-                "already_in_state": already_in_state,
-                "errors": errors,
-                "processed_users": processed_users,
-                "action": "enabled" if request_data.enabled else "disabled"
+                "task_id": task_id,
+                "total": len(request_data.user_ids),
+                "status": "processing"
             }
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al modificar acceso masivo: {str(e)}")
+        logger.error(f"Error al encolar toggle masivo: {str(e)}")
         raise ServiceException(
-            message=f"Error al modificar acceso masivo: {str(e)}",
+            message=f"Error al encolar toggle masivo: {str(e)}",
             details={"original_error": str(e)}
         )
 
 @router.delete(
     "/delete-bulk",
     response_model=SuccessResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Eliminar múltiples copropietarios seleccionados"
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Eliminar múltiples copropietarios (Celery)"
 )
 async def delete_coowners_bulk(
-    request_data: BulkDeleteRequest,  # { user_ids: [int] }
+    request_data: BulkDeleteRequest,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -812,30 +759,86 @@ async def delete_coowners_bulk(
 
     residential_service = ResidentialUnitService(db)
 
-    # Si es admin (rol 2), obtener su unidad; si es superadmin (rol 1), viene en el body
     if user.int_id_rol == 2:
         admin_unit = await residential_service.get_admin_residential_unit(user.id)
         unit_id = admin_unit['id']
     else:
-        unit_id = request_data.unit_id  # superadmin pasa unit_id
+        unit_id = request_data.unit_id
 
-    successful, failed, errors = 0, 0, []
+    if not request_data.user_ids:
+        raise HTTPException(status_code=400, detail="Debe proporcionar al menos un ID de usuario")
 
-    for user_id in request_data.user_ids:
-        try:
-            await residential_service.delete_resident(
-                user_id=user_id,
-                unit_id=unit_id,
-                deleting_user_role=user.int_id_rol
-            )
-            successful += 1
-        except Exception as e:
-            failed += 1
-            errors.append({"user_id": user_id, "error": str(e)})
+    task_id = str(uuid.uuid4())
+    celery_app.send_task(
+        'app.tasks.coowner_tasks.bulk_delete_task',
+        args=[request_data.user_ids, unit_id, user.int_id_rol, task_id],
+        task_id=task_id,
+        queue='celery'
+    )
+
+    logger.info(f"🗑️ {current_user} encoló eliminación masiva en unit_id={unit_id}: {len(request_data.user_ids)} usuarios, task_id={task_id}")
 
     return SuccessResponse(
         success=True,
-        status_code=200,
-        message=f"{successful} eliminados, {failed} fallidos",
-        data={"successful": successful, "failed": failed, "errors": errors}
+        status_code=status.HTTP_202_ACCEPTED,
+        message=f"Proceso de eliminación iniciado para {len(request_data.user_ids)} copropietario(s)",
+        data={
+            "task_id": task_id,
+            "total": len(request_data.user_ids),
+            "status": "processing"
+        }
     )
+
+
+@router.get(
+    "/bulk-task-status/{task_id}",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Consultar estado de tarea masiva (toggle/delete)",
+)
+async def get_bulk_task_status(
+    task_id: str,
+    current_user: str = Depends(get_current_user)
+):
+    import redis.asyncio as aioredis
+    from app.core.config import settings as _settings
+
+    try:
+        r = await aioredis.from_url(_settings.REDIS_URL)
+        key = f"coowner_task:{task_id}"
+        data = await r.hgetall(key)
+        await r.close()
+
+        if not data:
+            return SuccessResponse(
+                success=True,
+                status_code=status.HTTP_200_OK,
+                message="Tarea no encontrada o expirada",
+                data={"status": "not_found", "progress": 0, "current": 0, "total": 0}
+            )
+
+        def _int(k):
+            return int(data.get(k, b'0'))
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Estado obtenido",
+            data={
+                "status": data.get(b'status', b'unknown').decode(),
+                "progress": _int(b'progress'),
+                "current": _int(b'current'),
+                "total": _int(b'total'),
+                "successful": _int(b'successful'),
+                "failed": _int(b'failed'),
+                "already_in_state": _int(b'already_in_state'),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error consultando bulk-task-status {task_id}: {e}")
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Error consultando estado",
+            data={"status": "error", "error": str(e)}
+        )

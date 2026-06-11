@@ -167,6 +167,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       count: selectedIds.length,
       unitName: unitName,
       deletePromise: () => CoownerService.deleteCoownersBulk(selectedIds, residentialUnitId),
+      pollProgressFn: (taskId) => CoownerService.getBulkTaskStatus(taskId),
       onSuccess: () => {
         refetch();
       },
@@ -533,7 +534,10 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
 
     const result = await Swal.fire({
       title: `¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso?`,
-      html: `<p>${resident.firstname} ${resident.lastname} ${newStatus ? 'PODRÁ' : 'NO PODRÁ'} acceder al sistema.</p>`,
+      html: newStatus
+        ? `<p>${resident.firstname} ${resident.lastname} PODRÁ acceder al sistema.</p>
+           <p class="text-sm text-blue-600 mt-2">Si hay una reunión activa, quedará invitado y recibirá el correo de invitación.</p>`
+        : `<p>${resident.firstname} ${resident.lastname} NO PODRÁ acceder al sistema.</p>`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: newStatus ? '#27ae60' : '#e74c3c',
@@ -562,6 +566,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       count: selectedResidents.length,
       enabled,
       togglePromise: () => CoownerService.toggleCoownersAccessBulk(selectedResidents, enabled),
+      pollProgressFn: (taskId) => CoownerService.getBulkTaskStatus(taskId),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
       },
@@ -701,19 +706,8 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
               });
             }}
             isSendingBulk={sendBulkCredentialsMutation.isPending}
-            showInviteButton={true}
             residentialUnitId={residentialUnitId}
             presencialMeetingId={presencialMeeting?.id ?? null}
-            onInviteToMeeting={() => {
-              queryClient.invalidateQueries({ queryKey: ['meeting-invitations'] });
-              queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
-              queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
-              queryClient.refetchQueries({
-                queryKey: ['residential-unit-residents', residentialUnitId],
-                type: 'active',
-                throwOnError: false
-              });
-            }}
           />
         </div>
 
