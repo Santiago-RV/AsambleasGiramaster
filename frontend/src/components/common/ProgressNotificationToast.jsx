@@ -56,7 +56,7 @@ const ProgressNotificationToast = () => {
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="h-2 rounded-full transition-all duration-300 bg-blue-500"
-                      style={{ width: `${notification.progress}%` }}
+                      style={{ width: `${Math.max(notification.progress, 2)}%` }}
                     />
                   </div>
                 </>

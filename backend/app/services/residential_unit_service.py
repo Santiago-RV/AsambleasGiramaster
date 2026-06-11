@@ -509,10 +509,11 @@ class ResidentialUnitService:
             )
             
     async def process_residents_excel_file(
-        self, 
-        file_content: bytes, 
-        unit_id: int, 
-        created_by: int
+        self,
+        file_content: bytes,
+        unit_id: int,
+        created_by: int,
+        progress_callback=None
     ) -> dict:
         """
         Procesa el archivo Excel y crea copropietarios masivamente insertando en 3 tablas:
@@ -735,6 +736,11 @@ class ResidentialUnitService:
                     })
                     results['failed'] += 1
                     logger.error(f"Error procesando fila {index + 2}: {e}")
+
+                if progress_callback:
+                    processed_count = results['successful'] + results['failed']
+                    if processed_count % 10 == 0 or processed_count == results['total_rows']:
+                        await progress_callback(processed_count, results['total_rows'])
 
             # Commit de todas las operaciones exitosas
             # Guardar lo que quedó pendiente

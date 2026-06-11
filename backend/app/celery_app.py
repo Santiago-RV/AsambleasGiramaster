@@ -5,7 +5,7 @@ celery_app = Celery(
     'giramaster',
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=['app.tasks.email_tasks']
+    include=['app.tasks.email_tasks', 'app.tasks.excel_tasks']
 )
 
 # Configuración de Celery
