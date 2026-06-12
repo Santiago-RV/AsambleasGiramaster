@@ -709,6 +709,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
             isSendingBulk={sendBulkCredentialsMutation.isPending}
             residentialUnitId={residentialUnitId}
             presencialMeetingId={presencialMeeting?.id ?? null}
+            presencialMeetingStatus={presencialMeeting?.estado ?? null}
           />
         </div>
 

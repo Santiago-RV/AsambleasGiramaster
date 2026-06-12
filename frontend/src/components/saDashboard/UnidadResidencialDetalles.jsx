@@ -438,6 +438,11 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 								? (meetingsData.find(m => m.str_modality === 'presencial' && (m.estado === 'En Curso' || m.estado === 'Programada'))?.id ?? null)
 								: null
 						}
+						presencialMeetingStatus={
+							Array.isArray(meetingsData)
+								? (meetingsData.find(m => m.str_modality === 'presencial' && (m.estado === 'En Curso' || m.estado === 'Programada'))?.estado ?? null)
+								: null
+						}
 					/>
 				</div>
 

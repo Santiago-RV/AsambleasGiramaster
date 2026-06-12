@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useMeetingAttendanceSSE } from '../../hooks/useMeetingAttendanceSSE';
 import { UsersIcon, MoreVertical, Mail, Send, Shield, Loader2, ShieldOff, UserCheck, UserX, Search, Info, QrCode, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import Swal from "sweetalert2";
 import ResidentActionsMenu from './ResidentActionsMenu';
@@ -48,6 +49,7 @@ const ResidentsList = ({
 	onInviteToMeeting = null,
 	residentialUnitName: residentialUnitNameProp = null,
 	presencialMeetingId = null,
+	presencialMeetingStatus = null,
 }) => {
 	const [selectedResidents, setSelectedResidents] = useState([]);
 	const [selectAll, setSelectAll] = useState(false);
@@ -73,6 +75,21 @@ const ResidentsList = ({
 	const [inviting, setInviting] = useState(false);
 
 	const { startProgress, updateProgress, finishProgress } = useProgressNotification();
+
+	const [attendanceMap, setAttendanceMap] = useState({});
+	useMeetingAttendanceSSE({
+		meetingId: presencialMeetingId,
+		enabled: presencialMeetingStatus === 'En Curso',
+		onEvent: (data) => {
+			if (data.type === 'initial_state') {
+				const map = {};
+				data.attendances.forEach(a => { map[a.user_id] = a.status; });
+				setAttendanceMap(map);
+			} else if (data.type === 'attendance_update') {
+				setAttendanceMap(prev => ({ ...prev, [data.user_id]: data.status }));
+			}
+		},
+	});
 
 	// Obtener datos del usuario actual para nombre de unidad residencial
 	const { data: userData } = useQuery({
@@ -1426,6 +1443,29 @@ const ResidentsList = ({
 												}`}>
 													{resident.bln_allow_entry ? 'Habilitado' : 'Inhabilitado'}
 												</span>
+
+												{/* Badge: asistencia en tiempo real */}
+												{presencialMeetingStatus === 'En Curso' && (() => {
+													const status = attendanceMap[resident.id] ?? 'disconnected';
+													if (status === 'connected') return (
+														<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+															<span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+															En reunión
+														</span>
+													);
+													if (status === 'absent') return (
+														<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+															<span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+															Ausente
+														</span>
+													);
+													return (
+														<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+															<span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+															No conectado
+														</span>
+													);
+												})()}
 											</div>
 
 											{/* Segunda línea: Apartamento y Email */}

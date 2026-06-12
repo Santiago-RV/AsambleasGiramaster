@@ -404,7 +404,9 @@ class ResidentialUnitService:
                         "meeting_title": meeting.str_title if meeting else None,
                         "meeting_status": meeting.str_status if meeting else None,
                         "sent_at": invitation.dat_sent_at.isoformat() if invitation.dat_sent_at else None,
-                        "status": invitation.str_invitation_status
+                        "status": invitation.str_invitation_status,
+                        "bln_actually_attended": invitation.bln_actually_attended,
+                        "dat_joined_at": invitation.dat_joined_at.isoformat() if invitation.dat_joined_at else None,
                     }
                 
                 residents.append({

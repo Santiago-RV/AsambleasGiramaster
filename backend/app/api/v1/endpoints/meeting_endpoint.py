@@ -23,8 +23,27 @@ from app.services.user_service import UserService
 from app.celery_app import celery_app
 from app.core.config import settings
 from app.api.v1.endpoints.decorators import require_email_enabled
+import asyncio
+import json
+import redis.asyncio as aioredis
+from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
+from jose import JWTError, jwt
 
 logger = logging.getLogger(__name__)
+
+
+async def publish_attendance_event(meeting_id: int, user_id: int, status: str) -> None:
+    """Publica un cambio de asistencia al canal Redis del meeting. status: connected|absent|disconnected"""
+    try:
+        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        await r.publish(
+            f"meeting:attendance:{meeting_id}",
+            json.dumps({"type": "attendance_update", "user_id": user_id, "status": status})
+        )
+        await r.aclose()
+    except Exception as e:
+        logger.warning(f"[SSE] Error publicando evento de asistencia: {e}")
 
 
 class SendInvitationRequest(BaseModel):
@@ -34,6 +53,7 @@ class SendInvitationRequest(BaseModel):
 
 
 router = APIRouter()
+sse_router = APIRouter()
 
 
 @router.get(
@@ -486,6 +506,8 @@ async def register_attendance(
         user_id = user.id
 
         result = await meeting_service.register_attendance(meeting_id, user_id)
+        if result.get("success"):
+            await publish_attendance_event(meeting_id, user_id, "connected")
 
         return SuccessResponse(
             success=result.get("success", False),
@@ -523,6 +545,8 @@ async def register_leave(
         user_id = user.id
 
         result = await meeting_service.register_leave(meeting_id, user_id)
+        if result.get("success"):
+            await publish_attendance_event(meeting_id, user_id, "disconnected")
 
         return SuccessResponse(
             success=result.get("success", False),
@@ -653,7 +677,9 @@ async def scan_qr_attendance(
             qr_token=request.qr_token,
             admin_user_id=admin_user.id
         )
-        
+        if result.get("success") and result.get("user_id"):
+            await publish_attendance_event(result["meeting_id"], result["user_id"], "connected")
+
         return SuccessResponse(
             success=result.get("success", False),
             status_code=status.HTTP_200_OK,
@@ -668,3 +694,86 @@ async def scan_qr_attendance(
             message=f"Error al registrar asistencia por QR: {str(e)}",
             details={"original_error": str(e)}
         )
+
+
+def _derive_attendance_status(inv) -> str:
+    if inv.bln_marked_absent:
+        return "absent"
+    if inv.bln_actually_attended and not inv.dat_left_at:
+        return "connected"
+    return "disconnected"
+
+
+@sse_router.get(
+    "/{meeting_id}/attendance/events",
+    summary="SSE: eventos de asistencia en tiempo real",
+    tags=["Asistencia SSE"],
+)
+async def meeting_attendance_events(meeting_id: int, token: str):
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from app.models.meeting_invitation_model import MeetingInvitationModel
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+    async def event_generator():
+        engine = create_async_engine(settings.ASYNC_DATABASE_URL, echo=False, pool_pre_ping=True)
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = r.pubsub()
+        channel = f"meeting:attendance:{meeting_id}"
+        await pubsub.subscribe(channel)
+
+        try:
+            # Estado inicial
+            try:
+                async with async_session() as db:
+                    result = await db.execute(
+                        sa_select(MeetingInvitationModel).where(
+                            MeetingInvitationModel.int_meeting_id == meeting_id
+                        )
+                    )
+                    invitations = result.scalars().all()
+                    initial = [
+                        {"user_id": inv.int_user_id, "status": _derive_attendance_status(inv)}
+                        for inv in invitations
+                    ]
+                logger.info(f"[SSE] initial_state meeting={meeting_id}: {len(initial)} invitaciones")
+            except Exception as e:
+                logger.error(f"[SSE] Error consultando estado inicial meeting={meeting_id}: {e}")
+                initial = []
+            yield f"data: {json.dumps({'type': 'initial_state', 'attendances': initial})}\n\n"
+
+            while True:
+                try:
+                    msg = await asyncio.wait_for(
+                        pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1),
+                        timeout=30.0,
+                    )
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+                    continue
+                if msg is None:
+                    await asyncio.sleep(0.1)
+                    continue
+                if msg["type"] == "message":
+                    yield f"data: {msg['data']}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await pubsub.unsubscribe(channel)
+            await r.aclose()
+            await engine.dispose()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )

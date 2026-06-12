@@ -878,6 +878,8 @@ async def mark_user_absent(
         result = await ActiveMeetingService(db).mark_user_absent(meeting_id, user_id)
         if not result["success"]:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["message"])
+        from app.api.v1.endpoints.meeting_endpoint import publish_attendance_event
+        await publish_attendance_event(meeting_id, user_id, "absent")
         return SuccessResponse(success=True, status_code=status.HTTP_200_OK, message="Usuario marcado como ausente", data=result)
     except HTTPException:
         raise
@@ -906,9 +908,21 @@ async def unmark_user_absent(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
 
         from app.services.active_meeting_service import ActiveMeetingService
+        from app.models.meeting_invitation_model import MeetingInvitationModel
+        from sqlalchemy import select as _select, and_ as _and
         result = await ActiveMeetingService(db).unmark_user_absent(meeting_id, user_id)
         if not result["success"]:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["message"])
+        inv_row = await db.execute(
+            _select(MeetingInvitationModel).where(
+                _and(MeetingInvitationModel.int_meeting_id == meeting_id, MeetingInvitationModel.int_user_id == user_id)
+            )
+        )
+        inv = inv_row.scalar_one_or_none()
+        if inv:
+            from app.api.v1.endpoints.meeting_endpoint import publish_attendance_event
+            new_status = "connected" if (inv.bln_actually_attended and not inv.dat_left_at) else "disconnected"
+            await publish_attendance_event(meeting_id, user_id, new_status)
         return SuccessResponse(success=True, status_code=status.HTTP_200_OK, message="Marca de ausente eliminada", data=result)
     except HTTPException:
         raise

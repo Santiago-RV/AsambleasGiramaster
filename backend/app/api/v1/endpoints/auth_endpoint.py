@@ -242,9 +242,12 @@ async def register_participation(
     
     await db.commit()
     await db.refresh(invitation)
-    
+
+    from app.api.v1.endpoints.meeting_endpoint import publish_attendance_event
+    await publish_attendance_event(meeting_id, user.id, "connected")
+
     message = "Participación registrada correctamente" if not is_reconnection else "Reconexión registrada correctamente"
-    
+
     return SuccessResponse(
         success=True,
         status_code=status.HTTP_200_OK,
