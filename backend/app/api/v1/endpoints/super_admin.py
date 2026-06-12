@@ -868,7 +868,7 @@ async def toggle_residents_access_bulk(
         task_id = str(uuid.uuid4())
         celery_app.send_task(
             'app.tasks.coowner_tasks.bulk_toggle_access_task',
-            args=[request_data.user_ids, unit_id, request_data.enabled, user.id, task_id],
+            args=[request_data.user_ids, unit_id, request_data.enabled, user.id, task_id, request_data.frontend_url],
             task_id=task_id,
             queue='email_tasks'
         )

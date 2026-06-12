@@ -567,6 +567,7 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       enabled,
       togglePromise: () => CoownerService.toggleCoownersAccessBulk(selectedResidents, enabled),
       pollProgressFn: (taskId) => CoownerService.getBulkTaskStatus(taskId),
+      emailPollFn: (taskId) => CoownerService.getEmailTaskStatus(taskId),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['residential-unit-residents', residentialUnitId] });
       },

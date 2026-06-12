@@ -129,7 +129,8 @@ const CoownerService = {
 			'/admin/coowners/toggle-access-bulk',
 			{
 				user_ids: coownerIds,
-				enabled: enabled
+				enabled: enabled,
+				frontend_url: window.location.origin
 			}
 		);
 		return response.data;
@@ -160,6 +161,13 @@ const CoownerService = {
 	getBulkTaskStatus: async (taskId) => {
 		const response = await axiosInstance.get(
 			`/admin/coowners/bulk-task-status/${taskId}`
+		);
+		return response.data;
+	},
+
+	getEmailTaskStatus: async (taskId) => {
+		const response = await axiosInstance.get(
+			`/admin/coowners/email-task-status/${taskId}`
 		);
 		return response.data;
 	},

@@ -439,57 +439,55 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
             
             auto_login_service = SimpleAutoLoginService()
             notification_service = EmailNotificationService(db)
-            
+
             template_path = Path(__file__).parent.parent / "templates" / "email_meeting_invitation.html"
             with open(template_path, 'r', encoding='utf-8') as f:
                 template_content = f.read()
-            
+
             meeting_date = meeting.dat_schedule_date.strftime('%d/%m/%Y') if meeting.dat_schedule_date else ''
             meeting_time = meeting.dat_schedule_date.strftime('%H:%M') if meeting.dat_schedule_date else ''
-            
+
             template = Template(template_content)
             meeting_year = str(colombia_now().year)
             email_sender = EmailSender(db)
-            
-            # Obtener información de soporte técnico UNA SOLA VEZ antes del loop
+
             from app.services.support_service import SupportService
             support_service = SupportService(db)
             support_data = await support_service.get_support_info(meeting.int_id_residential_unit)
-            
-            for idx, (user, data_user, user_residential_unit) in enumerate(users_data):
+
+            from decimal import Decimal
+            from sqlalchemy import update as sa_update
+
+            await r.hset(f"email_task:{task_id}", mapping={
+                'current': '0', 'total': str(total), 'status': 'processing', 'progress': '0',
+                'meeting_title': meeting.str_title
+            })
+            await r.expire(f"email_task:{task_id}", 3600)
+
+            # Fase 1: preparar todos los correos y crear notificaciones
+            emails_to_send = []
+            notifications_map = {}  # user_id → notification.id
+            for user, data_user, user_residential_unit in users_data:
                 try:
-                    current = idx + 1
-                    progress_pct = int((current / total) * 100) if total > 0 else 0
-                    
-                    if current % 50 == 0 or current == total:
-                        await r.hset(f"email_task:{task_id}", mapping={
-                            'current': str(current),
-                            'total': str(total),
-                            'status': 'processing',
-                            'progress': str(progress_pct),
-                            'meeting_title': meeting.str_title
-                        })
-                        await r.expire(f"email_task:{task_id}", 3600)
-                    
                     notification = await notification_service.create_notification(
                         user_id=user.id,
                         template="meeting_invite",
                         status="pending",
                         meeting_id=meeting_id
                     )
-                    
+                    notifications_map[user.id] = notification.id
+
                     auto_login_token = auto_login_service.generate_auto_login_token(
                         username=user.str_username,
                         expiration_hours=24,
                         meeting_id=meeting_id if meeting.str_modality == "presencial" else None
                     )
-
                     auto_login_url = None
                     if auto_login_token:
                         if not frontend_url:
                             raise ValueError("frontend_url es requerido para generar URL de auto-login")
                         auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
-                    
+
                     html_content = template.render(
                         user_name=f"{data_user.str_firstname} {data_user.str_lastname}",
                         meeting_title=meeting.str_title,
@@ -512,59 +510,93 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                         support_phone=support_data.get("str_support_phone") if support_data else None,
                         support_whatsapp=support_data.get("str_support_whatsapp") if support_data else None,
                     )
-                    
-                    success = await email_sender.send_email_async(
-                        to_emails=[data_user.str_email],
-                        subject=f"Invitación: {meeting.str_title}",
-                        html_content=html_content
-                    )
-                    
-                    if success:
-                        successful += 1
-                        await notification_service.update_status(notification.id, status="sent", commit=False)
-                        
-                        from decimal import Decimal
-                        quorum_base = user_residential_unit.dec_default_voting_weight if user_residential_unit and user_residential_unit.dec_default_voting_weight else Decimal('1.0')
-                        
-                        existing_inv_query = select(MeetingInvitationModel).where(
-                            MeetingInvitationModel.int_meeting_id == meeting_id,
-                            MeetingInvitationModel.int_user_id == user.id
-                        )
-                        existing_result = await db.execute(existing_inv_query)
-                        existing_invitation = existing_result.scalar_one_or_none()
-                        
-                        if existing_invitation:
-                            existing_invitation.dat_sent_at = colombia_now()
-                            existing_invitation.str_invitation_status = "sent"
-                            existing_invitation.int_delivery_attemps += 1
-                            existing_invitation.updated_at = colombia_now()
-                        else:
-                            invitation = MeetingInvitationModel(
-                                int_meeting_id=meeting_id,
-                                int_user_id=user.id,
-                                dec_voting_weight=quorum_base,
-                                dec_quorum_base=quorum_base,
-                                str_apartment_number=user_residential_unit.str_apartment_number if user_residential_unit else "N/A",
-                                str_invitation_status="sent",
-                                str_response_status="no_response",
-                                dat_sent_at=colombia_now(),
-                                int_delivery_attemps=1,
-                                bln_will_attend=False,
-                                bln_actually_attended=False,
-                                created_by=meeting.created_by,
-                                updated_by=meeting.created_by
-                            )
-                            db.add(invitation)
-                    else:
-                        failed += 1
-                        await notification_service.update_status(notification.id, status="failed", commit=False)
-                    
+                    emails_to_send.append({
+                        'to_emails': [data_user.str_email],
+                        'subject': f"Invitación: {meeting.str_title}",
+                        'html_content': html_content,
+                        '_user_id': user.id,
+                        '_email': data_user.str_email,
+                        '_quorum': user_residential_unit.dec_default_voting_weight if user_residential_unit and user_residential_unit.dec_default_voting_weight else Decimal('1.0'),
+                        '_apartment': user_residential_unit.str_apartment_number if user_residential_unit else "N/A",
+                    })
                 except Exception as e:
-                    logger.error(f"❌ Error sending invitation to {data_user.str_email}: {str(e)}")
+                    logger.error(f"❌ Error preparando correo para user_id={user.id}: {e}")
                     failed += 1
-            
+
+            # Fase 2: enviar todos con una sola conexión SMTP
+            email_to_uid = {e['_email']: e['_user_id'] for e in emails_to_send}
+            batch_stats = await email_sender.send_batch_optimized(emails_to_send)
+
+            # Fase 3: procesar resultados y actualizar DB en bulk
+            successful_ids = []
+            failed_ids = []
+            for detail in batch_stats.get('detalles', []):
+                email = detail['to'][0] if detail.get('to') else None
+                uid = email_to_uid.get(email)
+                if not uid:
+                    continue
+                if detail.get('status') == 'exitoso':
+                    successful_ids.append(uid)
+                    successful += 1
+                else:
+                    failed_ids.append(uid)
+                    failed += 1
+
+            # Bulk update notificaciones
+            for uid in successful_ids:
+                notif_id = notifications_map.get(uid)
+                if notif_id:
+                    await notification_service.update_status(notif_id, status="sent", commit=False)
+            for uid in failed_ids:
+                notif_id = notifications_map.get(uid)
+                if notif_id:
+                    await notification_service.update_status(notif_id, status="failed", commit=False)
+
+            # Bulk update invitaciones exitosas
+            if successful_ids:
+                await db.execute(
+                    sa_update(MeetingInvitationModel)
+                    .where(
+                        MeetingInvitationModel.int_meeting_id == meeting_id,
+                        MeetingInvitationModel.int_user_id.in_(successful_ids)
+                    )
+                    .values(
+                        str_invitation_status="sent",
+                        dat_sent_at=colombia_now(),
+                        int_delivery_attemps=MeetingInvitationModel.int_delivery_attemps + 1,
+                        updated_at=colombia_now()
+                    )
+                )
+
+            # Crear invitaciones faltantes (usuarios que no tenían registro)
+            inv_result = await db.execute(
+                select(MeetingInvitationModel.int_user_id).where(
+                    MeetingInvitationModel.int_meeting_id == meeting_id,
+                    MeetingInvitationModel.int_user_id.in_(successful_ids)
+                )
+            )
+            existing_inv_ids = {row[0] for row in inv_result.all()}
+            for email_data in emails_to_send:
+                uid = email_data['_user_id']
+                if uid in successful_ids and uid not in existing_inv_ids:
+                    db.add(MeetingInvitationModel(
+                        int_meeting_id=meeting_id,
+                        int_user_id=uid,
+                        dec_voting_weight=email_data['_quorum'],
+                        dec_quorum_base=email_data['_quorum'],
+                        str_apartment_number=email_data['_apartment'],
+                        str_invitation_status="sent",
+                        str_response_status="no_response",
+                        dat_sent_at=colombia_now(),
+                        int_delivery_attemps=1,
+                        bln_will_attend=False,
+                        bln_actually_attended=False,
+                        created_by=meeting.created_by,
+                        updated_by=meeting.created_by
+                    ))
+
             await db.commit()
-            
+
             meeting.int_total_invitated = total
             meeting.updated_at = colombia_now()
             await db.commit()

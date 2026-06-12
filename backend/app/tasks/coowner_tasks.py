@@ -10,14 +10,14 @@ BATCH_SIZE = 50
 
 
 @celery_app.task(bind=True, name='app.tasks.coowner_tasks.bulk_toggle_access_task')
-def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, created_by: int, task_id: str):
+def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, created_by: int, task_id: str, frontend_url: str = None):
     logger.info(f"🔄 bulk_toggle_access_task iniciada: task_id={task_id}, unit_id={unit_id}, enabled={enabled}, count={len(user_ids)}")
 
     async def _run():
         import redis.asyncio as aioredis
         from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
         from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import select, and_
+        from sqlalchemy import select, and_, delete
         from app.models.user_model import UserModel
         from app.models.user_residential_unit_model import UserResidentialUnitModel
         from app.models.meeting_model import MeetingModel
@@ -48,7 +48,7 @@ def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, c
         failed = 0
         already_in_state = 0
         active_meeting_id = None
-        all_invited_ids = []
+        programmed_meeting_ids = []
 
         try:
             # Buscar reunión activa una sola vez (solo si habilitamos)
@@ -67,10 +67,28 @@ def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, c
                         active_meeting_id = active_meeting.id
                         logger.info(f"📋 Reunión activa encontrada: meeting_id={active_meeting_id}")
 
+            if not enabled:
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        select(MeetingModel.id).where(
+                            and_(
+                                MeetingModel.int_id_residential_unit == unit_id,
+                                MeetingModel.str_status == "Programada"
+                            )
+                        )
+                    )
+                    programmed_meeting_ids = [row[0] for row in result.all()]
+                    if programmed_meeting_ids:
+                        logger.info(f"📋 Reuniones programadas a limpiar: {programmed_meeting_ids}")
+
             # Procesar en batches
+            email_task_id = ''
+            all_to_email = []
             for batch_start in range(0, total, BATCH_SIZE):
                 batch = user_ids[batch_start:batch_start + BATCH_SIZE]
-                batch_invited = []
+                batch_new_invitations = []
+                batch_to_email = []
+                batch_removed_invitations = []
 
                 async with async_session_maker() as db:
                     for uid in batch:
@@ -98,6 +116,17 @@ def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, c
 
                             user.bln_allow_entry = enabled
                             user.updated_at = colombia_now()
+
+                            if not enabled and programmed_meeting_ids:
+                                await db.execute(
+                                    delete(MeetingInvitationModel).where(
+                                        and_(
+                                            MeetingInvitationModel.int_meeting_id.in_(programmed_meeting_ids),
+                                            MeetingInvitationModel.int_user_id == uid
+                                        )
+                                    )
+                                )
+                                batch_removed_invitations.append(uid)
 
                             if enabled and active_meeting_id:
                                 existing = await db.execute(
@@ -129,7 +158,9 @@ def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, c
                                         updated_by=created_by
                                     )
                                     db.add(inv)
-                                    batch_invited.append(uid)
+                                    batch_new_invitations.append(uid)
+
+                                batch_to_email.append(uid)
 
                             successful += 1
 
@@ -139,14 +170,25 @@ def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, c
 
                     await db.commit()
 
-                # Actualizar contador de invitados en la reunión para este batch
-                if batch_invited and active_meeting_id:
+                # Decrementar contador en reuniones programadas por invitaciones eliminadas
+                if batch_removed_invitations and programmed_meeting_ids:
+                    async with async_session_maker() as upd_db:
+                        for mid in programmed_meeting_ids:
+                            mtg = await upd_db.get(MeetingModel, mid)
+                            if mtg and mtg.int_total_invitated:
+                                mtg.int_total_invitated = max(0, mtg.int_total_invitated - len(batch_removed_invitations))
+                        await upd_db.commit()
+
+                # Actualizar contador de invitados solo para invitaciones nuevas
+                if batch_new_invitations and active_meeting_id:
                     async with async_session_maker() as upd_db:
                         mtg = await upd_db.get(MeetingModel, active_meeting_id)
                         if mtg:
-                            mtg.int_total_invitated = (mtg.int_total_invitated or 0) + len(batch_invited)
+                            mtg.int_total_invitated = (mtg.int_total_invitated or 0) + len(batch_new_invitations)
                             await upd_db.commit()
-                    all_invited_ids.extend(batch_invited)
+
+                if batch_to_email:
+                    all_to_email.extend(batch_to_email)
 
                 # Actualizar progreso
                 processed = batch_start + len(batch)
@@ -160,20 +202,21 @@ def bulk_toggle_access_task(self, user_ids: list, unit_id: int, enabled: bool, c
                 })
                 await r.expire(key, 7200)
 
-            # Encolar correos de invitación para todos los invitados
-            email_task_id = ''
-            if enabled and active_meeting_id and all_invited_ids:
+            # Encolar correos para todos los habilitados (una sola tarea al final)
+            if enabled and active_meeting_id and all_to_email and frontend_url:
                 email_task_id = str(_uuid.uuid4())
                 try:
                     celery_app.send_task(
                         'app.tasks.email_tasks.send_meeting_invitations',
-                        args=[active_meeting_id, email_task_id, None, all_invited_ids],
+                        args=[active_meeting_id, email_task_id, frontend_url, all_to_email],
                         task_id=email_task_id,
                         queue='email_tasks'
                     )
-                    logger.info(f"📧 Correos de invitación encolados para {len(all_invited_ids)} usuario(s), meeting_id={active_meeting_id}")
+                    logger.info(f"📧 Correos encolados para {len(all_to_email)} usuario(s), meeting_id={active_meeting_id}, email_task_id={email_task_id}")
                 except Exception as e:
                     logger.warning(f"⚠️ No se pudo encolar correos: {e}")
+            elif enabled and all_to_email and not frontend_url:
+                logger.warning(f"⚠️ {len(all_to_email)} usuario(s) sin correo — frontend_url no proporcionado")
 
             await r.hset(key, mapping={
                 'status': 'completed',

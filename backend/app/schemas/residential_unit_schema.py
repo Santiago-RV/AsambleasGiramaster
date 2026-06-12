@@ -69,6 +69,7 @@ class BulkToggleAccessRequest(BaseModel):
   """
   user_ids: List[int] = Field(..., min_items=1)
   enabled: bool
+  frontend_url: Optional[str] = None
   
 class BulkDeleteRequest(BaseModel):
   user_ids: List[int]

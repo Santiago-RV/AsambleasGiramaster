@@ -406,6 +406,7 @@ export const useResidentOperations = (unitId) => {
 			enabled,
 			togglePromise: () => ResidentService.toggleUsersAccessBulk(unitId, selectedResidents, enabled),
 			pollProgressFn: (taskId) => ResidentService.getBulkTaskStatus(taskId),
+			emailPollFn: (taskId) => ResidentService.getEmailTaskStatus(taskId),
 			onSuccess: () => {
 				queryClient.invalidateQueries({ queryKey: ['residents', unitId] });
 			},

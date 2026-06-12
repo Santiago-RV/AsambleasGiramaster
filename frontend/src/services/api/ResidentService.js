@@ -91,7 +91,8 @@ export class ResidentService {
             `/super-admin/${unitId}/residents/toggle-access-bulk`,
             {
                 user_ids: userIds,
-                enabled: enabled
+                enabled: enabled,
+                frontend_url: window.location.origin
             }
         );
         return response.data;

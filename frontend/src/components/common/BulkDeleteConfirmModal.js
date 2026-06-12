@@ -1,4 +1,5 @@
 import Swal from 'sweetalert2';
+import { startProgressNotification, updateProgressNotification, finishProgressNotification } from '../../contexts/ProgressNotificationContext';
 
 /**
  * Muestra un modal de confirmación para eliminar residentes de forma masiva.
@@ -712,7 +713,7 @@ export const showBulkSendProgressModal = async ({ total, pollProgressFn, startPr
  * @param {Function} options.onSuccess - Callback en éxito
  * @param {Function} options.onError - Callback en error (opcional)
  */
-export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePromise, pollProgressFn, onSuccess, onError }) => {
+export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePromise, pollProgressFn, emailPollFn, onSuccess, onError }) => {
   const action = enabled ? 'habilitar' : 'deshabilitar';
   const actionTitle = enabled ? 'Habilitar' : 'Deshabilitar';
   const actionColor = enabled ? '#27ae60' : '#e74c3c';
@@ -833,7 +834,9 @@ export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePr
 
     // Obtener estado final
     const finalResponse = await pollProgressFn(taskId);
-    const { successful = 0, failed = 0, already_in_state = 0 } = finalResponse.data || {};
+    const { successful = 0, failed = 0, already_in_state = 0, email_task_id: emailTaskId } = finalResponse.data || {};
+
+    const emailPending = enabled && emailPollFn && emailTaskId;
 
     Swal.fire({
       icon: successful > 0 ? 'success' : 'warning',
@@ -847,7 +850,7 @@ export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePr
             ${already_in_state > 0 ? `<p style="color:#6b7280;font-size:13px;text-align:center;margin:6px 0 0 0;">${already_in_state} ya estaban en ese estado</p>` : ''}
             ${failed > 0 ? `<p style="color:#dc2626;font-size:13px;text-align:center;margin:6px 0 0 0;">${failed} no pudieron modificarse</p>` : ''}
           </div>
-          <p style="color:#6b7280;font-size:12px;text-align:center;margin:0;">El listado se ha actualizado automáticamente</p>
+          ${emailPending ? '<p style="color:#1d4ed8;font-size:12px;text-align:center;margin:0;">📧 Enviando correos de invitación en segundo plano...</p>' : '<p style="color:#6b7280;font-size:12px;text-align:center;margin:0;">El listado se ha actualizado automáticamente</p>'}
         </div>
       `,
       timer: 3000,
@@ -856,6 +859,24 @@ export const showBulkToggleAccessWithLoading = async ({ count, enabled, togglePr
       allowOutsideClick: false,
       allowEscapeKey: false,
     });
+
+    if (emailPending) {
+      const notifId = startProgressNotification({ title: 'Enviando invitaciones', total: successful, message: 'Preparando envío...' });
+      const emailInterval = setInterval(async () => {
+        try {
+          const emailStatus = await emailPollFn(emailTaskId);
+          const { status, current = 0, total: emailTotal = 0, progress = 0 } = emailStatus.data || {};
+          if (!status || status === 'not_found') return;
+          updateProgressNotification({ id: notifId, current, total: emailTotal, progress, message: `${current} / ${emailTotal} correos enviados` });
+          if (status === 'completed' || status === 'failed') {
+            clearInterval(emailInterval);
+            finishProgressNotification({ id: notifId, status, message: status === 'completed' ? `${current} correo(s) enviados` : 'Error al enviar correos' });
+          }
+        } catch (err) {
+          console.error('Error polling email task:', err);
+        }
+      }, 2000);
+    }
 
     if (onSuccess) onSuccess(finalResponse);
   } catch (error) {
