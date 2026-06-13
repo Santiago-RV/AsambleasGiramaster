@@ -16,6 +16,7 @@ from app.services.user_service import UserService
 from app.services.residential_unit_service import ResidentialUnitService
 from app.core.database import get_db
 from app.core.exceptions import ServiceException
+from app.services.pool_service import PollService
 
 from app.schemas.residential_unit_schema import BulkToggleAccessRequest, ResidentialUnitResponse
 
@@ -1043,6 +1044,14 @@ async def get_attendance_report(
 
         total_quorum = sum(p["quorum_base"] for p in attended)
         
+        total_quorum_invited = sum(
+        float(inv.dec_quorum_base)
+        for inv, user, data_user in invitations
+        if inv.str_apartment_number != "ADMIN"
+        )
+
+        total_quorum_absent = max(0, total_quorum_invited - total_quorum)
+        
         return SuccessResponse(
             success=True,
             status_code=200,
@@ -1059,6 +1068,9 @@ async def get_attendance_report(
                     "total_invited": len(invitations),
                     "total_attended": len(attended),
                     "total_absent": len(absent),
+                    "total_quorum_attended": round(total_quorum, 4),
+                    "total_quorum_absent": round(total_quorum_absent, 4),
+                    "total_quorum_invited": round(total_quorum_invited, 4),
                     "attendance_percentage": round((len(attended) / len(invitations) * 100) if invitations else 0, 2),
                     "quorum_achieved": total_quorum,
                 },
@@ -1253,9 +1265,10 @@ async def get_polls_report(
             select(PollModel).where(PollModel.int_meeting_id == meeting_id)
         )
         polls = polls_result.scalars().all()
-        
+        poll_service = PollService(db)
         polls_data = []
         for poll in polls:
+            stats = await poll_service.get_poll_statistics(poll.id)
             options_result = await db.execute(
                 select(PollOptionModel).where(PollOptionModel.int_poll_id == poll.id)
             )
@@ -1433,6 +1446,9 @@ async def get_polls_report(
                 "minimum_quorum_percentage": float(poll.dec_minimum_quorum_percentage) if poll.dec_minimum_quorum_percentage else 0,
                 "options": list(options_map.values()),
                 "abstentions": abstentions,
+                "total_weight_attended": stats["total_weight_attended"],
+                "participation_by_attendance": stats["participation_by_attendance"],
+                "participation_by_total": stats["participation_by_total"],
                 "non_voters": non_voters,
                 "total_voters": len(unique_voters),
                 "total_weight_voted": total_weight_voted,

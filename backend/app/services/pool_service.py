@@ -762,7 +762,7 @@ class PollService:
 
         # Calcular peso total de participantes invitados (excluye ADMIN)
         total_weight_invited_result = await self.db.execute(
-            select(func.sum(MeetingInvitationModel.dec_voting_weight))
+            select(func.sum(MeetingInvitationModel.dec_quorum_base))
             .where(
                 and_(
                     MeetingInvitationModel.int_meeting_id == poll.int_meeting_id,
@@ -771,6 +771,23 @@ class PollService:
             )
         )
         total_weight_invited = float(total_weight_invited_result.scalar() or 0)
+
+        total_weight_attended_result = await self.db.execute(
+        select(func.sum(MeetingInvitationModel.dec_voting_weight))
+        .where(
+            and_(
+                MeetingInvitationModel.int_meeting_id == poll.int_meeting_id,
+                MeetingInvitationModel.bln_actually_attended == True,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN'
+                )
+            )
+        )
+    
+
+        total_weight_attended = float(total_weight_attended_result.scalar() or 0)
+        participation_by_attendance = {"voted": total_weight_voted,"not_voted": max(0, total_weight_attended - total_weight_voted)}
+        participation_by_total = {"voted": total_weight_voted, "not_voted": max(0,total_weight_invited - total_weight_voted)}
+        
 
         # Calcular porcentaje de participación por peso
         weight_participation_percentage = (total_weight_voted / total_weight_invited * 100) if total_weight_invited > 0 else 0
@@ -792,6 +809,9 @@ class PollService:
             "total_abstentions": total_abstentions,
             "total_weight_voted": total_weight_voted,
             "total_weight_invited": total_weight_invited,
+            "total_weight_attended": total_weight_attended,
+            "participation_by_attendance": participation_by_attendance,
+            "participation_by_total": participation_by_total,
             "weight_participation_percentage": weight_participation_percentage,
             "quorum_reached": quorum_reached,
             "participation_percentage": participation_percentage,
