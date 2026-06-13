@@ -139,3 +139,58 @@ class SMTPTestConnectionResponse(BaseModel):
     message: str
     recipient_email: Optional[str] = None
     timestamp: Optional[str] = None
+
+
+# ============================================
+# SMTP Multi-Account Schemas
+# ============================================
+
+class SmtpAccountSummary(BaseModel):
+    """Resumen de una cuenta SMTP configurada"""
+    id: int = Field(..., ge=1, description="ID de la cuenta SMTP")
+    name: str = Field(..., description="Nombre amigable de la cuenta")
+    email: Optional[str] = Field(None, description="Email enmascarado")
+    host: str = Field(..., description="Servidor SMTP")
+    port: int = Field(..., description="Puerto SMTP")
+    daily_limit: int = Field(..., description="Límite diario de envíos")
+    is_exceeded_today: bool = Field(..., description="Si excedió el límite hoy")
+    last_exceeded_date: Optional[str] = Field(None, description="Última fecha en que excedió el límite")
+
+
+class SmtpAccountCreateRequest(BaseModel):
+    """Request para crear una nueva cuenta SMTP"""
+    name: str = Field(..., min_length=1, max_length=50, description="Nombre amigable de la cuenta")
+    user: str = Field(..., description="Correo electrónico para autenticación SMTP")
+    password: str = Field(..., min_length=1, description="Contraseña o App Password de Gmail")
+    host: Optional[str] = Field("smtp.gmail.com", description="Servidor SMTP")
+    port: Optional[int] = Field(587, ge=1, le=65535, description="Puerto SMTP")
+    from_email: Optional[str] = Field(None, description="Email del remitente (opcional, usa 'user' si no se indica)")
+    from_name: Optional[str] = Field("GIRAMASTER - Sistema de Asambleas", max_length=100, description="Nombre visible del remitente")
+    daily_limit: Optional[int] = Field(500, ge=1, description="Límite diario de envíos (Gmail: ~500)")
+
+    @validator('user', 'from_email', pre=True, always=True)
+    def validate_email(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str) and v.strip():
+            if '@' not in v or '.' not in v.split('@')[-1]:
+                raise ValueError('Debe ser un correo electrónico válido')
+        return v
+
+
+class SmtpAccountUpdateRequest(BaseModel):
+    """Request para actualizar una cuenta SMTP (todos los campos opcionales)"""
+    name: Optional[str] = Field(None, min_length=1, max_length=50)
+    user: Optional[str] = Field(None, description="Correo electrónico")
+    password: Optional[str] = Field(None, min_length=1, description="Contraseña SMTP")
+    host: Optional[str] = None
+    port: Optional[int] = Field(None, ge=1, le=65535)
+    from_email: Optional[str] = None
+    from_name: Optional[str] = Field(None, max_length=100)
+    daily_limit: Optional[int] = Field(None, ge=1)
+
+    @validator('user', 'from_email', 'password', 'name', 'from_name', pre=True, always=True)
+    def empty_or_masked_to_none(cls, v):
+        if isinstance(v, str) and (v.strip() == '' or v.startswith('***')):
+            return None
+        return v

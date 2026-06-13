@@ -5,6 +5,7 @@ from app.services.encryption_service import encryption_service
 from app.core.logging_config import get_logger
 from typing import Optional, Dict, List
 from app.core.exceptions import ServiceException
+from datetime import date
 
 logger = get_logger(__name__)
 
@@ -668,3 +669,229 @@ class SystemConfigService:
         
         logger.info(f"Credenciales SMTP actualizadas: {list(results.keys())}")
         return results
+
+    # ============================================
+    # SMTP Multi-Account Methods
+    # ============================================
+
+    MAX_SMTP_ACCOUNTS = 10
+
+    async def _migrate_legacy_smtp_keys(self, updated_by: Optional[int] = None):
+        """
+        Migra las keys antiguas (SMTP_HOST, etc.) al formato multi-cuenta (SMTP_1_HOST, etc.).
+        Solo se ejecuta si existen keys antiguas y no existen las nuevas.
+        """
+        existing_name = await self.get_config("SMTP_1_NAME", decrypt=False, silent=True)
+        if existing_name:
+            return  # Ya migrado
+
+        legacy = await self.get_smtp_credentials()
+        if not legacy.get("SMTP_USER"):
+            return  # Nada que migrar
+
+        logger.info("Migrando credenciales SMTP legacy al formato multi-cuenta...")
+
+        await self.set_config("SMTP_1_NAME", "Cuenta Principal", encrypt=False,
+                              description="Nombre de la cuenta SMTP 1", updated_by=updated_by)
+
+        mapping = [
+            ("SMTP_1_HOST", legacy.get("SMTP_HOST", "smtp.gmail.com"), False, "Host SMTP cuenta 1"),
+            ("SMTP_1_PORT", legacy.get("SMTP_PORT", "587"), False, "Puerto SMTP cuenta 1"),
+            ("SMTP_1_USER", legacy.get("SMTP_USER", ""), True, "Usuario SMTP cuenta 1"),
+            ("SMTP_1_PASSWORD", legacy.get("SMTP_PASSWORD", ""), True, "Contraseña SMTP cuenta 1"),
+            ("SMTP_1_FROM_EMAIL", legacy.get("SMTP_FROM_EMAIL", ""), False, "From email cuenta 1"),
+            ("SMTP_1_FROM_NAME", legacy.get("SMTP_FROM_NAME", "GIRAMASTER"), False, "From name cuenta 1"),
+            ("SMTP_1_DAILY_LIMIT", "500", False, "Límite diario cuenta 1"),
+        ]
+
+        for key, value, encrypt, desc in mapping:
+            if value:
+                await self.set_config(key, value, encrypt=encrypt, description=desc, updated_by=updated_by)
+
+        logger.info("Migración SMTP completada: cuenta 1 = 'Cuenta Principal'")
+
+    async def get_smtp_accounts(self) -> List[Dict]:
+        """
+        Retorna lista de cuentas SMTP configuradas con información de estado.
+        """
+        await self._migrate_legacy_smtp_keys()
+
+        today = date.today().isoformat()
+        accounts = []
+
+        for i in range(1, self.MAX_SMTP_ACCOUNTS + 1):
+            name = await self.get_config(f"SMTP_{i}_NAME", decrypt=False, silent=True)
+            if not name:
+                break
+
+            user_raw = await self.get_config(f"SMTP_{i}_USER", decrypt=True, silent=True)
+            exceeded_date = await self.get_config(f"SMTP_{i}_EXCEEDED_DATE", decrypt=False, silent=True)
+            daily_limit_raw = await self.get_config(f"SMTP_{i}_DAILY_LIMIT", decrypt=False, silent=True)
+
+            masked_user = ("***" + user_raw[-8:]) if user_raw and len(user_raw) > 8 else ("***" if user_raw else None)
+
+            accounts.append({
+                "id": i,
+                "name": name,
+                "email": masked_user,
+                "host": await self.get_config(f"SMTP_{i}_HOST", decrypt=False, silent=True) or "smtp.gmail.com",
+                "port": int(await self.get_config(f"SMTP_{i}_PORT", decrypt=False, silent=True) or 587),
+                "daily_limit": int(daily_limit_raw or 500),
+                "is_exceeded_today": exceeded_date == today,
+                "last_exceeded_date": exceeded_date,
+            })
+
+        return accounts
+
+    async def get_smtp_account_credentials(self, account_id: int) -> Dict[str, str]:
+        """Retorna credenciales desencriptadas de una cuenta SMTP específica."""
+        prefix = f"SMTP_{account_id}_"
+        creds = {}
+        for key in ["HOST", "PORT", "USER", "PASSWORD", "FROM_EMAIL", "FROM_NAME", "DAILY_LIMIT", "NAME"]:
+            value = await self.get_config(f"{prefix}{key}", decrypt=True, silent=True)
+            if value:
+                creds[key] = value
+        return creds
+
+    async def get_smtp_account_name(self, account_id: int) -> Optional[str]:
+        """Retorna el nombre de una cuenta SMTP."""
+        return await self.get_config(f"SMTP_{account_id}_NAME", decrypt=False, silent=True)
+
+    async def get_next_smtp_account_id(self) -> Optional[int]:
+        """Retorna el siguiente ID disponible para una nueva cuenta SMTP."""
+        await self._migrate_legacy_smtp_keys()
+        for i in range(1, self.MAX_SMTP_ACCOUNTS + 1):
+            name = await self.get_config(f"SMTP_{i}_NAME", decrypt=False, silent=True)
+            if not name:
+                return i
+        return None  # Límite alcanzado
+
+    async def get_available_smtp_account(self) -> Optional[Dict]:
+        """
+        Retorna la primera cuenta SMTP disponible (no excedida hoy) con credenciales completas.
+        Retorna None si todas están excedidas o no hay cuentas configuradas.
+        """
+        await self._migrate_legacy_smtp_keys()
+
+        today = date.today().isoformat()
+
+        for i in range(1, self.MAX_SMTP_ACCOUNTS + 1):
+            name = await self.get_config(f"SMTP_{i}_NAME", decrypt=False, silent=True)
+            if not name:
+                break
+
+            exceeded_date = await self.get_config(f"SMTP_{i}_EXCEEDED_DATE", decrypt=False, silent=True)
+            if exceeded_date == today:
+                logger.info(f"Cuenta SMTP {i} ('{name}') excedida hoy, saltando...")
+                continue
+
+            user = await self.get_config(f"SMTP_{i}_USER", decrypt=True, silent=True)
+            password = await self.get_config(f"SMTP_{i}_PASSWORD", decrypt=True, silent=True)
+
+            if not user or not password:
+                continue
+
+            host = await self.get_config(f"SMTP_{i}_HOST", decrypt=False, silent=True) or "smtp.gmail.com"
+            port_raw = await self.get_config(f"SMTP_{i}_PORT", decrypt=False, silent=True)
+            from_email = await self.get_config(f"SMTP_{i}_FROM_EMAIL", decrypt=False, silent=True) or user
+            from_name = await self.get_config(f"SMTP_{i}_FROM_NAME", decrypt=False, silent=True) or "GIRAMASTER"
+            daily_limit = int(await self.get_config(f"SMTP_{i}_DAILY_LIMIT", decrypt=False, silent=True) or 500)
+
+            return {
+                "id": i,
+                "name": name,
+                "host": host,
+                "port": int(port_raw or 587),
+                "user": user,
+                "password": password,
+                "from_email": from_email,
+                "from_name": from_name,
+                "daily_limit": daily_limit,
+                "email_enabled": True,
+            }
+
+        return None
+
+    async def mark_smtp_account_exceeded(self, account_id: int) -> None:
+        """Marca una cuenta SMTP como excedida para el día de hoy."""
+        today = date.today().isoformat()
+        await self.set_config(
+            f"SMTP_{account_id}_EXCEEDED_DATE", today, encrypt=False,
+            description=f"Fecha en que la cuenta SMTP {account_id} excedió su límite diario"
+        )
+        logger.warning(f"Cuenta SMTP {account_id} marcada como excedida para hoy ({today})")
+
+    async def create_or_update_smtp_account(
+        self,
+        account_id: int,
+        name: str,
+        user: Optional[str] = None,
+        password: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        from_email: Optional[str] = None,
+        from_name: Optional[str] = None,
+        daily_limit: Optional[int] = None,
+        updated_by: Optional[int] = None
+    ) -> Dict[str, bool]:
+        """Crea o actualiza una cuenta SMTP."""
+        prefix = f"SMTP_{account_id}_"
+        results = {}
+
+        await self.set_config(f"{prefix}NAME", name, encrypt=False,
+                              description=f"Nombre de la cuenta SMTP {account_id}", updated_by=updated_by)
+        results["NAME"] = True
+
+        fields = [
+            ("HOST", host, False, "Host SMTP"),
+            ("PORT", str(port) if port else None, False, "Puerto SMTP"),
+            ("USER", user, True, "Usuario SMTP"),
+            ("PASSWORD", password, True, "Contraseña SMTP"),
+            ("FROM_EMAIL", from_email, False, "Email remitente"),
+            ("FROM_NAME", from_name, False, "Nombre remitente"),
+            ("DAILY_LIMIT", str(daily_limit) if daily_limit else None, False, "Límite diario de envío"),
+        ]
+
+        for suffix, value, encrypt, desc in fields:
+            if value is not None:
+                await self.set_config(
+                    f"{prefix}{suffix}", value, encrypt=encrypt,
+                    description=f"Cuenta SMTP {account_id} - {desc}", updated_by=updated_by
+                )
+                results[suffix] = True
+
+        logger.info(f"Cuenta SMTP {account_id} ('{name}') actualizada: {list(results.keys())}")
+        return results
+
+    async def delete_smtp_account(self, account_id: int) -> bool:
+        """Elimina (desactiva) todas las keys de una cuenta SMTP."""
+        prefix = f"SMTP_{account_id}_"
+        suffixes = ["NAME", "HOST", "PORT", "USER", "PASSWORD", "FROM_EMAIL", "FROM_NAME",
+                    "DAILY_LIMIT", "EXCEEDED_DATE"]
+
+        for suffix in suffixes:
+            full_key = f"{prefix}{suffix}"
+            stmt = select(SystemConfigModel).where(
+                SystemConfigModel.str_config_key == full_key
+            )
+            result = await self.db.execute(stmt)
+            config = result.scalar_one_or_none()
+            if config:
+                config.bln_is_active = False
+
+        await self.db.commit()
+        logger.info(f"Cuenta SMTP {account_id} eliminada")
+        return True
+
+    async def reset_smtp_account_exceeded(self, account_id: int) -> bool:
+        """Restablece manualmente el límite excedido de una cuenta SMTP."""
+        stmt = select(SystemConfigModel).where(
+            SystemConfigModel.str_config_key == f"SMTP_{account_id}_EXCEEDED_DATE"
+        )
+        result = await self.db.execute(stmt)
+        config = result.scalar_one_or_none()
+        if config:
+            config.bln_is_active = False
+            await self.db.commit()
+        logger.info(f"Límite de cuenta SMTP {account_id} restablecido manualmente")
+        return True

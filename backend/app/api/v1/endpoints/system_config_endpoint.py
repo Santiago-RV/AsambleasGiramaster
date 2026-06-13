@@ -12,7 +12,9 @@ from app.schemas.system_config_schema import (
     SMTPCredentialsResponse,
     SMTPCredentialsUpdateRequest,
     SMTPTestConnectionResponse,
-    SystemConfigResponse
+    SystemConfigResponse,
+    SmtpAccountCreateRequest,
+    SmtpAccountUpdateRequest,
 )
 from app.services.system_config_service import SystemConfigService
 from app.services.user_service import UserService
@@ -833,4 +835,394 @@ async def test_smtp_connection(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=f"Error al enviar email de prueba: {str(e)}",
             data={"error": str(e)}
+        )
+
+
+# ============================================
+# SMTP Multi-Account Endpoints
+# ============================================
+
+@router.get(
+    "/smtp/accounts",
+    response_model=SuccessResponse,
+    summary="Listar cuentas SMTP",
+    description="Obtiene la lista de cuentas SMTP configuradas con su estado de límite diario"
+)
+async def list_smtp_accounts(
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Lista todas las cuentas SMTP configuradas con estado de límite diario."""
+    try:
+        config_service = SystemConfigService(db)
+        accounts = await config_service.get_smtp_accounts()
+        next_id = await config_service.get_next_smtp_account_id()
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"{len(accounts)} cuenta(s) SMTP configurada(s)",
+            data={
+                "accounts": accounts,
+                "can_add_more": next_id is not None,
+                "next_available_id": next_id,
+                "max_accounts": config_service.MAX_SMTP_ACCOUNTS,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error al listar cuentas SMTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al listar cuentas SMTP: {str(e)}"
+        )
+
+
+@router.get(
+    "/smtp/accounts/{account_id}",
+    response_model=SuccessResponse,
+    summary="Obtener detalle de cuenta SMTP",
+    description="Obtiene los detalles (enmascarados) de una cuenta SMTP específica"
+)
+async def get_smtp_account(
+    account_id: int,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene credenciales enmascaradas de una cuenta SMTP."""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_smtp_account_name(account_id)
+
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta SMTP {account_id} no encontrada"
+            )
+
+        creds = await config_service.get_smtp_account_credentials(account_id)
+        raw_user = creds.get("USER", "")
+
+        from datetime import date as _date
+        exceeded_raw = creds.get("EXCEEDED_DATE")
+        is_exceeded = exceeded_raw == _date.today().isoformat()
+
+        response_data = {
+            "id": account_id,
+            "name": name,
+            "email": ("***" + raw_user[-8:]) if len(raw_user) > 8 else ("***" if raw_user else None),
+            "host": creds.get("HOST", "smtp.gmail.com"),
+            "port": int(creds.get("PORT", 587)),
+            "from_email": creds.get("FROM_EMAIL"),
+            "from_name": creds.get("FROM_NAME"),
+            "daily_limit": int(creds.get("DAILY_LIMIT", 500)),
+            "is_exceeded_today": is_exceeded,
+            "last_exceeded_date": exceeded_raw,
+            "password": "***••••" if creds.get("PASSWORD") else None,
+        }
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Cuenta SMTP '{name}' obtenida",
+            data=response_data
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al obtener cuenta SMTP {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener cuenta SMTP: {str(e)}"
+        )
+
+
+@router.post(
+    "/smtp/accounts",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear cuenta SMTP",
+    description="Registra una nueva cuenta SMTP para envío de correos"
+)
+async def create_smtp_account(
+    data: SmtpAccountCreateRequest,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Crea una nueva cuenta SMTP."""
+    try:
+        config_service = SystemConfigService(db)
+        next_id = await config_service.get_next_smtp_account_id()
+
+        if next_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Se alcanzó el límite máximo de {config_service.MAX_SMTP_ACCOUNTS} cuentas SMTP"
+            )
+
+        results = await config_service.create_or_update_smtp_account(
+            account_id=next_id,
+            name=data.name,
+            user=data.user,
+            password=data.password,
+            host=data.host,
+            port=data.port,
+            from_email=data.from_email,
+            from_name=data.from_name,
+            daily_limit=data.daily_limit,
+            updated_by=user.id
+        )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_201_CREATED,
+            message=f"Cuenta SMTP '{data.name}' creada con ID {next_id}",
+            data={"account_id": next_id, "name": data.name, "updated_fields": list(results.keys())}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al crear cuenta SMTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al crear cuenta SMTP: {str(e)}"
+        )
+
+
+@router.put(
+    "/smtp/accounts/{account_id}",
+    response_model=SuccessResponse,
+    summary="Actualizar cuenta SMTP",
+    description="Actualiza los datos de una cuenta SMTP existente (solo campos enviados)"
+)
+async def update_smtp_account(
+    account_id: int,
+    data: SmtpAccountUpdateRequest,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Actualiza una cuenta SMTP existente."""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_smtp_account_name(account_id)
+
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta SMTP {account_id} no encontrada"
+            )
+
+        results = await config_service.create_or_update_smtp_account(
+            account_id=account_id,
+            name=data.name or name,
+            user=data.user,
+            password=data.password,
+            host=data.host,
+            port=data.port,
+            from_email=data.from_email,
+            from_name=data.from_name,
+            daily_limit=data.daily_limit,
+            updated_by=user.id
+        )
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Cuenta SMTP {account_id} actualizada",
+            data={"account_id": account_id, "updated_fields": list(results.keys())}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al actualizar cuenta SMTP {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al actualizar cuenta SMTP: {str(e)}"
+        )
+
+
+@router.delete(
+    "/smtp/accounts/{account_id}",
+    response_model=SuccessResponse,
+    summary="Eliminar cuenta SMTP",
+    description="Elimina una cuenta SMTP y todas sus credenciales"
+)
+async def delete_smtp_account(
+    account_id: int,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Elimina una cuenta SMTP."""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_smtp_account_name(account_id)
+
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta SMTP {account_id} no encontrada"
+            )
+
+        await config_service.delete_smtp_account(account_id)
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Cuenta SMTP '{name}' eliminada",
+            data={"account_id": account_id, "name": name}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al eliminar cuenta SMTP {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar cuenta SMTP: {str(e)}"
+        )
+
+
+@router.post(
+    "/smtp/accounts/{account_id}/test",
+    response_model=SuccessResponse,
+    summary="Probar cuenta SMTP",
+    description="Envía un correo de prueba usando una cuenta SMTP específica"
+)
+async def test_smtp_account(
+    account_id: int,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Envía un correo de prueba con una cuenta SMTP específica."""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_smtp_account_name(account_id)
+
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta SMTP {account_id} no encontrada"
+            )
+
+        creds = await config_service.get_smtp_account_credentials(account_id)
+        smtp_user = creds.get("USER")
+        smtp_password = creds.get("PASSWORD")
+
+        if not smtp_user or not smtp_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"La cuenta SMTP {account_id} no tiene credenciales completas"
+            )
+
+        from app.utils.email_sender import EmailSender
+
+        timestamp = colombia_now().strftime("%d/%m/%Y %H:%M:%S")
+        html_content = f"""
+        <html><body style="font-family:Arial,sans-serif;">
+        <div style="max-width:600px;margin:0 auto;padding:20px;">
+          <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:30px;border-radius:10px 10px 0 0;text-align:center;">
+            <h1 style="margin:0;">✅ Cuenta SMTP #{account_id} Verificada</h1>
+          </div>
+          <div style="background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px;">
+            <p>Prueba de conexión exitosa para la cuenta <strong>'{name}'</strong>.</p>
+            <div style="background:white;padding:15px;border-left:4px solid #667eea;margin:20px 0;">
+              <p><strong>Cuenta:</strong> {name} (ID: {account_id})</p>
+              <p><strong>Servidor:</strong> {creds.get('HOST', 'smtp.gmail.com')}:{creds.get('PORT', 587)}</p>
+              <p><strong>Fecha:</strong> {timestamp}</p>
+            </div>
+            <p style="color:#28a745;font-weight:bold;">🎉 Esta cuenta está lista para enviar correos.</p>
+          </div>
+        </div>
+        </body></html>
+        """
+
+        account_config = {
+            'id': account_id,
+            'name': name,
+            'host': creds.get('HOST', 'smtp.gmail.com'),
+            'port': int(creds.get('PORT', 587)),
+            'user': smtp_user,
+            'password': smtp_password,
+            'from_email': creds.get('FROM_EMAIL') or smtp_user,
+            'from_name': creds.get('FROM_NAME', 'GIRAMASTER'),
+        }
+
+        email_sender = EmailSender()
+        success, rate_limited = email_sender._send_single_with_account(
+            account_config,
+            [smtp_user],
+            f"✅ Prueba de Cuenta SMTP #{account_id} - GIRAMASTER",
+            html_content,
+            attach_logo=False
+        )
+
+        if success:
+            return SuccessResponse(
+                success=True,
+                status_code=status.HTTP_200_OK,
+                message=f"Email de prueba enviado desde cuenta '{name}'",
+                data={"email_sent": True, "recipient_email": smtp_user, "account_id": account_id, "timestamp": timestamp}
+            )
+        elif rate_limited:
+            return SuccessResponse(
+                success=False,
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                message=f"La cuenta '{name}' ha excedido su límite diario de Gmail",
+                data={"email_sent": False, "rate_limited": True, "account_id": account_id}
+            )
+        else:
+            return SuccessResponse(
+                success=False,
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"No se pudo enviar el email de prueba desde cuenta '{name}'. Verifica las credenciales.",
+                data={"email_sent": False, "account_id": account_id}
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al probar cuenta SMTP {account_id}: {str(e)}")
+        return SuccessResponse(
+            success=False,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Error al probar cuenta SMTP: {str(e)}",
+            data={"error": str(e)}
+        )
+
+
+@router.post(
+    "/smtp/accounts/{account_id}/reset-limit",
+    response_model=SuccessResponse,
+    summary="Restablecer límite de cuenta SMTP",
+    description="Restablece manualmente el límite diario excedido de una cuenta SMTP"
+)
+async def reset_smtp_account_limit(
+    account_id: int,
+    user = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Restablece manualmente el límite excedido de una cuenta SMTP."""
+    try:
+        config_service = SystemConfigService(db)
+        name = await config_service.get_smtp_account_name(account_id)
+
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cuenta SMTP {account_id} no encontrada"
+            )
+
+        await config_service.reset_smtp_account_exceeded(account_id)
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message=f"Límite de cuenta SMTP '{name}' restablecido",
+            data={"account_id": account_id, "name": name}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al restablecer límite SMTP {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al restablecer límite: {str(e)}"
         )

@@ -245,11 +245,26 @@ class BusinessLogicException(BaseAPIException):
 # Excepciones específicas para conflictos
 class ConflictException(BaseAPIException):
     """Excepción para conflictos (recursos duplicados, estado inválido, etc)"""
-    
+
     def __init__(
-        self, 
+        self,
         message: str = "Existe un conflicto con el estado actual del recurso",
         error_code: str = "CONFLICT",
         details: Optional[Dict[str, Any]] = None
     ):
         super().__init__(409, message, error_code, details)
+
+
+class AllSmtpAccountsExceededException(BaseAPIException):
+    """Excepción cuando todas las cuentas SMTP han excedido su límite diario"""
+
+    def __init__(
+        self,
+        message: str = (
+            "Todas las cuentas SMTP han excedido su límite diario de envío. "
+            "Por favor registre una nueva cuenta en la configuración del sistema."
+        ),
+        error_code: str = "ALL_SMTP_ACCOUNTS_EXCEEDED",
+        details: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(503, message, error_code, details)
