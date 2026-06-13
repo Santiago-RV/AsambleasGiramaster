@@ -69,7 +69,7 @@ const PollChart = ({ poll }) => {
             ctx.textBaseline = "middle";
 
             ctx.fillText(
-              `${value.toFixed(2)}Q`,
+              `${value.toFixed(2)}`,
               position.x,
               position.y - 8
             );

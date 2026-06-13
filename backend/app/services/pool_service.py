@@ -736,14 +736,36 @@ class PollService:
         total_abstentions = total_responses - total_votes
 
         # Calcular peso total votado (suma de dec_voting_weight de todas las respuestas)
-        total_weight_result = await self.db.execute(
-            select(func.sum(PollResponseModel.dec_voting_weight))
-            .where(and_(
-                PollResponseModel.int_poll_id == poll_id,
-                PollResponseModel.bln_is_abstention == False
-            ))
-        )
-        total_weight_voted = float(total_weight_result.scalar() or 0)
+        # Calcular peso total votado
+        # Para encuestas múltiples contar el peso una sola vez por usuario
+        if is_multiple:
+            weight_rows_result = await self.db.execute(
+                select(
+                    PollResponseModel.int_user_id,
+                    func.max(PollResponseModel.dec_voting_weight).label("weight")
+                )
+                .where(and_(
+                    PollResponseModel.int_poll_id == poll_id,
+                    PollResponseModel.bln_is_abstention == False
+                ))
+                .group_by(PollResponseModel.int_user_id)
+            )
+
+            total_weight_voted = sum(
+                float(weight or 0)
+                for _, weight in weight_rows_result.all()
+            )
+
+        else:
+            total_weight_result = await self.db.execute(
+                select(func.sum(PollResponseModel.dec_voting_weight))
+                .where(and_(
+                    PollResponseModel.int_poll_id == poll_id,
+                    PollResponseModel.bln_is_abstention == False
+                ))
+            )
+
+            total_weight_voted = float(total_weight_result.scalar() or 0)
 
         # Calcular participación real (total de invitados a la reunión)
         from app.models.meeting_invitation_model import MeetingInvitationModel

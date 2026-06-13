@@ -314,11 +314,20 @@ async def get_polls_report(
                             delegator_row["voted_at"] = voted_at
                             options_map[opt_id]["voters"].append(delegator_row)
 
-        total_weight_voted = sum(
-            float(resp.dec_voting_weight)
-            for resp, user, data_user, inv in responses
-            if resp.dec_voting_weight and resp.str_ip_address != "delegation"
-        )
+        if poll.str_poll_type == "multiple":
+            total_weight_voted = sum({
+                resp.int_user_id: float(resp.dec_voting_weight)
+                for resp, user, data_user, inv in responses
+                if resp.dec_voting_weight
+                and resp.str_ip_address != "delegation"
+            }.values())
+        else:
+            total_weight_voted = sum(
+                float(resp.dec_voting_weight)
+                for resp, user, data_user, inv in responses
+                if resp.dec_voting_weight
+                and resp.str_ip_address != "delegation"
+            )
 
         voted_user_ids = {resp.int_user_id for resp, user, data_user, inv in responses}
         # For active polls, also mark delegators whose delegate voted as "voted" (they delegated)
