@@ -676,14 +676,38 @@ class SystemConfigService:
 
     MAX_SMTP_ACCOUNTS = 10
 
+    async def _get_legacy_smtp_as_account(self) -> Optional[Dict]:
+        """
+        Lee las credenciales SMTP legacy (SMTP_HOST/USER/etc.) y las
+        devuelve con forma de cuenta multi-cuenta (id=1).
+        Retorna None si no hay credenciales legacy.
+        """
+        legacy = await self.get_smtp_credentials()
+        if not legacy.get("SMTP_USER"):
+            return None
+
+        raw_user = legacy["SMTP_USER"]
+        return {
+            "_is_legacy": True,
+            "HOST": legacy.get("SMTP_HOST", "smtp.gmail.com"),
+            "PORT": legacy.get("SMTP_PORT", "587"),
+            "USER": raw_user,
+            "PASSWORD": legacy.get("SMTP_PASSWORD", ""),
+            "FROM_EMAIL": legacy.get("SMTP_FROM_EMAIL", ""),
+            "FROM_NAME": legacy.get("SMTP_FROM_NAME", "GIRAMASTER - Sistema de Asambleas"),
+            "DAILY_LIMIT": "500",
+            "NAME": "Cuenta Principal",
+        }
+
     async def _migrate_legacy_smtp_keys(self, updated_by: Optional[int] = None):
         """
         Migra las keys antiguas (SMTP_HOST, etc.) al formato multi-cuenta (SMTP_1_HOST, etc.).
-        Solo se ejecuta si existen keys antiguas y no existen las nuevas.
+        Idempotente y tolerante a fallos parciales: verifica campo a campo si ya fue migrado.
         """
-        existing_name = await self.get_config("SMTP_1_NAME", decrypt=False, silent=True)
-        if existing_name:
-            return  # Ya migrado
+        # Verificar si la migración completa ya ocurrió (usuario y contraseña presentes)
+        existing_user = await self.get_config("SMTP_1_USER", decrypt=False, silent=True)
+        if existing_user:
+            return  # Ya migrado con datos completos
 
         legacy = await self.get_smtp_credentials()
         if not legacy.get("SMTP_USER"):
@@ -691,13 +715,11 @@ class SystemConfigService:
 
         logger.info("Migrando credenciales SMTP legacy al formato multi-cuenta...")
 
-        await self.set_config("SMTP_1_NAME", "Cuenta Principal", encrypt=False,
-                              description="Nombre de la cuenta SMTP 1", updated_by=updated_by)
-
         mapping = [
+            ("SMTP_1_NAME", "Cuenta Principal", False, "Nombre de la cuenta SMTP 1"),
             ("SMTP_1_HOST", legacy.get("SMTP_HOST", "smtp.gmail.com"), False, "Host SMTP cuenta 1"),
             ("SMTP_1_PORT", legacy.get("SMTP_PORT", "587"), False, "Puerto SMTP cuenta 1"),
-            ("SMTP_1_USER", legacy.get("SMTP_USER", ""), True, "Usuario SMTP cuenta 1"),
+            ("SMTP_1_USER", legacy.get("SMTP_USER"), True, "Usuario SMTP cuenta 1"),
             ("SMTP_1_PASSWORD", legacy.get("SMTP_PASSWORD", ""), True, "Contraseña SMTP cuenta 1"),
             ("SMTP_1_FROM_EMAIL", legacy.get("SMTP_FROM_EMAIL", ""), False, "From email cuenta 1"),
             ("SMTP_1_FROM_NAME", legacy.get("SMTP_FROM_NAME", "GIRAMASTER"), False, "From name cuenta 1"),
@@ -706,15 +728,23 @@ class SystemConfigService:
 
         for key, value, encrypt, desc in mapping:
             if value:
-                await self.set_config(key, value, encrypt=encrypt, description=desc, updated_by=updated_by)
+                try:
+                    await self.set_config(key, value, encrypt=encrypt,
+                                         description=desc, updated_by=updated_by)
+                except Exception as e:
+                    logger.warning(f"No se pudo migrar {key}: {e}")
 
         logger.info("Migración SMTP completada: cuenta 1 = 'Cuenta Principal'")
 
     async def get_smtp_accounts(self) -> List[Dict]:
         """
         Retorna lista de cuentas SMTP configuradas con información de estado.
+        Incluye fallback a credenciales legacy si no hay cuentas multi-cuenta.
         """
-        await self._migrate_legacy_smtp_keys()
+        try:
+            await self._migrate_legacy_smtp_keys()
+        except Exception as e:
+            logger.warning(f"Migración SMTP falló (no crítico): {e}")
 
         today = date.today().isoformat()
         accounts = []
@@ -727,6 +757,8 @@ class SystemConfigService:
             user_raw = await self.get_config(f"SMTP_{i}_USER", decrypt=True, silent=True)
             exceeded_date = await self.get_config(f"SMTP_{i}_EXCEEDED_DATE", decrypt=False, silent=True)
             daily_limit_raw = await self.get_config(f"SMTP_{i}_DAILY_LIMIT", decrypt=False, silent=True)
+            host = await self.get_config(f"SMTP_{i}_HOST", decrypt=False, silent=True) or "smtp.gmail.com"
+            port_raw = await self.get_config(f"SMTP_{i}_PORT", decrypt=False, silent=True)
 
             masked_user = ("***" + user_raw[-8:]) if user_raw and len(user_raw) > 8 else ("***" if user_raw else None)
 
@@ -734,44 +766,94 @@ class SystemConfigService:
                 "id": i,
                 "name": name,
                 "email": masked_user,
-                "host": await self.get_config(f"SMTP_{i}_HOST", decrypt=False, silent=True) or "smtp.gmail.com",
-                "port": int(await self.get_config(f"SMTP_{i}_PORT", decrypt=False, silent=True) or 587),
+                "host": host,
+                "port": int(port_raw or 587),
                 "daily_limit": int(daily_limit_raw or 500),
                 "is_exceeded_today": exceeded_date == today,
                 "last_exceeded_date": exceeded_date,
             })
 
+        # Fallback: si no hay cuentas multi-cuenta pero sí hay credenciales legacy,
+        # mostramos la cuenta legacy como cuenta #1 para que no quede invisible.
+        if not accounts:
+            legacy_account = await self._get_legacy_smtp_as_account()
+            if legacy_account:
+                raw_user = legacy_account["USER"]
+                masked = ("***" + raw_user[-8:]) if len(raw_user) > 8 else "***"
+                accounts.append({
+                    "id": 1,
+                    "name": legacy_account["NAME"],
+                    "email": masked,
+                    "host": legacy_account["HOST"],
+                    "port": int(legacy_account["PORT"]),
+                    "daily_limit": int(legacy_account["DAILY_LIMIT"]),
+                    "is_exceeded_today": False,
+                    "last_exceeded_date": None,
+                })
+
         return accounts
 
     async def get_smtp_account_credentials(self, account_id: int) -> Dict[str, str]:
-        """Retorna credenciales desencriptadas de una cuenta SMTP específica."""
+        """
+        Retorna credenciales desencriptadas de una cuenta SMTP específica.
+        Para cuenta 1: si no existen claves SMTP_1_*, usa credenciales legacy como fallback.
+        """
         prefix = f"SMTP_{account_id}_"
         creds = {}
         for key in ["HOST", "PORT", "USER", "PASSWORD", "FROM_EMAIL", "FROM_NAME", "DAILY_LIMIT", "NAME"]:
             value = await self.get_config(f"{prefix}{key}", decrypt=True, silent=True)
             if value:
                 creds[key] = value
+
+        # Fallback para cuenta 1: si no tiene USER (credenciales incompletas), usar legacy
+        if account_id == 1 and not creds.get("USER"):
+            legacy_account = await self._get_legacy_smtp_as_account()
+            if legacy_account:
+                for k, v in legacy_account.items():
+                    if k != "_is_legacy" and not creds.get(k):
+                        creds[k] = v
+
         return creds
 
     async def get_smtp_account_name(self, account_id: int) -> Optional[str]:
-        """Retorna el nombre de una cuenta SMTP."""
-        return await self.get_config(f"SMTP_{account_id}_NAME", decrypt=False, silent=True)
+        """
+        Retorna el nombre de una cuenta SMTP.
+        Para cuenta 1: fallback a 'Cuenta Principal' si no existe clave multi-cuenta pero sí hay legacy.
+        """
+        name = await self.get_config(f"SMTP_{account_id}_NAME", decrypt=False, silent=True)
+        if not name and account_id == 1:
+            # Verificar si existe cuenta legacy
+            legacy_user = await self.get_config("SMTP_USER", decrypt=False, silent=True)
+            if legacy_user:
+                return "Cuenta Principal"
+        return name
 
     async def get_next_smtp_account_id(self) -> Optional[int]:
         """Retorna el siguiente ID disponible para una nueva cuenta SMTP."""
-        await self._migrate_legacy_smtp_keys()
+        try:
+            await self._migrate_legacy_smtp_keys()
+        except Exception:
+            pass
         for i in range(1, self.MAX_SMTP_ACCOUNTS + 1):
             name = await self.get_config(f"SMTP_{i}_NAME", decrypt=False, silent=True)
             if not name:
+                # Verificar también si es la cuenta 1 con datos legacy
+                if i == 1:
+                    legacy_user = await self.get_config("SMTP_USER", decrypt=False, silent=True)
+                    if legacy_user:
+                        continue  # La cuenta 1 "existe" como legacy
                 return i
         return None  # Límite alcanzado
 
     async def get_available_smtp_account(self) -> Optional[Dict]:
         """
         Retorna la primera cuenta SMTP disponible (no excedida hoy) con credenciales completas.
-        Retorna None si todas están excedidas o no hay cuentas configuradas.
+        Con fallback a credenciales legacy si no hay cuentas multi-cuenta configuradas.
         """
-        await self._migrate_legacy_smtp_keys()
+        try:
+            await self._migrate_legacy_smtp_keys()
+        except Exception:
+            pass
 
         today = date.today().isoformat()
 
@@ -807,6 +889,23 @@ class SystemConfigService:
                 "from_email": from_email,
                 "from_name": from_name,
                 "daily_limit": daily_limit,
+                "email_enabled": True,
+            }
+
+        # Fallback final: usar credenciales legacy directamente
+        legacy_account = await self._get_legacy_smtp_as_account()
+        if legacy_account and legacy_account.get("PASSWORD"):
+            user = legacy_account["USER"]
+            return {
+                "id": 1,
+                "name": legacy_account["NAME"],
+                "host": legacy_account["HOST"],
+                "port": int(legacy_account["PORT"]),
+                "user": user,
+                "password": legacy_account["PASSWORD"],
+                "from_email": legacy_account.get("FROM_EMAIL") or user,
+                "from_name": legacy_account.get("FROM_NAME", "GIRAMASTER"),
+                "daily_limit": int(legacy_account["DAILY_LIMIT"]),
                 "email_enabled": True,
             }
 

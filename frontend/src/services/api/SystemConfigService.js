@@ -214,11 +214,87 @@ class SystemConfigService {
     static async testSMTPConnection() {
         try {
             const response = await axiosInstance.post('/system-config/smtp/test', {}, {
-                timeout: 20000 // 20 segundos (envío de email puede tardar más)
+                timeout: 20000
             });
             return response.data;
         } catch (error) {
             console.error('Error al probar conexión SMTP:', error);
+            throw error;
+        }
+    }
+
+    // ============================================
+    // SMTP Multi-Account Methods
+    // ============================================
+
+    static async getSMTPAccounts() {
+        try {
+            const response = await axiosInstance.get('/system-config/smtp/accounts');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener cuentas SMTP:', error);
+            throw error;
+        }
+    }
+
+    static async getSMTPAccount(accountId) {
+        try {
+            const response = await axiosInstance.get(`/system-config/smtp/accounts/${accountId}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error al obtener cuenta SMTP ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    static async createSMTPAccount(data) {
+        try {
+            const response = await axiosInstance.post('/system-config/smtp/accounts', data);
+            return response.data;
+        } catch (error) {
+            console.error('Error al crear cuenta SMTP:', error);
+            throw error;
+        }
+    }
+
+    static async updateSMTPAccount(accountId, data) {
+        try {
+            const response = await axiosInstance.put(`/system-config/smtp/accounts/${accountId}`, data);
+            return response.data;
+        } catch (error) {
+            console.error(`Error al actualizar cuenta SMTP ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    static async deleteSMTPAccount(accountId) {
+        try {
+            const response = await axiosInstance.delete(`/system-config/smtp/accounts/${accountId}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error al eliminar cuenta SMTP ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    static async testSMTPAccount(accountId) {
+        try {
+            const response = await axiosInstance.post(`/system-config/smtp/accounts/${accountId}/test`, {}, {
+                timeout: 20000
+            });
+            return response.data;
+        } catch (error) {
+            console.error(`Error al probar cuenta SMTP ${accountId}:`, error);
+            throw error;
+        }
+    }
+
+    static async resetSMTPAccountLimit(accountId) {
+        try {
+            const response = await axiosInstance.post(`/system-config/smtp/accounts/${accountId}/reset-limit`, {});
+            return response.data;
+        } catch (error) {
+            console.error(`Error al restablecer límite SMTP ${accountId}:`, error);
             throw error;
         }
     }
