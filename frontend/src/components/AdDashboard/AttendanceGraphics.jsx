@@ -2,29 +2,34 @@ import { useEffect, useRef } from "react";
 import { Chart } from "chart.js/auto";
 
 
-const AttendanceChart = ({ summary }) => {
+const AttendanceChart = ({ title, attended, absent, unit = "" }) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
 
   useEffect(() => {
-    if (!canvasRef.current || !summary) return;
-
-    const attended = summary.total_attended || 0;
-    const absent = summary.total_absent || 0;
-
+    if (!canvasRef.current || attended == null || absent == null) return;
     if (attended === 0 && absent === 0) return;
 
     const ctx = canvasRef.current;
     const total = attended + absent;
-  
-    if (!chartRef.current) {
 
+    if (chartRef.current) {
+      chartRef.current.destroy();
+    }
+    const attendedLabel = unit
+      ? attended.toFixed(2)
+      : attended;
+
+    const absentLabel = unit
+      ? absent.toFixed(2)
+      : absent;
     chartRef.current = new Chart(ctx, {
+      
       type: "pie",
       data: {
         labels: [
-          `Asistieron (${((attended / total) * 100).toFixed(1)}%)`,
-          `No asistieron (${((absent / total) * 100).toFixed(1)}%)`
+          `Asistieron - ${attendedLabel}${unit} (${((attended / total) * 100).toFixed(1)}%)`,
+          `No asistieron - ${absentLabel}${unit} (${((absent / total) * 100).toFixed(1)}%)`
         ],
         datasets: [
           {
@@ -37,48 +42,76 @@ const AttendanceChart = ({ summary }) => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
+          title: {
+            display: true,
+            text: title
+          },
           legend: {
             position: "top",
+          },
+          tooltip: {
+            enabled: false,
           },
         },
       },
       plugins: [{
-  id: 'textInside',
-  afterDraw(chart) {
-    const { ctx } = chart;
+        id: "textInside",
+        afterDraw(chart) {
+          const { ctx } = chart;
 
-    chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
-      const { x, y } = datapoint.tooltipPosition();
+          chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
+            const { x, y } = datapoint.tooltipPosition();
 
-      const value = chart.data.datasets[0].data[index];
-      const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+            const value = chart.data.datasets[0].data[index];
+            const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
 
-      const percentage = ((value / total) * 100).toFixed(1) + "%";
+            if (!value) return;
 
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 14px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+            const percentage = ((value / total) * 100).toFixed(1);
 
-      ctx.fillText(percentage, x, y);
+            ctx.save();
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 11px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const displayValue = unit
+              ? `${Number(value).toFixed(2)}${unit}`
+              : `${Math.round(value)}`;
+
+            ctx.fillText(
+              displayValue,
+              x,
+              y - 8
+            );
+
+            ctx.fillText(
+              `(${percentage}%)`,
+              x,
+              y + 10
+            );
+
+            ctx.restore();
+          });
+        }
+      }]
     });
-  }
-}]
-    });
-    } else {
-      chartRef.current.data.datasets[0].data = [attended, absent];
-      chartRef.current.update();
-    }
 
-  }, [summary]);
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
 
-  return (
-    <div className="flex justify-center">
-      <div className="w-full max-w-xs h-[250px]">
-        <canvas ref={canvasRef}></canvas>
-      </div>
+  }, [attended, absent, title, unit]);
+    return (
+    <div className="w-full h-[280px]">
+      <canvas ref={canvasRef}></canvas>
     </div>
   );
 };
+
 
 export default AttendanceChart;

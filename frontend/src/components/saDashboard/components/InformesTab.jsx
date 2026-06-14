@@ -68,7 +68,7 @@ const addFooter = (doc) => {
 
 // ─── PDF Graphics ────────────────────────────────────────────────────────────
 
-const centerLabelsPlugin = () => ({
+const centerLabelsPlugin = (unit = "") => ({
     id: 'centerLabels',
     afterDatasetsDraw(chart) {
         const { ctx } = chart;
@@ -80,24 +80,40 @@ const centerLabelsPlugin = () => ({
             const total = dataset.data.reduce((acc, val) => acc + val, 0);
 
             meta.data.forEach((element, index) => {
-                const rawValue = dataset.data[index];
+                const rawValue = Number(dataset.data[index]);
+
                 if (!rawValue) return;
 
-                const percentage = total > 0 ? (rawValue / total) * 100 : 0;
+                const percentage = total > 0
+                    ? (rawValue / total) * 100
+                    : 0;
 
-                const midAngle = (element.startAngle + element.endAngle) / 2;
+                const midAngle =
+                    (element.startAngle + element.endAngle) / 2;
+
                 const radius = element.outerRadius * 0.6;
 
                 const x = element.x + Math.cos(midAngle) * radius;
                 const y = element.y + Math.sin(midAngle) * radius;
 
                 ctx.save();
+
                 ctx.fillStyle = '#ffffff';
-                ctx.font = `bold ${Math.round(element.outerRadius * 0.18)}px sans-serif`;
+                ctx.font = `bold ${Math.round(element.outerRadius * 0.14)}px sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                ctx.fillText(`${percentage.toFixed(1)}%`, x, y);
+                const labelValue = unit
+                    ? `${rawValue.toFixed(2)}${unit}`
+                    : `${Math.round(rawValue)}`;
+
+                ctx.fillText(labelValue, x, y - 12);
+
+                ctx.fillText(
+                    `(${percentage.toFixed(1)}%)`,
+                    x,
+                    y + 10
+                );
 
                 ctx.restore();
             });
@@ -105,13 +121,17 @@ const centerLabelsPlugin = () => ({
     }
 });
 
-const generatePieChartImage = async (attendedCount, absentCount) => {
+const generatePieChartImage = async (
+    attendedValue,
+    absentValue,
+    unit = ""
+) => {
     const { Chart } = await import('chart.js/auto');
 
     return new Promise((resolve, reject) => {
         const canvas = document.createElement('canvas');
-        canvas.width = 500;
-        canvas.height = 500;
+        canvas.width = 300;
+        canvas.height = 300;
 
         const ctx = canvas.getContext('2d');
 
@@ -120,22 +140,34 @@ const generatePieChartImage = async (attendedCount, absentCount) => {
             data: {
                 labels: ['Asistentes', 'Ausentes'],
                 datasets: [{
-                    data: [attendedCount, absentCount],
+                    data: [attendedValue, absentValue],
                     backgroundColor: ['#16a34a', '#dc2626']
                 }]
             },
             options: {
                 responsive: false,
-                animation: false
+                animation: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 16
+                            },
+                            padding: 20
+                        }
+                    }
+                }
             },
-            plugins: [centerLabelsPlugin()]
+            plugins: [centerLabelsPlugin(unit)]
         });
-
         try {
             chart.update();
+
             setTimeout(() => {
                 try {
                     const image = canvas.toDataURL('image/png');
+
                     chart.destroy();
 
                     if (!image || image.length < 1000) {
@@ -158,14 +190,13 @@ const generatePollChartImage = async (poll) => {
     const { Chart } = await import('chart.js/auto');
 
     const canvas = document.createElement('canvas');
-    canvas.width = 500;
-    canvas.height = 500;
+    canvas.width = 300;
+    canvas.height = 300;
 
     const ctx = canvas.getContext('2d');
 
     const labels = poll.options.map(opt => opt.text);
     const dataValues = poll.options.map(opt => opt.votes_weight);
-    const countValues = poll.options.map(opt => opt.votes_count);
 
     const colors = [
         '#4f46e5', '#16a34a', '#dc2626', '#f59e0b',
@@ -178,7 +209,7 @@ const generatePollChartImage = async (poll) => {
             labels,
             datasets: [{
                 data: dataValues,
-                backgroundColor: colors
+                backgroundColor: colors,
             }]
         },
         options: {
@@ -187,17 +218,25 @@ const generatePollChartImage = async (poll) => {
             plugins: {
                 legend: {
                     position: 'top',
-                    labels: { font: { size: 14 } }
+                    labels: {
+                        font: {
+                            size: 16
+                        }
+                    }
                 }
             }
         },
-        plugins: [centerLabelsPlugin(countValues)]
+        plugins: [centerLabelsPlugin()]
     });
 
     chart.update();
+
     await new Promise(r => setTimeout(r, 100));
+
     const image = canvas.toDataURL('image/png');
+
     chart.destroy();
+
     return image;
 };
 
@@ -223,7 +262,9 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     const pw = doc.internal.pageSize.getWidth();
 
     // Generar gráfica primero (async) antes de construir el PDF
-    const chartImage = await generatePieChartImage(attended.length, absent.length);
+    const attendanceChartImage = await generatePieChartImage (attended.length, absent.length);
+
+    const quorumChartImage = await generatePieChartImage(summary.total_quorum_attended, summary.total_quorum_absent, "Q");
 
     let y = addHeader(doc, 'INFORME DE ASISTENCIA', meeting.title, meeting.residential_unit, meeting.scheduled_date);
 
@@ -231,13 +272,48 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(30, 58, 138);
-    doc.text('GRÁFICO DE ASISTENCIA', 14, y);
+    doc.text('GRÁFICOS DE ASISTENCIA', 14, y);
+
     y += 6;
 
-    const pageWidthChart = doc.internal.pageSize.getWidth();
-    const imgSizeChart = 65;
-    const xChart = (pageWidthChart - imgSizeChart) / 2;
-    doc.addImage(chartImage, 'PNG', xChart, y, imgSizeChart, imgSizeChart);
+    const imgSizeChart = 45;
+    const gap = 15;
+
+    const totalWidth = (imgSizeChart * 2) + gap;
+    const startX = (pw - totalWidth) / 2;
+
+    doc.setFontSize(9);
+    doc.text('Nominal', startX + (imgSizeChart / 2), y, {
+        align: 'center'
+    });
+
+    doc.text(
+        'Por Quórum',
+        startX + imgSizeChart + gap + (imgSizeChart / 2),
+        y,
+        { align: 'center' }
+    );
+
+    y += 4;
+
+    doc.addImage(
+        attendanceChartImage,
+        'PNG',
+        startX,
+        y,
+        imgSizeChart,
+        imgSizeChart
+    );
+
+    doc.addImage(
+        quorumChartImage,
+        'PNG',
+        startX + imgSizeChart + gap,
+        y,
+        imgSizeChart,
+        imgSizeChart
+    );
+
     y += imgSizeChart + 10;
 
     // RESUMEN
@@ -245,8 +321,8 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 58, 138);
     doc.text('RESUMEN GENERAL', 14, y + 4);
-    const quorumPct = ((summary?.quorum_achieved || 0) * 100).toFixed(2);
-    doc.text(`QUÓRUM: ${quorumPct}%`, pw - 14, y + 4, { align: 'right' });
+    const quorumValue = Number(summary?.quorum_achieved || 0).toFixed(2);
+    doc.text(`QUÓRUM: ${quorumValue}`, pw - 14, y + 4, { align: 'right' });
     y += 8;
 
     // ASISTENTES
@@ -346,32 +422,98 @@ const generatePollsPDF = async (data) => {
         const isNumeric = poll.type === 'numeric';
         const responses = poll.responses || [];
         // Generar gráfica al inicio de cada encuesta
-        let chartImage = null;
+        let resultChart = null;
+        let attendanceChart = null;
+        let totalChart = null;
 
         if (isGraphType) {
-            chartImage = await generatePollChartImage(poll);
+            resultChart = await generatePollChartImage(poll);
+
+            attendanceChart = await generatePieChartImage(
+                poll.participation_by_attendance.voted,
+                poll.participation_by_attendance.not_voted,
+                "Q"
+            );
+
+            totalChart = await generatePieChartImage(
+                poll.participation_by_total.voted,
+                poll.participation_by_total.not_voted,
+                "Q"
+            );
         }
 
-        // Título encuesta
-        doc.setFillColor(238, 242, 255);
-        doc.roundedRect(14, y - 1, doc.internal.pageSize.getWidth() - 28, 10, 2, 2, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(30, 58, 138);
-        doc.text(`${idx + 1}. ${poll.title}`, 17, y + 6);
-        y += 14;
+        if (isGraphType && resultChart) {
 
-        // GRÁFICO ANTES DE LAS TABLAS
-        if (isGraphType && chartImage) {
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(9);
             doc.setTextColor(30, 58, 138);
-            doc.text('Resultados de votación', 14, y);
+            doc.text('Gráficos de votación', 14, y);
+
             y += 6;
 
-            doc.addImage(chartImage, 'PNG', x, y, imgWidth, imgWidth);
-            y += imgWidth + 8;
-}
+            const chartSize = 45;
+            const gap = 8;
+
+            const totalWidth = (chartSize * 3) + (gap * 2);
+            const startX = (pageWidth - totalWidth) / 2;
+
+            doc.setFontSize(8);
+
+            doc.text(
+                'Resultado',
+                startX + chartSize / 2,
+                y,
+                { align: 'center' }
+            );
+
+            doc.text(
+                'Sobre asistentes',
+                startX + chartSize + gap + chartSize / 2,
+                y,
+                { align: 'center' }
+            );
+
+            doc.text(
+                'Sobre Total Copropietarios',
+                startX + (chartSize * 2) + (gap * 2) + chartSize / 2,
+                y,
+                { align: 'center' }
+            );
+
+            y += 4;
+
+            doc.addImage(
+                resultChart,
+                'PNG',
+                startX,
+                y,
+                chartSize,
+                chartSize
+            );
+
+            doc.addImage(
+                attendanceChart,
+                'PNG',
+                startX + chartSize + gap,
+                y,
+                chartSize,
+                chartSize
+            );
+
+            doc.addImage(
+                totalChart,
+                'PNG',
+                startX + (chartSize * 2) + (gap * 2),
+                y,
+                chartSize,
+                chartSize
+            );
+
+            y += chartSize + 8;
+        }
+
+        // Título encuesta
+
 
         if (y > 240) { doc.addPage(); y = 20; }
 

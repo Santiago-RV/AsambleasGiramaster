@@ -212,31 +212,39 @@ const ReunionEnCursoTab = () => {
     <div className="flex flex-col h-[calc(100vh-88px)] md:h-[calc(100vh-104px)] overflow-hidden gap-3">
       {/* Header */}
       <div className="bg-blue-600 rounded-lg px-5 py-3 text-white shrink-0">
-        <div className="flex justify-between items-start">
-          <div>
+        <div className="flex items-center">
+          <div className="flex-1">
             <h2 className="text-xl font-bold">{meeting.title}</h2>
             <p className="text-blue-100 text-sm">{meeting.description}</p>
+
             <div className="flex gap-4 mt-2 text-sm flex-wrap">
               <span className="flex items-center gap-1">
                 <Users size={18} />
                 Copropietarios conectados: {meeting.connected_count} de {meeting.total_invited}
               </span>
-              <span className="flex items-center gap-1">
-                <BarChart3 size={18} />
-                Quórum: {meeting.connected_quorum} / {meeting.total_quorum} ({meeting.quorum_percentage}%)
-              </span>
-              <span className={`px-2 py-0.5 rounded text-xs self-center ${meeting.quorum_reached ? 'bg-green-500' : 'bg-red-500'}`}>
-                {meeting.quorum_reached ? "Quórum alcanzado" : "Sin quórum"}
-              </span>
             </div>
           </div>
+
+          <div className="mx-8 flex flex-col items-center justify-center bg-white/15 rounded-xl px-6 py-3 border border-white/20 min-w-[180px]">
+            <span className="text-xs uppercase tracking-wider text-blue-100">
+              Quórum
+            </span>
+            <span className="text-2xl font-bold">
+              {meeting.quorum_percentage}%
+            </span>
+            <span className="text-sm text-blue-100">
+              {meeting.connected_quorum} / {meeting.total_quorum}
+            </span>
+          </div>
+
           <button
             onClick={() => refetch()}
-            className="p-2 bg-blue-500 rounded hover:bg-blue-400 shrink-0"
+            className="p-2 bg-blue-500 rounded hover:bg-blue-400"
             title="Actualizar"
           >
             <RefreshCw size={18} />
           </button>
+
         </div>
       </div>
 

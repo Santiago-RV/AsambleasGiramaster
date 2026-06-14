@@ -5,6 +5,8 @@ import { MeetingService } from '../../services/api/MeetingService';
 import AttendanceChart from "./AttendanceGraphics";
 import PollChart  from "./PollGraphics";
 import { formatDateTime } from '../../utils/dateUtils';
+import ParticipationChart from './ParticipationChart';
+
 
 const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) => {
   const [loading, setLoading] = useState(true);
@@ -142,7 +144,6 @@ const ReportModal = ({ isOpen, onClose, reportType, meetingId, meetingTitle }) =
 const AttendanceReportContent = ({ data }) => {
 const { summary, attended, absent } = data;
 
-
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -164,11 +165,19 @@ const { summary, attended, absent } = data;
           <p className="text-sm text-purple-700">% Participación</p>
         </div>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
-          Distribución de Asistencia
-        </h3>
-        <AttendanceChart summary={summary} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <AttendanceChart
+          title="Asistencia nominal"
+          attended={summary.total_attended}
+          absent={summary.total_absent}
+        />
+
+        <AttendanceChart
+          title="Asistencia por quórum"
+          attended={summary.total_quorum_attended}
+          absent={summary.total_quorum_absent}
+          unit="Q"
+        />
       </div>
       {/* Quorum Info */}
       {/* <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
@@ -376,8 +385,7 @@ const PollDetailView = ({ poll }) => {
   const isNumeric = poll.type === 'numeric';
 
   const responses = poll.responses || [];
-  console.log(poll.type);
-  console.log(poll.responses);
+  console.log("POLL", poll);
   return (
 
   <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -424,11 +432,25 @@ const PollDetailView = ({ poll }) => {
     {/* 📊 GRÁFICO */}
     {isGraphType && (
       <div className="p-5 pb-0">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
-          Resultados de la votación
-        </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <PollChart poll={poll} />
 
-        <PollChart poll={poll} />
+          {poll?.participation_by_attendance && (
+            <ParticipationChart
+              title="Participación sobre asistentes"
+              voted={poll.participation_by_attendance.voted}
+              notVoted={poll.participation_by_attendance.not_voted}
+            />
+          )}
+
+          {poll?.participation_by_total && (
+            <ParticipationChart
+              title="Participación sobre total de copropietarios"
+              voted={poll.participation_by_total.voted}
+              notVoted={poll.participation_by_total.not_voted}
+            />
+          )}
+        </div>
       </div>
     )}
 

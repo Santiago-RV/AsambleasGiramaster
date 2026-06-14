@@ -18,6 +18,7 @@ from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.services.user_service import UserService
 from app.schemas.responses_schema import SuccessResponse
 import logging
+from app.services.pool_service import PollService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -138,6 +139,14 @@ async def get_attendance_report(
 
     total_quorum = sum(p["quorum_base"] for p in attended)
 
+    total_quorum_invited = sum(
+    float(inv.dec_quorum_base)
+    for inv, user, data_user in invitations
+    if inv.str_apartment_number != "ADMIN"
+    )
+
+    total_quorum_absent = max(0, total_quorum_invited - total_quorum)
+
     return SuccessResponse(
         success=True, status_code=200,
         message="Informe de asistencia generado",
@@ -154,6 +163,9 @@ async def get_attendance_report(
                 "total_attended": len(attended),
                 "total_absent": len(absent),
                 "quorum_achieved": total_quorum,
+                "total_quorum_attended": round(total_quorum, 4),
+                "total_quorum_absent": round(total_quorum_absent, 4),
+                "total_quorum_invited": round(total_quorum_invited, 4),
             },
             "attended": attended,
             "absent": absent,
@@ -188,9 +200,11 @@ async def get_polls_report(
         .order_by(PollModel.created_at)
     )
     polls = polls_result.scalars().all()
-
+    poll_service = PollService(db)
     polls_data = []
+    
     for poll in polls:
+        stats = await poll_service.get_poll_statistics(poll.id)
         options_result = await db.execute(
             select(PollOptionModel).where(PollOptionModel.int_poll_id == poll.id)
         )
@@ -300,11 +314,20 @@ async def get_polls_report(
                             delegator_row["voted_at"] = voted_at
                             options_map[opt_id]["voters"].append(delegator_row)
 
-        total_weight_voted = sum(
-            float(resp.dec_voting_weight)
-            for resp, user, data_user, inv in responses
-            if resp.dec_voting_weight and resp.str_ip_address != "delegation"
-        )
+        if poll.str_poll_type == "multiple":
+            total_weight_voted = sum({
+                resp.int_user_id: float(resp.dec_voting_weight)
+                for resp, user, data_user, inv in responses
+                if resp.dec_voting_weight
+                and resp.str_ip_address != "delegation"
+            }.values())
+        else:
+            total_weight_voted = sum(
+                float(resp.dec_voting_weight)
+                for resp, user, data_user, inv in responses
+                if resp.dec_voting_weight
+                and resp.str_ip_address != "delegation"
+            )
 
         voted_user_ids = {resp.int_user_id for resp, user, data_user, inv in responses}
         # For active polls, also mark delegators whose delegate voted as "voted" (they delegated)
@@ -343,6 +366,7 @@ async def get_polls_report(
             resp.int_user_id
             for resp, user, data_user, inv in responses
         }
+        
         polls_data.append({
             "id": poll.id,
             "title": poll.str_title,
@@ -356,6 +380,9 @@ async def get_polls_report(
             "options": list(options_map.values()),
             "abstentions": abstentions,
             "non_voters": non_voters,
+            "total_weight_attended": stats["total_weight_attended"],
+            "participation_by_attendance": stats["participation_by_attendance"],
+            "participation_by_total": stats["participation_by_total"],
             "total_voters": len(unique_voters),
             "total_weight_voted": total_weight_voted,
         })
