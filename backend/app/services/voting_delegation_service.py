@@ -567,5 +567,6 @@ class VotingDelegationService:
             "delegated_to": delegated_to,
             "received_delegations": received_delegations,
             "total_weight": total_weight,
-            "original_weight": original_weight
+            "original_weight": original_weight,
+            "is_marked_absent": bool(user_invitation.bln_marked_absent)
         }

@@ -37,6 +37,7 @@ export default function PresencialVotingPage() {
     const [hasVoted, setHasVoted] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
     const [delegationCountdown, setDelegationCountdown] = useState(0);
+    const [absentCountdown, setAbsentCountdown] = useState(5);
     const [textResponse, setTextResponse] = useState("");
     const [numericResponse, setNumericResponse] = useState("");
     const [pollExpired, setPollExpired] = useState(false);
@@ -122,6 +123,24 @@ export default function PresencialVotingPage() {
     const hasDelegated = delegationStatus?.has_delegated ?? false;
     const delegatedTo = delegationStatus?.delegated_to;
     const receivedDelegations = delegationStatus?.received_delegations ?? [];
+    const isMarkedAbsent = delegationStatus?.is_marked_absent ?? false;
+
+    // Countdown de 5s cuando el usuario está marcado como ausente → redirige al login
+    useEffect(() => {
+        if (!isMarkedAbsent) return;
+        setAbsentCountdown(5);
+        const interval = setInterval(() => {
+            setAbsentCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    handleLogout();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isMarkedAbsent]);
 
     useEffect(() => {
         if (!hasDelegated) return;
@@ -314,6 +333,44 @@ export default function PresencialVotingPage() {
                 <div className="text-center">
                     <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto" />
                     <p className="mt-4 text-gray-600">Cargando votación...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Bloqueo: el usuario está marcado como ausente por el administrador
+    if (isMarkedAbsent) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-rose-100 px-4">
+                <div className="bg-white rounded-2xl shadow-2xl border-2 border-red-300 p-8 max-w-md w-full text-center">
+                    <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                        <ShieldOff className="text-red-500" size={40} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-3">
+                        No puedes votar en esta reunión
+                    </h2>
+                    <p className="text-gray-600 mb-2">
+                        El administrador te ha marcado como{" "}
+                        <span className="font-semibold text-red-600">ausente</span> en esta
+                        reunión, por lo que no puedes participar en las encuestas.
+                    </p>
+                    <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6">
+                        Si crees que esto es un error, por favor contáctate con el
+                        administrador de tu unidad residencial.
+                    </p>
+                    <div className="mb-3">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                                className="bg-red-400 h-2 rounded-full transition-all duration-1000"
+                                style={{ width: `${(absentCountdown / 5) * 100}%` }}
+                            />
+                        </div>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                        Serás redirigido al login en{" "}
+                        <span className="font-bold text-red-600">{absentCountdown}</span>{" "}
+                        segundo{absentCountdown !== 1 ? "s" : ""}...
+                    </p>
                 </div>
             </div>
         );

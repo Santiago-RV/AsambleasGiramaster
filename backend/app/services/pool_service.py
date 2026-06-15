@@ -312,6 +312,7 @@ class PollService:
         # Verificar que el usuario esté presente en la reunión (presencial o virtual)
         if user_id and poll.int_meeting_id:
             from app.models.meeting_attendance_model import MeetingAttendanceModel
+            from app.models.meeting_invitation_model import MeetingInvitationModel
             attendance_result = await self.db.execute(
                 select(MeetingAttendanceModel).where(
                     and_(
@@ -326,6 +327,22 @@ class PollService:
                 raise BusinessLogicException(
                     message="No puedes votar porque no estás registrado como presente en esta reunión.",
                     error_code="USER_NOT_PRESENT"
+                )
+
+            # Verificar que el usuario no esté marcado como ausente
+            invitation_result = await self.db.execute(
+                select(MeetingInvitationModel).where(
+                    and_(
+                        MeetingInvitationModel.int_meeting_id == poll.int_meeting_id,
+                        MeetingInvitationModel.int_user_id == user_id
+                    )
+                ).limit(1)
+            )
+            invitation = invitation_result.scalar_one_or_none()
+            if invitation and invitation.bln_marked_absent:
+                raise BusinessLogicException(
+                    message="No puedes votar porque estás marcado como ausente en esta reunión.",
+                    error_code="USER_MARKED_ABSENT"
                 )
 
         # Verificar si ya votó (aplica para todos los tipos, incluidas anónimas)

@@ -6,6 +6,7 @@ import { PollService } from '../../services/api/PollService';
 import { UserService } from '../../services/api/UserService';
 import { MeetingService } from '../../services/api/MeetingService';
 import { DelegationService } from '../../services/api/DelegationService';
+import { AuthService } from '../../services/api/AuthService';
 import DelegatedPowersHeader from './DelegatedPowersHeader';
 import { formatDateTime, parseColombiaDate } from '../../utils/dateUtils';
 import { useMeetingPollsSSE } from '../../hooks/useMeetingPollsSSE';
@@ -68,6 +69,7 @@ export default function VotingPage({ onNavigate }) {
 
   const residentialUnitId = userData?.residential_unit?.id;
   const [delegationCountdown, setDelegationCountdown] = useState(10);
+  const [absentCountdown, setAbsentCountdown] = useState(5);
 
   const { data: meetingsData, isLoading: isLoadingMeetings } = useQuery({
     queryKey: ['residential-meetings', residentialUnitId],
@@ -125,6 +127,26 @@ export default function VotingPage({ onNavigate }) {
 
   const hasDelegated = delegationData?.data?.has_delegated ?? false;
   const delegatedTo = delegationData?.data?.delegated_to;
+  const isMarkedAbsent = delegationData?.data?.is_marked_absent ?? false;
+
+  // Countdown de 5s cuando el usuario está marcado como ausente → redirige al login
+  useEffect(() => {
+    if (!isMarkedAbsent) return;
+    setAbsentCountdown(5);
+    const interval = setInterval(() => {
+      setAbsentCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          AuthService.logout();
+          queryClient.clear();
+          window.location.href = '/';
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isMarkedAbsent]);
 
   // Countdown de 10s cuando el usuario cedió su poder
   useEffect(() => {
@@ -219,6 +241,38 @@ export default function VotingPage({ onNavigate }) {
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
         <p className="ml-4 text-gray-600">Cargando encuestas...</p>
+      </div>
+    );
+  }
+
+  // Bloqueo por ausencia marcada por el administrador
+  if (isMarkedAbsent) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white rounded-2xl shadow-xl border-2 border-red-300 p-10 max-w-lg w-full text-center">
+          <div className="flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mx-auto mb-5">
+            <ShieldOff className="text-red-500" size={40} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">No puedes votar en esta reunión</h2>
+          <p className="text-gray-600 mb-2">
+            El administrador te ha marcado como <span className="font-semibold text-red-600">ausente</span> en esta reunión,
+            por lo que no puedes participar en las encuestas.
+          </p>
+          <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6">
+            Si crees que esto es un error, por favor contáctate con el administrador de tu unidad residencial.
+          </p>
+          <div className="mb-3">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-red-400 h-2 rounded-full transition-all duration-1000"
+                style={{ width: `${(absentCountdown / 5) * 100}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-gray-500">
+            Serás redirigido al login en <span className="font-bold text-red-600">{absentCountdown}</span> segundo{absentCountdown !== 1 ? 's' : ''}...
+          </p>
+        </div>
       </div>
     );
   }
