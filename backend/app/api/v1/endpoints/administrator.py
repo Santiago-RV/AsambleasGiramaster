@@ -322,7 +322,11 @@ async def get_meeting_invitations(
                     )
                 )
             )
-            .where(MeetingInvitationModel.int_meeting_id == meeting_id)
+            .where(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                UserModel.int_id_rol != 2
+            )
             .order_by(
                 DataUserModel.str_firstname.asc(),
                 DataUserModel.str_lastname.asc()
@@ -992,19 +996,21 @@ async def get_attendance_report(
             select(MeetingInvitationModel, UserModel, DataUserModel)
             .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
-            .where(MeetingInvitationModel.int_meeting_id == meeting_id)
+            .where(
+                MeetingInvitationModel.int_meeting_id == meeting_id,
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                UserModel.int_id_rol != 2
+            )
             .order_by(DataUserModel.str_lastname)
         )
         invitations = inv_result.all()
-        
+
         attended = []
         absent = []
-        
+
         inv_map = {inv.int_user_id: inv for inv, user, data_user in invitations}
 
         for inv, user, data_user in invitations:
-            if inv.str_apartment_number == 'ADMIN':
-                continue
 
             is_directly_present = inv.bln_actually_attended and inv.dat_left_at is None
 
@@ -1043,11 +1049,10 @@ async def get_attendance_report(
                 absent.append(person)
 
         total_quorum = sum(p["quorum_base"] for p in attended)
-        
+
         total_quorum_invited = sum(
-        float(inv.dec_quorum_base)
-        for inv, user, data_user in invitations
-        if inv.str_apartment_number != "ADMIN"
+            float(inv.dec_quorum_base)
+            for inv, user, data_user in invitations
         )
 
         total_quorum_absent = max(0, total_quorum_invited - total_quorum)
@@ -1543,7 +1548,9 @@ async def get_delegations_report(
             .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
             .where(
                 MeetingInvitationModel.int_meeting_id == meeting_id,
-                MeetingInvitationModel.int_delegated_id.isnot(None)
+                MeetingInvitationModel.int_delegated_id.isnot(None),
+                MeetingInvitationModel.str_apartment_number != 'ADMIN',
+                UserModel.int_id_rol != 2
             )
         )
         delegator_rows = delegations_result.all()
