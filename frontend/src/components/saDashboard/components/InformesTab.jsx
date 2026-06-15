@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Users, CheckSquare, Handshake, Download, ChevronDown, Calendar, Building2, Bell } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -971,99 +971,70 @@ const REPORT_TYPES = [
     },
 ];
 
+const SPINNER = (
+    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+    </svg>
+);
+
+const LLAMADO_LABELS = ['Primer Llamado', 'Segundo Llamado', 'Tercer Llamado'];
+
 const InformesTab = () => {
     const [selectedMeeting, setSelectedMeeting] = useState('');
     const [loadingReport, setLoadingReport] = useState(null);
+    const [selectedPollIdxs, setSelectedPollIdxs] = useState(new Set());
+    const [selectedLlamados, setSelectedLlamados] = useState(new Set());
 
     const { data: meetingsData, isLoading: loadingMeetings } = useQuery({
         queryKey: ['report-meetings'],
         queryFn: ReportsService.getMeetings,
     });
 
-    const meetings = meetingsData?.data?.meetings || [];
+    const { data: pollsData, isLoading: isLoadingPolls } = useQuery({
+        queryKey: ['report-polls-list', selectedMeeting],
+        queryFn: () => ReportsService.getPolls(selectedMeeting),
+        enabled: !!selectedMeeting,
+        staleTime: 5 * 60 * 1000,
+    });
 
-    const handleDownload = async (report) => {
+    const meetings = meetingsData?.data?.meetings || [];
+    const pollsList = pollsData?.data?.polls || [];
+
+    useEffect(() => {
+        setSelectedPollIdxs(new Set());
+        setSelectedLlamados(new Set());
+    }, [selectedMeeting]);
+
+    const togglePoll = (idx) =>
+        setSelectedPollIdxs(prev => {
+            const next = new Set(prev);
+            next.has(idx) ? next.delete(idx) : next.add(idx);
+            return next;
+        });
+
+    const toggleAllPolls = () =>
+        setSelectedPollIdxs(prev =>
+            prev.size === pollsList.length ? new Set() : new Set(pollsList.map((_, i) => i))
+        );
+
+    const toggleLlamado = (num) =>
+        setSelectedLlamados(prev => {
+            const next = new Set(prev);
+            next.has(num) ? next.delete(num) : next.add(num);
+            return next;
+        });
+
+    const handleDownloadStatic = async (report) => {
         if (!selectedMeeting) {
             Swal.fire({ icon: 'warning', title: 'Selecciona una reunión', text: 'Debes elegir una reunión antes de descargar el informe.', confirmButtonColor: '#6366f1' });
             return;
         }
-
-        // Caso especial: informe de llamados
-        if (report.id === 'llamados') {
-            const { value: numeroStr, isConfirmed } = await Swal.fire({
-                title: 'Selecciona el llamado',
-                input: 'select',
-                inputOptions: {
-                    '1': 'Primer Llamado',
-                    '2': 'Segundo Llamado',
-                    '3': 'Tercer Llamado',
-                },
-                inputPlaceholder: '— Elige un llamado —',
-                showCancelButton: true,
-                confirmButtonText: 'Generar PDF',
-                cancelButtonText: 'Cancelar',
-                confirmButtonColor: '#6366f1',
-                cancelButtonColor: '#6b7280',
-                inputValidator: (v) => !v && 'Debes seleccionar un llamado',
-            });
-            if (!isConfirmed) return;
-
-            setLoadingReport('llamados');
-            try {
-                const [response, delResponse] = await Promise.all([
-                    getLlamadoReportSA(Number(selectedMeeting), Number(numeroStr)),
-                    ReportsService.getDelegations(selectedMeeting).catch(() => null),
-                ]);
-                if (!response.success) throw new Error(response.message);
-                const delegateMap = buildDelegateMap(delResponse?.data?.delegations || []);
-                generateLlamadoPDF(response.data, delegateMap);
-            } catch (err) {
-                const msg = err.response?.data?.detail || err.message || 'Ocurrió un error inesperado.';
-                Swal.fire({ icon: 'error', title: 'Error al generar informe', text: msg, confirmButtonColor: '#dc2626' });
-            } finally {
-                setLoadingReport(null);
-            }
-            return;
-        }
-
         setLoadingReport(report.id);
         try {
             const response = await report.fetcher(selectedMeeting);
             const data = response.data;
-
-            if (report.id === 'polls') {
-                const polls = data?.polls || [];
-                if (polls.length === 0) {
-                    Swal.fire({ icon: 'info', title: 'Sin encuestas', text: 'Esta reunión no tiene encuestas registradas.', confirmButtonColor: '#6366f1' });
-                    return;
-                }
-                if (polls.length === 1) {
-                    report.generator({ ...data, polls: [polls[0]] });
-                    return;
-                }
-                const inputOptions = polls.reduce((acc, p, idx) => {
-                    acc[idx] = `${p.title} (${p.status === 'closed' ? 'Cerrada' : p.status === 'active' ? 'Activa' : 'Borrador'})`;
-                    return acc;
-                }, {});
-                const { value: selectedIdx, isConfirmed } = await Swal.fire({
-                    title: 'Selecciona la pregunta',
-                    text: 'Elige la pregunta para la cual deseas generar el informe.',
-                    input: 'select',
-                    inputOptions,
-                    inputPlaceholder: '— Elige una pregunta —',
-                    showCancelButton: true,
-                    confirmButtonText: 'Generar PDF',
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#6366f1',
-                    cancelButtonColor: '#6b7280',
-                    inputValidator: (value) => {
-                        if (value === '') return 'Debes seleccionar una pregunta';
-                    },
-                });
-                if (!isConfirmed) return;
-                const selectedPoll = polls[Number(selectedIdx)];
-                report.generator({ ...data, polls: [selectedPoll] });
-            } else if (report.id === 'attendance') {
+            if (report.id === 'attendance') {
                 let delegateMap = {};
                 try {
                     const delRes = await ReportsService.getDelegations(selectedMeeting);
@@ -1074,14 +1045,63 @@ const InformesTab = () => {
                 report.generator(data);
             }
         } catch (err) {
-            console.error(err);
             Swal.fire({ icon: 'error', title: 'Error al generar informe', text: err.response?.data?.detail || 'Ocurrió un error inesperado.', confirmButtonColor: '#dc2626' });
         } finally {
             setLoadingReport(null);
         }
     };
 
+    const handleDownloadPolls = async () => {
+        if (!selectedMeeting) {
+            Swal.fire({ icon: 'warning', title: 'Selecciona una reunión', confirmButtonColor: '#6366f1' });
+            return;
+        }
+        if (selectedPollIdxs.size === 0) {
+            Swal.fire({ icon: 'warning', title: 'Selecciona al menos una votación', text: 'Marca las votaciones que deseas descargar.', confirmButtonColor: '#6366f1' });
+            return;
+        }
+        setLoadingReport('polls');
+        try {
+            const data = pollsData?.data;
+            const toDownload = pollsList.filter((_, idx) => selectedPollIdxs.has(idx));
+            for (const poll of toDownload) {
+                await generatePollsPDF({ ...data, polls: [poll] });
+            }
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Error al generar informe', text: err.response?.data?.detail || 'Ocurrió un error inesperado.', confirmButtonColor: '#dc2626' });
+        } finally {
+            setLoadingReport(null);
+        }
+    };
+
+    const handleDownloadLlamados = async () => {
+        if (!selectedMeeting) {
+            Swal.fire({ icon: 'warning', title: 'Selecciona una reunión', confirmButtonColor: '#6366f1' });
+            return;
+        }
+        if (selectedLlamados.size === 0) {
+            Swal.fire({ icon: 'warning', title: 'Selecciona al menos un llamado', text: 'Marca los llamados que deseas descargar.', confirmButtonColor: '#6366f1' });
+            return;
+        }
+        setLoadingReport('llamados');
+        try {
+            const delResponse = await ReportsService.getDelegations(selectedMeeting).catch(() => null);
+            const delegateMap = buildDelegateMap(delResponse?.data?.delegations || []);
+            for (const numero of [...selectedLlamados].sort()) {
+                const response = await getLlamadoReportSA(Number(selectedMeeting), numero);
+                if (!response.success) throw new Error(response.message);
+                await generateLlamadoPDF(response.data, delegateMap);
+            }
+        } catch (err) {
+            const msg = err.response?.data?.detail || err.message || 'Ocurrió un error inesperado.';
+            Swal.fire({ icon: 'error', title: 'Error al generar informe', text: msg, confirmButtonColor: '#dc2626' });
+        } finally {
+            setLoadingReport(null);
+        }
+    };
+
     const selectedMeetingInfo = meetings.find(m => m.id === Number(selectedMeeting));
+    const staticReports = REPORT_TYPES.filter(r => r.id === 'attendance' || r.id === 'delegations');
 
     return (
         <div className="space-y-8 p-1">
@@ -1115,7 +1135,6 @@ const InformesTab = () => {
                     </select>
                     <ChevronDown size={16} className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" />
                 </div>
-
                 {selectedMeetingInfo && (
                     <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
                         <span className="bg-gray-100 px-2 py-1 rounded-lg flex items-center gap-1"><Calendar size={14} /> {formatDateLong(selectedMeetingInfo.scheduled_date)}</span>
@@ -1125,56 +1144,165 @@ const InformesTab = () => {
                 )}
             </div>
 
-            {/* Tarjetas de informes */}
+            {/* Informes de descarga única: Asistencia y Poderes */}
             <div>
                 <p className="text-sm font-semibold text-gray-600 mb-4">2. Descarga el informe deseado</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {REPORT_TYPES.map((report) => {
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {staticReports.map((report) => {
                         const Icon = report.icon;
                         const isLoading = loadingReport === report.id;
-
                         return (
-                            <div
-                                key={report.id}
-                                className={`bg-white rounded-2xl border ${report.border} shadow-sm p-6 flex flex-col gap-4 hover:shadow-md transition-shadow`}
-                            >
+                            <div key={report.id} className={`bg-white rounded-2xl border ${report.border} shadow-sm p-6 flex flex-col gap-4 hover:shadow-md transition-shadow`}>
                                 <div className={`w-14 h-14 rounded-xl bg-linear-to-r ${report.color} flex items-center justify-center text-white shadow`}>
                                     <Icon size={28} />
                                 </div>
-
                                 <div className="flex-1">
                                     <h3 className="font-bold text-gray-800 text-base">{report.label}</h3>
                                     <p className="text-sm text-gray-500 mt-1">{report.description}</p>
                                 </div>
-
                                 <button
-                                    onClick={() => handleDownload(report)}
+                                    onClick={() => handleDownloadStatic(report)}
                                     disabled={isLoading || !selectedMeeting}
                                     className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all
                                         ${!selectedMeeting
                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : `bg-linear-to-r ${report.color} text-white hover:opacity-90 active:scale-95`
-                                        }`}
+                                            : `bg-linear-to-r ${report.color} text-white hover:opacity-90 active:scale-95`}`}
                                 >
-                                    {isLoading ? (
-                                        <>
-                                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                            </svg>
-                                            Generando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download size={16} />
-                                            Descargar PDF
-                                        </>
-                                    )}
+                                    {isLoading ? <>{SPINNER}Generando...</> : <><Download size={16} />Descargar PDF</>}
                                 </button>
                             </div>
                         );
                     })}
                 </div>
+            </div>
+
+            {/* Informes con selección múltiple: Votaciones y Llamados */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* Card Votaciones */}
+                <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm p-6 flex flex-col gap-4 hover:shadow-md transition-shadow">
+                    <div className="w-14 h-14 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 flex items-center justify-center text-white shadow">
+                        <CheckSquare size={28} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-gray-800 text-base">Informe de Votaciones</h3>
+                        <p className="text-sm text-gray-500 mt-1">Selecciona una o varias votaciones para descargar un PDF por cada una.</p>
+                    </div>
+
+                    {selectedMeeting && (
+                        <div className="border border-indigo-100 rounded-xl p-3 bg-indigo-50 space-y-2 min-h-[72px]">
+                            {isLoadingPolls ? (
+                                <div className="flex items-center gap-2 text-sm text-indigo-500">
+                                    {SPINNER} Cargando votaciones...
+                                </div>
+                            ) : pollsList.length === 0 ? (
+                                <p className="text-sm text-gray-400 italic">Esta reunión no tiene votaciones registradas.</p>
+                            ) : (
+                                <>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-indigo-700 cursor-pointer pb-1.5 border-b border-indigo-200">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedPollIdxs.size === pollsList.length}
+                                            onChange={toggleAllPolls}
+                                            className="w-4 h-4 accent-indigo-600"
+                                        />
+                                        Seleccionar todas ({pollsList.length})
+                                    </label>
+                                    {pollsList.map((poll, idx) => (
+                                        <label key={poll.id} className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedPollIdxs.has(idx)}
+                                                onChange={() => togglePoll(idx)}
+                                                className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                                            />
+                                            <span className="leading-tight">
+                                                {poll.title}
+                                                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                                    poll.status === 'closed' ? 'bg-gray-200 text-gray-600' :
+                                                    poll.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                    'bg-yellow-100 text-yellow-700'
+                                                }`}>
+                                                    {poll.status === 'closed' ? 'Cerrada' : poll.status === 'active' ? 'Activa' : 'Borrador'}
+                                                </span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleDownloadPolls}
+                        disabled={loadingReport === 'polls' || !selectedMeeting || selectedPollIdxs.size === 0}
+                        className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all
+                            ${!selectedMeeting || selectedPollIdxs.size === 0
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-linear-to-r from-indigo-500 to-indigo-600 text-white hover:opacity-90 active:scale-95'}`}
+                    >
+                        {loadingReport === 'polls' ? (
+                            <>{SPINNER}Generando...</>
+                        ) : (
+                            <><Download size={16} />
+                            {selectedPollIdxs.size > 1
+                                ? `Descargar ${selectedPollIdxs.size} PDFs`
+                                : selectedPollIdxs.size === 1
+                                ? 'Descargar PDF'
+                                : 'Descargar PDFs'}
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {/* Card Llamados */}
+                <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm p-6 flex flex-col gap-4 hover:shadow-md transition-shadow">
+                    <div className="w-14 h-14 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 flex items-center justify-center text-white shadow">
+                        <Bell size={28} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-gray-800 text-base">Informe de Llamados</h3>
+                        <p className="text-sm text-gray-500 mt-1">Selecciona los llamados de asistencia que deseas exportar como PDF.</p>
+                    </div>
+
+                    {selectedMeeting && (
+                        <div className="border border-indigo-100 rounded-xl p-3 bg-indigo-50 space-y-2">
+                            {[1, 2, 3].map(num => (
+                                <label key={num} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedLlamados.has(num)}
+                                        onChange={() => toggleLlamado(num)}
+                                        className="w-4 h-4 accent-indigo-600"
+                                    />
+                                    {LLAMADO_LABELS[num - 1]}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleDownloadLlamados}
+                        disabled={loadingReport === 'llamados' || !selectedMeeting || selectedLlamados.size === 0}
+                        className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all
+                            ${!selectedMeeting || selectedLlamados.size === 0
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-linear-to-r from-indigo-500 to-indigo-600 text-white hover:opacity-90 active:scale-95'}`}
+                    >
+                        {loadingReport === 'llamados' ? (
+                            <>{SPINNER}Generando...</>
+                        ) : (
+                            <><Download size={16} />
+                            {selectedLlamados.size > 1
+                                ? `Descargar ${selectedLlamados.size} PDFs`
+                                : selectedLlamados.size === 1
+                                ? 'Descargar PDF'
+                                : 'Descargar PDFs'}
+                            </>
+                        )}
+                    </button>
+                </div>
+
             </div>
         </div>
     );
