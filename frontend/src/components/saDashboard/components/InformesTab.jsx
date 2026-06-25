@@ -520,7 +520,7 @@ const generatePollsPDF = async (data) => {
         // Info general encuesta
         autoTable(doc, {
             startY: y,
-            head: [['Tipo', 'Estado', 'Total Votantes', 'Peso Total Votado']],
+            head: [['Tipo', 'Estado', 'Total Votantes', 'Quorum Total Votado']],
             body: [[poll.type, poll.status, poll.total_voters, poll.total_weight_voted.toFixed(4)]],
             styles: { fontSize: 8 },
             headStyles: { fillColor: [99, 102, 241] },
@@ -639,7 +639,7 @@ const generatePollsPDF = async (data) => {
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(9);
                 doc.setTextColor(55, 65, 81);
-                doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Peso: ${opt.votes_weight.toFixed(4)}`, 16, y);
+                doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Quorum: ${opt.votes_weight.toFixed(4)}`, 16, y);
                 y += 4;
 
                 autoTable(doc, {
@@ -687,7 +687,7 @@ const generatePollsPDF = async (data) => {
 
             autoTable(doc, {
                 startY: y,
-                head: [['Copropietario', 'Apartamento', 'Peso']],
+                head: [['Copropietario', 'Apartamento', 'Quorom']],
                 body: poll.abstentions.map(v => [v.full_name, v.apartment, v.voting_weight.toFixed(4)]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [229, 231, 235], textColor: 60 },
