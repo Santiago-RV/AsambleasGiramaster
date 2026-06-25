@@ -202,7 +202,7 @@ const { summary, attended, absent } = data;
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Apartamento</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Tipo</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Fecha Ingreso</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">Peso Quórum</th>
+                <th className="text-right px-4 py-2 font-medium text-gray-600">Quórum</th>
               </tr>
             </thead>
             <tbody>
@@ -246,7 +246,7 @@ const { summary, attended, absent } = data;
               <tr>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Nombre</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Apartamento</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">Peso Quórum</th>
+                <th className="text-right px-4 py-2 font-medium text-gray-600">Quórum</th>
               </tr>
             </thead>
             <tbody>
@@ -420,7 +420,7 @@ const PollDetailView = ({ poll }) => {
               ? poll.total_weight_voted.toFixed(4)
               : poll.total_weight_voted}
           </p>
-          <p className="text-xs text-indigo-200">Peso Total</p>
+          <p className="text-xs text-indigo-200">Quórum Total</p>
         </div>
         <div className="bg-white/15 rounded-lg p-2.5 text-center">
           <p className="text-xl font-bold text-white">{poll.participation_percentage}%</p>
@@ -545,7 +545,7 @@ const PollDetailView = ({ poll }) => {
             </h3>
 
             <p className="text-xs text-gray-500 mt-1">
-              Peso total votado: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
+              Quórum total votado: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
             </p>
           </div>
 
@@ -603,7 +603,7 @@ const PollDetailView = ({ poll }) => {
 
             <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-600">
               <span>
-                Peso total: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
+                Quórum total: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
               </span>
 
               <span>
@@ -677,7 +677,7 @@ const PollDetailView = ({ poll }) => {
                   <th className="text-left px-3 py-2 font-semibold text-gray-500">Copropietario</th>
                   <th className="text-left px-3 py-2 font-semibold text-gray-500">Apto</th>
                   <th className="text-left px-3 py-2 font-semibold text-gray-500">Fecha y Hora</th>
-                  <th className="text-right px-3 py-2 font-semibold text-gray-500">Peso</th>
+                  <th className="text-right px-3 py-2 font-semibold text-gray-500">Quórum</th>
                 </tr>
               </thead>
               <tbody>

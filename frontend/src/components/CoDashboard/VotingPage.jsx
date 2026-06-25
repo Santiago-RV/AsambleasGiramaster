@@ -26,20 +26,6 @@ export default function VotingPage({ onNavigate }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Programar refetch exactamente cuando venza cada encuesta activa con duración
-  useEffect(() => {
-    if (!allPollsData?.polls) return;
-    const now = Date.now();
-    const timers = allPollsData.polls
-      .filter(p => (p.str_status === 'active' || p.str_status === 'Activa') && p.dat_ended_at)
-      .map(p => {
-        const msLeft = parseColombiaDate(p.dat_ended_at).getTime() - now;
-        if (msLeft <= 0) { refetchPolls(); return null; }
-        return setTimeout(() => refetchPolls(), msLeft + 300);
-      })
-      .filter(Boolean);
-    return () => timers.forEach(clearTimeout);
-  }, [allPollsData?.polls]);
 
   const getTimeRemaining = (endDateStr) => {
     if (!endDateStr) return null;
@@ -101,6 +87,21 @@ export default function VotingPage({ onNavigate }) {
     enabled: !!meetingsData?.data && meetingsData.data.length > 0,
     refetchInterval: false,
   });
+
+  // Programar refetch exactamente cuando venza cada encuesta activa con duración
+  useEffect(() => {
+    if (!allPollsData?.polls) return;
+    const now = Date.now();
+    const timers = allPollsData.polls
+      .filter(p => (p.str_status === 'active' || p.str_status === 'Activa') && p.dat_ended_at)
+      .map(p => {
+        const msLeft = parseColombiaDate(p.dat_ended_at).getTime() - now;
+        if (msLeft <= 0) { refetchPolls(); return null; }
+        return setTimeout(() => refetchPolls(), msLeft + 300);
+      })
+      .filter(Boolean);
+    return () => timers.forEach(clearTimeout);
+  }, [allPollsData?.polls]);
 
   // Reunión activa para verificar delegación (cubre todos los estados posibles del backend)
   const activeMeeting = meetingsData?.data?.find(m => {

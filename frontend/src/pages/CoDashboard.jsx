@@ -377,14 +377,6 @@ export default function AppCopropietario() {
               </div>
             </div>
 
-            {/* BOTÓN DE LOGOUT */}
-            <button
-              onClick={handleLogout}
-              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-md shrink-0"
-              title="Cerrar Sesión"
-            >
-              <LogOut size={20} />
-            </button>
           </div>
         )}
 
@@ -406,14 +398,6 @@ export default function AppCopropietario() {
               </div>
             </div>
 
-            {/* Botón de logout durante loading */}
-            <button
-              onClick={handleLogout}
-              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm"
-              title="Cerrar Sesión"
-            >
-              <LogOut size={20} />
-            </button>
           </div>
         )}
 
@@ -436,22 +420,21 @@ export default function AppCopropietario() {
               </div>
             </div>
 
-            {/* Botón de logout para invitados */}
-            <button
-              onClick={handleLogout}
-              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm"
-              title="Cerrar Sesión"
-            >
-              <LogOut size={20} />
-            </button>
           </div>
         )}
       </div>
     </div>
   );
 
-  // Footer del sidebar SIN botón de logout (ya está en el header)
-  const sidebarFooter = null;
+  const sidebarFooter = (
+    <button
+      onClick={handleLogout}
+      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600/80 hover:bg-red-600 text-white rounded-xl transition-all font-semibold text-sm"
+    >
+      <LogOut size={18} />
+      Cerrar Sesión
+    </button>
+  );
 
   // Estado de error
   if (isErrorUser) {
