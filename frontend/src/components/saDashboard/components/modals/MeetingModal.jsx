@@ -157,8 +157,11 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 	};
 
 	const isVirtual = meetingMode === 'virtual';
-	const showZoomAccountSelector = isVirtual && zoomAccounts.length > 1;
-	const blockSubmit = isVirtual && !loadingAccounts && zoomConfigError;
+	const availableAccounts = zoomAccounts.filter(a => !conflictingAccounts.includes(a.id));
+	const singleAccountConflict = isVirtual && zoomAccounts.length === 1 && !!watchStart && conflictingAccounts.includes(zoomAccounts[0]?.id);
+	const allAccountsConflict = isVirtual && zoomAccounts.length > 1 && !!watchStart && availableAccounts.length === 0;
+	const showZoomAccountSelector = isVirtual && zoomAccounts.length > 1 && availableAccounts.length > 0;
+	const blockSubmit = isVirtual && !loadingAccounts && (zoomConfigError || singleAccountConflict || allAccountsConflict);
 
 	return (
 		<Modal 
@@ -397,7 +400,7 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 					</div>
 
 					<div className="grid grid-cols-1 gap-4">
-						{/* Selector de Cuenta Zoom (solo si hay mas de 1) */}
+						{/* Selector de Cuenta Zoom (solo si hay más de 1 disponible) */}
 						{showZoomAccountSelector && (
 							<div className="group">
 								<label className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700">
@@ -415,21 +418,12 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 									}`}
 								>
 									<option value="">-- Seleccionar cuenta Zoom --</option>
-									{zoomAccounts.map((account) => {
-										const hasConflict = conflictingAccounts.includes(account.id);
-										return (
-											<option key={account.id} value={account.id}>
-												{hasConflict ? '⚠️ ' : ''}{account.name} (Cuenta #{account.id}){hasConflict ? ' — ya tiene reunión en esta hora' : ''}
-											</option>
-										);
-									})}
+									{availableAccounts.map((account) => (
+										<option key={account.id} value={account.id}>
+											{account.name} (Cuenta #{account.id})
+										</option>
+									))}
 								</select>
-								{conflictingAccounts.length > 0 && (
-									<p className="text-amber-600 text-xs mt-1 flex items-center gap-1">
-										<AlertCircle className="w-3 h-3" />
-										Una o más cuentas ya tienen reunión programada en esta hora
-									</p>
-								)}
 								{errors.int_zoom_account_id && (
 									<p className="text-red-500 text-xs mt-1 flex items-center gap-1">
 										<AlertCircle className="w-3 h-3" />
@@ -439,6 +433,30 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 								<p className="text-xs text-gray-500 mt-1">
 									Selecciona la cuenta de Zoom donde se creara la reunion
 								</p>
+							</div>
+						)}
+
+						{/* Advertencia: cuenta única ya tiene reunión en ese horario */}
+						{singleAccountConflict && (
+							<div className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+								<div className="flex items-start gap-2">
+									<AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+									<p className="text-xs text-amber-800 leading-relaxed">
+										<strong>Cuenta no disponible:</strong> La cuenta Zoom ya tiene una reunión agendada en este horario. Elige una fecha u hora diferente.
+									</p>
+								</div>
+							</div>
+						)}
+
+						{/* Error: todas las cuentas tienen conflicto */}
+						{allAccountsConflict && (
+							<div className="bg-red-50 border border-red-300 rounded-lg p-3">
+								<div className="flex items-start gap-2">
+									<AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+									<p className="text-xs text-red-800 leading-relaxed">
+										<strong>Sin cuentas disponibles:</strong> Todas las cuentas Zoom tienen reuniones agendadas en este horario. Elige una fecha u hora diferente.
+									</p>
+								</div>
 							</div>
 						)}
 

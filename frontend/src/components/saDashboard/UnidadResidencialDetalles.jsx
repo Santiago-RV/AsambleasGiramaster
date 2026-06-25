@@ -435,12 +435,12 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 						residentialUnitName={unitData?.str_name || unitData?.str_residential_name || unitData?.name || 'Sin nombre'}
 						presencialMeetingId={
 							Array.isArray(meetingsData)
-								? (meetingsData.find(m => m.str_modality === 'presencial' && (m.estado === 'En Curso' || m.estado === 'Programada'))?.id ?? null)
+								? (meetingsData.find(m => (m.estado === 'En Curso' || m.estado === 'Programada'))?.id ?? null)
 								: null
 						}
 						presencialMeetingStatus={
 							Array.isArray(meetingsData)
-								? (meetingsData.find(m => m.str_modality === 'presencial' && (m.estado === 'En Curso' || m.estado === 'Programada'))?.estado ?? null)
+								? (meetingsData.find(m => (m.estado === 'En Curso' || m.estado === 'Programada'))?.estado ?? null)
 								: null
 						}
 					/>

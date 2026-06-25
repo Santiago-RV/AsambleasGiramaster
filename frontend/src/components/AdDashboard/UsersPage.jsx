@@ -92,9 +92,9 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
     }))
     : [];
 
-  // Reunión presencial activa para incluir meeting_id en los QR generados
+  // Reunión activa (presencial o virtual) para incluir meeting_id en los QR generados
   const presencialMeeting = meetings.find(
-    m => m.str_modality === 'presencial' && (m.estado === 'En Curso' || m.estado === 'Programada')
+    m => (m.estado === 'En Curso' || m.estado === 'Programada')
   );
 
   // Mutación para eliminar residente individual
