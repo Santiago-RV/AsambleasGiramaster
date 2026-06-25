@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axiosInstance from "../../services/api/axiosconfig";
-import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Loader2, Bell, CheckCircle2, UserMinus, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Loader2, Bell, CheckCircle2, UserMinus, X, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import Swal from "sweetalert2";
 import PollDetailsModal from "./PollDetailsModal";
 import LlamadoModal from "./LlamadoModal";
@@ -15,6 +15,9 @@ const ReunionEnCursoTab = () => {
   const [selectedLlamadoSnapshot, setSelectedLlamadoSnapshot] = useState(null);
   const [loadingLlamado, setLoadingLlamado] = useState(null);
   const [absentPage, setAbsentPage] = useState(0);
+  const [searchRegistrados, setSearchRegistrados] = useState('');
+  const [searchNoRegistrados, setSearchNoRegistrados] = useState('');
+  const [searchAusentes, setSearchAusentes] = useState('');
   const ABSENT_PAGE_SIZE = 6;
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -158,6 +161,16 @@ const ReunionEnCursoTab = () => {
 
   const registeredUsers = meeting?.connected_users ?? [];
   const absentUsers = meeting?.absent_users ?? [];
+  const disconnectedUsers = meeting?.disconnected_users ?? [];
+
+  const matchSearch = (user, term) => {
+    if (!term) return true;
+    const t = term.toLowerCase();
+    return user.full_name?.toLowerCase().includes(t) || user.apartment_number?.toString().includes(t);
+  };
+
+  const filteredRegistrados = registeredUsers.filter(u => matchSearch(u, searchRegistrados));
+  const filteredNoRegistrados = disconnectedUsers.filter(u => matchSearch(u, searchNoRegistrados));
 
   // Agrupar ausentes: el delegado (receptor de poderes) es el encabezado;
   // sus delegantes aparecen como sub-items dentro de la misma card.
@@ -176,8 +189,11 @@ const ReunionEnCursoTab = () => {
     }));
   })();
 
-  const absentPageCount = Math.ceil(absentGroups.length / ABSENT_PAGE_SIZE);
-  const absentPageItems = absentGroups.slice(absentPage * ABSENT_PAGE_SIZE, (absentPage + 1) * ABSENT_PAGE_SIZE);
+  const filteredAbsentGroups = absentGroups.filter(g => matchSearch(g.head, searchAusentes));
+
+  const absentPageCount = Math.ceil(filteredAbsentGroups.length / ABSENT_PAGE_SIZE);
+  const safeAbsentPage = absentPage >= absentPageCount ? 0 : absentPage;
+  const absentPageItems = filteredAbsentGroups.slice(safeAbsentPage * ABSENT_PAGE_SIZE, (safeAbsentPage + 1) * ABSENT_PAGE_SIZE);
 
   if (!meeting) {
     return (
@@ -254,11 +270,21 @@ const ReunionEnCursoTab = () => {
         <div className="bg-white rounded-lg shadow p-4 flex flex-col min-h-0">
           <h3 className="text-base font-semibold mb-2 flex items-center gap-2 shrink-0">
             <Wifi size={18} className="text-green-500" />
-            Registrados ({registeredUsers.length})
+            Registrados ({filteredRegistrados.length}{searchRegistrados ? ` de ${registeredUsers.length}` : ''})
           </h3>
+          <div className="relative mb-2 shrink-0">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o apto..."
+              value={searchRegistrados}
+              onChange={e => setSearchRegistrados(e.target.value)}
+              className="w-full pl-7 pr-2 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:border-green-400"
+            />
+          </div>
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-            {registeredUsers.length > 0 ? (
-              registeredUsers.map((user) => (
+            {filteredRegistrados.length > 0 ? (
+              filteredRegistrados.map((user) => (
                 <div
                   key={user.user_id}
                   className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg"
@@ -293,7 +319,9 @@ const ReunionEnCursoTab = () => {
                 </div>
               ))
             ) : (
-              <div className="text-gray-500 text-center py-6 text-sm">No hay usuarios registrados</div>
+              <div className="text-gray-500 text-center py-6 text-sm">
+                {searchRegistrados ? 'Sin resultados' : 'No hay usuarios registrados'}
+              </div>
             )}
           </div>
         </div>
@@ -394,11 +422,21 @@ const ReunionEnCursoTab = () => {
         <div className="bg-white rounded-lg shadow p-4 flex flex-col min-h-0">
           <h3 className="text-base font-semibold mb-2 flex items-center gap-2 shrink-0">
             <WifiOff size={18} className="text-red-500" />
-            No Registrados ({meeting.disconnected_count})
+            No Registrados ({filteredNoRegistrados.length}{searchNoRegistrados ? ` de ${disconnectedUsers.length}` : ''})
           </h3>
+          <div className="relative mb-2 shrink-0">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o apto..."
+              value={searchNoRegistrados}
+              onChange={e => setSearchNoRegistrados(e.target.value)}
+              className="w-full pl-7 pr-2 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:border-red-400"
+            />
+          </div>
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-            {meeting.disconnected_users?.length > 0 ? (
-              meeting.disconnected_users.map((user) => (
+            {filteredNoRegistrados.length > 0 ? (
+              filteredNoRegistrados.map((user) => (
                 <div
                   key={user.user_id}
                   className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg"
@@ -415,7 +453,9 @@ const ReunionEnCursoTab = () => {
                 </div>
               ))
             ) : (
-              <div className="text-gray-500 text-center py-6 text-sm">No hay usuarios desconectados</div>
+              <div className="text-gray-500 text-center py-6 text-sm">
+                {searchNoRegistrados ? 'Sin resultados' : 'No hay usuarios desconectados'}
+              </div>
             )}
           </div>
         </div>
@@ -423,11 +463,23 @@ const ReunionEnCursoTab = () => {
 
       {/* Ausentes */}
       <div className="bg-white rounded-lg shadow p-4 shrink-0">
-        <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
-          <UserMinus size={18} className="text-orange-500" />
-          Ausentes ({absentUsers.length})
-        </h3>
-        {absentGroups.length > 0 ? (
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <h3 className="text-base font-semibold flex items-center gap-2">
+            <UserMinus size={18} className="text-orange-500" />
+            Ausentes ({filteredAbsentGroups.length}{searchAusentes ? ` de ${absentGroups.length}` : ''})
+          </h3>
+          <div className="relative w-56 shrink-0">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o apto..."
+              value={searchAusentes}
+              onChange={e => { setSearchAusentes(e.target.value); setAbsentPage(0); }}
+              className="w-full pl-7 pr-2 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:border-orange-400"
+            />
+          </div>
+        </div>
+        {filteredAbsentGroups.length > 0 ? (
           <>
             <div className="grid grid-cols-3 gap-2">
               {absentPageItems.map(({ head, delegators }) => (
@@ -482,15 +534,15 @@ const ReunionEnCursoTab = () => {
               <div className="flex items-center justify-end gap-2 mt-2">
                 <button
                   onClick={() => setAbsentPage(p => p - 1)}
-                  disabled={absentPage === 0}
+                  disabled={safeAbsentPage === 0}
                   className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <span className="text-xs text-gray-500">{absentPage + 1} / {absentPageCount}</span>
+                <span className="text-xs text-gray-500">{safeAbsentPage + 1} / {absentPageCount}</span>
                 <button
                   onClick={() => setAbsentPage(p => p + 1)}
-                  disabled={absentPage === absentPageCount - 1}
+                  disabled={safeAbsentPage === absentPageCount - 1}
                   className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
                 >
                   <ChevronRight size={16} />
@@ -499,7 +551,9 @@ const ReunionEnCursoTab = () => {
             )}
           </>
         ) : (
-          <p className="text-xs text-gray-400">Sin ausentes marcados</p>
+          <p className="text-xs text-gray-400">
+            {searchAusentes ? 'Sin resultados' : 'Sin ausentes marcados'}
+          </p>
         )}
       </div>
 

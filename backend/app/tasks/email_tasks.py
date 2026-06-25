@@ -482,6 +482,18 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                         expiration_hours=24,
                         meeting_id=meeting_id if meeting.str_modality == "presencial" else None
                     )
+
+                    # Persistir el token en BD para que el endpoint de auto-login lo valide
+                    token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
+                    token_id = token_payload.get('token_id') if token_payload else None
+                    if token_id:
+                        try:
+                            await auto_login_service.upsert_user_token(db, token_id, user.id, None)
+                            await db.flush()
+                        except Exception as token_err:
+                            logger.warning(f"Error guardando token de auto-login: {token_err}")
+                            await db.rollback()
+
                     auto_login_url = None
                     if auto_login_token:
                         if not frontend_url:

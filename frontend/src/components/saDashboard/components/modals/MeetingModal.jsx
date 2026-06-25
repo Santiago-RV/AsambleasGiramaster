@@ -71,7 +71,12 @@ const MeetingModal = ({ isOpen, onClose, onSubmit, isSubmitting, meetingMode = '
 					setConflictingAccounts(res.data.data.conflicting_account_ids || []);
 				}
 			})
-			.catch(() => {});
+			.catch((err) => {
+				if (err?.code !== 'ERR_CANCELED') {
+					setConflictingAccounts([]);
+					console.error('Error verificando conflictos Zoom:', err);
+				}
+			});
 		return () => controller.abort();
 	}, [watchStart, meetingMode, meetingToEdit?.id]);
 

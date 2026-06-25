@@ -605,6 +605,18 @@
         {% endif %}
       </div>
 
+      <!-- Acceso a la plataforma (link de auto-login) -->
+      {% if auto_login_url %}
+      <div class="quick-access">
+        <div class="quick-access-title">🔐 Acceder a la Plataforma</div>
+        <a href="{{ auto_login_url }}" class="access-button">INGRESAR A LA REUNIÓN</a>
+        <div class="quick-access-note">
+          Este enlace es personal e intransferible. Expira en 24 horas.<br>
+          Al hacer clic iniciará sesión automáticamente en la plataforma.
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Acceso a Zoom (solo si es virtual) -->
       {% if str_modality == 'virtual' and zoom_meeting_id %}
       <div class="zoom-access">
@@ -625,7 +637,7 @@
         {% endif %}
 
         <div class="zoom-button-container">
-          <a href="{{zoom_join_url}}" class="zoom-button">UNIRSE A LA REUNIÓN</a>
+          <p style="font-size:13px;color:#6b7280;text-align:center;">Para unirse a la reunión, ingrese a la plataforma con el enlace de acceso personal que aparece más arriba.</p>
         </div>
       </div>
       {% endif %}

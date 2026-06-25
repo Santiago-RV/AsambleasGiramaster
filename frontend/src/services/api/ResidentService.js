@@ -109,7 +109,7 @@ export class ResidentService {
         const response = await axiosInstance.post(
             `/super-admin/${unitId}/residents/${userId}/toggle-access`,
             null,
-            { params: { enabled } }
+            { params: { enabled, frontend_url: window.location.origin } }
         );
         return response.data;
     }

@@ -431,6 +431,7 @@ export default function AppAdmin() {
         str_modality: meetingMode,
         int_zoom_account_id: meetingMode === 'virtual' && data.int_zoom_account_id
           ? parseInt(data.int_zoom_account_id) : null,
+        frontend_url: window.location.origin,
       };
       createMeetingMutation.mutate(createData, {
         onSuccess: () => {

@@ -114,6 +114,37 @@ async def get_meetings_by_residential_unit(
 
 
 @router.get(
+    "/zoom-account-conflicts",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verificar conflictos de cuentas Zoom",
+    description="Retorna los IDs de cuentas Zoom que ya tienen reunión virtual en el mismo día"
+)
+async def get_zoom_account_conflicts(
+    schedule_date: datetime,
+    exclude_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        meeting_service = MeetingService(db)
+        conflicting_ids = await meeting_service.get_zoom_account_conflicts(
+            schedule_date=schedule_date,
+            exclude_meeting_id=exclude_id
+        )
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Conflictos verificados",
+            data={"conflicting_account_ids": conflicting_ids}
+        )
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al verificar conflictos: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
+@router.get(
     "/{meeting_id}",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
@@ -140,37 +171,6 @@ async def get_meeting(
     except Exception as e:
         raise ServiceException(
             message=f"Error al obtener la reunión: {str(e)}",
-            details={"original_error": str(e)}
-        )
-
-
-@router.get(
-    "/zoom-account-conflicts",
-    response_model=SuccessResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Verificar conflictos de cuentas Zoom",
-    description="Retorna los IDs de cuentas Zoom que ya tienen reunión virtual en la misma hora"
-)
-async def get_zoom_account_conflicts(
-    schedule_date: datetime,
-    exclude_id: Optional[int] = None,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        meeting_service = MeetingService(db)
-        conflicting_ids = await meeting_service.get_zoom_account_conflicts(
-            schedule_date=schedule_date,
-            exclude_meeting_id=exclude_id
-        )
-        return SuccessResponse(
-            success=True,
-            status_code=status.HTTP_200_OK,
-            message="Conflictos verificados",
-            data={"conflicting_account_ids": conflicting_ids}
-        )
-    except Exception as e:
-        raise ServiceException(
-            message=f"Error al verificar conflictos: {str(e)}",
             details={"original_error": str(e)}
         )
 

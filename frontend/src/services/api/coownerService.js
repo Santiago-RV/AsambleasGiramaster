@@ -59,7 +59,7 @@ const CoownerService = {
 			`/admin/coowners/${coownerId}/enable`,
 			{},
 			{
-				params: { send_email: sendEmail }
+				params: { send_email: sendEmail, frontend_url: window.location.origin }
 			}
 		);
 		return response.data;

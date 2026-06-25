@@ -1730,7 +1730,7 @@ class ResidentialUnitService:
                 DataUserModel.str_email == admin_data.str_email
             )
             result_email = await self.db.execute(query_email_check)
-            existing_email = result_email.scalar_one_or_none()
+            existing_email = result_email.scalars().first()
 
             if existing_email:
                 # Reutilizar el DataUser existente (misma persona, múltiples unidades)

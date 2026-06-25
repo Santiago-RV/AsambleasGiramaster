@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 import base64
@@ -767,6 +768,7 @@ async def toggle_resident_access(
     unit_id: int,
     user_id: int,
     enabled: bool = True,
+    frontend_url: Optional[str] = None,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -802,7 +804,7 @@ async def toggle_resident_access(
                 try:
                     celery_app.send_task(
                         'app.tasks.email_tasks.send_meeting_invitations',
-                        args=[result["active_meeting_id"], task_id, None, [user_id]],
+                        args=[result["active_meeting_id"], task_id, frontend_url, [user_id]],
                         task_id=task_id,
                         queue='email_tasks'
                     )

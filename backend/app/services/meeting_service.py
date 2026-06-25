@@ -113,7 +113,7 @@ class MeetingService:
                 MeetingModel.int_zoom_account_id != None,
                 MeetingModel.str_modality == 'virtual',
                 MeetingModel.str_status != 'Cancelada',
-                func.date_trunc('day', MeetingModel.dat_schedule_date) == func.date_trunc('day', schedule_date),
+                func.date(MeetingModel.dat_schedule_date) == func.date(schedule_date),
             ]
             if exclude_meeting_id:
                 conditions.append(MeetingModel.id != exclude_meeting_id)
@@ -185,6 +185,18 @@ class MeetingService:
             zoom_join_url = None
             zoom_start_url = None
             resolved_zoom_account_id = zoom_account_id
+
+            # Validar conflicto de cuenta Zoom antes de crear
+            if modality == "virtual" and zoom_account_id:
+                conflicting_ids = await self.get_zoom_account_conflicts(
+                    schedule_date=schedule_date,
+                    exclude_meeting_id=None
+                )
+                if zoom_account_id in conflicting_ids:
+                    raise ServiceException(
+                        message="La cuenta Zoom seleccionada ya tiene una reunión virtual programada para ese día.",
+                        details={"zoom_account_id": zoom_account_id}
+                    )
 
             # Solo crear reunión en Zoom si la modalidad es virtual
             if modality == "virtual":
