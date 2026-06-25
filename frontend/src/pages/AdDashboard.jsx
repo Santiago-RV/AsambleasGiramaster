@@ -504,15 +504,8 @@ export default function AppAdmin() {
     try {
       await MeetingService.startMeeting(meeting.id);
       queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
-      setShowZoomMeeting({
-        id: meeting.id,
-        str_title: meeting.titulo,
-        int_zoom_meeting_id: meeting.zoom_meeting_id,
-        str_zoom_join_url: meeting.meeting_url,
-        str_zoom_password: meeting.zoom_password,
-        int_zoom_account_id: meeting.int_zoom_account_id,
-        str_modality: meeting.str_modality,
-      });
+      const url = meeting.zoom_start_url || meeting.meeting_url;
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       Swal.fire({
         icon: 'error',

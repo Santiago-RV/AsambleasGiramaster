@@ -106,14 +106,14 @@ class MeetingService:
     ) -> list[int]:
         """
         Retorna los IDs de cuentas Zoom que ya tienen una reunión virtual programada
-        en la misma hora (truncada al minuto) que schedule_date.
+        en el mismo día (mismo año, mes y día) que schedule_date.
         """
         try:
             conditions = [
                 MeetingModel.int_zoom_account_id != None,
                 MeetingModel.str_modality == 'virtual',
                 MeetingModel.str_status != 'Cancelada',
-                func.date_trunc('hour', MeetingModel.dat_schedule_date) == func.date_trunc('hour', schedule_date),
+                func.date_trunc('day', MeetingModel.dat_schedule_date) == func.date_trunc('day', schedule_date),
             ]
             if exclude_meeting_id:
                 conditions.append(MeetingModel.id != exclude_meeting_id)

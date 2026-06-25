@@ -80,9 +80,10 @@ export default function UsersPage({ residentialUnitId, unitName = '', onCreateUs
       asistentes: meeting.int_total_invitated || 0,
       fechaCompleta: new Date(meeting.dat_schedule_date),
       // Usar los campos correctos de Zoom
-      meeting_url: meeting.str_zoom_join_url,  // Corregido: era str_meeting_url (no existe)
-      zoom_meeting_id: meeting.int_zoom_meeting_id,  // Corregido: era str_zoom_meeting_id (tipo incorrecto)
-      zoom_password: meeting.str_zoom_password,  // Contraseña de la reunión
+      meeting_url: meeting.str_zoom_join_url,
+      zoom_start_url: meeting.str_zoom_start_url,
+      zoom_meeting_id: meeting.int_zoom_meeting_id,
+      zoom_password: meeting.str_zoom_password,
       str_modality: meeting.str_modality || 'virtual',
       int_zoom_account_id: meeting.int_zoom_account_id,
       // Campos adicionales para edición
