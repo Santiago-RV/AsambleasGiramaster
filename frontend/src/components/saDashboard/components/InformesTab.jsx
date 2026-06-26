@@ -138,7 +138,7 @@ const generatePieChartImage = async (
         const chart = new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['Asistentes', 'Ausentes'],
+                labels: ['Asistentes', 'Sin Ingresar'],
                 datasets: [{
                     data: [attendedValue, absentValue],
                     backgroundColor: ['#16a34a', '#dc2626']
@@ -261,14 +261,26 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     const { meeting, summary, attended, absent } = data;
     const pw = doc.internal.pageSize.getWidth();
 
-    // Generar gráfica primero (async) antes de construir el PDF
-    const attendanceChartImage = await generatePieChartImage (attended.length, absent.length);
-
+    // Generar gráficas (coeficiente primero, nominal segundo)
     const quorumChartImage = await generatePieChartImage(summary.total_quorum_attended, summary.total_quorum_absent, "Q");
+    const attendanceChartImage = await generatePieChartImage(attended.length, absent.length);
 
     let y = addHeader(doc, 'INFORME DE ASISTENCIA', meeting.title, meeting.residential_unit, meeting.scheduled_date);
 
-    // GRÁFICO AL INICIO
+    // QUÓRUM destacado
+    doc.setFillColor(255, 247, 230);
+    doc.roundedRect(14, y, pw - 28, 14, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(146, 64, 14);
+    doc.text('Quórum de la Asamblea:', 18, y + 6);
+    doc.setFont('helvetica', 'normal');
+    const quorumValue = Number(summary?.total_quorum_attended || 0).toFixed(4);
+    const quorumTotal = Number(summary?.total_quorum_invited || 0).toFixed(4);
+    doc.text(`${quorumValue}  (de ${quorumTotal} total invitado)`, 68, y + 6);
+    y += 20;
+
+    // GRÁFICOS DE ASISTENCIA
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(30, 58, 138);
@@ -283,36 +295,13 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     const startX = (pw - totalWidth) / 2;
 
     doc.setFontSize(9);
-    doc.text('Nominal', startX + (imgSizeChart / 2), y, {
-        align: 'center'
-    });
-
-    doc.text(
-        'Por Quórum',
-        startX + imgSizeChart + gap + (imgSizeChart / 2),
-        y,
-        { align: 'center' }
-    );
+    doc.text('Por Coeficiente (Principal)', startX + (imgSizeChart / 2), y, { align: 'center' });
+    doc.text('Por Porcentual (Cantidad)', startX + imgSizeChart + gap + (imgSizeChart / 2), y, { align: 'center' });
 
     y += 4;
 
-    doc.addImage(
-        attendanceChartImage,
-        'PNG',
-        startX,
-        y,
-        imgSizeChart,
-        imgSizeChart
-    );
-
-    doc.addImage(
-        quorumChartImage,
-        'PNG',
-        startX + imgSizeChart + gap,
-        y,
-        imgSizeChart,
-        imgSizeChart
-    );
+    doc.addImage(quorumChartImage, 'PNG', startX, y, imgSizeChart, imgSizeChart);
+    doc.addImage(attendanceChartImage, 'PNG', startX + imgSizeChart + gap, y, imgSizeChart, imgSizeChart);
 
     y += imgSizeChart + 10;
 
@@ -321,7 +310,6 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 58, 138);
     doc.text('RESUMEN GENERAL', 14, y + 4);
-    const quorumValue = Number(summary?.quorum_achieved || 0).toFixed(2);
     doc.text(`QUÓRUM: ${quorumValue}`, pw - 14, y + 4, { align: 'right' });
     y += 8;
 
@@ -460,7 +448,7 @@ const generatePollsPDF = async (data) => {
             doc.setFontSize(8);
 
             doc.text(
-                'Resultado',
+                'Por Coeficiente (Principal)',
                 startX + chartSize / 2,
                 y,
                 { align: 'center' }
@@ -512,8 +500,37 @@ const generatePollsPDF = async (data) => {
             y += chartSize + 8;
         }
 
-        // Título encuesta
+        if (y > 240) { doc.addPage(); y = 20; }
 
+        // RESUMEN GENERAL (Opción | Coeficiente | Porcentual | Votos)
+        if (isGraphType && poll.options.length > 0) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(30, 58, 138);
+            doc.text('RESUMEN GENERAL', 14, y);
+            y += 4;
+
+            const totalVotos = poll.options.reduce((s, o) => s + (o.votes_count || 0), 0);
+            autoTable(doc, {
+                startY: y,
+                head: [['Opción', 'Coeficiente', 'Porcentual', 'Votos']],
+                body: poll.options.map(opt => [
+                    opt.text,
+                    Number(opt.votes_weight || 0).toFixed(4),
+                    totalVotos > 0 ? `${Math.round((opt.votes_count / totalVotos) * 100)}%` : '0%',
+                    opt.votes_count,
+                ]),
+                styles: { fontSize: 9 },
+                headStyles: { fillColor: [30, 58, 138] },
+                columnStyles: {
+                    1: { halign: 'right' },
+                    2: { halign: 'right' },
+                    3: { halign: 'right' },
+                },
+                margin: { left: 14, right: 14 },
+            });
+            y = doc.lastAutoTable.finalY + 6;
+        }
 
         if (y > 240) { doc.addPage(); y = 20; }
 

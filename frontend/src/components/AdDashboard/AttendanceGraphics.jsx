@@ -28,8 +28,8 @@ const AttendanceChart = ({ title, attended, absent, unit = "" }) => {
       type: "pie",
       data: {
         labels: [
-          `Asistieron - ${attendedLabel}${unit} (${((attended / total) * 100).toFixed(1)}%)`,
-          `No asistieron - ${absentLabel}${unit} (${((absent / total) * 100).toFixed(1)}%)`
+          `Asistentes - ${attendedLabel}${unit} (${((attended / total) * 100).toFixed(1)}%)`,
+          `Sin Ingresar - ${absentLabel}${unit} (${((absent / total) * 100).toFixed(1)}%)`
         ],
         datasets: [
           {

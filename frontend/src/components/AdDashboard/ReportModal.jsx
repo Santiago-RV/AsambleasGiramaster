@@ -158,35 +158,42 @@ const { summary, attended, absent } = data;
         </div>
         <div className="bg-red-50 rounded-xl p-4 border border-red-100">
           <p className="text-3xl font-bold text-red-600">{summary.total_absent}</p>
-          <p className="text-sm text-red-700">No Asistieron</p>
+          <p className="text-sm text-red-700">Sin Ingresar</p>
         </div>
         <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
           <p className="text-3xl font-bold text-purple-600">{summary.attendance_percentage}%</p>
           <p className="text-sm text-purple-700">% Participación</p>
         </div>
       </div>
+
+      {/* Quorum Info */}
+      <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp className="text-amber-600" size={20} />
+          <span className="font-semibold text-amber-800">Quórum de la Asamblea</span>
+        </div>
+        <p className="text-2xl font-bold text-amber-700">
+          {Number(summary.total_quorum_attended || 0).toFixed(4)}
+        </p>
+        <p className="text-xs text-amber-600 mt-1">
+          Suma de coeficientes de copropietarios presentes sobre {Number(summary.total_quorum_invited || 0).toFixed(4)} total invitado
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <AttendanceChart
-          title="Asistencia nominal"
-          attended={summary.total_attended}
-          absent={summary.total_absent}
-        />
-
-        <AttendanceChart
-          title="Asistencia por quórum"
+          title="Por Coeficiente (Principal)"
           attended={summary.total_quorum_attended}
           absent={summary.total_quorum_absent}
           unit="Q"
         />
+
+        <AttendanceChart
+          title="Por Porcentual (Cantidad)"
+          attended={summary.total_attended}
+          absent={summary.total_absent}
+        />
       </div>
-      {/* Quorum Info */}
-      {/* <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-        <div className="flex items-center gap-2 mb-2">
-          <TrendingUp className="text-amber-600" size={20} />
-          <span className="font-semibold text-amber-800">Quórum Alcanzado</span>
-        </div>
-        <p className="text-2xl font-bold text-amber-700">{summary.quorum_achieved}</p>
-      </div> */}
 
       {/* Attended List */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -238,7 +245,7 @@ const { summary, attended, absent } = data;
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex items-center gap-2">
           <UserX className="text-red-600" size={18} />
-          <h3 className="font-semibold text-red-800">Lista de No Asistentes ({absent.length})</h3>
+          <h3 className="font-semibold text-red-800">Sin Ingresar ({absent.length})</h3>
         </div>
         <div className="max-h-64 overflow-y-auto">
           <table className="w-full text-sm">
@@ -429,6 +436,50 @@ const PollDetailView = ({ poll }) => {
       </div>
     </div>
     
+    {/* RESUMEN GENERAL (tabla coeficiente + porcentual + votos) */}
+    {isGraphType && poll.options.length > 0 && (() => {
+      const totalVotos = poll.options.reduce((s, o) => s + (o.votes_count || 0), 0);
+      const totalCoef  = poll.options.reduce((s, o) => s + (o.votes_weight || 0), 0);
+      return (
+        <div className="px-5 pt-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Resumen General</p>
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-indigo-50">
+                  <th className="text-left px-4 py-2 font-semibold text-indigo-700">Opción</th>
+                  <th className="text-right px-4 py-2 font-semibold text-indigo-700">Coeficiente</th>
+                  <th className="text-right px-4 py-2 font-semibold text-indigo-700">Porcentual</th>
+                  <th className="text-right px-4 py-2 font-semibold text-indigo-700">Votos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {poll.options.map((opt, i) => {
+                  const pct = totalVotos > 0 ? ((opt.votes_count / totalVotos) * 100).toFixed(0) : 0;
+                  return (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-2 font-medium text-gray-800">{opt.text}</td>
+                      <td className="px-4 py-2 text-right font-mono text-gray-700">{Number(opt.votes_weight || 0).toFixed(4)}</td>
+                      <td className="px-4 py-2 text-right text-gray-600">{pct}%</td>
+                      <td className="px-4 py-2 text-right text-gray-600">{opt.votes_count}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-gray-100">
+                <tr>
+                  <td className="px-4 py-2 font-semibold text-gray-700">Total</td>
+                  <td className="px-4 py-2 text-right font-mono font-semibold text-gray-700">{totalCoef.toFixed(4)}</td>
+                  <td className="px-4 py-2 text-right font-semibold text-gray-700">100%</td>
+                  <td className="px-4 py-2 text-right font-semibold text-gray-700">{totalVotos}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      );
+    })()}
+
     {/* 📊 GRÁFICO */}
     {isGraphType && (
       <div className="p-5 pb-0">
