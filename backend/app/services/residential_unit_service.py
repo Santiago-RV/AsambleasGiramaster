@@ -167,12 +167,37 @@ class ResidentialUnitService:
                 )
                 logger.info(f"🗑️ {len(user_ids_to_delete)} usuarios eliminados (solo belong a esta unidad)")
             
-            # 3. Eliminar datos personales de esos usuarios
+            # 3. Eliminar datos personales SOLO de los que ya no tienen ningún
+            #    usuario referenciándolos. Un tbl_data_users puede ser compartido
+            #    por varios tbl_users (la misma persona en varias unidades reutiliza
+            #    el DataUser), por lo que borrarlo mientras otro usuario lo referencia
+            #    rompería la FK tbl_users_ibfk_1.
             if data_user_ids_to_delete:
-                await self.db.execute(
-                    delete(DataUserModel).where(DataUserModel.id.in_(data_user_ids_to_delete))
-                )
-                logger.info(f"🗑️ {len(data_user_ids_to_delete)} registros de datos personales eliminados")
+                # Filtrar IDs nulos por seguridad
+                candidate_ids = [d for d in data_user_ids_to_delete if d is not None]
+
+                if candidate_ids:
+                    # ¿Cuáles siguen referenciados por algún usuario NO eliminado?
+                    still_referenced = await self.db.execute(
+                        select(UserModel.int_data_user_id)
+                        .where(UserModel.int_data_user_id.in_(candidate_ids))
+                        .distinct()
+                    )
+                    referenced_ids = set(still_referenced.scalars().all())
+
+                    deletable_data_user_ids = [
+                        d for d in candidate_ids if d not in referenced_ids
+                    ]
+
+                    if deletable_data_user_ids:
+                        await self.db.execute(
+                            delete(DataUserModel).where(DataUserModel.id.in_(deletable_data_user_ids))
+                        )
+                        logger.info(f"🗑️ {len(deletable_data_user_ids)} registros de datos personales eliminados")
+
+                    kept = len(candidate_ids) - len(deletable_data_user_ids)
+                    if kept:
+                        logger.info(f"ℹ️ {kept} registros de datos personales conservados (aún referenciados por otros usuarios)")
             
             # 4. Eliminar la unidad (cascade elimina el resto)
             await self.db.delete(unit)

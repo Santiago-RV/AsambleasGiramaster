@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import { ReportsService } from '../../../services/api/ReportsService';
 import { getLlamadoReportSA } from '../../../services/api/ActiveMeetingService';
 import { formatDateLong, formatDateTime } from '../../../utils/dateUtils';
+import { truncar3 } from '../../../utils/numberUtils';
 import logoGiramaster from '../../../assets/logo-giramaster.png';
 
 // ─── Helpers PDF ────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ const centerLabelsPlugin = (unit = "") => ({
                 ctx.textBaseline = 'middle';
 
                 const labelValue = unit
-                    ? `${rawValue.toFixed(2)}${unit}`
+                    ? `${truncar3(rawValue)}${unit}`
                     : `${Math.round(rawValue)}`;
 
                 ctx.fillText(labelValue, x, y - 12);
@@ -275,8 +276,8 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     doc.setTextColor(146, 64, 14);
     doc.text('Quórum de la Asamblea:', 18, y + 6);
     doc.setFont('helvetica', 'normal');
-    const quorumValue = Number(summary?.total_quorum_attended || 0).toFixed(4);
-    const quorumTotal = Number(summary?.total_quorum_invited || 0).toFixed(4);
+    const quorumValue = truncar3(summary?.total_quorum_attended);
+    const quorumTotal = truncar3(summary?.total_quorum_invited);
     doc.text(`${quorumValue}  (de ${quorumTotal} total invitado)`, 68, y + 6);
     y += 20;
 
@@ -328,8 +329,8 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
             p.apartment,
             delegateMap[`${p.full_name}|${p.apartment}`] || '—',
             p.attended_at ? formatDateTime(p.attended_at) : '—',
-            p.quorum_base.toFixed(4),
-            Math.max(0, (p.voting_weight || 0) - p.quorum_base).toFixed(4),
+            truncar3(p.quorum_base),
+            truncar3(Math.max(0, (p.voting_weight || 0) - p.quorum_base)),
         ]),
         styles: { fontSize: 8.5 },
         headStyles: { fillColor: [22, 101, 52] },
@@ -360,8 +361,8 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
                 p.full_name,
                 p.apartment,
                 delegateMap[`${p.full_name}|${p.apartment}`] || '—',
-                p.quorum_base.toFixed(4),
-                '0.0000',
+                truncar3(p.quorum_base),
+                '0.000',
             ]),
             styles: { fontSize: 8.5 },
             headStyles: { fillColor: [185, 28, 28] },
@@ -516,7 +517,7 @@ const generatePollsPDF = async (data) => {
                 head: [['Opción', 'Coeficiente', 'Porcentual', 'Votos']],
                 body: poll.options.map(opt => [
                     opt.text,
-                    Number(opt.votes_weight || 0).toFixed(4),
+                    truncar3(opt.votes_weight),
                     totalVotos > 0 ? `${Math.round((opt.votes_count / totalVotos) * 100)}%` : '0%',
                     opt.votes_count,
                 ]),
@@ -538,7 +539,7 @@ const generatePollsPDF = async (data) => {
         autoTable(doc, {
             startY: y,
             head: [['Tipo', 'Estado', 'Total Votantes', 'Quorum Total Votado']],
-            body: [[poll.type, poll.status, poll.total_voters, poll.total_weight_voted.toFixed(4)]],
+            body: [[poll.type, poll.status, poll.total_voters, truncar3(poll.total_weight_voted)]],
             styles: { fontSize: 8 },
             headStyles: { fillColor: [99, 102, 241] },
             margin: { left: 14, right: 14 },
@@ -656,7 +657,7 @@ const generatePollsPDF = async (data) => {
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(9);
                 doc.setTextColor(55, 65, 81);
-                doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Quorum: ${opt.votes_weight.toFixed(4)}`, 16, y);
+                doc.text(`Opción: "${opt.text}" — Votos: ${opt.votes_count} | Quorum: ${truncar3(opt.votes_weight)}`, 16, y);
                 y += 4;
 
                 autoTable(doc, {
@@ -667,8 +668,8 @@ const generatePollsPDF = async (data) => {
                         v.apartment || '—',
                         v.is_delegation_vote ? 'Vía delegado' : 'Directo',
                         v.voted_at ? formatDateTime(v.voted_at) : '—',
-                        parseFloat(v.quorum_base || 0).toFixed(4),
-                        Math.max(0, (v.voting_weight || 0) - (v.quorum_base || 0)).toFixed(4),
+                        truncar3(v.quorum_base),
+                        truncar3(Math.max(0, (v.voting_weight || 0) - (v.quorum_base || 0))),
                     ]),
                     styles: { fontSize: 8 },
                     headStyles: { fillColor: [67, 56, 202] },
@@ -705,7 +706,7 @@ const generatePollsPDF = async (data) => {
             autoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apartamento', 'Quorom']],
-                body: poll.abstentions.map(v => [v.full_name, v.apartment, v.voting_weight.toFixed(4)]),
+                body: poll.abstentions.map(v => [v.full_name, v.apartment, truncar3(v.voting_weight)]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [229, 231, 235], textColor: 60 },
                 margin: { left: 20, right: 14 },
@@ -726,7 +727,7 @@ const generatePollsPDF = async (data) => {
             autoTable(doc, {
                 startY: y,
                 head: [['Copropietario', 'Apartamento', 'Q. Real']],
-                body: poll.non_voters.map(v => [v.full_name, v.apartment, parseFloat(v.quorum_base || 0).toFixed(4)]),
+                body: poll.non_voters.map(v => [v.full_name, v.apartment, truncar3(v.quorum_base)]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [209, 213, 219], textColor: 60 },
                 alternateRowStyles: { fillColor: [249, 250, 251] },
@@ -767,7 +768,7 @@ const generateDelegationsPDF = async (data) => {
     doc.setFont('helvetica', 'bold');
     doc.text(`Coeficiente total delegado`, 110, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(totalWeight.toFixed(4), 175, y);
+    doc.text(truncar3(totalWeight), 175, y);
     y += 10;
 
     if (delegations.length === 0) {
@@ -801,7 +802,7 @@ const generateDelegationsPDF = async (data) => {
             doc.setFontSize(9);
 
             const delegateApt = group.delegate.apartment || '—';
-            const delegateTotal = group.total_weight.toFixed(4);
+            const delegateTotal = truncar3(group.total_weight);
 
             doc.text(group.delegate.full_name, 17, y + 6.5);
             doc.text(`apto ${delegateApt}`, 130, y + 6.5);
@@ -818,7 +819,7 @@ const generateDelegationsPDF = async (data) => {
                     idx + 1,
                     d.delegator.full_name,
                     d.delegator.apartment || '—',
-                    typeof d.delegated_weight === 'number' ? d.delegated_weight.toFixed(4) : d.delegated_weight,
+                    typeof d.delegated_weight === 'number' ? truncar3(d.delegated_weight) : d.delegated_weight,
                     'Registrado',
                     fmtDate(d.delegated_at),
                 ]),
@@ -878,7 +879,7 @@ const generateLlamadoPDF = async (data, delegateMap = {}) => {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(50, 50, 50);
     doc.text(
-        `Presentes: ${snapshot.present?.length || 0}   ·   Ausentes: ${snapshot.absent?.length || 0}   ·   Quórum activo: ${Number(snapshot.connected_quorum || 0).toFixed(4)}   ·   Quórum total: ${Number(snapshot.total_quorum || 0).toFixed(4)}   ·   %: ${snapshot.quorum_percentage || 0}%`,
+        `Presentes: ${snapshot.present?.length || 0}   ·   Ausentes: ${snapshot.absent?.length || 0}   ·   Quórum activo: ${truncar3(snapshot.connected_quorum)}   ·   Quórum total: ${truncar3(snapshot.total_quorum)}   ·   %: ${snapshot.quorum_percentage || 0}%`,
         18, y + 13
     );
     y += 24;
@@ -899,7 +900,7 @@ const generateLlamadoPDF = async (data, delegateMap = {}) => {
             i + 1,
             u.full_name,
             u.apartment_number,
-            Number(u.quorum_base || 0).toFixed(4),
+            truncar3(u.quorum_base),
             delegateMap[`${u.full_name}|${u.apartment_number}`] || '—',
         ]),
         styles: { fontSize: 8.5 },
@@ -926,7 +927,7 @@ const generateLlamadoPDF = async (data, delegateMap = {}) => {
             i + 1,
             u.full_name,
             u.apartment_number,
-            Number(u.quorum_base || 0).toFixed(4),
+            truncar3(u.quorum_base),
             u.has_delegated ? 'Cedió poder' : '—',
         ]),
         styles: { fontSize: 8.5 },

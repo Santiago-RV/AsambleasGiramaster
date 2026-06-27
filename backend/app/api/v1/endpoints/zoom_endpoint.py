@@ -78,6 +78,65 @@ async def _get_sdk_credentials_from_db(db: AsyncSession, zoom_account_id: int = 
     return None
 
 
+async def _get_oauth_credentials_from_db(db: AsyncSession, zoom_account_id: int = None) -> dict | None:
+    """
+    Obtiene credenciales OAuth Server-to-Server (ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET)
+    desde la BD para una cuenta específica. Estas credenciales son necesarias para
+    obtener el ZAK del anfitrión vía la API REST de Zoom.
+    Si no se especifica cuenta, usa la primera disponible o legacy.
+    """
+    def _is_complete(creds: dict | None) -> bool:
+        return bool(
+            creds
+            and creds.get("ZOOM_ACCOUNT_ID")
+            and creds.get("ZOOM_CLIENT_ID")
+            and creds.get("ZOOM_CLIENT_SECRET")
+        )
+
+    try:
+        config_service = SystemConfigService(db)
+
+        if zoom_account_id:
+            creds = await config_service.get_zoom_account_credentials(zoom_account_id)
+            if _is_complete(creds):
+                return creds
+
+        # Fallback: primera cuenta disponible
+        accounts = await config_service.get_zoom_accounts()
+        if accounts:
+            creds = await config_service.get_zoom_account_credentials(accounts[0]["id"])
+            if _is_complete(creds):
+                return creds
+
+        # Fallback: legacy
+        credentials = await config_service.get_zoom_credentials()
+        if _is_complete(credentials):
+            return credentials
+    except Exception as e:
+        logger.warning(f"No se pudo obtener credenciales OAuth desde BD: {str(e)}")
+    return None
+
+
+async def _get_host_zak(db: AsyncSession, zoom_account_id: int = None) -> str | None:
+    """
+    Obtiene el ZAK del anfitrión usando las credenciales OAuth de la cuenta Zoom.
+    Retorna None si no se puede obtener (no debe bloquear la generación de la firma).
+    """
+    try:
+        from app.services.zoom_api_service import ZoomAPIService
+
+        oauth_credentials = await _get_oauth_credentials_from_db(db, zoom_account_id)
+        if oauth_credentials:
+            zoom_api = ZoomAPIService(credentials=oauth_credentials)
+        else:
+            zoom_api = ZoomAPIService(db)
+
+        return await zoom_api.get_user_zak("me")
+    except Exception as e:
+        logger.error(f"No se pudo obtener el ZAK del anfitrión: {str(e)}")
+        return None
+
+
 @router.post(
     "/generate-signature",
     response_model=SuccessResponse,
@@ -121,13 +180,25 @@ async def generate_zoom_signature(
         # Usar el sdk_key del mismo servicio que generó el JWT para garantizar coherencia
         sdk_key = zoom_service.sdk_key or settings.ZOOM_SDK_KEY
 
+        # Si el rol es anfitrión (1), obtener el ZAK del host para poder INICIAR la
+        # reunión. Sin el ZAK, el SDK muestra "esperando a que el anfitrión inicie".
+        zak = None
+        if request.role == 1:
+            zak = await _get_host_zak(db, request.zoom_account_id)
+            if not zak:
+                logger.warning(
+                    "No se obtuvo ZAK del anfitrión; el administrador podría quedar "
+                    "en sala de espera. Verifique las credenciales OAuth de la cuenta Zoom."
+                )
+
         # Preparar la respuesta
         response_data = ZoomSignatureResponse(
             signature=signature,
             meeting_number=clean_meeting_number,
             role=request.role,
             expires_in=7200,  # 2 horas en segundos
-            sdk_key=sdk_key
+            sdk_key=sdk_key,
+            zak=zak
         )
         
         return SuccessResponse(

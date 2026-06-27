@@ -38,6 +38,10 @@ class ZoomSignatureResponse(BaseModel):
     role: int = Field(..., description="Rol del usuario")
     expires_in: int = Field(..., description="Tiempo de expiración en segundos")
     sdk_key: str = Field(..., description="SDK Key para el frontend")
+    zak: Optional[str] = Field(
+        None,
+        description="Token ZAK del anfitrión (solo para role=1). Necesario para iniciar la reunión como host."
+    )
 
 
 class ZoomMeetingInfoRequest(BaseModel):

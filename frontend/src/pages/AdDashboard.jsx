@@ -505,7 +505,20 @@ export default function AppAdmin() {
     try {
       await MeetingService.startMeeting(meeting.id);
       queryClient.invalidateQueries({ queryKey: ['meetings', residentialUnitId] });
-      const url = meeting.zoom_start_url || meeting.meeting_url;
+
+      // Pedir un start_url FRESCO a Zoom para iniciar como anfitrión.
+      // El start_url guardado al crear la reunión caduca (~2h) y deja al admin
+      // en "esperando a que el anfitrión inicie la reunión".
+      let url = meeting.zoom_start_url || meeting.meeting_url;
+      try {
+        const startUrlResponse = await MeetingService.getHostStartUrl(meeting.id);
+        if (startUrlResponse?.data?.start_url) {
+          url = startUrlResponse.data.start_url;
+        }
+      } catch (startUrlError) {
+        console.warn('⚠️ No se pudo obtener start_url fresco, usando el almacenado:', startUrlError);
+      }
+
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       Swal.fire({

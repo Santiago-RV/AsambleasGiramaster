@@ -114,7 +114,10 @@ class ZoomService:
             )
 
         # Tiempo actual y expiración (en segundos para JWT estándar)
-        iat = int(time.time())
+        # Se resta un margen de seguridad al iat (recomendación oficial de Zoom)
+        # para tolerar pequeñas diferencias de reloj entre el servidor y Zoom y
+        # evitar el error "Signature is invalid" (3712) por iat en el futuro.
+        iat = int(time.time()) - 30
         exp = iat + (60 * 60 * expire_hours)  # Expira en X horas (en segundos)
 
         # Payload del JWT para Zoom SDK 5.x+

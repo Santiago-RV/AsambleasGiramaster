@@ -93,7 +93,12 @@ const ZoomMeetingContainer = ({
 
 			// Generar firma (role: 1 para anfitriones/administradores)
 			// sdkKey y signature vienen del mismo endpoint para garantizar que coincidan
-			const { signature, sdkKey } = await generateSignature(meetingNumber);
+			// zak: token del anfitrión necesario para INICIAR la reunión como host
+			const { signature, sdkKey, zak } = await generateSignature(meetingNumber);
+
+			if (!zak) {
+				console.warn('⚠️ No se recibió ZAK del anfitrión. El administrador podría quedar en sala de espera.');
+			}
 
 			console.log('🔵 Iniciando Zoom SDK Web...');
 			setLoadingMessage('Cargando sala de reunión...');
@@ -131,7 +136,7 @@ const ZoomMeetingContainer = ({
 						userName: userName,
 						userEmail: '',
 						tk: '',
-						zak: '',
+						zak: zak || '',
 						success: async (success) => {
 							console.log('✅ Conectado a la reunión como anfitrión', success);
 							setLoadingMessage('Cargando interfaz de Zoom...');
@@ -298,6 +303,7 @@ const ZoomMeetingContainer = ({
 				return {
 					signature: response.data.data.signature,
 					sdkKey: response.data.data.sdk_key,
+					zak: response.data.data.zak,
 				};
 			} else {
 				throw new Error('No se pudo generar el signature');

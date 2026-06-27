@@ -66,6 +66,17 @@ export class MeetingService {
   }
 
   /**
+   * Obtener un start_url fresco para que el anfitrión inicie la reunión.
+   * Regenera el ZAK en Zoom (válido ~2h) para evitar la sala de espera.
+   */
+  static async getHostStartUrl(meetingId) {
+    const response = await axiosInstance.get(
+      `/meetings/${meetingId}/host-start-url`
+    );
+    return response.data;
+  }
+
+  /**
    * Finalizar una reunión
    * Cambia el estado a "Finalizada"
    */

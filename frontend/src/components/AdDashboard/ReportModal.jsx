@@ -5,6 +5,7 @@ import { MeetingService } from '../../services/api/MeetingService';
 import AttendanceChart from "./AttendanceGraphics";
 import PollChart  from "./PollGraphics";
 import { formatDateTime } from '../../utils/dateUtils';
+import { truncar3 } from '../../utils/numberUtils';
 import ParticipationChart from './ParticipationChart';
 
 
@@ -173,10 +174,10 @@ const { summary, attended, absent } = data;
           <span className="font-semibold text-amber-800">Quórum de la Asamblea</span>
         </div>
         <p className="text-2xl font-bold text-amber-700">
-          {Number(summary.total_quorum_attended || 0).toFixed(4)}
+          {truncar3(summary.total_quorum_attended)}
         </p>
         <p className="text-xs text-amber-600 mt-1">
-          Suma de coeficientes de copropietarios presentes sobre {Number(summary.total_quorum_invited || 0).toFixed(4)} total invitado
+          Suma de coeficientes de copropietarios presentes sobre {truncar3(summary.total_quorum_invited)} total invitado
         </p>
       </div>
 
@@ -424,7 +425,7 @@ const PollDetailView = ({ poll }) => {
         <div className="bg-white/15 rounded-lg p-2.5 text-center">
           <p className="text-xl font-bold text-white">
             {typeof poll.total_weight_voted === 'number'
-              ? poll.total_weight_voted.toFixed(4)
+              ? truncar3(poll.total_weight_voted)
               : poll.total_weight_voted}
           </p>
           <p className="text-xs text-indigo-200">Quórum Total</p>
@@ -459,7 +460,7 @@ const PollDetailView = ({ poll }) => {
                   return (
                     <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-2 font-medium text-gray-800">{opt.text}</td>
-                      <td className="px-4 py-2 text-right font-mono text-gray-700">{Number(opt.votes_weight || 0).toFixed(4)}</td>
+                      <td className="px-4 py-2 text-right font-mono text-gray-700">{truncar3(opt.votes_weight)}</td>
                       <td className="px-4 py-2 text-right text-gray-600">{pct}%</td>
                       <td className="px-4 py-2 text-right text-gray-600">{opt.votes_count}</td>
                     </tr>
@@ -469,7 +470,7 @@ const PollDetailView = ({ poll }) => {
               <tfoot className="bg-gray-100">
                 <tr>
                   <td className="px-4 py-2 font-semibold text-gray-700">Total</td>
-                  <td className="px-4 py-2 text-right font-mono font-semibold text-gray-700">{totalCoef.toFixed(4)}</td>
+                  <td className="px-4 py-2 text-right font-mono font-semibold text-gray-700">{truncar3(totalCoef)}</td>
                   <td className="px-4 py-2 text-right font-semibold text-gray-700">100%</td>
                   <td className="px-4 py-2 text-right font-semibold text-gray-700">{totalVotos}</td>
                 </tr>
@@ -567,10 +568,10 @@ const PollDetailView = ({ poll }) => {
                           </td>
                           <td className="px-3 py-2 text-gray-500">{fmtDate(voter.voted_at)}</td>
                           <td className="px-3 py-2 text-right font-mono text-gray-600">
-                            {parseFloat(qReal).toFixed(4)}
+                            {truncar3(qReal)}
                           </td>
                           <td className="px-3 py-2 text-right font-mono text-gray-600">
-                            {parseFloat(qCedido).toFixed(4)}
+                            {truncar3(qCedido)}
                           </td>
                         </tr>
                       );
@@ -596,7 +597,7 @@ const PollDetailView = ({ poll }) => {
             </h3>
 
             <p className="text-xs text-gray-500 mt-1">
-              Quórum total votado: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
+              Quórum total votado: {truncar3(poll.total_weight_voted)}
             </p>
           </div>
 
@@ -654,7 +655,7 @@ const PollDetailView = ({ poll }) => {
 
             <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-600">
               <span>
-                Quórum total: {parseFloat(poll.total_weight_voted || 0).toFixed(4)}
+                Quórum total: {truncar3(poll.total_weight_voted)}
               </span>
 
               <span>
@@ -738,7 +739,7 @@ const PollDetailView = ({ poll }) => {
                     <td className="px-3 py-2 text-gray-500">{abs.apartment || '—'}</td>
                     <td className="px-3 py-2 text-gray-500">{fmtDate(abs.voted_at)}</td>
                     <td className="px-3 py-2 text-right font-mono text-gray-600">
-                      {parseFloat(abs.voting_weight).toFixed(4)}
+                      {truncar3(abs.voting_weight)}
                     </td>
                   </tr>
                 ))}
@@ -769,7 +770,7 @@ const PollDetailView = ({ poll }) => {
                     <td className="px-3 py-2 text-gray-600">{nv.full_name}</td>
                     <td className="px-3 py-2 text-gray-500">{nv.apartment || '—'}</td>
                     <td className="px-3 py-2 text-right font-mono text-gray-500">
-                      {parseFloat(nv.quorum_base || 0).toFixed(4)}
+                      {truncar3(nv.quorum_base)}
                     </td>
                   </tr>
                 ))}
@@ -866,7 +867,7 @@ const DelegationsReportContent = ({ data }) => {
         <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
           <p className="text-3xl font-bold text-purple-600">
             {typeof summary.total_delegated_weight === 'number'
-              ? summary.total_delegated_weight.toFixed(4)
+              ? truncar3(summary.total_delegated_weight)
               : summary.total_delegated_weight}
           </p>
           <p className="text-sm text-purple-700">Peso Total Delegado</p>
@@ -890,7 +891,7 @@ const DelegationsReportContent = ({ data }) => {
                 )}
                 <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                   Peso: {typeof delegation.delegated_weight === 'number'
-                    ? delegation.delegated_weight.toFixed(4)
+                    ? truncar3(delegation.delegated_weight)
                     : delegation.delegated_weight}
                 </span>
               </div>
@@ -910,7 +911,7 @@ const DelegationsReportContent = ({ data }) => {
                 <div className="mt-2 bg-red-100 rounded px-2 py-1 inline-block">
                   <span className="text-xs text-red-700 font-medium">
                     Coef: {typeof delegation.delegator.original_weight === 'number'
-                      ? delegation.delegator.original_weight.toFixed(4)
+                      ? truncar3(delegation.delegator.original_weight)
                       : delegation.delegated_weight}
                   </span>
                 </div>

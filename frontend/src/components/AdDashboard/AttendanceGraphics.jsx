@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Chart } from "chart.js/auto";
+import { truncar3 } from "../../utils/numberUtils";
 
 
 const AttendanceChart = ({ title, attended, absent, unit = "" }) => {
@@ -17,11 +18,11 @@ const AttendanceChart = ({ title, attended, absent, unit = "" }) => {
       chartRef.current.destroy();
     }
     const attendedLabel = unit
-      ? attended.toFixed(2)
+      ? truncar3(attended)
       : attended;
 
     const absentLabel = unit
-      ? absent.toFixed(2)
+      ? truncar3(absent)
       : absent;
     chartRef.current = new Chart(ctx, {
       
@@ -77,7 +78,7 @@ const AttendanceChart = ({ title, attended, absent, unit = "" }) => {
             ctx.textBaseline = "middle";
 
             const displayValue = unit
-              ? `${Number(value).toFixed(2)}${unit}`
+              ? `${truncar3(value)}${unit}`
               : `${Math.round(value)}`;
 
             ctx.fillText(

@@ -283,6 +283,18 @@ class VotingDelegationService:
         # 9. Actualizar MeetingInvitationModel
         logger.info(f"💾 Actualizando invitaciones...")
 
+        # Determinar si el delegado YA está presente en la reunión. Si lo está,
+        # el coeficiente del delegador queda representado por él, por lo que el
+        # delegador debe contar como asistente automáticamente.
+        delegate_is_present = bool(
+            delegate_invitation.bln_actually_attended
+            and not delegate_invitation.bln_marked_absent
+        )
+        delegate_joined_at = delegate_invitation.dat_joined_at or colombia_now()
+
+        # IDs de delegadores que pasan a contar como asistentes por esta delegación
+        newly_attended_delegator_ids: List[int] = []
+
         # Actualizar delegadores: marcar como delegados y peso = 0
         for delegator_id in delegator_ids:
             invitation = await self._get_invitation(meeting_id, delegator_id)
@@ -290,6 +302,19 @@ class VotingDelegationService:
             invitation.dec_voting_weight = Decimal('0.0')  # Peso actual = 0
             invitation.updated_at = colombia_now()
             invitation.updated_by = admin_user_id
+
+            # Si el delegado ya está presente y el delegador aún no había
+            # ingresado, marcarlo como asistente (representado por el delegado).
+            if delegate_is_present and invitation.dat_joined_at is None:
+                invitation.dat_joined_at = delegate_joined_at
+                invitation.bln_actually_attended = True
+                invitation.bln_marked_absent = False
+                invitation.str_response_status = "attended"
+                newly_attended_delegator_ids.append(delegator_id)
+                logger.info(
+                    f"👥 Asistencia por delegación: delegador {delegator_id} marcado "
+                    f"presente porque el delegado {delegate_id} ya está en la reunión"
+                )
 
         # Actualizar delegado: sumar peso delegado
         delegate_invitation = await self._get_invitation(meeting_id, delegate_id)
@@ -330,7 +355,10 @@ class VotingDelegationService:
             "delegators": delegator_infos,
             "delegate": delegate_info,
             "total_delegated_weight": float(total_weight_to_delegate),
-            "delegation_date": colombia_now()
+            "delegation_date": colombia_now(),
+            # Delegadores que pasaron a contar como asistentes porque el delegado
+            # ya estaba presente (para refrescar el panel de asistencia en vivo).
+            "newly_attended_delegator_ids": newly_attended_delegator_ids
         }
 
     async def revoke_delegation(

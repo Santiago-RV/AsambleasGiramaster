@@ -154,6 +154,108 @@ class ZoomAPIService:
             logger.error(f"Error de conexión al obtener token: {str(e)}")
             raise Exception(f"Error de conexión con Zoom OAuth: {str(e)}")
     
+    async def get_meeting_start_url(self, meeting_id: str) -> str:
+        """
+        Obtiene un start_url FRESCO de una reunión consultando la API de Zoom.
+
+        El start_url lleva un ZAK embebido que permite al anfitrión INICIAR la
+        reunión sin pasar por la sala de espera. Zoom regenera este ZAK (válido
+        ~2 horas) en cada consulta, por lo que pedirlo al momento de unirse evita
+        el problema de "esperando a que el anfitrión inicie la reunión" que ocurre
+        cuando el start_url guardado al crear la reunión ya caducó.
+
+        Args:
+            meeting_id: ID numérico de la reunión de Zoom.
+
+        Returns:
+            str: start_url fresco con ZAK válido.
+
+        Raises:
+            Exception: Si hay error al consultar la reunión.
+        """
+        try:
+            await self._ensure_credentials_loaded()
+            token = await self._get_access_token()
+
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+
+            url = f"{self.BASE_URL}/meetings/{meeting_id}"
+
+            logger.info(f"Obteniendo start_url fresco de la reunión {meeting_id}...")
+            response = requests.get(url, headers=headers, timeout=30)
+
+            if response.status_code == 200:
+                start_url = response.json().get("start_url")
+                if not start_url:
+                    raise Exception("La respuesta de Zoom no contiene start_url")
+                logger.info("start_url fresco obtenido exitosamente")
+                return start_url
+            else:
+                error_msg = f"Error al obtener start_url: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error de conexión al obtener start_url: {str(e)}")
+            raise Exception(f"Error de conexión con Zoom al obtener start_url: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error al obtener start_url de la reunión: {str(e)}")
+            raise
+
+    async def get_user_zak(self, user_id: str = "me") -> str:
+        """
+        Obtiene el ZAK (Zoom Access Key) del usuario anfitrión.
+
+        El ZAK es indispensable para que el Meeting SDK Web pueda INICIAR
+        una reunión como anfitrión. Sin él, aunque la firma tenga role=1,
+        Zoom muestra "esperando a que el anfitrión inicie la reunión".
+
+        Args:
+            user_id: ID o email del usuario anfitrión. "me" usa el dueño de la cuenta
+                     (que es quien crea las reuniones con user_id="me").
+
+        Returns:
+            str: Token ZAK válido para iniciar la reunión.
+
+        Raises:
+            Exception: Si hay error al obtener el ZAK.
+        """
+        try:
+            await self._ensure_credentials_loaded()
+            token = await self._get_access_token()
+
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+
+            url = f"{self.BASE_URL}/users/{user_id}/token"
+            params = {"type": "zak"}
+
+            logger.info(f"Obteniendo ZAK del anfitrión '{user_id}'...")
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+
+            if response.status_code == 200:
+                zak = response.json().get("token")
+                if not zak:
+                    raise Exception("La respuesta de Zoom no contiene el token ZAK")
+                logger.info("ZAK del anfitrión obtenido exitosamente")
+                return zak
+            else:
+                error_msg = f"Error al obtener ZAK: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error de conexión al obtener ZAK: {str(e)}")
+            raise Exception(f"Error de conexión con Zoom al obtener ZAK: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error al obtener ZAK del anfitrión: {str(e)}")
+            raise
+
     async def create_meeting(
         self,
         topic: str,

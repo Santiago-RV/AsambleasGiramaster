@@ -9,6 +9,53 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Añadido
 
+#### 2026-06-27 - Asistencia automática del delegante al ceder poder a un delegado presente
+
+- Al crear una delegación durante la reunión, si el **delegado ya está presente** (ingresado y no marcado ausente), el/los **delegantes** que ceden su poder se marcan automáticamente como **asistentes**, porque su coeficiente queda representado por el delegado.
+  - **Backend - VotingDelegationService** (`backend/app/services/voting_delegation_service.py`, `create_delegation`): marca `bln_actually_attended`, `dat_joined_at` y `str_response_status='attended'` del delegante cuando el delegado está presente; devuelve `newly_attended_delegator_ids`.
+  - **Backend - delegation_endpoint** (`backend/app/api/v1/endpoints/delegation_endpoint.py`): publica el evento SSE `connected` de esos delegantes para refrescar el panel de asistencia en vivo.
+  - Es complementario a `_mark_delegators_attended` (que cubre el caso inverso: el delegado ingresa después). El cálculo de cuórum no cambia (el delegante pasa de contar como "delegante representado" a "asistente directo", sin doble conteo ni duplicados en la lista).
+
+### Cambiado
+
+#### 2026-06-27 - Reportes con 3 decimales truncados (sin redondeo)
+
+- Los valores de cuórum / coeficiente / peso en los reportes ahora se muestran con **exactamente 3 decimales truncados** (antes 4 decimales redondeados con `toFixed(4)`).
+  - **Nuevo helper** (`frontend/src/utils/numberUtils.js`): `truncar3(value)` trunca a 3 decimales sin redondear (ej: `0.4567 → 0.456`, `3.99999 → 3.999`).
+  - **Modal del Administrador** (`frontend/src/components/AdDashboard/ReportModal.jsx`): participación, votaciones y poderes.
+  - **Gráficos** (`AttendanceGraphics.jsx`, `PollGraphics.jsx`, `ParticipationChart.jsx`): etiquetas de coeficiente.
+  - **PDF de informes** (`frontend/src/components/saDashboard/components/InformesTab.jsx`): asistencia, votaciones, poderes y llamados (tablas y gráficos embebidos).
+  - Los porcentajes y promedios se mantienen con su formato actual.
+
+### Corregido
+
+#### 2026-06-27 - Error de FK al eliminar unidad residencial con datos compartidos
+
+- **Problema**: Al eliminar una unidad residencial fallaba con `IntegrityError (1451) ... tbl_users_ibfk_1 ... tbl_data_users`. Un mismo `tbl_data_users` puede ser referenciado por varios `tbl_users` (la misma persona reutiliza el DataUser en varias unidades), por lo que al borrar los datos personales de los usuarios de la unidad se rompía la FK cuando otro usuario conservado aún los referenciaba.
+- **Solución** (`backend/app/services/residential_unit_service.py`, `delete_residential_unit`): tras eliminar los usuarios de la unidad, solo se borran los `tbl_data_users` que ya no tienen ninguna referencia restante en `tbl_users`; los compartidos se conservan.
+
+
+#### 2026-06-27 - Anfitrión real al unirse a reunión virtual (start_url + ZAK)
+
+- **Problema**: Al unirse a una reunión virtual como Administrador, se abría Zoom en otra ventana pero mostraba "esperando a que el anfitrión inicie la reunión". El botón "Unirse" abría el `str_zoom_start_url` guardado al crear la reunión, cuyo ZAK embebido **caduca a las ~2 horas**; en reuniones programadas con anticipación ese enlace ya estaba vencido y Zoom degradaba al admin a participante en sala de espera.
+- **Solución**: Generar un `start_url` FRESCO en el momento de unirse, consultando la API de Zoom (que regenera el ZAK válido ~2h en cada consulta).
+  - **Backend - ZoomAPIService** (`backend/app/services/zoom_api_service.py`):
+    - Nuevo método `get_meeting_start_url(meeting_id)` → `GET /v2/meetings/{meetingId}` (start_url fresco).
+    - Nuevo método `get_user_zak(user_id="me")` → `GET /v2/users/{userId}/token?type=zak` (para el flujo por SDK).
+  - **Backend - meeting_endpoint** (`backend/app/api/v1/endpoints/meeting_endpoint.py`):
+    - Nuevo `GET /meetings/{meeting_id}/host-start-url` que devuelve el start_url fresco usando las credenciales OAuth de la cuenta Zoom de la reunión.
+  - **Backend - zoom_endpoint** (`backend/app/api/v1/endpoints/zoom_endpoint.py`):
+    - Helpers `_get_oauth_credentials_from_db()` y `_get_host_zak()` (respetan `zoom_account_id` multi-cuenta).
+    - `POST /zoom/generate-signature` incluye el `zak` en la respuesta cuando `role == 1` (flujo SDK).
+  - **Backend - zoom_schema** (`backend/app/schemas/zoom_schema.py`): campo opcional `zak` en `ZoomSignatureResponse`.
+  - **Frontend - MeetingService** (`frontend/src/services/api/MeetingService.js`): método `getHostStartUrl(meetingId)`.
+  - **Frontend - AdDashboard** (`frontend/src/pages/AdDashboard.jsx`): `handleJoinMeeting` pide el start_url fresco antes de `window.open` (con fallback al almacenado).
+  - **Frontend - ZoomMeetingContainer** (`frontend/src/components/AdDashboard/ZoomMeetingContainer.jsx`): recibe el `zak` de la firma y lo pasa a `ZoomMtg.join({ zak })` (cubre el SuperAdministrador en `HomeSA`, que usa el SDK).
+- **Robustez de firma SDK** (`backend/app/services/zoom_service.py`): el `iat` del JWT se genera con 30s de margen hacia atrás (recomendación oficial de Zoom) para tolerar diferencias de reloj y evitar el error 3712 "Signature is invalid".
+- **Diagnóstico** (`backend/test/diag_zoom_signature.py`): script para verificar a qué cuenta Zoom pertenece una reunión, qué credenciales SDK están configuradas y si la firma generada es coherente.
+
+### Añadido
+
 #### 2026-02-24 - Sistema de Reportes con Datos Reales para Admin
 
 - **Reportes con datos reales en dashboard Admin**:

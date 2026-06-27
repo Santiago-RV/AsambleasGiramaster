@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { truncar3 } from "../../utils/numberUtils";
 
 const ParticipationChart = ({ title, voted, notVoted }) => {
   const canvasRef = useRef(null);
@@ -42,7 +43,7 @@ const ParticipationChart = ({ title, voted, notVoted }) => {
             ctx.textBaseline = "middle";
 
             ctx.fillText(
-              `${value.toFixed(2)}Q`,
+              `${truncar3(value)}Q`,
               position.x,
               position.y - 8
             );
@@ -62,8 +63,8 @@ const ParticipationChart = ({ title, voted, notVoted }) => {
         type: "pie",
         data: {
           labels: [
-            `Participó - ${voted.toFixed(2)} (${((voted / total) * 100).toFixed(1)}%)`,
-            `No participó - ${notVoted.toFixed(2)} (${((notVoted / total) * 100).toFixed(1)}%)`
+            `Participó - ${truncar3(voted)} (${((voted / total) * 100).toFixed(1)}%)`,
+            `No participó - ${truncar3(notVoted)} (${((notVoted / total) * 100).toFixed(1)}%)`
           ],
           datasets: [
             {

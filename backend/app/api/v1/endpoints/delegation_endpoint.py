@@ -75,6 +75,14 @@ async def create_delegation(
             admin_user_id=user.id
         )
 
+        # Si algún delegador pasó a contar como asistente (porque el delegado
+        # ya estaba presente), notificar al panel de asistencia en vivo.
+        newly_attended = result.get("newly_attended_delegator_ids") or []
+        if newly_attended:
+            from app.api.v1.endpoints.meeting_endpoint import publish_attendance_event
+            for delegator_id in newly_attended:
+                await publish_attendance_event(meeting_id, delegator_id, "connected")
+
         return SuccessResponse(
             success=True,
             status_code=status.HTTP_201_CREATED,

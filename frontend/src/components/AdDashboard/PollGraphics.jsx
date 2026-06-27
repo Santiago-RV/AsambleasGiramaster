@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { truncar3 } from "../../utils/numberUtils";
 
 const PollChart = ({ poll }) => {
   const canvasRef = useRef(null);
@@ -69,7 +70,7 @@ const PollChart = ({ poll }) => {
             ctx.textBaseline = "middle";
 
             ctx.fillText(
-              `${value.toFixed(2)}`,
+              `${truncar3(value)}`,
               position.x,
               position.y - 8
             );
@@ -91,7 +92,7 @@ const PollChart = ({ poll }) => {
         labels: labels.map((label, index) => {
           const percentage = ((dataValues[index] / total) * 100).toFixed(1);
 
-          return `${label} - ${dataValues[index].toFixed(2)}Q (${percentage}%)`;
+          return `${label} - ${truncar3(dataValues[index])}Q (${percentage}%)`;
         }),
           datasets: [
             {

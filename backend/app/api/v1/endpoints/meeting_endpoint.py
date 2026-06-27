@@ -448,6 +448,62 @@ async def start_meeting(
         )
 
 
+@router.get(
+    "/{meeting_id}/host-start-url",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener start_url fresco para el anfitrión",
+    description="Devuelve un start_url recién generado por Zoom (con ZAK válido) para que el administrador inicie la reunión como anfitrión"
+)
+async def get_host_start_url(
+    meeting_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Obtiene un start_url fresco desde la API de Zoom para iniciar la reunión como anfitrión.
+
+    El start_url guardado al crear la reunión caduca a las ~2 horas, por lo que para
+    reuniones programadas con anticipación es necesario regenerarlo al momento de unirse.
+    Esto evita que el administrador quede en "esperando a que el anfitrión inicie la reunión".
+    """
+    try:
+        from app.services.zoom_api_service import ZoomAPIService
+        from app.api.v1.endpoints.zoom_endpoint import _get_oauth_credentials_from_db
+
+        meeting_service = MeetingService(db)
+        meeting = await meeting_service.get_meeting_by_id(meeting_id)
+
+        if not meeting or not meeting.int_zoom_meeting_id:
+            raise ServiceException(
+                message="La reunión no tiene una sesión de Zoom asociada",
+                details={"meeting_id": meeting_id}
+            )
+
+        oauth_credentials = await _get_oauth_credentials_from_db(db, meeting.int_zoom_account_id)
+        if oauth_credentials:
+            zoom_api = ZoomAPIService(credentials=oauth_credentials)
+        else:
+            zoom_api = ZoomAPIService(db)
+
+        start_url = await zoom_api.get_meeting_start_url(str(meeting.int_zoom_meeting_id))
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="start_url obtenido exitosamente",
+            data={"start_url": start_url}
+        )
+    except ServiceException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al obtener start_url del anfitrión: {str(e)}")
+        raise ServiceException(
+            message=f"Error al obtener el start_url de la reunión: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+
 @router.post(
     "/{meeting_id}/end",
     response_model=SuccessResponse,
