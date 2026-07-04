@@ -502,7 +502,7 @@ class EmailService:
                 password=password,
                 residential_unit_name=residential_unit_name,
                 apartment_number=apartment_number,
-                voting_weight=float(voting_weight),
+                voting_weight=f"{float(voting_weight):.3f}".replace('.', ','),
                 user_email=to_email,
                 phone=phone,
                 auto_login_url=auto_login_url,

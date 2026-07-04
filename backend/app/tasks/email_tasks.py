@@ -782,8 +782,9 @@ def send_welcome_email(
                     auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
                 
                 template = Template(html_template)
-                voting_weight_percent = voting_weight * 100
-                
+                # El voting_weight ya viene guardado en escala porcentual (0-100), no como fracción
+                voting_weight_percent = float(voting_weight)
+
                 html_content = template.render(
                     firstname=firstname,
                     lastname=lastname,
@@ -791,7 +792,7 @@ def send_welcome_email(
                     password=password,
                     residential_unit_name=residential_unit_name,
                     apartment_number=apartment_number,
-                    voting_weight=f"{voting_weight_percent:.2f}",
+                    voting_weight=f"{voting_weight_percent:.3f}".replace('.', ','),
                     user_email=user_email,
                     phone=phone,
                     current_year=str(colombia_now().year),
@@ -916,8 +917,9 @@ def send_single_credential_email(
                 support_service = SupportService(db)
                 support_data = await support_service.get_support_info(unit_id)
                 
-                voting_weight_percent = float(user_unit.dec_default_voting_weight or 0) * 100
-                
+                # El voting_weight ya viene guardado en escala porcentual (0-100), no como fracción
+                voting_weight_percent = float(user_unit.dec_default_voting_weight or 0)
+
                 html_content = template.render(
                     firstname=data_user.str_firstname,
                     lastname=data_user.str_lastname,
@@ -925,7 +927,7 @@ def send_single_credential_email(
                     password=temp_password,
                     residential_unit_name=residential_unit.str_name,
                     apartment_number=user_unit.str_apartment_number,
-                    voting_weight=f"{voting_weight_percent:.2f}",
+                    voting_weight=f"{voting_weight_percent:.3f}".replace('.', ','),
                     user_email=data_user.str_email,
                     phone=data_user.str_phone,
                     current_year=str(colombia_now().year),

@@ -1062,8 +1062,8 @@ class ResidentialUnitService:
             with open(template_path, 'r', encoding='utf-8') as f:
                 html_template = f.read()
             
-            # Convertir voting_weight a porcentaje para mostrar
-            voting_weight_percent = float(voting_weight) * 100
+            # El voting_weight ya viene guardado en escala porcentual (0-100), no como fracción
+            voting_weight_percent = float(voting_weight)
             
             # Separar nombre completo en firstname y lastname
             name_parts = user_name.split(' ', 1)
@@ -1085,7 +1085,7 @@ class ResidentialUnitService:
                 password=password,
                 residential_unit_name=residential_unit_name,
                 apartment_number=apartment_number,
-                voting_weight=f"{voting_weight_percent:.2f}",
+                voting_weight=f"{voting_weight_percent:.3f}".replace('.', ','),
                 user_email=user_email,
                 phone=phone,
                 current_year=str(colombia_now().year),
