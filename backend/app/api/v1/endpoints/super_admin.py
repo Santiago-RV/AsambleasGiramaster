@@ -574,6 +574,8 @@ async def get_active_meetings(
                         "total_invited": meeting.total_invited,
                         "quorum_reached": meeting.quorum_reached,
                         "quorum_percentage": meeting.quorum_percentage,
+                        "connected_quorum": meeting.connected_quorum,
+                        "total_quorum": meeting.total_quorum,
                         "active_polls_count": meeting.active_polls_count
                     }
                     for meeting in active_meetings.active_meetings

@@ -65,7 +65,7 @@ class ActiveMeetingService:
             connected_count = await self._count_connected_users(meeting.id)
             total_invited = await self._count_total_invited(meeting.id)
             active_polls_count = await self._count_active_polls(meeting.id)
-            quorum_pct = await self._compute_quorum_percentage(meeting.id)
+            connected_quorum, total_quorum, quorum_pct = await self._compute_quorum_values(meeting.id)
 
             active_meetings.append(ActiveMeetingCardSchema(
                 meeting_id=meeting.id,
@@ -78,6 +78,8 @@ class ActiveMeetingService:
                 total_invited=total_invited,
                 quorum_reached=meeting.bln_quorum_reached or False,
                 quorum_percentage=quorum_pct,
+                connected_quorum=connected_quorum,
+                total_quorum=total_quorum,
                 active_polls_count=active_polls_count
             ))
 
@@ -209,8 +211,8 @@ class ActiveMeetingService:
         )
         return (await self.db.execute(q)).scalar() or 0
 
-    async def _compute_quorum_percentage(self, meeting_id: int) -> float:
-        """Calcula el porcentaje de quórum actual (conectados no ausentes / total)."""
+    async def _compute_quorum_values(self, meeting_id: int) -> tuple[float, float, float]:
+        """Calcula (coeficiente conectado, coeficiente total, porcentaje) del quórum actual."""
         q_total = await self.db.execute(
             select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
                 and_(
@@ -221,7 +223,7 @@ class ActiveMeetingService:
         )
         total = float(q_total.scalar() or 0)
         if total == 0:
-            return 0.0
+            return 0.0, 0.0, 0.0
 
         q_direct = await self.db.execute(
             select(func.coalesce(func.sum(MeetingInvitationModel.dec_quorum_base), 0)).where(
@@ -253,7 +255,7 @@ class ActiveMeetingService:
             ))
         )
         connected = float(q_direct.scalar() or 0) + float(q_deleg.scalar() or 0)
-        return round(connected / total * 100, 2)
+        return connected, total, round(connected / total * 100, 2)
 
     async def _count_active_polls(self, meeting_id: int) -> int:
         """Cuenta encuestas activas de la reunión"""

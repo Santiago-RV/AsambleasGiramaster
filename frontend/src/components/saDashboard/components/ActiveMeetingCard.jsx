@@ -9,16 +9,18 @@ import {
 } from 'lucide-react';
 import {
 	calculateMeetingDuration,
-	calculateAttendancePercentage,
 	formatMeetingStartTime,
 } from '../../../services/api/ActiveMeetingService';
 
 const ActiveMeetingCard = ({ meeting, onClick }) => {
 	const duration = calculateMeetingDuration(meeting.started_at);
-	const attendancePercentage = calculateAttendancePercentage(
-		meeting.connected_users_count,
-		meeting.total_invited
-	);
+	const formatCoef = (value) =>
+		(value ?? 0).toLocaleString('es-CO', {
+			minimumFractionDigits: 3,
+			maximumFractionDigits: 3,
+		});
+	const connectedQuorumLabel = formatCoef(meeting.connected_quorum);
+	const totalQuorumLabel = formatCoef(meeting.total_quorum);
 
 	return (
 		<div
@@ -68,8 +70,8 @@ const ActiveMeetingCard = ({ meeting, onClick }) => {
 								/ {meeting.total_invited}
 							</span>
 						</p>
-						<p className="text-xs text-gray-500 mt-1">
-							{attendancePercentage}% asistencia
+						<p className="text-xs font-bold text-blue-700 mt-1">
+							Coef: {connectedQuorumLabel} <span className="text-gray-400 font-semibold">/ {totalQuorumLabel}</span>
 						</p>
 					</div>
 

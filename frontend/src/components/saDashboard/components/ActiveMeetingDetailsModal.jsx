@@ -244,11 +244,11 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 								<CheckCircle size={14} />
 								<span>Quórum actual</span>
 							</div>
-							<p className="text-xl font-bold">
-								{meetingDetails.quorum_percentage ?? 0}%
+							<p className="text-2xl font-extrabold">
+								{(meetingDetails.connected_quorum ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
 							</p>
 							<p className="text-xs text-green-200 mt-0.5">
-								{(meetingDetails.connected_quorum ?? 0).toFixed(4)} / {(meetingDetails.total_quorum ?? 0).toFixed(4)}
+								de {(meetingDetails.total_quorum ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} coeficiente total
 							</p>
 						</div>
 						<div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
@@ -352,11 +352,11 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 													{registrado && (
 														<div className="flex items-center gap-2">
 															<div className="flex flex-col items-end">
-																<span className="text-sm font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
-																	{llamadoInfo?.snapshot?.quorum_percentage ?? 0}% quórum
+																<span className="text-sm font-extrabold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
+																	Quórum: {(llamadoInfo?.snapshot?.connected_quorum ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
 																</span>
 																<span className="text-xs text-gray-400 mt-0.5 pr-1">
-																	{(llamadoInfo?.snapshot?.connected_quorum ?? 0).toFixed(4)} / {(llamadoInfo?.snapshot?.total_quorum ?? 0).toFixed(4)}
+																	de {(llamadoInfo?.snapshot?.total_quorum ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} total
 																</span>
 															</div>
 															<button
@@ -407,8 +407,11 @@ const ActiveMeetingDetailsModal = ({ isOpen, onClose, meetingDetails }) => {
 															<p className="text-xs text-indigo-600 font-medium flex items-center justify-center gap-1">
 																<BarChart3 size={11} /> Quórum
 															</p>
-															<p className="text-lg font-bold text-indigo-700">
-																{llamadoInfo?.snapshot?.quorum_percentage ?? 0}%
+															<p className="text-lg font-extrabold text-indigo-700">
+																{(llamadoInfo?.snapshot?.connected_quorum ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+															</p>
+															<p className="text-[10px] text-indigo-400">
+																de {(llamadoInfo?.snapshot?.total_quorum ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
 															</p>
 														</div>
 													</div>
