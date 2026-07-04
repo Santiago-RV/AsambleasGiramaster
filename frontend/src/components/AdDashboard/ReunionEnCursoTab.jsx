@@ -210,19 +210,23 @@ const ReunionEnCursoTab = () => {
     );
   }
 
-  const total = meeting.total_invited > 0 ? meeting.total_invited : 1;
-  const registeredBase = registeredUsers.length > 0 ? registeredUsers.length : 1;
+  // El Quórum SIEMPRE es la suma de los coeficientes de los asistentes (dato principal)
+  const quorumCoefficient = meeting.connected_quorum ?? 0;
+  const quorumDisplay = quorumCoefficient.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
-  // % para el donut (proporcional al total para que los segmentos sumen 100%)
-  const registeredPercentage = Math.round((registeredUsers.length / total) * 100);
-  const absentPercentage = Math.round((absentUsers.length / total) * 100);
-  const disconnectedPercentage = 100 - registeredPercentage - absentPercentage;
-  const connectedPercentage = registeredPercentage;
+  // % del gráfico: participación de ese coeficiente sobre el 100% de coeficientes, NO cantidad de personas
+  const registeredCoefPct = Math.min(Math.max(quorumCoefficient, 0), 100);
+  const notRegisteredCoefPct = 100 - registeredCoefPct;
+  const registeredCoefLabel = registeredCoefPct.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const notRegisteredCoefLabel = notRegisteredCoefPct.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // % para la leyenda con denominadores correctos
-  const registeredPct = Math.round((registeredUsers.length / total) * 100);
-  const absentPct = parseFloat(((absentUsers.length / registeredBase) * 100).toFixed(1));
-  const disconnectedPct = Math.round((meeting.disconnected_count / total) * 100);
+  // Posición de las etiquetas de % sobre el pie (ángulo medio de cada porción, 0° = arriba, sentido horario)
+  const polarPoint = (percentFromTop, radius) => {
+    const angleRad = (percentFromTop * 3.6 * Math.PI) / 180;
+    return { x: 50 + radius * Math.sin(angleRad), y: 50 - radius * Math.cos(angleRad) };
+  };
+  const registeredLabelPos = polarPoint(registeredCoefPct / 2, registeredCoefPct < 15 ? 58 : 27);
+  const notRegisteredLabelPos = polarPoint(registeredCoefPct + notRegisteredCoefPct / 2, notRegisteredCoefPct < 15 ? 58 : 27);
 
   return (
     <div className="flex flex-col h-[calc(100vh-88px)] md:h-[calc(100vh-104px)] overflow-hidden gap-3">
@@ -333,66 +337,59 @@ const ReunionEnCursoTab = () => {
             Asistencia
           </h3>
 
-          {/* Donut */}
-          <div className="flex flex-col items-center shrink-0">
-            <div className="relative w-32 h-32">
+          {/* Quórum (dato principal) al lado del pie, para no invadir sus etiquetas */}
+          <div className="flex items-center justify-center gap-5 shrink-0">
+            <div className="text-center shrink-0">
+              <div className="text-[11px] uppercase tracking-wider text-gray-500">Quórum</div>
+              <div className="text-2xl font-extrabold text-green-700 leading-tight whitespace-nowrap">{quorumDisplay}%</div>
+            </div>
+
+            {/* Pie (por coeficiente, no por cantidad de personas) */}
+            <div className="relative w-32 h-32 shrink-0">
               <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="18" />
                 <circle
-                  cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="18"
-                  strokeDasharray={`${registeredPercentage * 2.51} 251`}
+                  cx="50" cy="50" r="25" fill="none" stroke="#22c55e" strokeWidth="50"
+                  strokeDasharray={`${registeredCoefPct * 2.51} 251`}
                   strokeLinecap="butt"
                 />
                 <circle
-                  cx="50" cy="50" r="40" fill="none" stroke="#f97316" strokeWidth="18"
-                  strokeDasharray={`${absentPercentage * 2.51} 251`}
-                  strokeDashoffset={`-${registeredPercentage * 2.51}`}
-                  strokeLinecap="butt"
-                />
-                <circle
-                  cx="50" cy="50" r="40" fill="none" stroke="#ef4444" strokeWidth="18"
-                  strokeDasharray={`${disconnectedPercentage * 2.51} 251`}
-                  strokeDashoffset={`-${(registeredPercentage + absentPercentage) * 2.51}`}
+                  cx="50" cy="50" r="25" fill="none" stroke="#ef4444" strokeWidth="50"
+                  strokeDasharray={`${notRegisteredCoefPct * 2.51} 251`}
+                  strokeDashoffset={`-${registeredCoefPct * 2.51}`}
                   strokeLinecap="butt"
                 />
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-bold leading-none">{registeredPercentage}%</span>
-                <span className="text-[10px] text-gray-400 mt-0.5">en sala</span>
-              </div>
+              <span
+                className="absolute text-[11px] font-bold text-green-700 -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${registeredLabelPos.x}%`, top: `${registeredLabelPos.y}%` }}
+              >
+                {registeredCoefLabel}
+              </span>
+              <span
+                className="absolute text-[11px] font-bold text-white -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${notRegisteredLabelPos.x}%`, top: `${notRegisteredLabelPos.y}%` }}
+              >
+                {notRegisteredCoefLabel}
+              </span>
             </div>
+          </div>
 
-            {/* Leyenda */}
+          {/* Leyenda (conteo por personas) */}
+          <div className="flex flex-col items-center shrink-0">
             <div className="mt-3 w-full space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-sm bg-green-500 shrink-0"></div>
                   <span className="text-gray-600">Registrados</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{registeredUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
-                  <span className="text-green-600 font-bold w-11 text-right">{registeredPct}%</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-orange-400 shrink-0"></div>
-                  <span className="text-gray-600">Ausentes</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{absentUsers.length} <span className="text-gray-400 font-normal">/ {registeredUsers.length}</span></span>
-                  <span className="text-orange-500 font-bold w-11 text-right">{absentPct}%</span>
-                </div>
+                <span className="font-semibold">{registeredUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-sm bg-red-500 shrink-0"></div>
                   <span className="text-gray-600">No registrados</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{meeting.disconnected_count} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
-                  <span className="text-red-500 font-bold w-11 text-right">{disconnectedPct}%</span>
-                </div>
+                <span className="font-semibold">{meeting.disconnected_count + absentUsers.length} <span className="text-gray-400 font-normal">/ {meeting.total_invited}</span></span>
               </div>
             </div>
           </div>
