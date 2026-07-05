@@ -5,6 +5,7 @@ import { Users, Wifi, WifiOff, PieChart, LogOut, BarChart3, RefreshCw, Eye, Load
 import Swal from "sweetalert2";
 import PollDetailsModal from "./PollDetailsModal";
 import LlamadoModal from "./LlamadoModal";
+import AttendanceChart from "./AttendanceGraphics";
 import { registrarLlamado, getLlamado } from "../../services/api/ActiveMeetingService";
 
 const ReunionEnCursoTab = () => {
@@ -210,23 +211,9 @@ const ReunionEnCursoTab = () => {
     );
   }
 
-  // El Quórum SIEMPRE es la suma de los coeficientes de los asistentes (dato principal)
+  // El Quórum SIEMPRE es la suma de los coeficientes de los asistentes (dato principal).
   const quorumCoefficient = meeting.connected_quorum ?? 0;
-  const quorumDisplay = quorumCoefficient.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-
-  // % del gráfico: participación de ese coeficiente sobre el 100% de coeficientes, NO cantidad de personas
-  const registeredCoefPct = Math.min(Math.max(quorumCoefficient, 0), 100);
-  const notRegisteredCoefPct = 100 - registeredCoefPct;
-  const registeredCoefLabel = registeredCoefPct.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const notRegisteredCoefLabel = notRegisteredCoefPct.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  // Posición de las etiquetas de % sobre el pie (ángulo medio de cada porción, 0° = arriba, sentido horario)
-  const polarPoint = (percentFromTop, radius) => {
-    const angleRad = (percentFromTop * 3.6 * Math.PI) / 180;
-    return { x: 50 + radius * Math.sin(angleRad), y: 50 - radius * Math.cos(angleRad) };
-  };
-  const registeredLabelPos = polarPoint(registeredCoefPct / 2, registeredCoefPct < 15 ? 58 : 27);
-  const notRegisteredLabelPos = polarPoint(registeredCoefPct + notRegisteredCoefPct / 2, notRegisteredCoefPct < 15 ? 58 : 27);
+  const quorumAbsentCoefficient = Math.max((meeting.total_quorum ?? 0) - quorumCoefficient, 0);
 
   return (
     <div className="flex flex-col h-[calc(100vh-88px)] md:h-[calc(100vh-104px)] overflow-hidden gap-3">
@@ -337,41 +324,14 @@ const ReunionEnCursoTab = () => {
             Asistencia
           </h3>
 
-          {/* Quórum (dato principal) al lado del pie, para no invadir sus etiquetas */}
-          <div className="flex items-center justify-center gap-5 shrink-0">
-            <div className="text-center shrink-0">
-              <div className="text-[11px] uppercase tracking-wider text-gray-500">Quórum</div>
-              <div className="text-2xl font-extrabold text-green-700 leading-tight whitespace-nowrap">{quorumDisplay}%</div>
-            </div>
-
-            {/* Pie (por coeficiente, no por cantidad de personas) */}
-            <div className="relative w-32 h-32 shrink-0">
-              <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-                <circle
-                  cx="50" cy="50" r="25" fill="none" stroke="#22c55e" strokeWidth="50"
-                  strokeDasharray={`${registeredCoefPct * 2.51} 251`}
-                  strokeLinecap="butt"
-                />
-                <circle
-                  cx="50" cy="50" r="25" fill="none" stroke="#ef4444" strokeWidth="50"
-                  strokeDasharray={`${notRegisteredCoefPct * 2.51} 251`}
-                  strokeDashoffset={`-${registeredCoefPct * 2.51}`}
-                  strokeLinecap="butt"
-                />
-              </svg>
-              <span
-                className="absolute text-[11px] font-bold text-green-700 -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${registeredLabelPos.x}%`, top: `${registeredLabelPos.y}%` }}
-              >
-                {registeredCoefLabel}
-              </span>
-              <span
-                className="absolute text-[11px] font-bold text-white -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${notRegisteredLabelPos.x}%`, top: `${notRegisteredLabelPos.y}%` }}
-              >
-                {notRegisteredCoefLabel}
-              </span>
-            </div>
+          {/* Pie por coeficiente (mismo gráfico reutilizable del informe de asistencia) */}
+          <div className="shrink-0">
+            <AttendanceChart
+              title="Por Coeficiente (Principal)"
+              attended={quorumCoefficient}
+              absent={quorumAbsentCoefficient}
+              unit="Q"
+            />
           </div>
 
           {/* Leyenda (conteo por personas) */}

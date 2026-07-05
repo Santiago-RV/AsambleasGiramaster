@@ -270,7 +270,7 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
 
     // QUÓRUM destacado
     doc.setFillColor(255, 247, 230);
-    doc.roundedRect(14, y, pw - 28, 14, 2, 2, 'F');
+    doc.roundedRect(14, y, pw - 28, 20, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(146, 64, 14);
@@ -279,7 +279,22 @@ const generateAttendancePDF = async (data, delegateMap = {}) => {
     const quorumValue = truncar3(summary?.total_quorum_attended);
     const quorumTotal = truncar3(summary?.total_quorum_invited);
     doc.text(`${quorumValue}  (de ${quorumTotal} total invitado)`, 68, y + 6);
-    y += 20;
+
+    // Cifras nominales (cantidad de personas, no coeficiente)
+    doc.setFont('helvetica', 'bold');
+    doc.text('Conectados:', 18, y + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${attended.length}`, 44, y + 13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('No conectados:', 65, y + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${absent.length}`, 96, y + 13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total a ingresar:', 117, y + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${attended.length + absent.length}`, 150, y + 13);
+
+    y += 26;
 
     // GRÁFICOS DE ASISTENCIA
     doc.setFont('helvetica', 'bold');
