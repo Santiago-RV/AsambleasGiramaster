@@ -873,6 +873,7 @@ async def get_poll_votes(
                 "votes": votes_list,
             })
         else:
+            option_direct_voters = {}
             for option in options:
                 votes_query = base_joins(
                     select(*voter_cols)
@@ -892,6 +893,71 @@ async def get_poll_votes(
                     "votes_count": len(votes),
                     "votes": [build_voter_row(v) for v in votes],
                 })
+                option_direct_voters[option.id] = [
+                    (v.voter_id, v.dat_response_at)
+                    for v in votes
+                ]
+
+            # Para encuestas activas, sumar los delegantes cuyo delegado ya votó (las
+            # encuestas cerradas ya tienen esas filas creadas por _register_delegation_votes
+            # al momento de cerrarse, así que no se duplican aquí)
+            if poll.str_status != "closed":
+                all_direct_voter_ids = list({
+                    uid for uids in option_direct_voters.values() for uid, _ in uids
+                })
+                if all_direct_voter_ids:
+                    from app.models.meeting_invitation_model import MeetingInvitationModel
+                    from app.models.delegation_history_model import DelegationHistoryModel
+
+                    del_result = await db.execute(
+                        select(MeetingInvitationModel, DataUserModel)
+                        .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
+                        .join(DataUserModel, UserModel.int_data_user_id == DataUserModel.id)
+                        .where(
+                            MeetingInvitationModel.int_meeting_id == poll.int_meeting_id,
+                            MeetingInvitationModel.int_delegated_id.in_(all_direct_voter_ids)
+                        )
+                    )
+                    delegations = del_result.all()
+
+                    delegate_to_delegators = {}
+                    delegator_ids = []
+                    for del_inv, del_data_user in delegations:
+                        delegate_to_delegators.setdefault(del_inv.int_delegated_id, []).append({
+                            "user_id": del_inv.int_user_id,
+                            "full_name": f"{del_data_user.str_firstname} {del_data_user.str_lastname}".strip(),
+                            "apartment_number": del_inv.str_apartment_number or "N/A",
+                            "voting_weight": float(del_inv.dec_quorum_base) if del_inv.dec_quorum_base else 0.0,
+                            "is_delegation_vote": True,
+                        })
+                        delegator_ids.append(del_inv.int_user_id)
+
+                    # Momento real en que se registró cada delegación, para no atribuir
+                    # el voto a delegaciones hechas DESPUÉS de que el delegado ya había votado
+                    delegated_at_map = {}
+                    if delegator_ids:
+                        history_result = await db.execute(
+                            select(DelegationHistoryModel).where(
+                                DelegationHistoryModel.int_meeting_id == poll.int_meeting_id,
+                                DelegationHistoryModel.int_delegator_user_id.in_(delegator_ids),
+                                DelegationHistoryModel.int_delegate_user_id.in_(all_direct_voter_ids),
+                            )
+                        )
+                        for h in history_result.scalars().all():
+                            key = (h.int_delegator_user_id, h.int_delegate_user_id)
+                            if key not in delegated_at_map or h.dat_delegated_at > delegated_at_map[key]:
+                                delegated_at_map[key] = h.dat_delegated_at
+
+                    for option_data in options_with_votes:
+                        for voter_id, voted_at_dt in option_direct_voters.get(option_data["option_id"], []):
+                            for delegator_info in delegate_to_delegators.get(voter_id, []):
+                                delegated_at = delegated_at_map.get((delegator_info["user_id"], voter_id))
+                                if not delegated_at or not voted_at_dt or delegated_at > voted_at_dt:
+                                    continue
+                                row = dict(delegator_info)
+                                row["voted_at"] = voted_at_dt.isoformat() if voted_at_dt else None
+                                option_data["votes"].append(row)
+                                option_data["votes_count"] += 1
         
         # Obtener abstenciones
         abstentions_query = base_joins(

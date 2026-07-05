@@ -617,6 +617,7 @@ class PollService:
         - Si el delegado no votó o se abstuvo → no registrar nada para el delegante
         """
         from app.models.meeting_invitation_model import MeetingInvitationModel
+        from app.models.delegation_history_model import DelegationHistoryModel
         from app.core.logging_config import get_logger
 
         logger = get_logger(__name__)
@@ -670,6 +671,28 @@ class PollService:
             votos_reales = [v for v in votos_delegado if not v.bln_is_abstention]
             if not votos_reales and votos_delegado[0].bln_is_abstention:
                 logger.info(f"   Delegado {delegado_id} se abstuvo, no se copia voto para delegante {delegante_id}.")
+                continue
+
+            # 3.5. Verificar que la delegación YA estaba activa cuando el delegado votó.
+            # Si la delegación se registró DESPUÉS de que el delegado emitió su voto,
+            # esta encuesta no debe contarle el voto al delegante (aunque la encuesta
+            # se haya cerrado más tarde, ya con la delegación activa).
+            primer_voto_delegado_at = min(v.dat_response_at for v in votos_reales)
+            delegacion_result = await self.db.execute(
+                select(DelegationHistoryModel).where(
+                    and_(
+                        DelegationHistoryModel.int_meeting_id == meeting_id,
+                        DelegationHistoryModel.int_delegator_user_id == delegante_id,
+                        DelegationHistoryModel.int_delegate_user_id == delegado_id,
+                        DelegationHistoryModel.dat_delegated_at <= primer_voto_delegado_at,
+                    )
+                )
+            )
+            if not delegacion_result.scalars().first():
+                logger.info(
+                    f"   Delegación de {delegante_id} a {delegado_id} fue POSTERIOR al voto del delegado, "
+                    f"no se copia voto para poll {poll_id}."
+                )
                 continue
 
             # 4. Registrar voto(s) del delegante copiando las opciones del delegado

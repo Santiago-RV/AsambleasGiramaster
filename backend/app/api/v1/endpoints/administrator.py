@@ -1267,7 +1267,9 @@ async def get_polls_report(
             )
         
         polls_result = await db.execute(
-            select(PollModel).where(PollModel.int_meeting_id == meeting_id)
+            select(PollModel)
+            .where(PollModel.int_meeting_id == meeting_id)
+            .order_by(PollModel.created_at)
         )
         polls = polls_result.scalars().all()
         poll_service = PollService(db)
@@ -1344,13 +1346,16 @@ async def get_polls_report(
                         opt_id = resp.int_option_id
                         if opt_id not in option_direct_voters:
                             option_direct_voters[opt_id] = []
-                        option_direct_voters[opt_id].append((resp.int_user_id, voter_info["voted_at"]))
+                        option_direct_voters[opt_id].append((resp.int_user_id, resp.dat_response_at))
 
             # Para encuestas activas, inyectar filas de delegantes
             # (las encuestas cerradas ya tienen esas filas via _register_delegation_votes)
+            injected_delegator_ids = set()
             if poll.str_status != "closed" and option_direct_voters:
                 all_direct_voter_ids = list({uid for uids in option_direct_voters.values() for uid, _ in uids})
                 if all_direct_voter_ids:
+                    from app.models.delegation_history_model import DelegationHistoryModel
+
                     del_result = await db.execute(
                         select(MeetingInvitationModel, UserModel, DataUserModel)
                         .join(UserModel, MeetingInvitationModel.int_user_id == UserModel.id)
@@ -1363,11 +1368,13 @@ async def get_polls_report(
                     delegations = del_result.all()
 
                     delegate_to_delegators: dict = {}
+                    delegator_ids = []
                     for del_inv, del_user, del_data_user in delegations:
                         delegate_id = del_inv.int_delegated_id
                         if delegate_id not in delegate_to_delegators:
                             delegate_to_delegators[delegate_id] = []
                         delegate_to_delegators[delegate_id].append({
+                            "user_id": del_inv.int_user_id,
                             "full_name": f"{del_data_user.str_firstname} {del_data_user.str_lastname}",
                             "apartment": del_inv.str_apartment_number,
                             "quorum_base": float(del_inv.dec_quorum_base) if del_inv.dec_quorum_base else 0.0,
@@ -1375,13 +1382,35 @@ async def get_polls_report(
                             "is_delegation_vote": True,
                             "weight_note": "Peso cedido al delegado",
                         })
+                        delegator_ids.append(del_inv.int_user_id)
+
+                    # Momento real en que se registró cada delegación, para no atribuir el
+                    # voto a delegaciones hechas DESPUÉS de que el delegado ya había votado
+                    delegated_at_map = {}
+                    if delegator_ids:
+                        history_result = await db.execute(
+                            select(DelegationHistoryModel).where(
+                                DelegationHistoryModel.int_meeting_id == meeting_id,
+                                DelegationHistoryModel.int_delegator_user_id.in_(delegator_ids),
+                                DelegationHistoryModel.int_delegate_user_id.in_(all_direct_voter_ids),
+                            )
+                        )
+                        for h in history_result.scalars().all():
+                            key = (h.int_delegator_user_id, h.int_delegate_user_id)
+                            if key not in delegated_at_map or h.dat_delegated_at > delegated_at_map[key]:
+                                delegated_at_map[key] = h.dat_delegated_at
 
                     for opt_id, direct_voters in option_direct_voters.items():
-                        for voter_id, voted_at in direct_voters:
+                        for voter_id, voted_at_dt in direct_voters:
                             for delegator_info in delegate_to_delegators.get(voter_id, []):
+                                delegated_at = delegated_at_map.get((delegator_info["user_id"], voter_id))
+                                if not delegated_at or not voted_at_dt or delegated_at > voted_at_dt:
+                                    continue
                                 delegator_row = dict(delegator_info)
-                                delegator_row["voted_at"] = voted_at
+                                delegator_row["voted_at"] = voted_at_dt.isoformat() if voted_at_dt else None
                                 options_map[opt_id]["voters"].append(delegator_row)
+                                options_map[opt_id]["votes_count"] += 1
+                                injected_delegator_ids.add(delegator_info["user_id"])
 
             if poll.str_poll_type == "multiple":
                 total_weight_voted = sum({
@@ -1443,8 +1472,8 @@ async def get_polls_report(
             unique_voters = {
                 resp.int_user_id
                 for resp, user, data_user, inv in responses
-            }
-            
+            } | injected_delegator_ids
+
             polls_data.append({
                 "participation_percentage":
                     round((len(voted_user_ids) / total_invited) * 100, 2)

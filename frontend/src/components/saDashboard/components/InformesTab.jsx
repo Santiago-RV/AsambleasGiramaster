@@ -187,7 +187,7 @@ const generatePieChartImage = async (
     });
 };
 
-const generatePollChartImage = async (poll) => {
+const generatePollChartImage = async (poll, metric = 'weight') => {
     const { Chart } = await import('chart.js/auto');
 
     const canvas = document.createElement('canvas');
@@ -197,7 +197,7 @@ const generatePollChartImage = async (poll) => {
     const ctx = canvas.getContext('2d');
 
     const labels = poll.options.map(opt => opt.text);
-    const dataValues = poll.options.map(opt => opt.votes_weight);
+    const dataValues = poll.options.map(opt => metric === 'count' ? opt.votes_count : opt.votes_weight);
 
     const colors = [
         '#4f46e5', '#16a34a', '#dc2626', '#f59e0b',
@@ -227,7 +227,7 @@ const generatePollChartImage = async (poll) => {
                 }
             }
         },
-        plugins: [centerLabelsPlugin()]
+        plugins: [centerLabelsPlugin(metric === 'weight' ? 'Q' : '')]
     });
 
     chart.update();
@@ -425,25 +425,38 @@ const generatePollsPDF = async (data) => {
         const isFreeText = poll.type === 'text';
         const isNumeric = poll.type === 'numeric';
         const responses = poll.responses || [];
-        // Generar gráfica al inicio de cada encuesta
+        // Generar gráficas al inicio de cada encuesta (coeficiente primero, nominal segundo,
+        // igual que en el informe de asistencia)
         let resultChart = null;
-        let attendanceChart = null;
-        let totalChart = null;
+        let countChart = null;
 
         if (isGraphType) {
-            resultChart = await generatePollChartImage(poll);
+            resultChart = await generatePollChartImage(poll, 'weight');
+            countChart = await generatePollChartImage(poll, 'count');
+        }
 
-            attendanceChart = await generatePieChartImage(
-                poll.participation_by_attendance.voted,
-                poll.participation_by_attendance.not_voted,
-                "Q"
-            );
+        // Cifras nominales (cantidad de personas, no coeficiente)
+        if (isGraphType) {
+            const noVotaron = poll.non_voters?.length || 0;
+            const esperados = poll.total_expected_voters ?? ((poll.total_voters || 0) + noVotaron);
 
-            totalChart = await generatePieChartImage(
-                poll.participation_by_total.voted,
-                poll.participation_by_total.not_voted,
-                "Q"
-            );
+            doc.setFillColor(255, 247, 230);
+            doc.roundedRect(14, y, pageWidth - 28, 10, 2, 2, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(146, 64, 14);
+            doc.text('Votaron:', 18, y + 6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${poll.total_voters || 0}`, 40, y + 6.5);
+            doc.setFont('helvetica', 'bold');
+            doc.text('No votaron:', 60, y + 6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${noVotaron}`, 90, y + 6.5);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Esperados a votar:', 110, y + 6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${esperados}`, 150, y + 6.5);
+            y += 16;
         }
 
         if (isGraphType && resultChart) {
@@ -456,9 +469,9 @@ const generatePollsPDF = async (data) => {
             y += 6;
 
             const chartSize = 45;
-            const gap = 8;
+            const gap = 15;
 
-            const totalWidth = (chartSize * 3) + (gap * 2);
+            const totalWidth = (chartSize * 2) + gap;
             const startX = (pageWidth - totalWidth) / 2;
 
             doc.setFontSize(8);
@@ -471,15 +484,8 @@ const generatePollsPDF = async (data) => {
             );
 
             doc.text(
-                'Sobre asistentes',
+                'Por Porcentual (Cantidad)',
                 startX + chartSize + gap + chartSize / 2,
-                y,
-                { align: 'center' }
-            );
-
-            doc.text(
-                'Sobre Total Copropietarios',
-                startX + (chartSize * 2) + (gap * 2) + chartSize / 2,
                 y,
                 { align: 'center' }
             );
@@ -496,18 +502,9 @@ const generatePollsPDF = async (data) => {
             );
 
             doc.addImage(
-                attendanceChart,
+                countChart,
                 'PNG',
                 startX + chartSize + gap,
-                y,
-                chartSize,
-                chartSize
-            );
-
-            doc.addImage(
-                totalChart,
-                'PNG',
-                startX + (chartSize * 2) + (gap * 2),
                 y,
                 chartSize,
                 chartSize

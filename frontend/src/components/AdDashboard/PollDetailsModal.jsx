@@ -118,6 +118,11 @@ const PollDetailsModal = ({ poll, isOpen, onClose }) => {
                               <div>
                                 <div className="text-sm font-medium text-gray-800">
                                   {vote.full_name}
+                                  {vote.is_delegation_vote && (
+                                    <span className="ml-1.5 text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full align-middle">
+                                      vía delegado
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   Apto {vote.apartment_number}
