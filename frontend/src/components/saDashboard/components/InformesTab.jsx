@@ -793,8 +793,8 @@ const generateDelegationsPDF = async (data) => {
             const group = grouped[key];
             if (y > 175) { doc.addPage(); y = 20; }
 
-            // Fila encabezado del delegado (fondo violeta)
-            const headerH = 10;
+            // Fila encabezado del delegado (fondo violeta) — nombre/apto + desglose de coeficientes
+            const headerH = 16;
             doc.setFillColor(124, 58, 237);
             doc.rect(14, y, usableWidth, headerH, 'F');
             doc.setTextColor(255, 255, 255);
@@ -802,12 +802,25 @@ const generateDelegationsPDF = async (data) => {
             doc.setFontSize(9);
 
             const delegateApt = group.delegate.apartment || '—';
-            const delegateTotal = truncar3(group.total_weight);
+            const ownWeight = typeof group.delegate.original_weight === 'number' ? group.delegate.original_weight : 0;
+            const delegatedWeight = group.total_weight || 0;
+            const representedTotal = ownWeight + delegatedWeight;
 
-            doc.text(group.delegate.full_name, 17, y + 6.5);
-            doc.text(`apto ${delegateApt}`, 130, y + 6.5);
-            doc.text('Coeficiente total delegado:', 185, y + 6.5);
-            doc.text(delegateTotal, 255, y + 6.5);
+            doc.text(group.delegate.full_name, 17, y + 6);
+            doc.text(`apto ${delegateApt}`, 200, y + 6);
+
+            doc.setFontSize(8);
+            doc.text('Coeficiente propio:', 17, y + 13);
+            doc.setFont('helvetica', 'normal');
+            doc.text(truncar3(ownWeight), 60, y + 13);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Coeficiente cedido:', 90, y + 13);
+            doc.setFont('helvetica', 'normal');
+            doc.text(truncar3(delegatedWeight), 133, y + 13);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Coeficiente Total Representado:', 163, y + 13);
+            doc.setFont('helvetica', 'normal');
+            doc.text(truncar3(representedTotal), 255, y + 13);
             y += headerH;
 
             // Tabla de delegantes

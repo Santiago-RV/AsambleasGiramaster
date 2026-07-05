@@ -454,7 +454,10 @@ async def get_delegations_report(
         delegate_data = delegate_result.scalar_one_or_none()
 
         delegate_inv_result = await db.execute(
-            select(MeetingInvitationModel.str_apartment_number)
+            select(
+                MeetingInvitationModel.str_apartment_number,
+                MeetingInvitationModel.dec_quorum_base
+            )
             .where(
                 and_(
                     MeetingInvitationModel.int_meeting_id == inv.int_meeting_id,
@@ -462,16 +465,24 @@ async def get_delegations_report(
                 )
             )
         )
-        delegate_apartment = delegate_inv_result.scalar_one_or_none()
+        delegate_inv_row = delegate_inv_result.first()
+        delegate_apartment = delegate_inv_row.str_apartment_number if delegate_inv_row else None
+        delegate_original_weight = float(delegate_inv_row.dec_quorum_base) if delegate_inv_row else 0.0
 
         # Fallback: buscar en tbl_user_residential_units si no hay invitación
         if not delegate_apartment:
             delegate_unit_result = await db.execute(
-                select(UserResidentialUnitModel.str_apartment_number)
+                select(
+                    UserResidentialUnitModel.str_apartment_number,
+                    UserResidentialUnitModel.dec_default_voting_weight
+                )
                 .where(UserResidentialUnitModel.int_user_id == inv.int_delegated_id)
                 .limit(1)
             )
-            delegate_apartment = delegate_unit_result.scalar_one_or_none()
+            delegate_unit_row = delegate_unit_result.first()
+            if delegate_unit_row:
+                delegate_apartment = delegate_unit_row.str_apartment_number
+                delegate_original_weight = float(delegate_unit_row.dec_default_voting_weight or 0)
 
         delegated_at = None
         if delegation_history and delegation_history.dat_delegated_at:
@@ -490,6 +501,7 @@ async def get_delegations_report(
                 "full_name": f"{delegate_data.str_firstname} {delegate_data.str_lastname}" if delegate_data else "—",
                 "email": delegate_data.str_email if delegate_data else "—",
                 "apartment": delegate_apartment,
+                "original_weight": delegate_original_weight,
             },
             "delegated_weight": float(inv.dec_quorum_base),
             "delegated_at": delegated_at,
