@@ -484,16 +484,8 @@ const PollDetailView = ({ poll }) => {
     {/* 📊 GRÁFICO */}
     {isGraphType && (
       <div className="p-5 pb-0">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <PollChart poll={poll} />
-
-          {poll?.participation_by_attendance && (
-            <ParticipationChart
-              title="Participación sobre asistentes"
-              voted={poll.participation_by_attendance.voted}
-              notVoted={poll.participation_by_attendance.not_voted}
-            />
-          )}
 
           {poll?.participation_by_total && (
             <ParticipationChart

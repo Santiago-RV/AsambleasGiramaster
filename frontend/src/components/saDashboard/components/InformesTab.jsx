@@ -822,15 +822,15 @@ const generateDelegationsPDF = async (data) => {
             doc.text(`apto ${delegateApt}`, 200, y + 6);
 
             doc.setFontSize(8);
-            doc.text('Coeficiente propio:', 17, y + 13);
+            doc.text('Coeficiente Propio:', 17, y + 13);
             doc.setFont('helvetica', 'normal');
             doc.text(truncar3(ownWeight), 60, y + 13);
             doc.setFont('helvetica', 'bold');
-            doc.text('Coeficiente cedido:', 90, y + 13);
+            doc.text('Coeficiente a Representar:', 90, y + 13);
             doc.setFont('helvetica', 'normal');
             doc.text(truncar3(delegatedWeight), 133, y + 13);
             doc.setFont('helvetica', 'bold');
-            doc.text('Coeficiente Total Representado:', 163, y + 13);
+            doc.text('Coeficiente Total:', 163, y + 13);
             doc.setFont('helvetica', 'normal');
             doc.text(truncar3(representedTotal), 255, y + 13);
             y += headerH;
