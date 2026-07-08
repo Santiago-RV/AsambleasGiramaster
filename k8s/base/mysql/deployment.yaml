@@ -6,6 +6,8 @@ metadata:
     app: mysql
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: mysql
@@ -14,16 +16,6 @@ spec:
       labels:
         app: mysql
     spec:
-      initContainers:
-        - name: init-mysql
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - rm -rf /var/lib/mysql/* && mkdir -p /var/lib/mysql
-          volumeMounts:
-            - name: mysql-data
-              mountPath: /var/lib/mysql
       containers:
         - name: mysql
           image: mariadb:10.11
@@ -62,5 +54,6 @@ spec:
             periodSeconds: 10
       volumes:
         - name: mysql-data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: mysql-pvc
       restartPolicy: Always
