@@ -16,7 +16,6 @@ from app.core.exceptions import ServiceException
 from app.schemas.residential_unit_schema import AdministratorData, BulkToggleAccessRequest
 from app.schemas.email_notification_schema import BulkSendCredentialsRequest
 from app.celery_app import celery_app
-from app.api.v1.endpoints.decorators import require_email_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -364,7 +363,6 @@ async def change_unit_administrator(
     summary="Enviar credenciales a múltiples copropietarios",
     description="Envía credenciales por correo a múltiples copropietarios seleccionados usando Celery"
 )
-@require_email_enabled
 async def send_credentials_bulk(
     unit_id: int,
     request_data: BulkSendCredentialsRequest,

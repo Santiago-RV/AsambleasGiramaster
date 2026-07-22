@@ -22,7 +22,6 @@ from app.auth.auth import get_current_user
 from app.services.user_service import UserService
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.api.v1.endpoints.decorators import require_email_enabled
 import asyncio
 import json
 import redis.asyncio as aioredis
@@ -624,7 +623,6 @@ async def register_leave(
     summary="Enviar invitaciones por correo",
     description="Envía invitaciones por correo electrónico a los usuarios de la unidad residencial de la reunión usando Celery"
 )
-@require_email_enabled
 async def send_meeting_invitations(
     meeting_id: int,
     request: SendInvitationRequest,

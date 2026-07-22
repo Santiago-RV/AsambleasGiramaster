@@ -16,7 +16,6 @@ from app.schemas.responses_schema import SuccessResponse
 from app.schemas.residential_unit_schema import BulkDeleteRequest, BulkToggleAccessRequest
 from app.core.exceptions import ServiceException, ResourceNotFoundException
 from app.celery_app import celery_app
-from app.api.v1.endpoints.decorators import require_email_enabled
 import logging
 import uuid
 
@@ -474,7 +473,6 @@ async def enable_all_coowners(
     summary="Reenviar credenciales a un copropietario",
     description="Genera una nueva contraseña temporal y la envía por correo"
 )
-@require_email_enabled
 async def resend_coowner_credentials(
     coowner_id: int,
     request: ResendCredentialsRequest,
@@ -533,7 +531,6 @@ async def resend_coowner_credentials(
     summary="Enviar credenciales en masa a múltiples copropietarios",
     description="Genera nuevas contraseñas temporales y las envía por correo a múltiples copropietarios seleccionados"
 )
-@require_email_enabled
 async def send_bulk_credentials(
     request_data: BulkSendCredentialsRequest,
     current_user: str = Depends(get_current_user),

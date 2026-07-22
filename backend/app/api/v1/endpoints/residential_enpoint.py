@@ -20,7 +20,6 @@ from app.core.exceptions import ResourceNotFoundException
 from app.auth.auth import get_current_user
 from app.services.user_service import UserService
 from app.celery_app import celery_app
-from app.api.v1.endpoints.decorators import require_email_enabled
 
 import logging
 class ResendCredentialsRequest(BaseModel):
@@ -287,7 +286,6 @@ async def delete_resident(
     summary="Crear copropietario",
     description="Crea un nuevo copropietario para una unidad residencial"
 )
-@require_email_enabled
 async def create_resident(
     unit_id: int,
     resident_data: ResidentUpdate,
@@ -344,7 +342,6 @@ async def create_resident(
     summary="Reenviar credenciales por correo",
     description="Envía las credenciales de acceso al copropietario por correo electrónico"
 )
-@require_email_enabled
 async def resend_credentials(
     unit_id: int,
     user_id: int,

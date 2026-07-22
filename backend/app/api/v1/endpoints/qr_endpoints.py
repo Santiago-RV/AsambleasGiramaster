@@ -36,7 +36,6 @@ from app.services.email_service import EmailService
 from app.core.config import settings
 from app.core.security import security_manager
 from app.celery_app import celery_app
-from app.api.v1.endpoints.decorators import require_email_enabled
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -379,7 +378,6 @@ async def generate_enhanced_qr(
     description="Genera QR con contraseña temporal y lo envía por email",
     response_model=SuccessResponse[Dict]
 )
-@require_email_enabled
 async def send_enhanced_qr_email(
     request: SendQREmailRequest,
     background_tasks: BackgroundTasks = BackgroundTasks(),
