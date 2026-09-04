@@ -293,7 +293,7 @@ class EmailService:
                 auto_login_service = SimpleAutoLoginService()
                 auto_login_token = auto_login_service.generate_auto_login_token(
                     username=user.str_username,
-                    expiration_hours=24
+                    expiration_hours=settings.QR_INDIVIDUAL_EXPIRATION_HOURS
                 )
                 if auto_login_token:
                     template_data["auto_login_url"] = f"{frontend_url}/auto-login/{auto_login_token}"

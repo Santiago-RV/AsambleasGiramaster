@@ -25,34 +25,45 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 
 ## 1. Build de Imágenes Docker
 
-### 1.1 Imagen Unificada (Backend + Celery)
+Los Deployments usan `imagePullPolicy: Never` (ver `k8s/base/backend/deployment.yaml` y
+`k8s/base/frontend/deployment.yaml`): Kubernetes nunca intenta descargar la imagen de un
+registry, espera que ya exista en el nodo. Por eso el flujo real **no usa ningún registry
+externo** — las imágenes se construyen localmente y se importan directo al containerd del
+cluster (k3s). Si el cluster tiene varios nodos, hay que repetir el build/import en cada uno
+donde puedan programarse los pods.
+
+### 1.1 Backend + Celery (misma imagen)
 
 ```bash
-# Build imagen unificada
-docker build -t giramaster:latest ./backend
+# Build imagen unificada (nombre real usado por los manifiestos)
+docker build -t giramaster-backend:latest ./backend
 
-# Tag para registry
-docker tag giramaster:latest tu-registry/giramaster:latest
-docker push tu-registry/giramaster:latest
+# Importar directo al containerd de k3s (sin registry)
+docker save giramaster-backend:latest | sudo k3s ctr images import -
 
-# Importante: La misma imagen se usa para backend y celery
-# K8s selecciona el servicio mediante variable SERVICE
+# Importante: La misma imagen se usa para backend, celery-worker y celery-beat
+# El entrypoint selecciona el rol mediante la variable de entorno SERVICE
 ```
 
 ### 1.2 Frontend
 
 ```bash
-# Build del frontend
+# Build del frontend (pnpm, no npm)
 cd frontend
-npm run build
+pnpm install --frozen-lockfile
+pnpm build
+cd ..
 
-# Build imagen Docker
-docker build -t frontend:latest ./frontend
+# Build imagen Docker (sirve el build de dist/ vía Nginx)
+docker build -t giramaster-frontend:latest ./frontend
 
-# Tag para registry (si usa uno privado)
-docker tag frontend:latest tu-registry/frontend:latest
-docker push tu-registry/frontend:latest
+# Importar directo al containerd de k3s (sin registry)
+docker save giramaster-frontend:latest | sudo k3s ctr images import -
 ```
+
+> Si en tu entorno sí usás un registry (Docker Hub, GHCR, uno privado), cambiá
+> `imagePullPolicy: Never` por `IfNotPresent`/`Always` en los Deployments y agregá los pasos
+> de `docker tag`/`docker push` correspondientes.
 
 ---
 
@@ -84,6 +95,35 @@ kubectl get ingress
 kubectl get secrets
 ```
 
+### 2.3 Despliegue automático (CI/CD)
+
+Lo anterior es el flujo manual para un despliegue inicial. Para el día a día, el despliegue real
+ocurre vía GitHub Actions (`.github/workflows/deploy.yml`), que se dispara con cada `push` a
+`master` (o manualmente desde la pestaña **Actions**, con la opción `skip_frontend_build`). El
+workflow se conecta por SSH al servidor y ejecuta 6 pasos:
+
+1. **Actualizar código**: `git fetch origin master && git reset --hard origin/master`
+2. **Build frontend**: `pnpm install --frozen-lockfile && pnpm build`
+3. **Build de imágenes Docker**: `giramaster-backend` y `giramaster-frontend` (con `--no-cache`, también etiquetadas con el SHA corto del commit)
+4. **Importar a k3s**: `docker save ... | sudo k3s ctr images import -` (sin registry externo)
+5. **Rollout restart**: `backend`, `frontend` y `celery-worker`
+6. **Verificación**: `kubectl rollout status` de los 3 Deployments (timeout 120s) y resumen final de pods
+
+```
+==========================================
+  GIRAMASTER - Deploy 2026-07-29 20:10:03
+==========================================
+📥 [1/6] Actualizando código desde master...
+🔨 [2/6] Compilando frontend...
+🐳 [3/6] Construyendo imágenes Docker...
+📦 [4/6] Importando imágenes a k3s...
+♻️  [5/6] Reiniciando deployments...
+⏳ [6/6] Esperando que los pods estén Ready...
+==========================================
+  ✅ Deploy exitoso
+==========================================
+```
+
 ---
 
 ## 3. Configuración de DNS
@@ -105,9 +145,13 @@ kubectl get ingress main-ingress -o jsonpath='{.status.loadBalancer.ingress[0].h
 3. Ir a **DNS** → **Records**
 4. Crear/editar registro A:
    - **Type**: A
-   - **Name**: @ o assembleas
+   - **Name**: @ o asambleas
    - **Content**: [IP_DEL_INGRESS]
    - **Proxy status**: Activado (orange cloud)
+
+> El host configurado en `k8s/base/ingress.yaml` y en `k8s/base/tls-secret.yaml` debe coincidir
+> exactamente con el dominio real (`asambleas.giramaster.co`) y con el certificado TLS emitido
+> para ese dominio.
 
 ---
 
@@ -117,18 +161,18 @@ kubectl get ingress main-ingress -o jsonpath='{.status.loadBalancer.ingress[0].h
 
 | Servicio | URL |
 |----------|-----|
-| Frontend | https://asambleas.giramaster.com/ |
-| Backend API | https://asambleas.giramaster.com/api/v1/ |
-| Health | https://asambleas.giramaster.com/health |
+| Frontend | https://asambleas.giramaster.co/ |
+| Backend API | https://asambleas.giramaster.co/api/v1/ |
+| Health | https://asambleas.giramaster.co/health |
 
 ### Verificar SSL
 
 ```bash
 # Ver certificado SSL
-curl -vI https://asambleas.giramaster.com/
+curl -vI https://asambleas.giramaster.co/
 
 # Verificar que el certificado es válido
-openssl s_client -connect assembleas.giramaster.com:443 -servername assembleas.giramaster.com
+openssl s_client -connect asambleas.giramaster.co:443 -servername asambleas.giramaster.co
 ```
 
 ### Health checks
@@ -139,10 +183,10 @@ kubectl get pods -l app=mysql
 kubectl exec -it <mysql-pod> -- mysqladmin ping
 
 # Backend
-curl https://asambleas.giramaster.com/api/v1/
+curl https://asambleas.giramaster.co/api/v1/
 
 # Frontend
-curl https://asambleas.giramaster.com/health
+curl https://asambleas.giramaster.co/health
 ```
 
 ---
@@ -189,17 +233,22 @@ kubectl scale deployment backend --replicas=2
 
 ## 7. Actualizaciones
 
-### Actualizar Backend
+### Camino recomendado: CI/CD automático
+
+El flujo real de actualización es hacer `push` a la rama `master`. El workflow de GitHub Actions
+(`.github/workflows/deploy.yml`) se conecta por SSH al servidor y hace todo automáticamente:
+actualiza el código, compila el frontend, reconstruye ambas imágenes Docker, las importa a k3s
+(`k3s ctr images import`, sin registry) y reinicia `backend`, `frontend` y `celery-worker` con
+`kubectl rollout restart` + `rollout status`. También se puede disparar manualmente desde la
+pestaña **Actions** del repo (`workflow_dispatch`), con la opción `skip_frontend_build` si solo
+cambió el backend.
+
+### Camino manual (fuera del pipeline)
 
 ```bash
-# Rebuild imagen
-docker build -t giramaster:latest ./backend
-
-# Tag y push (si usa registry)
-docker tag giramaster:latest tu-registry/giramaster:latest
-docker push tu-registry/giramaster:latest
-
-# Restart pods (backend y celery usan la misma imagen)
+# Backend (también reinicia celery-worker, comparte imagen)
+docker build -t giramaster-backend:latest ./backend
+docker save giramaster-backend:latest | sudo k3s ctr images import -
 kubectl rollout restart deployment/backend
 kubectl rollout restart deployment/celery-worker
 
@@ -208,17 +257,14 @@ kubectl rollout status deployment/backend
 kubectl rollout status deployment/celery-worker
 ```
 
-### Actualizar Frontend
-
 ```bash
-# Rebuild imagen
+# Frontend
 cd frontend
-npm run build
-docker build -t frontend:latest ./frontend
-
-# Tag y push (si usa registry)
-docker tag frontend:latest tu-registry/frontend:latest
-docker push tu-registry/frontend:latest
+pnpm install --frozen-lockfile
+pnpm build
+cd ..
+docker build -t giramaster-frontend:latest ./frontend
+docker save giramaster-frontend:latest | sudo k3s ctr images import -
 
 # Restart pods
 kubectl rollout restart deployment/frontend
@@ -251,7 +297,7 @@ kubectl delete -k k8s/overlays/local
 kubectl delete pvc mysql-pvc
 
 # Eliminar imágenes locales (opcional)
-docker rmi backend:latest frontend:latest
+docker rmi giramaster-backend:latest giramaster-frontend:latest
 ```
 
 ---

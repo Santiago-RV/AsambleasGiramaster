@@ -122,7 +122,7 @@ const UnidadResidencialDetalles = ({ unitId, onBack, onStartMeeting, onOpenGuest
 					</p>
 				</div>
 				<p class="text-xs text-gray-600 mt-3">
-					💡 Cada copropietario recibirá un enlace para acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 24 horas.
+					💡 Cada copropietario recibirá un enlace para acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 1 semana.
 				</p>
 			</div>
 		`,

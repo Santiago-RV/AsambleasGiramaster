@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.utils.timezone_utils import colombia_now
 import logging
 import secrets
@@ -64,7 +64,7 @@ class EnhancedQRRequest(BaseModel):
     userId: int
     include_personal_info: bool = True
     qr_size: int = 400
-    expiration_hours: int = 48
+    expiration_hours: int = Field(default_factory=lambda: settings.QR_BULK_EXPIRATION_HOURS)
     frontend_url: Optional[str] = None
 
 
@@ -89,7 +89,7 @@ class BulkQRRequest(BaseModel):
     """Request para generar QRs en masa"""
     user_ids: List[int]
     qr_size: int = 400
-    expiration_hours: int = 48
+    expiration_hours: int = Field(default_factory=lambda: settings.QR_BULK_EXPIRATION_HOURS)
     frontend_url: Optional[str] = None
 
 
@@ -103,7 +103,7 @@ class BulkQRResponse(BaseModel):
 class BulkQRSimpleRequest(BaseModel):
     """Request para generar tokens QR simples en masa (sin imágenes)"""
     user_ids: List[int]
-    expiration_hours: int = 48
+    expiration_hours: int = Field(default_factory=lambda: settings.QR_BULK_EXPIRATION_HOURS)
     frontend_url: Optional[str] = Field(None, description="URL base del frontend para construir auto-login URL")
     meeting_id: Optional[int] = None
 
@@ -238,21 +238,23 @@ async def generate_qr_simple(
             await _get_user_complete_data(db, request.userId)
         
         # Generar token JWT (sin contraseña - solo valida el token)
+        expiration_hours = settings.QR_INDIVIDUAL_EXPIRATION_HOURS
         auto_login_token = simple_auto_login_service.generate_auto_login_token(
             username=target_user.str_username,
-            expiration_hours=24,
+            expiration_hours=expiration_hours,
             meeting_id=request.meeting_id
         )
-        
+
         # Guardar el token para el usuario (invalidar anteriores)
         from app.services.simple_auto_login_service import simple_auto_login_service as sal_service
         token_payload = sal_service.decode_auto_login_token(auto_login_token)
         if token_payload and token_payload.get("token_id"):
             await sal_service.upsert_user_token(
-                db, 
-                token_payload["token_id"], 
-                target_user.id, 
-                None
+                db,
+                token_payload["token_id"],
+                target_user.id,
+                None,
+                expires_at=colombia_now() + timedelta(hours=expiration_hours)
             )
         
         # Construir URL del frontend
@@ -270,7 +272,7 @@ async def generate_qr_simple(
             data=SimpleQRResponse(
                 auto_login_token=auto_login_token,
                 auto_login_url=auto_login_url,
-                expires_in_hours=24
+                expires_in_hours=expiration_hours
             ),
             message="Código QR generado exitosamente"
         )
@@ -330,22 +332,24 @@ async def generate_enhanced_qr(
         } if request.include_personal_info else {}
         
         # Generar QR mejorado con imagen
+        expiration_hours = request.expiration_hours if request.expiration_hours else settings.QR_INDIVIDUAL_EXPIRATION_HOURS
         qr_data = qr_service.generate_user_qr_data(
             user_id=target_user.id,
             username=target_user.str_username,
             user_info=user_info,
-            expiration_hours=request.expiration_hours if request.expiration_hours else 24,
+            expiration_hours=expiration_hours,
             frontend_url=request.frontend_url
         )
-        
+
         # Guardar el token para el usuario (invalidar anteriores)
         token_payload = simple_auto_login_service.decode_auto_login_token(qr_data['auto_login_token'])
         if token_payload and token_payload.get("token_id"):
             await simple_auto_login_service.upsert_user_token(
-                db, 
-                token_payload["token_id"], 
-                target_user.id, 
-                None
+                db,
+                token_payload["token_id"],
+                target_user.id,
+                None,
+                expires_at=colombia_now() + timedelta(hours=expiration_hours)
             )
         
         logger.info(f"🎯 QR mejorado generado para {user_info.get('name', 'Unknown')}")
@@ -595,33 +599,44 @@ async def generate_qr_bulk_simple(
             try:
                 # Verificar si ya existe un token válido para este usuario
                 existing_token_data = existing_tokens.get(target_user.id)
-                
+                expiration_hours = request.expiration_hours if request.expiration_hours else settings.QR_BULK_EXPIRATION_HOURS
+                new_expires_at = colombia_now() + timedelta(hours=expiration_hours)
+
                 if existing_token_data:
                     # Reutilizar el token_id existente y generar nuevo JWT
                     token_id = existing_token_data["token_id"]
                     token = simple_auto_login_service.generate_auto_login_token_with_id(
                         username=target_user.str_username,
                         token_id=token_id,
-                        expiration_hours=request.expiration_hours if request.expiration_hours else 24,
+                        expiration_hours=expiration_hours,
                         meeting_id=request.meeting_id
+                    )
+                    # Actualizar expires_at en BD para que coincida con el JWT regenerado
+                    await simple_auto_login_service.upsert_user_token(
+                        db,
+                        token_id,
+                        target_user.id,
+                        None,
+                        expires_at=new_expires_at
                     )
                     logger.info(f"♻️ Token reutilizado para usuario {target_user.id}: {token_id}")
                 else:
                     # Generar nuevo token de auto-login
                     token = simple_auto_login_service.generate_auto_login_token(
                         username=target_user.str_username,
-                        expiration_hours=request.expiration_hours if request.expiration_hours else 24,
+                        expiration_hours=expiration_hours,
                         meeting_id=request.meeting_id
                     )
-                    
+
                     # Guardar el token para el usuario
                     token_payload = simple_auto_login_service.decode_auto_login_token(token)
                     if token_payload and token_payload.get("token_id"):
                         await simple_auto_login_service.upsert_user_token(
-                            db, 
-                            token_payload["token_id"], 
-                            target_user.id, 
-                            None
+                            db,
+                            token_payload["token_id"],
+                            target_user.id,
+                            None,
+                            expires_at=new_expires_at
                         )
                     logger.info(f"✅ Token generado para usuario {target_user.id}: {target_user.str_username}")
                 

@@ -110,6 +110,37 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 		},
 	});
 
+	// Mutación para actualizar unidad residencial
+	const updateResidentialUnitMutation = useMutation({
+		mutationFn: ({ unitId, unitData }) => ResidentialUnitService.updateResidentialUnit(unitId, unitData),
+		onSuccess: (response) => {
+			queryClient.invalidateQueries({ queryKey: ['residentialUnits'] });
+			reset();
+			setIsModalOpen(false);
+			setIsEditMode(false);
+			setEditingUnit(null);
+			Swal.fire({
+				icon: 'success',
+				title: '¡Éxito!',
+				text: response.message || 'Unidad residencial actualizada exitosamente',
+				toast: true,
+				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				backdrop: false,
+			});
+		},
+		onError: (error) => {
+			Swal.fire({
+				icon: 'error',
+				title: 'Error',
+				text: error.message || 'Error al actualizar la unidad residencial',
+				showConfirmButton: true,
+				confirmButtonColor: '#3498db',
+			});
+		},
+	});
+
 	const handleAdminSelect = (e) => {
 		const selectedId = e.target.value;
 
@@ -135,7 +166,7 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 	};
 
 	// Estado de envío del formulario
-	const isSubmitting = createResidentialUnitMutation.isPending;
+	const isSubmitting = createResidentialUnitMutation.isPending || updateResidentialUnitMutation.isPending;
 
 	const onSubmit = (data) => {
 		const unitData = {
@@ -165,7 +196,11 @@ const UnidadesResidencialesTab = ({ onViewDetails }) => {
 			}
 		};
 
-		createResidentialUnitMutation.mutate(unitData);
+		if (isEditMode && editingUnit) {
+			updateResidentialUnitMutation.mutate({ unitId: editingUnit.id, unitData });
+		} else {
+			createResidentialUnitMutation.mutate(unitData);
+		}
 	};
 
 	const handleCloseModal = () => {

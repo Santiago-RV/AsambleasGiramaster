@@ -4,6 +4,24 @@
 
 AsambleasGiramaster es una aplicación web completa diseñada para la gestión eficiente de unidades residenciales, que permite crear y administrar reuniones virtuales directamente desde la plataforma, con sistemas de votación, estadísticas avanzadas y gestión integral de asambleas.
 
+## 📚 Documentación
+
+Toda la documentación técnica del proyecto vive centralizada en **[`docs/`](docs/)**:
+
+| Documento | Contenido |
+|---|---|
+| [`docs/BACKEND.md`](docs/BACKEND.md) | Configuración y ejecución del backend (FastAPI + Celery): variables de entorno, migraciones, Docker, comandos `make`. |
+| [`docs/FRONTEND.md`](docs/FRONTEND.md) | Configuración y ejecución del frontend (React + Vite): estructura de carpetas, rutas por rol, comandos `make`. |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Guía de despliegue en Kubernetes (k3s): build de imágenes, despliegue manual con Kustomize, pipeline de CI/CD (GitHub Actions), DNS/TLS, escalado, rollback, troubleshooting. |
+| [`docs/GUIA_DESPLIEGUE.pdf`](docs/GUIA_DESPLIEGUE.pdf) | Versión en PDF de la guía de despliegue, con portada, diagrama de arquitectura y ejemplos de salida. Se regenera con `docs/generate_deploy_guide.py`. |
+| [`docs/ROLES.md`](docs/ROLES.md) | Catálogo de roles del sistema (Super Admin, Admin, Copropietario, Invitado), cómo se identifican en BD/backend/frontend y dónde se aplican los permisos. |
+| [`docs/QR_AUTH_FLOW.md`](docs/QR_AUTH_FLOW.md) | Cómo funciona el acceso sin contraseña por QR/link (auto-login): generación, expiración, envío por email, validación y registro de asistencia. |
+| [`docs/CASCADE_ANALYSIS.md`](docs/CASCADE_ANALYSIS.md) | Análisis de las estrategias `CASCADE`/`RESTRICT`/`SET NULL` en las relaciones de los modelos SQLAlchemy. |
+| [`docs/CASCADE_MIGRATIONS.md`](docs/CASCADE_MIGRATIONS.md) | Cómo aplicar la migración SQL que agrega esas constraints (`backend/migrations/add_cascade_constraints.sql`). |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Historial completo de cambios del proyecto. |
+
+También hay documentación puntual junto al código que describe, por estar acoplada a archivos vecinos: [`tests/load/README.md`](tests/load/README.md) (pruebas de carga con k6).
+
 ## ✨ Características Principales
 
 ### 🏘️ **Gestión de Unidades Residenciales**
@@ -55,13 +73,14 @@ AsambleasGiramaster es una aplicación web completa diseñada para la gestión e
 - **ESLint**: Linter para calidad de código
 
 ### **Base de Datos**
-- **PostgreSQL/MySQL**: Base de datos relacional (configurable)
-- **Modelos relacionales**: Estructura optimizada para consultas complejas
+- **MySQL / MariaDB**: vía SQLAlchemy async (driver `aiomysql`)
+- **Modelos relacionales**: Estructura optimizada para consultas complejas, con estrategias `CASCADE`/`RESTRICT`/`SET NULL` documentadas en [`docs/CASCADE_ANALYSIS.md`](docs/CASCADE_ANALYSIS.md)
 
 ## 📁 Estructura del Proyecto
 
 ```
 AsambleasGiramaster/
+├── docs/                     # Documentación técnica centralizada (ver sección "Documentación")
 ├── backend/
 │   ├── app/
 │   │   ├── models/           # Modelos de base de datos
@@ -83,99 +102,56 @@ AsambleasGiramaster/
 │   │   └── main.jsx         # Punto de entrada
 │   ├── package.json         # Dependencias Node.js
 │   └── vite.config.js       # Configuración Vite
-└── README.md                # Este archivo
+├── k8s/                      # Manifiestos de Kubernetes (Kustomize)
+└── README.md                 # Este archivo
 ```
 
 ## 🚀 Instalación y Configuración
 
 ### **Prerrequisitos**
-- Python 3.8+
-- Node.js 16+
-- Base de datos PostgreSQL o MySQL
-- Cuenta de Zoom para integración de reuniones
+- Python 3.11+
+- Node.js 18+ con **pnpm** (no `npm`)
+- MySQL / MariaDB
+- Redis (broker/cache y sesiones)
+- Cuenta de Zoom para integración de reuniones (configuración vía panel de Super Admin, ver nota abajo)
 
-### **Backend**
+### **Quickstart**
 
-1. **Clonar el repositorio**
 ```bash
 git clone [URL_DEL_REPOSITORIO]
-cd AsambleasGiramaster/backend
-```
+cd AsambleasGiramaster
 
-2. **Crear entorno virtual**
-```bash
-python -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
-```
+# Backend
+cd backend
+cp .env.example .env   # completar variables (ver docs/BACKEND.md)
+make install
+make migrate
+make dev                # http://localhost:8000 — Swagger en /docs
 
-3. **Instalar dependencias**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Configurar variables de entorno**
-```bash
-# Crear archivo .env con:
-DATABASE_URL=postgresql://usuario:password@localhost/asambleas_db
-ZOOM_API_KEY=tu_api_key_zoom
-ZOOM_API_SECRET=tu_api_secret_zoom
-SECRET_KEY=tu_clave_secreta
-```
-
-5. **Ejecutar migraciones**
-```bash
-# Configurar base de datos y ejecutar migraciones
-python -m alembic upgrade head
-```
-
-6. **Iniciar servidor**
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### **Frontend**
-
-1. **Navegar al directorio frontend**
-```bash
+# Frontend (en otra terminal)
 cd ../frontend
+cp .env.example .env
+make install
+make dev                # http://localhost:5173
 ```
 
-2. **Instalar dependencias**
-```bash
-npm install
-```
-
-3. **Configurar variables de entorno**
-```bash
-# Crear archivo .env con:
-VITE_API_URL=http://localhost:8000
-```
-
-4. **Iniciar servidor de desarrollo**
-```bash
-npm run dev
-```
+Guías completas, con todas las variables de entorno, comandos de Celery, Docker y estructura de carpetas: **[`docs/BACKEND.md`](docs/BACKEND.md)** y **[`docs/FRONTEND.md`](docs/FRONTEND.md)**.
 
 ## 🔧 Configuración de Zoom
 
-Para habilitar las reuniones virtuales, necesitas:
+> Las variables `ZOOM_SDK_KEY`/`ZOOM_SDK_SECRET`/`ZOOM_ACCOUNT_ID`/`ZOOM_CLIENT_ID`/`ZOOM_CLIENT_SECRET` en `backend/app/core/config.py` están marcadas como **deprecadas**: hoy las credenciales de Zoom se configuran desde el panel de **Super Admin** (persistidas en base de datos), no por variables de entorno. Los pasos de Zoom Marketplace siguen aplicando para obtener las credenciales, solo cambia dónde se cargan.
 
 1. **Crear aplicación en Zoom Marketplace**
    - Ir a [Zoom Marketplace](https://marketplace.zoom.us/)
    - Crear una aplicación "Server-to-Server OAuth"
-   - Obtener API Key y API Secret
+   - Obtener Account ID, Client ID y Client Secret
 
 2. **Configurar permisos**
    - Habilitar permisos para crear reuniones
    - Habilitar grabación automática
    - Configurar webhooks para notificaciones
 
-3. **Variables de entorno**
-```bash
-ZOOM_API_KEY=tu_api_key
-ZOOM_API_SECRET=tu_api_secret
-ZOOM_WEBHOOK_SECRET=tu_webhook_secret
-```
+3. **Cargar credenciales**: desde el panel de Super Admin de la aplicación (no por `.env`).
 
 ## 📊 Funcionalidades Detalladas
 
@@ -228,13 +204,13 @@ La aplicación está optimizada para:
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+Este proyecto está pensado bajo la Licencia MIT (pendiente agregar el archivo `LICENSE` al repositorio).
 
 ## 📞 Soporte
 
 Para soporte técnico o consultas:
 - **Email**: soporte@asambleasgiramaster.com
-- **Documentación**: [Wiki del proyecto]
+- **Documentación**: [`docs/`](docs/)
 - **Issues**: [GitHub Issues]
 
 ## 🎯 Roadmap

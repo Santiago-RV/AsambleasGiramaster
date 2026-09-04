@@ -28,7 +28,11 @@ class Settings(BaseSettings):
   ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 días (7 * 24 * 60)
   REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 días
   REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-  
+
+  # Expiración de links/QR de auto-login
+  QR_INDIVIDUAL_EXPIRATION_HOURS: int = 168  # 1 semana
+  QR_BULK_EXPIRATION_HOURS: int = 168  # 1 semana
+
   # CORS
   ALLOWED_HOSTS_DEV: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"]
   ALLOWED_HOSTS_PROD: List[str] = []  # Configurar dominios específicos en producción

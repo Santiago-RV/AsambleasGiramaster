@@ -12,7 +12,7 @@ from app.core.database import get_db
 from app.core.exceptions import ServiceException
 from app.schemas.responses_schema import SuccessResponse
 
-from app.schemas.residential_unit_schema import ResidentialUnitCreate, ResidentialUnitResponse
+from app.schemas.residential_unit_schema import ResidentialUnitCreate, ResidentialUnitUpdate, ResidentialUnitResponse
 from app.services.residential_unit_service import ResidentialUnitService
 
 from app.schemas.resident_update_schema import ResidentUpdate
@@ -109,6 +109,37 @@ async def create_residential_unit(
     except Exception as e:
         raise ServiceException(
             message=f"Error al crear la unidad residencial: {str(e)}",
+            details={"original_error": str(e)}
+        )
+
+@router.put(
+  "/units/{unit_id}",
+  response_model=SuccessResponse,
+  status_code=status.HTTP_200_OK,
+  summary="Actualizar una unidad residencial",
+  description="Actualiza los datos propios de una unidad residencial"
+)
+async def update_residential_unit(
+    unit_id: int,
+    residential_unit_data: ResidentialUnitUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Actualiza una unidad residencial"""
+    try:
+        residential_unit_service = ResidentialUnitService(db)
+        residential_unit = await residential_unit_service.update_residential_unit(unit_id, residential_unit_data)
+
+        return SuccessResponse(
+            success=True,
+            status_code=status.HTTP_200_OK,
+            message="Unidad residencial actualizada correctamente",
+            data=ResidentialUnitResponse.from_orm(residential_unit).dict()
+        )
+    except (ResourceNotFoundException, HTTPException, ServiceException):
+        raise
+    except Exception as e:
+        raise ServiceException(
+            message=f"Error al actualizar la unidad residencial: {str(e)}",
             details={"original_error": str(e)}
         )
 

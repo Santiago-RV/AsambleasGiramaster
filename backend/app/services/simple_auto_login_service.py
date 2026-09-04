@@ -22,7 +22,7 @@ class SimpleAutoLoginService:
     def generate_auto_login_token(
         self,
         username: str,
-        expiration_hours: int = 24,
+        expiration_hours: int = settings.QR_INDIVIDUAL_EXPIRATION_HOURS,
         meeting_id: int = None
     ) -> str:
         """
@@ -30,7 +30,7 @@ class SimpleAutoLoginService:
         
         Args:
             username: Nombre de usuario
-            expiration_hours: Horas hasta expiración (default: 24)
+            expiration_hours: Horas hasta expiración (default: settings.QR_INDIVIDUAL_EXPIRATION_HOURS)
             meeting_id: ID de reunión presencial (opcional)
             
         Returns:
@@ -73,7 +73,7 @@ class SimpleAutoLoginService:
         self,
         username: str,
         token_id: str,
-        expiration_hours: int = 24,
+        expiration_hours: int = settings.QR_INDIVIDUAL_EXPIRATION_HOURS,
         meeting_id: int = None
     ) -> str:
         """
@@ -83,7 +83,7 @@ class SimpleAutoLoginService:
         Args:
             username: Nombre de usuario
             token_id: UUID del token existente a reutilizar
-            expiration_hours: Horas hasta expiración (default: 24)
+            expiration_hours: Horas hasta expiración (default: settings.QR_INDIVIDUAL_EXPIRATION_HOURS)
             meeting_id: ID de reunión presencial (opcional)
             
         Returns:
@@ -170,32 +170,37 @@ class SimpleAutoLoginService:
     
     async def upsert_user_token(self, db, token_id: str, user_id: int, ip_address: str = None, expires_at = None):
         """
-        Registra un token de auto-login para un usuario.
-        Si el token ya existe, no hace nada (evita errores de duplicado).
-        
+        Registra o actualiza un token de auto-login para un usuario.
+        Si el token ya existe, actualiza su expires_at (y ip_address si se pasa)
+        en vez de reinsertarlo, para mantenerlo alineado con el JWT vigente.
+
         Args:
             db: Sesión de base de datos
-            token_id: UUID del nuevo token
+            token_id: UUID del token
             user_id: ID del usuario
             ip_address: Dirección IP del cliente
-            expires_at: Fecha de expiración del token (si no se pasa, usa 24h por defecto)
+            expires_at: Fecha de expiración del token (si no se pasa, usa settings.QR_INDIVIDUAL_EXPIRATION_HOURS por defecto)
         """
         from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
         from sqlalchemy import select
-        
+
         result = await db.execute(
             select(UsedAutoLoginTokenModel).where(
                 UsedAutoLoginTokenModel.token_id == token_id
             )
         )
         existing_token = result.scalar_one_or_none()
-        
-        if existing_token:
-            logger.info(f"Token {token_id} ya existe para usuario {user_id}, no se re-inserta")
-            return
-        
+
         if expires_at is None:
-            expires_at = colombia_now() + timedelta(hours=24)
+            expires_at = colombia_now() + timedelta(hours=settings.QR_INDIVIDUAL_EXPIRATION_HOURS)
+
+        if existing_token:
+            existing_token.expires_at = expires_at
+            if ip_address is not None:
+                existing_token.ip_address = ip_address
+            await db.commit()
+            logger.info(f"Token {token_id} actualizado para usuario {user_id} (nueva expiración: {expires_at})")
+            return
         
         new_token = UsedAutoLoginTokenModel(
             token_id=token_id,

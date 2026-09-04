@@ -170,7 +170,7 @@ const AutoLogin = () => {
           if (status === 404) {
             if (detail?.includes('expirado') || detail?.includes('expir')) {
               errorTitle = 'Enlace Expirado ⏰';
-              errorMessage = 'Este enlace de acceso ha expirado (48 horas). Por favor, solicita uno nuevo.';
+              errorMessage = 'Este enlace de acceso ha expirado (1 semana). Por favor, solicita uno nuevo.';
             } else {
               errorTitle = 'Enlace Inválido ❌';
               errorMessage = 'El enlace de acceso no es válido o no existe.';

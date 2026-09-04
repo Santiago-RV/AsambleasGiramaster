@@ -1,5 +1,5 @@
 from ast import Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.utils.timezone_utils import colombia_now
 from decimal import Decimal
 from typing import List, Optional
@@ -18,7 +18,7 @@ from app.models.residential_unit_model import ResidentialUnitModel
 from app.models.user_residential_unit_model import UserResidentialUnitModel
 from app.models.user_model import UserModel
 from app.models.data_user_model import DataUserModel
-from app.schemas.residential_unit_schema import AdministratorData, ResidentialUnitCreate, ResidentialUnitResponse
+from app.schemas.residential_unit_schema import AdministratorData, ResidentialUnitCreate, ResidentialUnitUpdate, ResidentialUnitResponse
 from app.core.exceptions import ServiceException, ResourceNotFoundException
 from app.core.security import security_manager 
 from app.services.email_notification_service import EmailNotificationService
@@ -115,6 +115,32 @@ class ResidentialUnitService:
         except Exception as e:
             raise ServiceException(
                 message=f"Error al obtener la unidad residencial por ID: {str(e)}",
+                details={"original_error": str(e)}
+            )
+
+    async def update_residential_unit(self, unit_id: int, residential_unit_data: ResidentialUnitUpdate) -> ResidentialUnitResponse:
+        """Actualiza los datos propios de una unidad residencial existente"""
+        try:
+            residential_unit = await self.get_residential_unit_by_id(unit_id)
+            if not residential_unit:
+                raise ResourceNotFoundException(f"No se encontró la unidad residencial con ID {unit_id}")
+
+            update_data = residential_unit_data.model_dump()
+            for field, value in update_data.items():
+                setattr(residential_unit, field, value)
+
+            await self.db.commit()
+            await self.db.refresh(residential_unit)
+
+            return ResidentialUnitResponse.model_validate(residential_unit)
+
+        except ResourceNotFoundException:
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error al actualizar la unidad residencial: {e}")
+            raise ServiceException(
+                message=f"Error al actualizar la unidad residencial: {str(e)}",
                 details={"original_error": str(e)}
             )
     
@@ -942,10 +968,10 @@ class ResidentialUnitService:
             # 10. Generar token de auto-login
             from app.services.simple_auto_login_service import simple_auto_login_service
             from app.core.config import settings
-            
+
             auto_login_token = simple_auto_login_service.generate_auto_login_token(
                 username=username,
-                expiration_hours=24
+                expiration_hours=settings.QR_INDIVIDUAL_EXPIRATION_HOURS
             )
             if not frontend_url:
                 raise ValueError("frontend_url es requerido para generar URL de auto-login")
@@ -1115,7 +1141,7 @@ class ResidentialUnitService:
                 text_content += f"""
     ACCESO DIRECTO:
     - URL: {auto_login_url}
-    - Válido por 24 horas
+    - Válido por 1 semana
 
 """
             else:
@@ -1515,19 +1541,21 @@ class ResidentialUnitService:
             # ============================================
             # Generar JWT de auto-login (sin contraseña temporal)
             # ============================================
+            expiration_hours = settings.QR_INDIVIDUAL_EXPIRATION_HOURS
             auto_login_token = simple_auto_login_service.generate_auto_login_token(
                 username=user.str_username,
-                expiration_hours=24
+                expiration_hours=expiration_hours
             )
-            
+
             # Guardar el token para el usuario (invalidar anteriores)
             token_payload = simple_auto_login_service.decode_auto_login_token(auto_login_token)
             if token_payload and token_payload.get("token_id"):
                 await simple_auto_login_service.upsert_user_token(
-                    self.db, 
-                    token_payload["token_id"], 
-                    user.id, 
-                    None
+                    self.db,
+                    token_payload["token_id"],
+                    user.id,
+                    None,
+                    expires_at=colombia_now() + timedelta(hours=expiration_hours)
                 )
             
             logger.info(f"JWT de auto-login generado para {user.str_username}")
@@ -1886,19 +1914,21 @@ class ResidentialUnitService:
             # Generar token de auto-login
             from app.services.simple_auto_login_service import SimpleAutoLoginService
             auto_login_service = SimpleAutoLoginService()
+            expiration_hours = settings.QR_INDIVIDUAL_EXPIRATION_HOURS
             auto_login_token = auto_login_service.generate_auto_login_token(
                 username=username,
-                expiration_hours=24
+                expiration_hours=expiration_hours
             )
-            
+
             # Guardar el token para el usuario (invalidar anteriores)
             token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
             if token_payload and token_payload.get("token_id"):
                 await auto_login_service.upsert_user_token(
-                    self.db, 
-                    token_payload["token_id"], 
-                    user.id, 
-                    None
+                    self.db,
+                    token_payload["token_id"],
+                    user.id,
+                    None,
+                    expires_at=colombia_now() + timedelta(hours=expiration_hours)
                 )
 
             try:
@@ -2278,21 +2308,23 @@ class ResidentialUnitService:
             # 7. Generar token de auto-login
             from app.services.simple_auto_login_service import SimpleAutoLoginService
             auto_login_service = SimpleAutoLoginService()
+            expiration_hours = settings.QR_INDIVIDUAL_EXPIRATION_HOURS
             auto_login_token = auto_login_service.generate_auto_login_token(
                 username=username,  # Username en minúsculas
-                expiration_hours=24
+                expiration_hours=expiration_hours
             )
-            
+
             # Guardar el token para el usuario (invalidar anteriores)
             token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
             if token_payload and token_payload.get("token_id"):
                 await auto_login_service.upsert_user_token(
-                    self.db, 
-                    token_payload["token_id"], 
-                    user.id, 
-                    None
+                    self.db,
+                    token_payload["token_id"],
+                    user.id,
+                    None,
+                    expires_at=colombia_now() + timedelta(hours=expiration_hours)
                 )
-            
+
             logger.info(f"🎟️ Token de auto-login generado para {username}")
             
             # 8. Enviar email de bienvenida

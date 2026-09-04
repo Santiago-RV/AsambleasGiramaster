@@ -2,24 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, MessageCircle, Printer, Download, Share2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { ResidentService } from '../../services/api/ResidentService';
-import { formatDateLong } from '../../utils/dateUtils';
+import { formatDateLong, formatDateTime } from '../../utils/dateUtils';
 
 const QRCodeModal = ({
 	resident,
 	isOpen,
 	onClose,
-	autoLoginUrl
+	autoLoginUrl,
+	expiresInHours
 }) => {
 	const [qrCodeUrl, setQrCodeUrl] = useState('');
 	const [isGenerating, setIsGenerating] = useState(false);
 	const [isSending, setIsSending] = useState(false);
+	const [expiresAt, setExpiresAt] = useState(null);
 
 	// Generar QR Code cuando se abre el modal
 	useEffect(() => {
 		if (isOpen && autoLoginUrl) {
 			generateQRCode();
+			setExpiresAt(
+				expiresInHours ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000) : null
+			);
 		}
-	}, [isOpen, autoLoginUrl]);
+	}, [isOpen, autoLoginUrl, expiresInHours]);
 
 	const generateQRCode = async () => {
 		setIsGenerating(true);
@@ -255,6 +260,7 @@ const QRCodeModal = ({
 					<div class="footer">
 						<p>Este código QR proporciona acceso directo y seguro al sistema.</p>
 						<p>Generado el: ${formatDateLong(new Date())}</p>
+						${expiresAt ? `<p>Válido hasta el: ${formatDateTime(expiresAt)}</p>` : ''}
 					</div>
 				</body>
 			</html>
@@ -397,6 +403,9 @@ const QRCodeModal = ({
 						<p className="text-xs text-yellow-800">
 							<strong>Importante:</strong> Este código QR proporciona acceso directo al sistema.
 							Manténlo en un lugar seguro y no lo compartas con personas no autorizadas.
+							{expiresAt && (
+								<> Es válido hasta el <strong>{formatDateTime(expiresAt)}</strong>.</>
+							)}
 						</p>
 					</div>
 				</div>

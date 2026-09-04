@@ -291,7 +291,7 @@ export const useResidentOperations = (unitId) => {
             </p>
           </div>
           <p class="text-xs text-gray-600 mt-3">
-            💡 Podrá acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 24 horas.
+            💡 Podrá acceder directamente al sistema sin escribir contraseña. El enlace tiene vigencia de 1 semana.
           </p>
         </div>
       `,
@@ -337,7 +337,7 @@ export const useResidentOperations = (unitId) => {
               </p>
             </div>
             <p class="text-xs text-gray-600 mt-3">
-              💡 Recibirá un enlace para acceder directamente al sistema sin contraseña. Vigencia de 24 horas.
+              💡 Recibirá un enlace para acceder directamente al sistema sin contraseña. Vigencia de 1 semana.
             </p>
           </div>
         `,

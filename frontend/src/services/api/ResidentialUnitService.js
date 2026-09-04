@@ -55,6 +55,58 @@ export class ResidentialUnitService {
   }
 
   /**
+   * Actualiza una unidad residencial existente
+   * @param {number} unitId - ID de la unidad residencial
+   * @param {Object} unitData - Datos actualizados de la unidad residencial
+   * @returns {Promise} Respuesta del servidor
+   */
+  static async updateResidentialUnit(unitId, unitData) {
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+
+      if (!user || !user.id) {
+        throw new Error('No se pudo obtener el ID del usuario');
+      }
+
+      const payload = {
+        str_residential_code: unitData.str_residential_code,
+        str_name: unitData.str_name,
+        str_nit: unitData.str_nit,
+        str_unit_type: unitData.str_unit_type,
+        int_total_apartments: unitData.int_total_apartments,
+        str_address: unitData.str_address,
+        str_city: unitData.str_city,
+        str_state: unitData.str_state,
+        bln_is_active: unitData.bln_is_active ?? true,
+        int_max_concurrent_meetings: unitData.int_max_concurrent_meetings,
+        str_management_company: unitData.str_management_company,
+        str_contact_person: unitData.str_contact_person,
+        str_contact_phone: unitData.str_contact_phone,
+      };
+
+      const response = await axiosInstance.put(`/residential/units/${unitId}`, payload);
+
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Error al actualizar la unidad residencial');
+      }
+
+      return {
+        success: true,
+        message: response.data.message,
+        data: response.data.data,
+      };
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al actualizar la unidad residencial';
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
    * Crea un administrador manualmente para una unidad residencial
    * @param {number} unitId - ID de la unidad residencial
    * @param {Object} adminData - Datos del administrador

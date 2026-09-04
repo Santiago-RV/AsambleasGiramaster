@@ -16,6 +16,9 @@ import { showMeetingInvitationProgressModal } from '../common/BulkDeleteConfirmM
 import { useProgressNotification } from '../../contexts/ProgressNotificationContext';
 import { formatDateLong, formatDateTime } from '../../utils/dateUtils';
 
+// Debe coincidir con settings.QR_BULK_EXPIRATION_HOURS del backend (app/core/config.py)
+const QR_BULK_EXPIRATION_HOURS = 168; // 1 semana
+
 const SVG_ICONS = {
 	checkCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
 	xCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
@@ -60,6 +63,7 @@ const ResidentsList = ({
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedResidentForQR, setSelectedResidentForQR] = useState(null);
 	const [autoLoginUrl, setAutoLoginUrl] = useState('');
+	const [qrExpiresInHours, setQrExpiresInHours] = useState(null);
 	const [isSendingQRs, setIsSendingQRs] = useState(false);
 	const menuButtonRefs = useRef({});
   	const [isHelpModalCopro, setIsHelpModalCoproOpen] = useState(false);
@@ -405,7 +409,7 @@ const ResidentsList = ({
 					},
 					body: JSON.stringify({
 						user_ids: selectedResidents,
-						expiration_hours: 48,
+						expiration_hours: QR_BULK_EXPIRATION_HOURS,
 						frontend_url: window.location.origin,
 						...(presencialMeetingId ? { meeting_id: presencialMeetingId } : {})
 					})
@@ -519,7 +523,9 @@ const ResidentsList = ({
 				const cellHeight = availableHeight / rows;
 
 				// Tamaño del QR (ajustado para que quepa con el texto)
-				const qrSize = Math.min(cellWidth * 0.75, cellHeight * 0.55);
+				const qrSize = Math.min(cellWidth * 0.75, cellHeight * 0.60);
+				const qrExpiresAt = new Date(Date.now() + QR_BULK_EXPIRATION_HOURS * 60 * 60 * 1000);
+				const qrExpiresLabel = `Válido hasta: ${formatDateTime(qrExpiresAt)}`;
 
 				let currentPage = 1;
 				let pageQRCount = 0;
@@ -541,7 +547,7 @@ const ResidentsList = ({
 
 					// Centrar QR en la celda
 					const qrX = x + (cellWidth - qrSize) / 2;
-					const qrY = y + 5;
+					const qrY = y + 4;
 
 					// Añadir imagen QR
 					pdf.addImage(qrImageUrl, 'PNG', qrX, qrY, qrSize, qrSize);
@@ -550,7 +556,7 @@ const ResidentsList = ({
 					pdf.setFontSize(7);
 					pdf.setFont('helvetica', 'normal');
 					pdf.setTextColor(100, 100, 100);
-					const unitY = qrY + qrSize + 3;
+					const unitY = qrY + qrSize + 2.5;
 					pdf.text(
 						residentialUnitName || 'Unidad Residencial',
 						x + cellWidth / 2,
@@ -562,7 +568,7 @@ const ResidentsList = ({
 					pdf.setFontSize(9);
 					pdf.setFont('helvetica', 'bold');
 					pdf.setTextColor(0, 0, 0);
-					const nameY = unitY + 4;
+					const nameY = unitY + 3.5;
 					pdf.text(
 						`${resident.firstname} ${resident.lastname}`,
 						x + cellWidth / 2,
@@ -574,12 +580,24 @@ const ResidentsList = ({
 					pdf.setFontSize(8);
 					pdf.setFont('helvetica', 'normal');
 					pdf.setTextColor(80, 80, 80);
-					const aptY = nameY + 3.5;
+					const aptY = nameY + 3;
 					pdf.text(
 						`Apt. ${resident.apartment_number}`,
 						x + cellWidth / 2,
 						aptY,
 						{ align: 'center' }
+					);
+
+					// Añadir vigencia del QR (centrado, debajo del apartamento)
+					pdf.setFontSize(6);
+					pdf.setFont('helvetica', 'normal');
+					pdf.setTextColor(150, 40, 40);
+					const expiresY = aptY + 2.3;
+					pdf.text(
+						qrExpiresLabel,
+						x + cellWidth / 2,
+						expiresY,
+						{ align: 'center', maxWidth: cellWidth - 4 }
 					);
 
 					// Resetear color de texto
@@ -716,7 +734,7 @@ const ResidentsList = ({
 				},
 				body: JSON.stringify({
 					user_ids: selectedResidents,
-					expiration_hours: 48,
+					expiration_hours: QR_BULK_EXPIRATION_HOURS,
 					frontend_url: window.location.origin,
 					...(presencialMeetingId ? { meeting_id: presencialMeetingId } : {})
 				})
@@ -743,8 +761,12 @@ const ResidentsList = ({
 			// Agregar worksheet
 			const worksheet = workbook.addWorksheet('Tokens QR');
 
+			// Fecha de expiración de los tokens generados en este lote
+			const qrExpiresAt = new Date(Date.now() + QR_BULK_EXPIRATION_HOURS * 60 * 60 * 1000);
+			const qrExpiresLabel = formatDateTime(qrExpiresAt);
+
 			// Agregar encabezados
-			worksheet.addRow(['Nombre', 'Apartamento', 'URL de Acceso']);
+			worksheet.addRow(['Nombre', 'Apartamento', 'URL de Acceso', 'Expira']);
 
 			// Aplicar estilo a los encabezados
 			const headerRow = worksheet.getRow(1);
@@ -761,7 +783,8 @@ const ResidentsList = ({
 				worksheet.addRow([
 					`${item.firstname || ''} ${item.lastname || ''}`.trim(),
 					item.apartment_number || '',
-					item.auto_login_url || ''
+					item.auto_login_url || '',
+					qrExpiresLabel
 				]);
 			});
 
@@ -769,6 +792,7 @@ const ResidentsList = ({
 			worksheet.getColumn(1).width = 35;
 			worksheet.getColumn(2).width = 18;
 			worksheet.getColumn(3).width = 90;
+			worksheet.getColumn(4).width = 22;
 
 			// Nombre del archivo con fecha
 			const fecha = new Date().toISOString().slice(0, 10);
@@ -787,7 +811,7 @@ const ResidentsList = ({
 				icon: 'success',
 				title: '¡Excel descargado!',
 				html: `Se generaron <strong>${tokens.length}</strong> tokens de acceso.<br/>
-                   <small style="color:#888">Los tokens tienen vigencia de 48 horas.</small>`,
+                   <small style="color:#888">Válidos hasta el ${qrExpiresLabel} (${QR_BULK_EXPIRATION_HOURS}h).</small>`,
 				confirmButtonColor: '#16a34a',
 				timer: 4000,
 				timerProgressBar: true,
@@ -1078,6 +1102,7 @@ const ResidentsList = ({
 				const url = data.data.auto_login_url;
 
 				setAutoLoginUrl(url);
+				setQrExpiresInHours(data.data.expires_in_hours ?? null);
 				setSelectedResidentForQR(resident);
 				setQrModalOpen(true);
 
@@ -1622,8 +1647,10 @@ const ResidentsList = ({
 						setQrModalOpen(false);
 						setSelectedResidentForQR(null);
 						setAutoLoginUrl('');
+						setQrExpiresInHours(null);
 					}}
 					autoLoginUrl={autoLoginUrl}
+					expiresInHours={qrExpiresInHours}
 				/>
 			)}
 

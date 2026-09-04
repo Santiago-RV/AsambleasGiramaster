@@ -1338,7 +1338,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
     - Build local de la aplicación React + Vite
     - Solo copia archivos compilados (`dist/`) a la imagen
     - Enfoque pragmático: compilación en host, servido en Docker
-  - **Configuración de Nginx** ([nginx.conf](frontend/nginx.conf)):
+  - **Configuración de Nginx** ([nginx.conf](../frontend/nginx.conf)):
     - Servidor web en puerto 80 interno
     - Compresión gzip habilitada para mejor rendimiento
     - Configuración SPA (Single Page Application) con fallback a index.html

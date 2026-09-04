@@ -3,7 +3,7 @@ import secrets
 import string
 import threading
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.utils.timezone_utils import colombia_now
 from app.celery_app import celery_app
 from app.utils.email_sender import EmailSender
@@ -215,17 +215,21 @@ def send_bulk_emails(self, resident_ids: List[int], unit_id: int, task_id: str, 
                         user_unit.str_apartment_number
                     )
                     
+                    expiration_hours = settings.QR_INDIVIDUAL_EXPIRATION_HOURS
                     auto_login_token = auto_login_service.generate_auto_login_token(
                         username=user.str_username,
-                        expiration_hours=24
+                        expiration_hours=expiration_hours
                     )
-                    
+
                     token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
                     token_id = token_payload.get('token_id') if token_payload else None
-                    
+
                     if token_id:
                         try:
-                            await auto_login_service.upsert_user_token(db, token_id, user.id, None)
+                            await auto_login_service.upsert_user_token(
+                                db, token_id, user.id, None,
+                                expires_at=colombia_now() + timedelta(hours=expiration_hours)
+                            )
                             await db.flush()
                         except Exception as token_err:
                             logger.warning(f"Token ya existe o error guardando token: {token_err}")
@@ -477,9 +481,10 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                     )
                     notifications_map[user.id] = notification.id
 
+                    meeting_expiration_hours = settings.QR_INDIVIDUAL_EXPIRATION_HOURS
                     auto_login_token = auto_login_service.generate_auto_login_token(
                         username=user.str_username,
-                        expiration_hours=24,
+                        expiration_hours=meeting_expiration_hours,
                         meeting_id=meeting_id if meeting.str_modality == "presencial" else None
                     )
 
@@ -488,7 +493,10 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                     token_id = token_payload.get('token_id') if token_payload else None
                     if token_id:
                         try:
-                            await auto_login_service.upsert_user_token(db, token_id, user.id, None)
+                            await auto_login_service.upsert_user_token(
+                                db, token_id, user.id, None,
+                                expires_at=colombia_now() + timedelta(hours=meeting_expiration_hours)
+                            )
                             await db.flush()
                         except Exception as token_err:
                             logger.warning(f"Error guardando token de auto-login: {token_err}")
@@ -699,7 +707,7 @@ def send_qr_email(self, user_id: int, recipient_email: str = None, frontend_url:
                     user_id=user.id,
                     username=user.str_username,
                     user_info=user_info,
-                    expiration_hours=24,
+                    expiration_hours=settings.QR_INDIVIDUAL_EXPIRATION_HOURS,
                     frontend_url=frontend_url
                 )
                 
@@ -881,17 +889,21 @@ def send_single_credential_email(
                 user.updated_at = colombia_now()
                 await db.commit()
                 
+                expiration_hours = settings.QR_INDIVIDUAL_EXPIRATION_HOURS
                 auto_login_token = simple_auto_login_service.generate_auto_login_token(
                     username=user.str_username,
-                    expiration_hours=24
+                    expiration_hours=expiration_hours
                 )
-                
+
                 token_payload = simple_auto_login_service.decode_auto_login_token(auto_login_token)
                 token_id = token_payload.get('token_id') if token_payload else None
-                
+
                 if token_id:
                     try:
-                        await simple_auto_login_service.upsert_user_token(db, token_id, user.id, None)
+                        await simple_auto_login_service.upsert_user_token(
+                            db, token_id, user.id, None,
+                            expires_at=colombia_now() + timedelta(hours=expiration_hours)
+                        )
                         await db.flush()
                     except Exception as token_err:
                         logger.warning(f"Token ya existe o error guardando token: {token_err}")
