@@ -26,6 +26,17 @@ from app.core.config import settings
 
 logger = get_logger(__name__)
 
+# Estados en los que una reunión ya no ocupa su cuenta Zoom.
+# Se comparan en minúsculas para tolerar variantes de casing/acentos que pueden
+# entrar por PUT /meetings/{id} (str_status es String(50) sin enum ni CHECK).
+MEETING_FINAL_STATUSES = (
+    "completada",
+    "finalizada",
+    "cerrada",
+    "terminada",
+    "cancelada",
+)
+
 
 class MeetingService:
     def __init__(self, db: AsyncSession):
@@ -105,14 +116,17 @@ class MeetingService:
         exclude_meeting_id: Optional[int] = None
     ) -> list[int]:
         """
-        Retorna los IDs de cuentas Zoom que ya tienen una reunión virtual programada
+        Retorna los IDs de cuentas Zoom que ya tienen una reunión virtual vigente
         en el mismo día (mismo año, mes y día) que schedule_date.
+
+        Solo cuentan las reuniones en estado no terminal: una reunión ya cerrada
+        (ver MEETING_FINAL_STATUSES) libera la cuenta para el resto del día.
         """
         try:
             conditions = [
                 MeetingModel.int_zoom_account_id != None,
                 MeetingModel.str_modality == 'virtual',
-                MeetingModel.str_status != 'Cancelada',
+                func.lower(MeetingModel.str_status).notin_(MEETING_FINAL_STATUSES),
                 func.date(MeetingModel.dat_schedule_date) == func.date(schedule_date),
             ]
             if exclude_meeting_id:
@@ -194,7 +208,7 @@ class MeetingService:
                 )
                 if zoom_account_id in conflicting_ids:
                     raise ServiceException(
-                        message="La cuenta Zoom seleccionada ya tiene una reunión virtual programada para ese día.",
+                        message="La cuenta Zoom seleccionada ya tiene una reunión virtual activa o programada para ese día.",
                         details={"zoom_account_id": zoom_account_id}
                     )
 
@@ -431,6 +445,22 @@ class MeetingService:
                 meeting.dat_schedule_date != schedule_date
             )
 
+            # Si se mueve la fecha, la cuenta Zoom debe estar libre ese nuevo día
+            # (excluyendo la propia reunión). Se valida antes de mutar campos.
+            if date_changed and meeting.str_modality == "virtual" and meeting.int_zoom_account_id:
+                conflicting_ids = await self.get_zoom_account_conflicts(
+                    schedule_date=schedule_date,
+                    exclude_meeting_id=meeting_id
+                )
+                if meeting.int_zoom_account_id in conflicting_ids:
+                    raise ServiceException(
+                        message="La cuenta Zoom de esta reunión ya tiene otra reunión virtual activa o programada para ese día.",
+                        details={
+                            "zoom_account_id": meeting.int_zoom_account_id,
+                            "meeting_id": meeting_id
+                        }
+                    )
+
             if title is not None:
                 meeting.str_title = title
             if description is not None:
@@ -461,8 +491,11 @@ class MeetingService:
             await self.db.refresh(meeting)
 
             return meeting
-            
+
         except ResourceNotFoundException:
+            raise
+        except ServiceException:
+            await self.db.rollback()
             raise
         except Exception as e:
             await self.db.rollback()
@@ -851,20 +884,21 @@ class MeetingService:
                     "meeting_info": None
                 }
 
-            # 3. Verificar que el token_id fue emitido para este usuario y no ha expirado
-            if token_id:
-                is_valid = await simple_auto_login_service.is_token_valid_for_user(
-                    self.db, token_id, target_user.id
-                )
-                if not is_valid:
-                    logger.warning(f"QR Attendance: Token invalido o expirado para usuario {username}")
-                    return {
-                        "success": False,
-                        "already_registered": False,
-                        "message": "El codigo QR ha expirado o ya no es valido. El copropietario debe solicitar un nuevo QR.",
-                        "user_info": None,
-                        "meeting_info": None
-                    }
+            # 3. Verificar que el token_id fue emitido para este usuario y no ha expirado.
+            # Aqui NO se aplica el atado por dispositivo: el request sale del celular
+            # del administrador que escanea, no del dueno del QR.
+            is_valid = bool(token_id) and await simple_auto_login_service.is_token_valid_for_user(
+                self.db, token_id, target_user.id
+            )
+            if not is_valid:
+                logger.warning(f"QR Attendance: Token invalido o expirado para usuario {username}")
+                return {
+                    "success": False,
+                    "already_registered": False,
+                    "message": "El codigo QR ha expirado o ya no es valido. El copropietario debe solicitar un nuevo QR.",
+                    "user_info": None,
+                    "meeting_info": None
+                }
             
             # 4. Obtener datos personales del usuario
             data_user_query = select(DataUserModel).where(DataUserModel.id == target_user.int_data_user_id)
@@ -988,6 +1022,8 @@ class MeetingService:
                 "success": result.get("success", False),
                 "already_registered": result.get("already_registered", False),
                 "message": result.get("message", ""),
+                "user_id": target_user.id,
+                "meeting_id": active_meeting.id,
                 "user_info": user_info,
                 "meeting_info": meeting_info,
                 "joined_at": result.get("joined_at")

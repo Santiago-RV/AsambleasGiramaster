@@ -14,5 +14,9 @@ class UsedAutoLoginTokenModel(Base):
     created_at = Column(DateTime, default=colombia_now, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     ip_address = Column(String(45), nullable=True)
+    # Huella del primer dispositivo que usó el link (TOFU). NULL = aún sin usar.
+    device_fingerprint = Column(String(64), nullable=True, index=True)
+    first_used_at = Column(DateTime, nullable=True)
+    use_count = Column(Integer, nullable=False, default=0, server_default="0")
 
     user = relationship("UserModel", backref="auto_login_tokens")

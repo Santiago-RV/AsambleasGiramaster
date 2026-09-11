@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { publicAxios } from '../../services/api/axiosconfig';
+import { getOrCreateDeviceId } from '../../utils/deviceId';
 import Swal from 'sweetalert2';
 import { Lightbulb, CheckCircle, Lock } from 'lucide-react';
 
@@ -49,8 +50,12 @@ const AutoLogin = () => {
           },
         });
 
-        // Llamar al endpoint de auto-login
-        const response = await publicAxios.get(`/auth/auto-login/${token}`);
+        // Llamar al endpoint de auto-login.
+        // El device id ata el enlace a este dispositivo en su primer uso.
+        const deviceId = getOrCreateDeviceId();
+        const response = await publicAxios.get(`/auth/auto-login/${token}`, {
+          headers: deviceId ? { 'X-Device-Id': deviceId } : {},
+        });
 
         if (response.data.success) {
           const { access_token, user, attendance_registered, meeting_id } = response.data.data;
@@ -174,6 +179,14 @@ const AutoLogin = () => {
             } else {
               errorTitle = 'Enlace Inválido ❌';
               errorMessage = 'El enlace de acceso no es válido o no existe.';
+            }
+          } else if (status === 410) {
+            if (detail?.includes('otro dispositivo')) {
+              errorTitle = 'Enlace Usado en Otro Dispositivo 📵';
+              errorMessage = 'Este enlace quedó vinculado al primer dispositivo donde se abrió. Pídele al administrador que te genere un acceso nuevo.';
+            } else {
+              errorTitle = 'Enlace Ya No Válido ⏰';
+              errorMessage = detail || 'Este enlace de acceso ya no es válido. Solicita uno nuevo al administrador.';
             }
           } else if (status === 401) {
             errorTitle = 'Credenciales Inválidas 🔒';

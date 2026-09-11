@@ -976,7 +976,12 @@ class ResidentialUnitService:
             if not frontend_url:
                 raise ValueError("frontend_url es requerido para generar URL de auto-login")
             auto_login_url = f"{frontend_url}/auto-login/{auto_login_token}"
-            
+
+            # Sin este registro el link de bienvenida nace muerto (410 al abrirlo)
+            await simple_auto_login_service.register_issued_token(
+                self.db, auto_login_token, user.id
+            )
+
             # 11. Enviar correo de bienvenida (opcional) - vía Celery
             from app.celery_app import celery_app
             
@@ -1547,17 +1552,11 @@ class ResidentialUnitService:
                 expiration_hours=expiration_hours
             )
 
-            # Guardar el token para el usuario (invalidar anteriores)
-            token_payload = simple_auto_login_service.decode_auto_login_token(auto_login_token)
-            if token_payload and token_payload.get("token_id"):
-                await simple_auto_login_service.upsert_user_token(
-                    self.db,
-                    token_payload["token_id"],
-                    user.id,
-                    None,
-                    expires_at=colombia_now() + timedelta(hours=expiration_hours)
-                )
-            
+            # Registrar el token emitido e invalidar los anteriores del usuario
+            await simple_auto_login_service.register_issued_token(
+                self.db, auto_login_token, user.id
+            )
+
             logger.info(f"JWT de auto-login generado para {user.str_username}")
             
             # COMMIT O FLUSH según el modo (sin cambios de contraseña)
@@ -1920,16 +1919,10 @@ class ResidentialUnitService:
                 expiration_hours=expiration_hours
             )
 
-            # Guardar el token para el usuario (invalidar anteriores)
-            token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
-            if token_payload and token_payload.get("token_id"):
-                await auto_login_service.upsert_user_token(
-                    self.db,
-                    token_payload["token_id"],
-                    user.id,
-                    None,
-                    expires_at=colombia_now() + timedelta(hours=expiration_hours)
-                )
+            # Registrar el token emitido e invalidar los anteriores del usuario
+            await auto_login_service.register_issued_token(
+                self.db, auto_login_token, user.id
+            )
 
             try:
                 await email_svc.send_administrator_credentials_email(
@@ -2314,16 +2307,10 @@ class ResidentialUnitService:
                 expiration_hours=expiration_hours
             )
 
-            # Guardar el token para el usuario (invalidar anteriores)
-            token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
-            if token_payload and token_payload.get("token_id"):
-                await auto_login_service.upsert_user_token(
-                    self.db,
-                    token_payload["token_id"],
-                    user.id,
-                    None,
-                    expires_at=colombia_now() + timedelta(hours=expiration_hours)
-                )
+            # Registrar el token emitido e invalidar los anteriores del usuario
+            await auto_login_service.register_issued_token(
+                self.db, auto_login_token, user.id
+            )
 
             logger.info(f"🎟️ Token de auto-login generado para {username}")
             

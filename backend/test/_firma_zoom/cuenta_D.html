@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Prueba D: SDK Key / SDK Secret con tokenExp &lt; exp</title>
+<script src="vendor/react.min.js"></script>
+<script src="vendor/react-dom.min.js"></script>
+<script src="vendor/redux.min.js"></script>
+<script src="vendor/redux-thunk.min.js"></script>
+<script src="vendor/lodash.min.js"></script>
+<script src="zoom-meeting.min.js"></script>
+</head><body>
+<div id="estado" style="font:14px/1.6 monospace;padding:24px;white-space:pre-wrap">Prueba D: SDK Key / SDK Secret con tokenExp &lt; exp
+appKey: NIy1v0l3QLeXD2GgkSrdg
+reunion: 87491983030
+</div>
+<script>
+const out = document.getElementById('estado');
+const log = (m) => {
+  out.textContent += "\n" + m;
+  console.log(m);
+  try { navigator.sendBeacon("/log", "[D]" + " " + m); } catch (e) {}
+};
+window.addEventListener("error", (e) => log("ERROR DE PAGINA " + e.message));
+if (typeof ZoomMtg === "undefined") {
+  log("NO CARGO EL SDK: revise que zoom-meeting.min.js se sirva junto a esta página");
+  throw new Error("ZoomMtg no disponible");
+}
+ZoomMtg.preLoadWasm();
+ZoomMtg.prepareWebSDK();
+ZoomMtg.init({
+  leaveUrl: window.location.href,
+  patchJsMedia: true,
+  disablePreview: true,
+  success: () => {
+    log("init OK, uniendo...");
+    ZoomMtg.join({
+      signature: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBLZXkiOiJOSXkxdjBsM1FMZVhEMkdna1NyZGciLCJzZGtLZXkiOiJOSXkxdjBsM1FMZVhEMkdna1NyZGciLCJtbiI6Ijg3NDkxOTgzMDMwIiwicm9sZSI6MCwiaWF0IjoxNzg4NDk2MzY1LCJleHAiOjE3ODg1MDM1NjUsInRva2VuRXhwIjoxNzg4NTAyOTY1fQ.WgQA6zLqXQg1R_mOclYofEJTuSaQ75uTV3E1A8Ga2BU",
+      sdkKey: "NIy1v0l3QLeXD2GgkSrdg",
+      meetingNumber: "87491983030",
+      passWord: "689204",
+      userName: "Prueba D",
+      userEmail: "",
+      tk: "",
+      success: (r) => log("*** UNIDO CORRECTAMENTE *** " + JSON.stringify(r)),
+      error: (e) => log("FALLO AL UNIRSE: " + JSON.stringify(e)),
+    });
+  },
+  error: (e) => log("FALLO AL INICIALIZAR: " + JSON.stringify(e)),
+});
+</script></body></html>

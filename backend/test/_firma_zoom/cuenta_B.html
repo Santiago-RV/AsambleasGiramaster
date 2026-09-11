@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Prueba B: Client ID / Client Secret</title>
+<script src="vendor/react.min.js"></script>
+<script src="vendor/react-dom.min.js"></script>
+<script src="vendor/redux.min.js"></script>
+<script src="vendor/redux-thunk.min.js"></script>
+<script src="vendor/lodash.min.js"></script>
+<script src="zoom-meeting.min.js"></script>
+</head><body>
+<div id="estado" style="font:14px/1.6 monospace;padding:24px;white-space:pre-wrap">Prueba B: Client ID / Client Secret
+appKey: A6kb3gvDRUmwDcey83RArg
+reunion: 87491983030
+</div>
+<script>
+const out = document.getElementById('estado');
+const log = (m) => {
+  out.textContent += "\n" + m;
+  console.log(m);
+  try { navigator.sendBeacon("/log", "[B]" + " " + m); } catch (e) {}
+};
+window.addEventListener("error", (e) => log("ERROR DE PAGINA " + e.message));
+if (typeof ZoomMtg === "undefined") {
+  log("NO CARGO EL SDK: revise que zoom-meeting.min.js se sirva junto a esta página");
+  throw new Error("ZoomMtg no disponible");
+}
+ZoomMtg.preLoadWasm();
+ZoomMtg.prepareWebSDK();
+ZoomMtg.init({
+  leaveUrl: window.location.href,
+  patchJsMedia: true,
+  disablePreview: true,
+  success: () => {
+    log("init OK, uniendo...");
+    ZoomMtg.join({
+      signature: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBLZXkiOiJBNmtiM2d2RFJVbXdEY2V5ODNSQXJnIiwic2RrS2V5IjoiQTZrYjNndkRSVW13RGNleTgzUkFyZyIsIm1uIjoiODc0OTE5ODMwMzAiLCJyb2xlIjowLCJpYXQiOjE3ODg0OTYzNjUsImV4cCI6MTc4ODUwMzU2NSwidG9rZW5FeHAiOjE3ODg1MDM1NjV9.BUSQkk6YLCu44pjzuMciFAGLfs048NZCJAgCDzFHpDs",
+      sdkKey: "A6kb3gvDRUmwDcey83RArg",
+      meetingNumber: "87491983030",
+      passWord: "689204",
+      userName: "Prueba B",
+      userEmail: "",
+      tk: "",
+      success: (r) => log("*** UNIDO CORRECTAMENTE *** " + JSON.stringify(r)),
+      error: (e) => log("FALLO AL UNIRSE: " + JSON.stringify(e)),
+    });
+  },
+  error: (e) => log("FALLO AL INICIALIZAR: " + JSON.stringify(e)),
+});
+</script></body></html>

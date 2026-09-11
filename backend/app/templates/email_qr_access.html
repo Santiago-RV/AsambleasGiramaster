@@ -420,9 +420,11 @@
       <!-- QR Section -->
       <div class="qr-section">
         <div class="qr-title">📱 Escanea este código QR</div>
+        {% if qr_image_url %}
         <div class="qr-container">
           <img src="{{qr_image_url}}" alt="Código QR de Acceso" class="qr-image" />
         </div>
+        {% endif %}
         
         <div class="qr-info">
           <div class="qr-info-title">📋 ¿Cómo usar tu código QR?</div>

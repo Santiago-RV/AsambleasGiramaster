@@ -84,15 +84,37 @@ async def auto_login_simple(
                 detail="Usuario no encontrado"
             )
         
-        # Verificar si el token es válido para este usuario
-        if token_id:
-            token_valid = await simple_auto_login_service.is_token_valid_for_user(db, token_id, user.id)
-            if not token_valid:
-                logger.warning(f"Token inválido para el usuario {username}: {token_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_410_GONE,
-                    detail="Este enlace de acceso ya no es válido. Solicita uno nuevo."
+        # Validar y consumir el token para este dispositivo.
+        # Sin jti no hay forma de verificarlo contra la BD: se rechaza.
+        if not token_id:
+            logger.warning(f"Token sin jti para el usuario {username}")
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="Este enlace de acceso ya no es válido. Solicita uno nuevo."
+            )
+
+        fingerprint = simple_auto_login_service.compute_device_fingerprint(
+            device_id=request.headers.get("X-Device-Id"),
+            user_agent=request.headers.get("User-Agent"),
+            accept_language=request.headers.get("Accept-Language")
+        )
+
+        token_valid, reason = await simple_auto_login_service.consume_token_for_device(
+            db, token_id, user.id, fingerprint, client_ip
+        )
+        if not token_valid:
+            logger.warning(f"Token rechazado para el usuario {username} ({reason}): {token_id}")
+            if reason == "other_device":
+                detail = (
+                    "Este enlace ya fue usado en otro dispositivo. "
+                    "Solicita uno nuevo al administrador."
                 )
+            else:
+                detail = "Este enlace de acceso ya no es válido. Solicita uno nuevo."
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail=detail
+            )
         
         # Verificar que el usuario tiene acceso permitido
         if not user.bln_allow_entry:
@@ -142,15 +164,6 @@ async def auto_login_simple(
             f"✅ Auto-login exitoso: user_id={user.id}, "
             f"username={user.str_username}, role={user.rol.str_name}"
         )
-        
-        # Actualizar el token del usuario (nuevo: upsert)
-        if token_id:
-            try:
-                await simple_auto_login_service.upsert_user_token(
-                    db, token_id, user.id, client_ip
-                )
-            except Exception as e:
-                logger.warning(f"No se pudo actualizar el token: {str(e)}")
         
         # Registro automatico de asistencia para copropietarios (rol 3) e invitados (rol 4)
         # Si hay una reunion presencial "En Curso" en su unidad residencial y tienen invitacion

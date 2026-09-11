@@ -221,20 +221,14 @@ def send_bulk_emails(self, resident_ids: List[int], unit_id: int, task_id: str, 
                         expiration_hours=expiration_hours
                     )
 
-                    token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
-                    token_id = token_payload.get('token_id') if token_payload else None
+                    try:
+                        await auto_login_service.register_issued_token(
+                            db, auto_login_token, user.id
+                        )
+                    except Exception as token_err:
+                        logger.warning(f"Error guardando token de auto-login: {token_err}")
+                        await db.rollback()
 
-                    if token_id:
-                        try:
-                            await auto_login_service.upsert_user_token(
-                                db, token_id, user.id, None,
-                                expires_at=colombia_now() + timedelta(hours=expiration_hours)
-                            )
-                            await db.flush()
-                        except Exception as token_err:
-                            logger.warning(f"Token ya existe o error guardando token: {token_err}")
-                            await db.rollback()
-                    
                     notification = await notification_service.create_notification(
                         user_id=user.id,
                         template="resend_credentials",
@@ -489,18 +483,13 @@ def send_meeting_invitations(self, meeting_id: int, task_id: str, frontend_url: 
                     )
 
                     # Persistir el token en BD para que el endpoint de auto-login lo valide
-                    token_payload = auto_login_service.decode_auto_login_token(auto_login_token)
-                    token_id = token_payload.get('token_id') if token_payload else None
-                    if token_id:
-                        try:
-                            await auto_login_service.upsert_user_token(
-                                db, token_id, user.id, None,
-                                expires_at=colombia_now() + timedelta(hours=meeting_expiration_hours)
-                            )
-                            await db.flush()
-                        except Exception as token_err:
-                            logger.warning(f"Error guardando token de auto-login: {token_err}")
-                            await db.rollback()
+                    try:
+                        await auto_login_service.register_issued_token(
+                            db, auto_login_token, user.id
+                        )
+                    except Exception as token_err:
+                        logger.warning(f"Error guardando token de auto-login: {token_err}")
+                        await db.rollback()
 
                     auto_login_url = None
                     if auto_login_token:
@@ -664,6 +653,7 @@ def send_qr_email(self, user_id: int, recipient_email: str = None, frontend_url:
         from app.models.residential_unit_model import ResidentialUnitModel
         from app.services.qr_service import qr_service
         from app.services.email_service import EmailService
+        from app.services.simple_auto_login_service import simple_auto_login_service
         from app.core.config import settings
         from app.core.security import security_manager
         from pathlib import Path
@@ -710,7 +700,12 @@ def send_qr_email(self, user_id: int, recipient_email: str = None, frontend_url:
                     expiration_hours=settings.QR_INDIVIDUAL_EXPIRATION_HOURS,
                     frontend_url=frontend_url
                 )
-                
+
+                # Sin este registro el link del QR nace muerto (410 al abrirlo)
+                await simple_auto_login_service.register_issued_token(
+                    db, qr_data['auto_login_token'], user.id
+                )
+
                 to_email = recipient_email or data_user.str_email
                 
                 email_service = EmailService(db)
@@ -895,19 +890,13 @@ def send_single_credential_email(
                     expiration_hours=expiration_hours
                 )
 
-                token_payload = simple_auto_login_service.decode_auto_login_token(auto_login_token)
-                token_id = token_payload.get('token_id') if token_payload else None
-
-                if token_id:
-                    try:
-                        await simple_auto_login_service.upsert_user_token(
-                            db, token_id, user.id, None,
-                            expires_at=colombia_now() + timedelta(hours=expiration_hours)
-                        )
-                        await db.flush()
-                    except Exception as token_err:
-                        logger.warning(f"Token ya existe o error guardando token: {token_err}")
-                        await db.rollback()
+                try:
+                    await simple_auto_login_service.register_issued_token(
+                        db, auto_login_token, user.id
+                    )
+                except Exception as token_err:
+                    logger.warning(f"Error guardando token de auto-login: {token_err}")
+                    await db.rollback()
                 
                 valid_templates = {
                     'email_coproprietario_credentials': 'email_coproprietario_credentials.html',

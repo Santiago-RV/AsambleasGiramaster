@@ -152,6 +152,7 @@ app.add_middleware(
     "DNT",
     "Accept",
     "X-CSRFToken",
+    "X-Device-Id",
     "keep-alive",
     "User-Agent",
     "Origin",

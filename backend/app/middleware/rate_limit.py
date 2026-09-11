@@ -23,7 +23,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Keys específicas por tipo de endpoint
         if "/auth/" in path:
             rate_key = f"auth_{client_ip}"
-        elif "/qr/" in path or "generate-auto-login" in path:
+        elif "-qr" in path or "generate-auto-login" in path:
             rate_key = f"qr_{client_ip}"
         else:
             rate_key = f"general_{method}_{client_ip}"

@@ -3,6 +3,7 @@ import { X, Mail, MessageCircle, Printer, Download, Share2 } from 'lucide-react'
 import Swal from 'sweetalert2';
 import { ResidentService } from '../../services/api/ResidentService';
 import { formatDateLong, formatDateTime } from '../../utils/dateUtils';
+import { copyToClipboard } from '../../utils/clipboard';
 
 const QRCodeModal = ({
 	resident,
@@ -277,8 +278,9 @@ const QRCodeModal = ({
 	};
 
 	const handleCopyLink = async () => {
-		try {
-			await navigator.clipboard.writeText(autoLoginUrl);
+		const copied = await copyToClipboard(autoLoginUrl);
+
+		if (copied) {
 			Swal.fire({
 				icon: 'success',
 				title: '¡Copiado!',
@@ -287,14 +289,20 @@ const QRCodeModal = ({
 				showConfirmButton: false,
 				confirmButtonColor: '#27ae60'
 			});
-		} catch (error) {
-			Swal.fire({
-				icon: 'error',
-				title: 'Error',
-				text: 'No se pudo copiar el enlace',
-				confirmButtonColor: '#e74c3c'
-			});
+			return;
 		}
+
+		// Último recurso: mostrar el enlace seleccionable para copiarlo a mano
+		Swal.fire({
+			icon: 'warning',
+			title: 'Copia el enlace manualmente',
+			html: `<textarea readonly rows="4" style="width:100%;font-size:12px;padding:8px;border:1px solid #ddd;border-radius:6px;resize:none;word-break:break-all;">${autoLoginUrl}</textarea>`,
+			confirmButtonColor: '#e74c3c',
+			didOpen: () => {
+				const field = Swal.getPopup().querySelector('textarea');
+				field?.select();
+			}
+		});
 	};
 
 	if (!isOpen) return null;

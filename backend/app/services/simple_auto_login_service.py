@@ -1,7 +1,8 @@
-﻿import uuid
-from datetime import datetime, timedelta
+﻿import hashlib
+import uuid
+from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
-from app.utils.timezone_utils import colombia_now
+from app.utils.timezone_utils import colombia_now, utc_to_colombia
 from typing import Optional, Dict, List
 from app.core.config import settings
 from app.core.logging_config import get_logger
@@ -280,6 +281,201 @@ class SimpleAutoLoginService:
         
         return True
     
+    def compute_device_fingerprint(
+        self,
+        device_id: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        accept_language: Optional[str] = None
+    ) -> str:
+        """
+        Calcula la huella del dispositivo que abre el link de auto-login.
+
+        Prioriza el device_id que el frontend guarda en localStorage; si no llega
+        (QR abierto fuera de la app, storage bloqueado, curl), cae al User-Agent
+        junto con el idioma del navegador.
+
+        Returns:
+            str: hash hexadecimal de 64 caracteres
+        """
+        if device_id:
+            raw = f"did:{device_id.strip()}"
+        else:
+            raw = f"ua:{user_agent or ''}|{accept_language or ''}"
+
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    async def consume_token_for_device(
+        self,
+        db,
+        token_id: str,
+        user_id: int,
+        fingerprint: str,
+        ip_address: str = None
+    ) -> tuple:
+        """
+        Valida y consume un token de auto-login para un dispositivo concreto.
+
+        El primer uso ata el token a la huella del dispositivo (TOFU). Los usos
+        siguientes solo se permiten desde esa misma huella, salvo dentro de la
+        ventana de gracia posterior al primer uso, donde el token se re-ata.
+
+        A diferencia de upsert_user_token, NUNCA modifica expires_at: usar el
+        link no debe extender su vigencia.
+
+        Args:
+            db: Sesión de base de datos
+            token_id: UUID (jti) del token
+            user_id: ID del usuario dueño del token
+            fingerprint: Huella del dispositivo actual
+            ip_address: IP del cliente
+
+        Returns:
+            tuple[bool, str]: (permitido, motivo). Motivos: "ok", "invalid",
+            "expired", "other_device"
+        """
+        from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
+        from sqlalchemy import select
+
+        result = await db.execute(
+            select(UsedAutoLoginTokenModel).where(
+                UsedAutoLoginTokenModel.user_id == user_id,
+                UsedAutoLoginTokenModel.token_id == token_id
+            )
+        )
+        user_token = result.scalar_one_or_none()
+
+        if not user_token:
+            return False, "invalid"
+
+        now = colombia_now()
+
+        if user_token.expires_at and user_token.expires_at < now:
+            logger.info(f"⛔ Token {token_id} ha expirado para usuario {user_id}")
+            return False, "expired"
+
+        if not settings.AUTO_LOGIN_DEVICE_BINDING_ENABLED:
+            user_token.use_count = (user_token.use_count or 0) + 1
+            if ip_address:
+                user_token.ip_address = ip_address
+            await db.commit()
+            return True, "ok"
+
+        if not user_token.device_fingerprint:
+            # Primer uso: el token queda atado a este dispositivo
+            user_token.device_fingerprint = fingerprint
+            user_token.first_used_at = now
+            user_token.use_count = 1
+            if ip_address:
+                user_token.ip_address = ip_address
+            await db.commit()
+            logger.info(f"🔗 Token {token_id} atado al dispositivo del usuario {user_id}")
+            return True, "ok"
+
+        if user_token.device_fingerprint != fingerprint:
+            grace_limit = (user_token.first_used_at or now) + timedelta(
+                minutes=settings.AUTO_LOGIN_REBIND_GRACE_MINUTES
+            )
+            if now > grace_limit:
+                logger.warning(
+                    f"⛔ Token {token_id} usado desde otro dispositivo (usuario {user_id})"
+                )
+                return False, "other_device"
+
+            # Dentro de la gracia: el usuario saltó del webview al navegador
+            user_token.device_fingerprint = fingerprint
+            logger.info(f"♻️ Token {token_id} re-atado dentro de la ventana de gracia")
+
+        user_token.use_count = (user_token.use_count or 0) + 1
+        if ip_address:
+            user_token.ip_address = ip_address
+        await db.commit()
+        return True, "ok"
+
+    async def revoke_user_tokens(self, db, user_id: int, except_token_id: str = None) -> int:
+        """
+        Revoca los tokens de auto-login de un usuario marcándolos como expirados.
+
+        No borra las filas para conservar el rastro; is_token_valid_for_user y
+        consume_token_for_device ya tratan un token vencido como inválido.
+
+        Args:
+            db: Sesión de base de datos
+            user_id: ID del usuario
+            except_token_id: token_id que NO debe revocarse (el recién emitido)
+
+        Returns:
+            int: Número de tokens revocados
+        """
+        from app.models.used_auto_login_token_model import UsedAutoLoginTokenModel
+        from sqlalchemy import update
+
+        now = colombia_now()
+        conditions = [
+            UsedAutoLoginTokenModel.user_id == user_id,
+            UsedAutoLoginTokenModel.expires_at > now
+        ]
+        if except_token_id:
+            conditions.append(UsedAutoLoginTokenModel.token_id != except_token_id)
+
+        result = await db.execute(
+            update(UsedAutoLoginTokenModel)
+            .where(*conditions)
+            .values(expires_at=now)
+        )
+        revoked = result.rowcount or 0
+        if revoked > 0:
+            logger.info(f"🚫 Revocados {revoked} tokens previos del usuario {user_id}")
+        return revoked
+
+    async def register_issued_token(
+        self,
+        db,
+        token: str,
+        user_id: int,
+        revoke_previous: bool = True
+    ) -> Optional[str]:
+        """
+        Punto único de registro de un link de auto-login recién emitido.
+
+        Extrae el jti y el exp del propio JWT (en vez de recalcular la expiración
+        desde settings, que desalinea el espejo en BD respecto al token real),
+        persiste la fila y revoca los demás tokens vigentes del usuario.
+
+        Todo emisor de links debe pasar por acá: si el jti no queda en la tabla,
+        el endpoint de auto-login responde 410 y el link nace muerto.
+
+        Args:
+            db: Sesión de base de datos
+            token: JWT de auto-login ya generado
+            user_id: ID del usuario dueño del token
+            revoke_previous: Si revoca los links anteriores del usuario
+
+        Returns:
+            str: token_id (jti) registrado, o None si el token no es válido
+        """
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+        except JWTError as e:
+            logger.error(f"No se pudo registrar el token emitido: {str(e)}")
+            return None
+
+        token_id = payload.get("jti")
+        exp = payload.get("exp")
+
+        if not token_id or not exp:
+            logger.error("El token emitido no contiene jti o exp; no se registra")
+            return None
+
+        expires_at = utc_to_colombia(datetime.fromtimestamp(exp, tz=timezone.utc))
+
+        await self.upsert_user_token(db, token_id, user_id, expires_at=expires_at)
+
+        if revoke_previous:
+            await self.revoke_user_tokens(db, user_id, except_token_id=token_id)
+            await db.commit()
+
+        return token_id
+
     async def is_token_used(self, db, token_id: str) -> bool:
         """
         Verifica si un token existe en la base de datos (deprecated - usar is_token_valid_for_user)

@@ -70,7 +70,10 @@ class EmailService:
             with open(template_path, 'r', encoding='utf-8') as file:
                 template_content = file.read()
             
-            qr_image_url = qr_base64 or f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={auto_login_url}"
+            # Nunca usar un generador externo de QR: mandaría el JWT de acceso
+            # a un tercero en la query string. Si no hay imagen, queda el link
+            # en texto que la plantilla ya imprime.
+            qr_image_url = qr_base64 or ""
             
             # Obtener información de soporte técnico
             from app.services.support_service import SupportService
@@ -296,6 +299,10 @@ class EmailService:
                     expiration_hours=settings.QR_INDIVIDUAL_EXPIRATION_HOURS
                 )
                 if auto_login_token:
+                    # Sin este registro el link nace muerto (410 al abrirlo)
+                    await auto_login_service.register_issued_token(
+                        self.db, auto_login_token, user.id
+                    )
                     template_data["auto_login_url"] = f"{frontend_url}/auto-login/{auto_login_token}"
                     template_data["auto_login_token"] = auto_login_token
                     logger.info(f"Auto-login generado para {data_user.str_email}")

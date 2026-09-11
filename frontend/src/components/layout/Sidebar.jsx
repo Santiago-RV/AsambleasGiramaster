@@ -167,7 +167,7 @@ const Sidebar = ({
 				<div className="p-6 border-t border-white/10 bg-black/20">
 					<div className="text-xs text-gray-400 text-center">
 						<p>© {new Date().getFullYear()} Giramaster</p>
-						<p className="mt-1">v1.0.0</p>
+						<p className="mt-1">v1.1.0</p>
 					</div>
 				</div>
 			)}

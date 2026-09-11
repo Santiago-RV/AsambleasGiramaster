@@ -4,7 +4,7 @@ from typing import List
 class Settings(BaseSettings):
   # COnfiguracion Basica
   PROJECT_NAME: str = "GIRAMASTER"
-  VERSION: str = "1.0.0"
+  VERSION: str = "1.1.0"
   ENVIRONMENT: str = "development"
   HOST: str = "0.0.0.0"
   PORT: int = 8000
@@ -33,8 +33,14 @@ class Settings(BaseSettings):
   QR_INDIVIDUAL_EXPIRATION_HOURS: int = 168  # 1 semana
   QR_BULK_EXPIRATION_HOURS: int = 168  # 1 semana
 
+  # El link de auto-login queda atado al primer dispositivo que lo usa.
+  # La ventana de gracia permite re-atarlo si el usuario salta del webview
+  # del correo/WhatsApp al navegador real poco después del primer uso.
+  AUTO_LOGIN_DEVICE_BINDING_ENABLED: bool = True
+  AUTO_LOGIN_REBIND_GRACE_MINUTES: int = 15
+
   # CORS
-  ALLOWED_HOSTS_DEV: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"]
+  ALLOWED_HOSTS_DEV: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://devstar:5173"]
   ALLOWED_HOSTS_PROD: List[str] = []  # Configurar dominios específicos en producción
   
   @property

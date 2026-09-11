@@ -7,6 +7,140 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-11
+
+### Añadido
+
+#### 2026-09-11 - Enlaces de auto-login atados al primer dispositivo que los usa
+
+- Un enlace/QR de auto-login es una **credencial de sesión completa** (el QR codifica literalmente `{frontend_url}/auto-login/{JWT}`), y hasta ahora era reutilizable por cualquiera durante toda su vigencia. Ahora queda vinculado al primer dispositivo que lo abre (TOFU).
+  - **Modelo** (`backend/app/models/used_auto_login_token_model.py`): nuevas columnas `device_fingerprint`, `first_used_at` y `use_count`. Migración en `backend/migrations/add_device_binding_to_auto_login_tokens.sql` (requiere aplicarse a mano: `create_all` no hace `ALTER` sobre tablas existentes).
+  - **SimpleAutoLoginService** (`backend/app/services/simple_auto_login_service.py`): `compute_device_fingerprint()` (SHA-256 del `device_id` del navegador, con fallback a User-Agent + `Accept-Language`), `consume_token_for_device()` (valida, ata en el primer uso y cuenta usos) y `revoke_user_tokens()`.
+  - **Endpoint** (`backend/app/api/v1/endpoints/simple_auto_login_endpoint.py`): lee el header `X-Device-Id` y responde **410** con mensaje propio si el enlace se abre desde otro dispositivo. También rechaza los JWT sin `jti`, que antes se saltaban toda validación contra BD.
+  - **Ventana de gracia** configurable (`AUTO_LOGIN_REBIND_GRACE_MINUTES = 15` en `backend/app/core/config.py`): dentro de ese lapso el enlace puede re-atarse, para cubrir el salto del webview de Gmail/WhatsApp al navegador real. `AUTO_LOGIN_DEVICE_BINDING_ENABLED` permite desactivar el mecanismo sin redesplegar.
+  - **Frontend**: nuevo `frontend/src/utils/deviceId.js` (`getOrCreateDeviceId()`, persistido en `localStorage`, tolerante a modo incógnito) y `AutoLogin.jsx` envía el header y muestra mensaje específico para el 410.
+  - **Escaneo por administrador no afectado**: `POST /meetings/scan-qr-attendance` sigue validando solo vigencia y titularidad, porque el request sale del dispositivo del admin y no del dueño del QR.
+- Al emitir un enlace nuevo se **revocan los anteriores** del mismo usuario (`register_issued_token()`), de modo que un enlace filtrado deja de servir apenas se regenera el acceso.
+
+#### 2026-09-03 - Edición de unidades residenciales desde el Super Administrador
+
+- Antes solo se podían crear unidades; no existía endpoint de actualización.
+  - **Backend**: nuevo `PUT /residential/units/{unit_id}` (`backend/app/api/v1/endpoints/residential_enpoint.py`) y `ResidentialUnitService.update_residential_unit()` con el schema `ResidentialUnitUpdate`.
+  - **Frontend**: `ResidentialUnitService.updateResidentialUnit()` y `updateResidentialUnitMutation` en `UnidadesResidencialesTab.jsx`, con `onSubmit` bifurcando entre crear y actualizar según `isEditMode`.
+
+#### 2026-09-03 - Fecha de vigencia visible en QRs, PDF y Excel
+
+- **QRCodeModal** (`frontend/src/components/common/QRCodeModal.jsx`): nueva prop `expiresInHours` y leyenda "Válido hasta el ..." tanto en el modal como en la versión imprimible.
+- **ResidentsList** (`frontend/src/components/common/ResidentsList.jsx`): el PDF masivo imprime la vigencia bajo cada QR y el export a Excel gana la columna "Expira".
+
+#### 2026-09-03 - Documentación técnica centralizada en `docs/`
+
+- Se consolidan `docs/BACKEND.md`, `docs/FRONTEND.md`, `docs/ROLES.md`, `docs/QR_AUTH_FLOW.md`, `docs/DEPLOY.md`, `docs/CASCADE_MIGRATIONS.md` y este changelog bajo `docs/`, más `docs/GUIA_DESPLIEGUE.pdf` y su generador `docs/generate_deploy_guide.py`.
+- `README.md`: índice de documentación y corrección del stack de BD (MySQL/MariaDB con `aiomysql`). Las credenciales de Zoom quedan **deprecadas como variables de entorno**: se configuran desde el panel de Super Admin y se persisten en BD.
+
+#### 2026-07-04 - Quórum por coeficiente en reuniones activas del Super Administrador
+
+- Antes solo se veía el porcentaje de asistencia por cantidad de personas; ahora se muestra el coeficiente real.
+  - **Backend** (`backend/app/services/active_meeting_service.py`): `_compute_quorum_percentage()` se reemplaza por `_compute_quorum_values()`, que devuelve `(connected_quorum, total_quorum, quorum_pct)`. Los dos primeros se exponen en `ActiveMeetingCardSchema` y en `GET` de reuniones activas (`super_admin.py`).
+  - **Frontend**: `ActiveMeetingCard.jsx` muestra `Coef: X / Y` a 3 decimales y `ActiveMeetingDetailsModal.jsx` reemplaza `quorum_percentage` por `connected_quorum / total_quorum` en la tarjeta de quórum y en los snapshots de llamado a lista.
+
+#### 2026-07-04 - Desglose de coeficientes en el informe de poderes
+
+- El PDF solo mostraba el coeficiente cedido, sin dejar ver cuánto representaba realmente el delegado.
+  - **Backend** (`reports_superadmin_endpoint.py`, `get_delegations_report`): se agrega `delegate.original_weight` tomado de `dec_quorum_base` (con fallback a `dec_default_voting_weight`).
+  - **Frontend** (`InformesTab.jsx`, `generateDelegationsPDF`): cada delegado muestra Coeficiente Propio, Coeficiente a Representar y Coeficiente Total.
+
+#### 2026-07-04 - Cifras nominales en los informes de asistencia y votaciones
+
+- **Asistencia** (`InformesTab.jsx`, `generateAttendancePDF`): el bloque de quórum suma "Conectados", "No conectados" y "Total a ingresar".
+- **Votaciones** (`generatePollChartImage`): acepta la métrica `'weight'` o `'count'`, de modo que el PDF incluye el gráfico por coeficiente y el gráfico por cantidad, más la franja "Votaron / No votaron / Esperados a votar".
+
+### Cambiado
+
+#### 2026-09-11 - Versión de la aplicación a 1.1.0
+
+- `frontend/src/components/layout/Sidebar.jsx` y `frontend/package.json`: de `1.0.0` a `1.1.0`.
+
+#### 2026-09-11 - Cuenta Zoom reutilizable el mismo día si la reunión previa ya cerró
+
+- La validación bloqueaba una cuenta Zoom para todo el día ante **cualquier** reunión virtual existente; la única excepción era el estado `Cancelada`, que ningún código del backend asigna. En la práctica, una reunión de la mañana ya terminada dejaba la cuenta inutilizable el resto del día.
+  - **MeetingService** (`backend/app/services/meeting_service.py`): nueva constante `MEETING_FINAL_STATUSES` y `get_zoom_account_conflicts()` pasa a excluir los estados terminales (`completada`, `finalizada`, `cerrada`, `terminada`, `cancelada`, comparados en minúsculas para tolerar variantes de casing). Solo bloquean las reuniones vigentes (`Programada`, `En Curso`).
+  - El arreglo cubre a la vez la creación y el pre-chequeo del modal, porque `GET /meetings/zoom-account-conflicts` usa la misma función.
+  - **Nuevo en edición**: `update_meeting()` ahora también valida el conflicto al mover la fecha de una reunión virtual (antes no validaba nada), excluyéndose a sí misma vía `exclude_meeting_id`.
+
+#### 2026-09-03 - Expiración de enlaces/QR de auto-login a 1 semana y configurable
+
+- Los enlaces pasan de 24–48 horas fijas a 168 horas parametrizables.
+  - **Settings** (`backend/app/core/config.py`): `QR_INDIVIDUAL_EXPIRATION_HOURS` y `QR_BULK_EXPIRATION_HOURS`.
+  - `simple_auto_login_service.py`, `qr_endpoints.py` (`EnhancedQRRequest`, `BulkQRRequest`, `BulkQRSimpleRequest` con `Field(default_factory=...)`), `residential_unit_service.py`, `email_tasks.py` y `email_service.py` dejan de hardcodear 24/48 h.
+  - Textos de plantillas de correo y de UI actualizados de "24/48 horas" a "1 semana".
+
+#### 2026-07-22 - Se elimina la validación que bloqueaba el envío de correos
+
+- Con `EMAIL_ENABLED != true` los endpoints devolvían 400 aunque el SMTP funcionara.
+  - Se elimina `backend/app/api/v1/endpoints/decorators.py` (`check_email_enabled()` y `require_email_enabled`) y su uso en `admin_coowners.py`, `meeting_endpoint.py`, `qr_endpoints.py`, `residential_enpoint.py` y `super_admin.py`.
+
+#### 2026-07-04 - El gráfico de asistencia del administrador pasa a medir coeficiente
+
+- `frontend/src/components/AdDashboard/ReunionEnCursoTab.jsx`: el donut de 3 segmentos calculado sobre `total_invited` se reemplaza por el componente compartido `AttendanceChart` (`./AttendanceGraphics`), con `attended = connected_quorum` y `absent = total_quorum - connected_quorum` en unidad `Q`. La leyenda queda como conteo de personas y fusiona ausentes + desconectados en "No registrados".
+
+#### 2026-07-04 - Simplificación de gráficos en votaciones y etiquetas de poderes
+
+- `ReportModal.jsx` (`PollDetailView`): se elimina el `ParticipationChart` "Participación sobre asistentes" por redundante y el grid pasa de 3 a 2 columnas.
+- `InformesTab.jsx`: las etiquetas del PDF de poderes pasan a "Coeficiente Propio", "Coeficiente a Representar" y "Coeficiente Total".
+
+### Corregido
+
+#### 2026-09-11 - Enlaces de auto-login que nacían muertos (410 GONE)
+
+- **Problema**: `qr_service.generate_user_qr_data()` generaba el JWT pero **nunca persistía el `jti`** en `tbl_used_auto_login_tokens`. Como el endpoint de auto-login sí valida contra esa tabla, todo enlace nacido por esa vía devolvía 410 al abrirse: correo de bienvenida a residente nuevo (`residential_unit_service.py`), invitaciones vía `email_service.py`, correo de acceso QR (`email_tasks.send_qr_email`) y el endpoint `POST /residents/bulk-qr`.
+- **Solución**: nuevo punto único de registro `SimpleAutoLoginService.register_issued_token()`, por el que pasan **todas** las emisiones de enlaces. Extrae `jti` y `exp` del propio JWT, persiste la fila y revoca los tokens previos del usuario.
+
+#### 2026-09-11 - Usar el enlace de auto-login extendía su vigencia
+
+- **Problema**: cada apertura llamaba `upsert_user_token()` sin `expires_at`, y el valor por defecto empujaba `expires_at` a "ahora + 168 h". El espejo en BD nunca caducaba mientras el enlace se siguiera usando.
+- **Solución**: `consume_token_for_device()` nunca toca `expires_at`.
+- **Además**, el `expires_at` guardado se deriva ahora del `exp` del propio JWT convertido a hora Colombia (nuevo helper `utc_to_colombia()` en `backend/app/utils/timezone_utils.py`). Antes el JWT usaba `datetime.utcnow()` y la BD `colombia_now()`, así que el espejo quedaba 5 horas por delante del token real.
+
+#### 2026-09-11 - El panel del administrador no se actualizaba al escanear un QR
+
+- **Problema**: `meeting_endpoint.py` leía `result["user_id"]` y `result["meeting_id"]`, claves que `register_attendance_by_qr()` no devolvía a nivel raíz (estaban anidadas en `user_info` / `meeting_info`). La condición siempre era falsa y el evento SSE de asistencia nunca se publicaba, a diferencia del flujo de auto-login.
+- **Solución**: `register_attendance_by_qr()` devuelve también `user_id` y `meeting_id` planos.
+
+#### 2026-09-11 - El JWT de auto-login se filtraba a un servicio externo
+
+- **Problema**: `email_service.py` (`send_qr_access_email`) armaba la imagen del QR con `https://api.qrserver.com/v1/create-qr-code/?data={auto_login_url}` cuando no había `qr_base64`, enviando el token de acceso a un tercero en la query string.
+- **Solución**: se elimina el fallback externo; sin imagen se muestra el enlace en texto que la plantilla ya imprime (`email_qr_access.html`, ahora con el bloque del QR condicionado para no dejar una imagen rota).
+
+#### 2026-09-11 - El rate limit de QR nunca se aplicaba
+
+- `backend/app/middleware/rate_limit.py` buscaba el patrón `"/qr/"`, que ninguna ruta real contiene (`/residents/generate-qr-simple`, `/residents/generate-qr-bulk-simple`). Se corrige a `"-qr"`.
+
+#### 2026-09-03 - `expires_at` del token de auto-login desincronizado con el JWT
+
+- El registro en BD no se actualizaba al regenerar el JWT, así que un token válido podía aparecer expirado o al revés.
+  - `simple_auto_login_service.upsert_user_token()` deja de ser no-op cuando el token ya existe y actualiza `expires_at` (e `ip_address` si se pasa); las llamadas en `qr_endpoints.py`, `residential_unit_service.py` y `email_tasks.py` pasan el valor explícitamente.
+
+#### 2026-07-08 - MySQL perdía todos los datos en cada redespliegue
+
+- `k8s/base/mysql/deployment.yaml`: se elimina el `initContainer` `init-mysql` que ejecutaba `rm -rf /var/lib/mysql/*` en cada arranque, el volumen pasa de `emptyDir` a `persistentVolumeClaim: mysql-pvc` y se fija `strategy.type: Recreate` para evitar dos pods montando el mismo PVC.
+
+#### 2026-07-04 - Votos por delegación mal atribuidos en encuestas
+
+- **Problema**: se contaban votos de delegantes cuya delegación se registró **después** de que el delegado ya había votado, y los conteos/porcentajes no incluían las filas inyectadas.
+- **Solución**:
+  - `backend/app/services/pool_service.py` (`_register_delegation_votes`): nuevo paso que consulta `DelegationHistoryModel` y descarta la copia del voto si `dat_delegated_at > primer voto del delegado`.
+  - `poll_endpoint.get_poll_votes`, `administrator.get_polls_report` y `reports_superadmin_endpoint.get_polls_report`: misma validación temporal, se usa `resp.dat_response_at` en vez del `voted_at` del votante, y se acumulan los `injected_delegator_ids` para corregir `unique_voters`.
+  - `frontend/src/components/AdDashboard/PollDetailsModal.jsx`: badge "vía delegado" cuando `vote.is_delegation_vote`.
+
+#### 2026-07-04 - Coeficiente inflado y header del correo de credenciales
+
+- **Problema**: `voting_weight` ya está guardado en escala 0-100, pero el código lo volvía a multiplicar por 100, mostrando coeficientes inflados en el correo del copropietario.
+- **Solución**: se elimina `voting_weight_percent = voting_weight * 100` en `residential_unit_service.py` y `email_tasks.py` (`send_welcome_email`, `send_single_credential_email`), y el formato se unifica a 3 decimales con coma decimal.
+- `backend/app/templates/email_coproprietario_credentials.html`: el header abandona el gradiente violeta y pasa a fondo blanco con borde; el logo pierde el filtro `brightness(0) invert(1)`.
+
+## [1.0.0] - 2026-06-27
+
 ### Añadido
 
 #### 2026-06-27 - Asistencia automática del delegante al ceder poder a un delegado presente
