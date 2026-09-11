@@ -5,15 +5,26 @@ import ProgressNotificationToast from './components/common/ProgressNotificationT
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { RoleBasedRoute } from './components/Auth/RoleBasedRoute';
 import AutoLogin from './components/Auth/AutoLogin';
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import Login from './pages/Login';
-import HomeSA from './pages/HomeSA';
-import AppAdmin from './pages/AdDashboard.jsx'
-import AppCopropietario from './pages/CoDashboard.jsx'
-import PresencialVotingPage from './pages/PresencialVotingPage';
-import NotFound from './pages/NotFound';
 import { Toaster } from 'react-hot-toast';
 import './App.css';
+
+// Los dashboards se cargan bajo demanda: cada uno arrastra sus propias
+// dependencias pesadas (Zoom SDK, chart.js, jsPDF, ExcelJS) y ningún usuario
+// entra a los tres. Login y AutoLogin quedan estáticos por ser la puerta de
+// entrada y no hacer esperar una descarga extra.
+const HomeSA = lazy(() => import('./pages/HomeSA'));
+const AppAdmin = lazy(() => import('./pages/AdDashboard.jsx'));
+const AppCopropietario = lazy(() => import('./pages/CoDashboard.jsx'));
+const PresencialVotingPage = lazy(() => import('./pages/PresencialVotingPage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+const RouteFallback = () => (
+	<div className="w-full min-h-screen flex items-center justify-center">
+		<div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+	</div>
+);
 
 function App() {
 	return (
@@ -23,6 +34,7 @@ function App() {
 			<ProgressNotificationToast />
 			<AppProvider>
 				<div className="w-full min-h-screen overflow-x-hidden">
+					<Suspense fallback={<RouteFallback />}>
 					<Routes>
 						{/* ========================================== */}
 						{/* RUTAS PÚBLICAS (NO REQUIEREN AUTENTICACIÓN) */}
@@ -76,6 +88,7 @@ function App() {
 
 							<Route path="*" element={<NotFound />} />
 					</Routes>
+					</Suspense>
 				</div>
 			</AppProvider>
 		</ProgressNotificationProvider>

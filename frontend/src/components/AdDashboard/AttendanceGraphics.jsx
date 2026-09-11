@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { Chart } from "chart.js/auto";
 import { truncar3 } from "../../utils/numberUtils";
 
 
@@ -10,6 +9,13 @@ const AttendanceChart = ({ title, attended, absent, unit = "" }) => {
   useEffect(() => {
     if (!canvasRef.current || attended == null || absent == null) return;
     if (attended === 0 && absent === 0) return;
+
+    let mounted = true;
+
+    const initChart = async () => {
+    const { default: Chart } = await import("chart.js/auto");
+
+    if (!mounted || !canvasRef.current) return;
 
     const ctx = canvasRef.current;
     const total = attended + absent;
@@ -98,8 +104,12 @@ const AttendanceChart = ({ title, attended, absent, unit = "" }) => {
         }
       }]
     });
+    };
+
+    initChart();
 
     return () => {
+      mounted = false;
       if (chartRef.current) {
         chartRef.current.destroy();
         chartRef.current = null;
